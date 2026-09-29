@@ -1,0 +1,474 @@
+spec_version: 1
+scope: root
+input:
+  kind: payload
+  paths: []
+  sha256: {}
+  summary: >-
+    Base comum do monorepo Orakel-AI-Content/platform (fase 0 do MVP): organização,
+    stack, pacotes compartilhados, CI, configuração e comandos locais. Texto integral
+    em docs/decisions/0001-entrada.md.
+project:
+  name: platform
+  type: [web, api, worker, lib, cli]
+  goal: >-
+    Rede de 5 a 20 sites de conteúdo gerados a partir de uma única base de código
+    (single codebase, multi-instance), com Backoffice próprio, geração de conteúdo
+    com LLM e revisão humana.
+  scale: mvp
+  constraints:
+    - time de 1 pessoa
+    - sem prazo rígido para a fase 0
+    - orçamento de infraestrutura mínimo (planos gratuitos/baratos da Cloudflare + uma VPS pequena)
+    - GitHub Free, repositório privado (2.000 min/mês de Actions)
+    - nenhum segredo de produção no GitHub; CI sem segredos
+    - LGPD — eventos de visitantes anônimos (sem cookie, sem identificador persistente, sem IP armazenado)
+    - fase 0 = ambiente local ponta a ponta em containers, antes do primeiro deploy
+
+decisions:
+  # Bloco 1 – Stack
+  stack.language:
+    {
+      value: TypeScript 6.0 (strict + noUncheckedIndexedAccess),
+      rationale: 'Última versão com API programática; TS 7.0 não roda com typescript-eslint nem astro check até o 7.1',
+      source: input,
+      input_ref: 'Linguagem e runtime',
+    }
+  stack.runtime:
+    {
+      value: Node.js 24.21.0 (LTS),
+      rationale: 'LTS ativo, suporte até 2028-04; Renovate propõe Node 26 após virar LTS em 2026-10-28',
+      source: input,
+      input_ref: 'Linguagem e runtime — versões fixadas; número escolhido no Bloco 1',
+    }
+  stack.framework:
+    {
+      value: not_applicable,
+      rationale: Decidido por unidade (Astro no blog,
+      Next.js no backoffice),
+      source: inferred,
+    }
+  stack.package_manager:
+    {
+      value: pnpm 11.28.2,
+      rationale: 'Maduro, com catalog:; pnpm 12 (reescrita em Rust) ainda recuperando paridade',
+      source: input,
+      input_ref: 'Organização',
+    }
+  stack.repo_organization: { value: monorepo, source: input, input_ref: 'Organização' }
+
+  # Bloco M – Monorepo
+  monorepo.tool:
+    { value: pnpm workspaces + Turborepo 2.11, source: input, input_ref: 'Organização' }
+  monorepo.layout:
+    {
+      value: 'apps/, apps/blog/worker, packages/, adapters/, tooling/, infra/, docker/; escopo @orakel/*',
+      rationale: 'Worker de borda é pacote próprio (@orakel/blog-worker), perto do blog porque é publicado com os assets de cada site',
+      source: user,
+      input_ref: 'Estrutura',
+    }
+  monorepo.internal_packages:
+    {
+      value: fonte TypeScript (exports → src/*.ts),
+      rationale: 'Um só passo de compilação (Vite/Astro, Next transpilePackages, wrangler, Vitest); tokens tem build próprio (CSS + contraste)',
+      source: recommended,
+    }
+  monorepo.boundaries:
+    {
+      value: ESLint no-restricted-imports com presets por camada (domain,
+      ui,
+      adapter,
+      app) + exports + isolamento do pnpm,
+      source: recommended,
+    }
+  monorepo.pipeline:
+    {
+      value: 'dev, build, lint, typecheck, test, test:e2e, test:contract, build:examples, test:a11y, test:parity, db:migrate, db:seed; cache local + actions/cache no CI; turbo --affected',
+      rationale: Cache remoto da Vercel exigiria token (CI sem segredos),
+      source: inferred,
+      input_ref: 'CI',
+    }
+  monorepo.dependency_versions:
+    {
+      value: 'catalog: do pnpm em modo estrito',
+      rationale: Backoffice e build validam o mesmo Zod; uma versão por dependência,
+      source: recommended,
+    }
+  monorepo.images:
+    {
+      value: 'turbo prune --docker por unidade; alvos e tags em docker/docker-bake.hcl (mesmas tags local e produção)',
+      source: inferred,
+      input_ref: 'Comandos — local:images; CI — images.yml',
+    }
+  monorepo.claude_sessions:
+    {
+      value: raiz (principal) com worktrees; unidades com settings.json próprio,
+      source: recommended,
+    }
+
+  # Bloco 2 – Arquitetura
+  architecture.macro:
+    value: >-
+      Três planos: conteúdo (Backoffice Next.js monolito modular + Postgres + S3, na VPS),
+      entrega (sites estáticos na Cloudflare gerados pela imagem site-builder, SSR só para
+      visualização) e eventos (Worker de borda /_e/* → Analytics Engine + fila → agregador).
+      O agregador é entrypoint do backoffice; uma imagem do backoffice serve web, worker,
+      build-runner e aggregator.
+    source: user
+    input_ref: 'Estrutura; packages/events; CI — images.yml'
+  architecture.communication:
+    {
+      value: 'API de exportação NDJSON em streaming (schemaVersion), leitura ao vivo para visualização, Publish API, eventos HTTP /_e/* → AE e Cloudflare Queues',
+      source: input,
+      input_ref: 'packages/content-client, packages/events',
+    }
+  architecture.code_design:
+    {
+      value: 'Domínio em pacotes TS agnósticos de framework, funções puras; adaptador fino por framework; nada de fork por site — o que varia é configuração',
+      source: input,
+      input_ref: 'Design de código',
+    }
+  architecture.folder_structure: { value: aprovada (ver structure.tree), source: user }
+
+  # Bloco 3 – Dados
+  data.persistence:
+    {
+      value: 'PostgreSQL 18.6 (dono do schema: backoffice); armazenamento compatível com S3; Cloudflare Analytics Engine para eventos brutos',
+      source: input,
+      input_ref: 'Linguagem e runtime; Configuração e segredos (S3_*, AE_SQL_*)',
+    }
+  data.access:
+    { value: not_applicable, rationale: Decidido na unidade backoffice, source: inferred }
+  data.migrations:
+    {
+      value: 'backoffice é dono; a raiz chama turbo run db:migrate / db:seed',
+      source: inferred,
+      input_ref: 'Comandos — local:up (sobe e migra)',
+    }
+  data.cache:
+    { value: not_applicable, rationale: Sites estáticos; cache é o da CDN, source: inferred }
+  data.messaging:
+    {
+      value: 'Cloudflare Queues para eventos (formato de @orakel/events); fila de jobs do backoffice decidida na unidade',
+      source: input,
+      input_ref: 'packages/events',
+    }
+
+  # Bloco 4 – Segurança
+  security.authentication:
+    {
+      value: Cloudflare Access na frente do Backoffice (JWT via JWKS); detalhe e modo local na unidade backoffice,
+      source: inferred,
+      input_ref: 'ACCESS_TEAM_DOMAIN, ACCESS_JWKS_URL, ACCESS_AUD',
+    }
+  security.authorization:
+    { value: not_applicable, rationale: Decidido na unidade backoffice, source: inferred }
+  security.validation: { value: Zod, source: inferred, input_ref: 'packages/content-model' }
+  security.config_and_secrets:
+    {
+      value: '.env.example na raiz com todas as variáveis que mudam entre local e produção; .env.local fora do Git; cada unidade valida o ambiente com Zod em src/env.ts e falha no boot',
+      source: input,
+      input_ref: 'Configuração e segredos',
+      provisional: true,
+    }
+
+  # Bloco 5 – UI compartilhada
+  design.design_system:
+    {
+      value: 'Próprio em três camadas: @orakel/tokens → @orakel/elements (Web Components) → @orakel/ui (ilhas React, último recurso)',
+      source: input,
+      input_ref: 'packages/tokens, elements, ui',
+    }
+  design.styling:
+    {
+      value: CSS Modules com variáveis dos tokens; sem CSS-in-JS com runtime,
+      source: input,
+      input_ref: 'packages/ui',
+    }
+  design.tokens:
+    {
+      value: 'Um JSON por tema → variáveis CSS; contraste WCAG AA verificado no build do pacote (falha abaixo de AA)',
+      source: input,
+      input_ref: 'packages/tokens',
+    }
+  design.themes:
+    {
+      value: Um tema por site via configuração; modo escuro decidido na unidade tokens,
+      source: input,
+      input_ref: 'packages/content-model — configuração do site',
+    }
+  design.accessibility:
+    {
+      value: WCAG 2.2 AA; axe no CI,
+      source: input,
+      input_ref: 'packages/tokens; CI — axe',
+      rationale: 'Entrada diz AA; 2.2 é a versão atual (mesma fórmula de contraste)',
+    }
+  design.i18n:
+    {
+      value: Um idioma e um fuso por site (configuração); sem biblioteca de i18n na raiz,
+      source: input,
+      input_ref: 'packages/content-model — configuração do site',
+    }
+  platform.rendering:
+    { value: Estático + SSR de visualização (apps/blog), source: input, input_ref: 'Estrutura' }
+  design.visual_reference:
+    { value: not_applicable, rationale: Decidido nas unidades de UI, source: inferred }
+  design.layout: { value: not_applicable, rationale: Decidido nas unidades de UI, source: inferred }
+  design.icons_assets:
+    { value: not_applicable, rationale: Decidido nas unidades de UI, source: inferred }
+
+  # Bloco 6 – Qualidade
+  quality.tests:
+    {
+      value: 'Vitest (config comum em @orakel/vitest-config); Playwright para E2E e axe; cobertura 90% linhas/branches em content-model, core e events, sem meta nos demais',
+      source: user,
+      input_ref: 'Testes',
+    }
+  quality.lint_format:
+    {
+      value: ESLint 10 (flat config) + typescript-eslint + Prettier 3; configs em tooling/; hook de formatação do Claude,
+      source: input,
+      input_ref: 'Lint e format',
+    }
+  quality.typecheck:
+    { value: tsc --noEmit por pacote, source: input, input_ref: 'Linguagem e runtime' }
+  quality.git_hooks:
+    {
+      value: 'lefthook: pre-commit com Prettier e ESLint --fix nos arquivos staged',
+      source: recommended,
+    }
+  quality.git_conventions:
+    {
+      value: 'main sem proteção; branch <issue>-<slug>; Conventional Commits; squash merge; tags manuais core-vX.Y.Z',
+      source: input,
+      input_ref: 'Git; skill execute do orakel',
+    }
+
+  # Bloco 7 – Operação
+  ops.environments:
+    {
+      value: local e produção (sem staging),
+      source: inferred,
+      input_ref: 'Configuração e segredos — fora delas, local e produção se comportam igual',
+    }
+  ops.observability:
+    {
+      value: 'pino (JSON) nos processos Node; console JSON nos Workers; Sentry (desligado com SENTRY_DSN vazio); heartbeat dos jobs em HEARTBEAT_BASE_URL; sem tracing',
+      source: recommended,
+      input_ref: 'SENTRY_DSN, HEARTBEAT_BASE_URL',
+    }
+  ops.error_handling:
+    {
+      value: 'Domínio devolve erro esperado como valor (união discriminada, estilo safeParse); inesperado lança; bordas traduzem para application/problem+json (RFC 9457) ou código de saída',
+      source: recommended,
+    }
+  ops.container:
+    {
+      value: 'compose base infra/vps/compose.yaml + override infra/local/compose.override.yaml; Postgres 18.6 e SeaweedFS 4.48 presos por tag + digest; comandos pnpm local:*',
+      source: input,
+      input_ref: 'Estrutura; Comandos',
+      provisional: true,
+    }
+  ops.ci:
+    {
+      value: 'GitHub Actions sem segredos: ci.yml (filtros de caminho, turbo --affected, fixtures NDJSON para os sites de exemplo), images.yml (bake → GHCR, tag = SHA, mantém 30 versões), release.yml (tag core-v*), e2e.yml (manual)',
+      source: input,
+      input_ref: 'CI',
+    }
+  ops.deploy:
+    {
+      value: 'Sites e Worker na Cloudflare (wrangler.jsonc gerado por site); backoffice na VPS com compose; OpenTofu e Ansible — gerados no primeiro deploy',
+      source: input,
+      input_ref: 'Estrutura — infra/',
+    }
+  ops.mcp:
+    {
+      value: not_applicable,
+      rationale: Nenhum servidor MCP compartilhado por enquanto,
+      source: user,
+    }
+  ops.orakel_workflow:
+    {
+      value: 'Orakel-AI-Content/workspace; Project Workspace — https://github.com/orgs/Orakel-AI-Content/projects/2',
+      source: inferred,
+      input_ref: 'CLAUDE.md existente',
+    }
+
+  # Fora do catálogo
+  extra.content-model-contract:
+    {
+      value: 'schemaVersion = 1 + lista de recursos suportados (tipos de bloco, presets, variantes, perfil de imagem); blocos iniciais texto (rich text restrito), sumário, citação, imagem (alt obrigatório ou decorativa), FAQ; todo bloco tem type e n estável nunca reutilizado; validação semântica além do schema; evolução aditiva dentro da versão, mudança incompatível cria a próxima; parse ignora campos desconhecidos',
+      source: input,
+      input_ref: 'packages/content-model',
+    }
+  extra.site-config:
+    {
+      value: 'domínios, idioma, fuso, flag indexavel, tema, presets por tipo de página, variantes, feature flags, sobrescrita da lista de crawlers, textos institucionais, integrações',
+      source: input,
+      input_ref: 'packages/content-model',
+    }
+  extra.seo-core:
+    {
+      value: 'title, description, canonical, Open Graph, JSON-LD Article/BreadcrumbList/Person/Organization, sitemap, RSS, robots.txt, _redirects, _headers — funções puras com testes',
+      source: input,
+      input_ref: 'packages/core',
+    }
+  extra.events-format:
+    {
+      value: 'formato versionado: payload, layout posicional do Analytics Engine, mensagem de fila',
+      source: input,
+      input_ref: 'packages/events',
+    }
+  extra.release-policy:
+    {
+      value: 'tag manual core-vX.Y.Z; major muda o schema da API ou exige migração de configuração; minor funcionalidades; patch correções; merge na main não cria release',
+      source: input,
+      input_ref: 'Git',
+    }
+  extra.dependency-policy:
+    {
+      value: 'Renovate; segurança em até 7 dias; críticas de Next.js ou React em até 48 h',
+      source: input,
+      input_ref: 'Dependências',
+    }
+  extra.ci-quality-gates:
+    {
+      value: 'orçamento de JS nos sites de exemplo; paridade estático × SSR; axe; teste de contrato da API de exportação',
+      source: input,
+      input_ref: 'CI',
+    }
+  extra.env-vars:
+    {
+      value: 'ACCESS_TEAM_DOMAIN, ACCESS_JWKS_URL, ACCESS_AUD, S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, DEPLOY_TARGET, AE_SQL_TRANSPORT, AE_SQL_URL, IMAGE_REGISTRY, BR_BACKUP_ENDPOINT, HEARTBEAT_BASE_URL, SENTRY_DSN, LIGHTHOUSE_PROVIDER',
+      source: input,
+      input_ref: 'Configuração e segredos',
+      provisional: true,
+    }
+
+commands:
+  install: pnpm install
+  dev: pnpm dev
+  build: pnpm build
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  format: pnpm format
+  filter: 'pnpm turbo run <tarefa> --filter=@orakel/<nome>'
+  local_up: pnpm local:up
+  local_seed: pnpm local:seed
+  local_down: pnpm local:down
+  local_reset: pnpm local:reset
+  local_images: pnpm local:images
+  local_e2e: pnpm local:e2e
+
+structure:
+  tree: |
+    platform/
+    ├── CLAUDE.md  README.md  package.json  pnpm-workspace.yaml  turbo.json
+    ├── .nvmrc  lefthook.yml  renovate.json  eslint.config.js   # config do pnpm fica em pnpm-workspace.yaml
+    ├── .env.example  .gitignore  .worktreeinclude  .prettierignore
+    ├── .claude/{settings.json, rules/}
+    ├── apps/                 # unidades: blog, blog/worker, backoffice, generator
+    ├── packages/             # unidades: content-model, content-client, core, tokens, elements, events, ui
+    ├── adapters/             # unidade: astro
+    ├── tooling/{tsconfig, eslint-config, prettier-config, vitest-config}   # + build-site (unidade)
+    ├── infra/{vps/compose.yaml, local/{compose.override.yaml, compose.sh}}
+    ├── docker/{docker-bake.hcl, bake.sh}   # + site-builder/Dockerfile (com a unidade build-site)
+    ├── .github/workflows/{ci, images, release, e2e, add-to-project}.yml
+    └── docs/
+  paths:
+    tooling: tooling/
+    infra: infra/
+    docker: docker/
+    workflows: .github/workflows/
+
+units:
+  - {
+      name: blog,
+      path: apps/blog,
+      type: web,
+      role: 'App Astro dos sites, parametrizado por SITE_ID (estático + SSR de visualização)',
+      status: planned,
+    }
+  - {
+      name: blog-worker,
+      path: apps/blog/worker,
+      type: worker,
+      role: 'Worker de borda da rota /_e/* (eventos → Analytics Engine + fila)',
+      status: planned,
+    }
+  - {
+      name: backoffice,
+      path: apps/backoffice,
+      type: [web, api, worker],
+      role: 'Next.js: UI, Publish API, API de exportação; entrypoints backoffice-worker, build-runner e aggregator',
+      status: planned,
+    }
+  - {
+      name: generator,
+      path: apps/generator,
+      type: worker,
+      role: 'Motor de geração de conteúdo com LLM (fase 2)',
+      status: planned,
+    }
+  - {
+      name: content-model,
+      path: packages/content-model,
+      type: lib,
+      role: 'Schemas Zod do conteúdo e da configuração de site; schemaVersion e validação semântica',
+      status: planned,
+    }
+  - {
+      name: content-client,
+      path: packages/content-client,
+      type: lib,
+      role: 'Cliente da API de exportação: loader do Content Layer do Astro (subcaminho /astro) e leitura ao vivo',
+      status: planned,
+    }
+  - {
+      name: core,
+      path: packages/core,
+      type: lib,
+      role: 'SEO, sitemap, RSS, robots.txt, _redirects, _headers — funções puras',
+      status: planned,
+    }
+  - {
+      name: tokens,
+      path: packages/tokens,
+      type: lib,
+      role: 'Temas JSON → variáveis CSS com verificação de contraste WCAG AA',
+      status: planned,
+    }
+  - { name: elements, path: packages/elements, type: lib, role: 'Web Components', status: planned }
+  - {
+      name: events,
+      path: packages/events,
+      type: lib,
+      role: 'Formato versionado dos eventos (payload, layout do AE, mensagem de fila)',
+      status: planned,
+    }
+  - {
+      name: ui,
+      path: packages/ui,
+      type: lib,
+      role: 'Ilhas React com CSS Modules, só quando CSS e Web Component não resolvem',
+      status: planned,
+    }
+  - { name: astro, path: adapters/astro, type: lib, role: 'Integração Astro', status: planned }
+  - {
+      name: build-site,
+      path: tooling/build-site,
+      type: cli,
+      role: 'Entrypoints render e publish; gera o wrangler.jsonc de cada site; base da imagem docker/site-builder',
+      status: planned,
+    }
+
+open_questions:
+  - 'Provedor S3 de produção (R2?) — decidir no primeiro deploy'
+  - 'Onde ficam os segredos de produção (VPS/Ansible, Cloudflare) — decidir no primeiro deploy'
+  - 'Nomes das variáveis de ambiente e dos comandos local:* são proposta — confirmar ao implementar as unidades'
+  - 'Atualizar para Node 26 após 2026-10-28 (LTS) e para TypeScript 7.1 quando o typescript-eslint suportar'
+  - 'Modo escuro — decidir na unidade tokens'
+  - 'Autenticação Cloudflare Access no ambiente local — decidir na unidade backoffice'
+  - 'Fixtures NDJSON dos sites de exemplo: onde ficam e como o stub as serve — decidir nas unidades content-model e blog'

@@ -1,0 +1,27 @@
+# Dependências e caches
+node_modules/
+.turbo/
+.pnpm-store/
+
+# Saídas de build e testes
+dist/
+dist-examples/
+coverage/
+.next/
+.astro/
+.wrangler/
+playwright-report/
+test-results/
+
+# Ambiente e segredos (use .env.example como referência)
+.env
+.env.local
+.env.*.local
+
+# Claude Code — arquivos pessoais
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Sistema
+.DS_Store
+*.log

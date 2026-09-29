@@ -1,0 +1,12 @@
+# Git hooks (ADR 0007). Instalados pelo script "prepare" no pnpm install.
+pre-commit:
+  parallel: true
+  jobs:
+    - name: prettier
+      glob: '*'
+      run: pnpm exec prettier --write --ignore-unknown {staged_files}
+      stage_fixed: true
+    - name: eslint
+      glob: '*.{js,mjs,cjs,ts,mts,cts,tsx,astro}'
+      run: pnpm exec eslint --fix --no-warn-ignored {staged_files}
+      stage_fixed: true

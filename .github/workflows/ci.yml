@@ -1,0 +1,156 @@
+# CI de todo PR e da main (ADR 0008). Sem segredos. Roda só o que o commit afetou:
+# filtros de caminho escolhem os jobs e o `turbo --affected` escolhe os pacotes.
+# Jobs cujas tarefas nenhuma unidade define ainda terminam sem executar nada.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+
+jobs:
+  changes:
+    name: Filtros de caminho
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      sites: ${{ steps.filter.outputs.sites }}
+      backoffice: ${{ steps.filter.outputs.backoffice }}
+      infra: ${{ steps.filter.outputs.infra }}
+      workspace: ${{ steps.filter.outputs.workspace }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          # O que não casa com nenhum grupo (docs/**, *.md) é "só documentação": nenhum job roda.
+          filters: |
+            sites:
+              - 'apps/blog/**'
+              - 'packages/**'
+              - 'adapters/**'
+              - 'tooling/**'
+            backoffice:
+              - 'apps/backoffice/**'
+              - 'apps/generator/**'
+              - 'packages/**'
+              - 'tooling/**'
+            infra:
+              - 'infra/**'
+              - 'docker/**'
+            workspace:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+              - '.nvmrc'
+              - 'eslint.config.js'
+              - '.github/workflows/ci.yml'
+
+  quality:
+    name: Lint, tipos e testes
+    needs: changes
+    if: needs.changes.outputs.sites == 'true' || needs.changes.outputs.backoffice == 'true' || needs.changes.outputs.workspace == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
+      - run: pnpm format:check
+      - run: pnpm turbo run lint typecheck test //#lint:root --affected
+
+  contract:
+    name: Contrato da API de exportação
+    needs: changes
+    if: needs.changes.outputs.backoffice == 'true' || needs.changes.outputs.workspace == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: orakel
+          POSTGRES_PASSWORD: orakel-ci
+          POSTGRES_DB: orakel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orakel -d orakel"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      POSTGRES_USER: orakel
+      POSTGRES_PASSWORD: orakel-ci
+      POSTGRES_DB: orakel
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run test:contract --affected
+
+  sites:
+    name: Sites de exemplo (orçamento de JS, axe, paridade)
+    needs: changes
+    if: needs.changes.outputs.sites == 'true' || needs.changes.outputs.workspace == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
+      # Os sites de exemplo são construídos a partir das fixtures NDJSON versionadas (ADR 0005).
+      - name: Navegador do Playwright
+        if: hashFiles('apps/blog/package.json') != ''
+        run: pnpm --filter @orakel/blog exec playwright install --with-deps chromium
+      - run: pnpm turbo run build:examples test:a11y test:parity --affected
+
+  infra:
+    name: Compose e imagens
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Compose válido
+        run: |
+          cp .env.example .env.local
+          infra/local/compose.sh config --quiet
+      - name: Alvos do bake válidos
+        run: docker/bake.sh default --print

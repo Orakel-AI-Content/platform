@@ -1,0 +1,47 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "agentGuidance": false,
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {},
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test:contract": {
+      "dependsOn": ["^build"]
+    },
+    "build:examples": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist-examples/**"]
+    },
+    "test:a11y": {
+      "dependsOn": ["build:examples"]
+    },
+    "test:parity": {
+      "dependsOn": ["build:examples"]
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "db:migrate": {
+      "cache": false
+    },
+    "db:seed": {
+      "cache": false
+    },
+    "//#lint:root": {}
+  }
+}

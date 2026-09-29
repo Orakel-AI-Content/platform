@@ -1,0 +1,43 @@
+{
+  "name": "@orakel/platform",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.28.2",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.21.0",
+      "onFail": "download"
+    }
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint //#lint:root",
+    "lint:root": "eslint *.js tooling/prettier-config",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "local:up": "infra/local/compose.sh up --detach --wait && turbo run db:migrate",
+    "local:seed": "turbo run db:seed",
+    "local:down": "infra/local/compose.sh down",
+    "local:reset": "infra/local/compose.sh down --volumes --remove-orphans",
+    "local:images": "docker/bake.sh",
+    "local:e2e": "turbo run test:e2e",
+    "prepare": "lefthook install"
+  },
+  "prettier": "@orakel/prettier-config",
+  "devDependencies": {
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/prettier-config": "workspace:*",
+    "eslint": "catalog:",
+    "lefthook": "catalog:",
+    "prettier": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
+  }
+}

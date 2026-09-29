@@ -1,0 +1,29 @@
+packages:
+  - apps/*
+  - apps/blog/worker
+  - packages/*
+  - adapters/*
+  - tooling/*
+
+# Uma versão por dependência no repositório (ADR 0003).
+# Adicione aqui primeiro e use "catalog:" no package.json da unidade.
+catalogMode: strict
+catalog:
+  '@eslint/js': 10.0.1
+  '@types/node': 24.19.0
+  '@vitest/coverage-v8': 5.0.2
+  eslint: 10.11.0
+  eslint-config-prettier: 10.1.8
+  globals: 17.12.0
+  lefthook: 2.1.14
+  prettier: 3.9.9
+  turbo: 2.11.5
+  typescript: 6.0.3
+  typescript-eslint: 8.71.0
+  vitest: 5.0.2
+
+engineStrict: true
+# Espera 24 h antes de instalar versões recém-publicadas (padrão do pnpm 11, explícito aqui).
+minimumReleaseAge: 1440
+allowBuilds:
+  lefthook: true
