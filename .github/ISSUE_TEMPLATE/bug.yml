@@ -1,0 +1,29 @@
+name: Bug
+description: Defeito em comportamento existente
+type: Bug
+body:
+  - type: textarea
+    id: sintoma
+    attributes:
+      label: Sintoma
+      description: O que acontece de errado, do ponto de vista de quem usa.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducao
+    attributes:
+      label: Reprodução
+      description: Passos, entrada e ambiente. Se não conseguiu reproduzir, diga isso.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Comportamento esperado
+    validations:
+      required: true
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidência
+      description: Log, stack trace, print, teste que falha.

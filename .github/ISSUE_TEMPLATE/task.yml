@@ -1,0 +1,40 @@
+name: Task
+description: Unidade de trabalho neste repositório
+type: Task
+body:
+  - type: input
+    id: story
+    attributes:
+      label: Story
+      description: URL da issue de planejamento (pai), se houver. Task criada direto neste repositório não tem.
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto
+      description: Uma frase. Por que isso existe.
+    validations:
+      required: true
+  - type: textarea
+    id: escopo
+    attributes:
+      label: Escopo
+      description: O que muda neste repositório. Arquivos e módulos prováveis.
+    validations:
+      required: true
+  - type: textarea
+    id: fora
+    attributes:
+      label: Fora de escopo
+  - type: textarea
+    id: aceite
+    attributes:
+      label: Critérios de aceite
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: direcao
+    attributes:
+      label: Direção técnica
