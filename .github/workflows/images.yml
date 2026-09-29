@@ -1,0 +1,67 @@
+# Imagens do backoffice e serviços no GHCR a cada merge na main (ADR 0008).
+# Tag = SHA do commit; mesmas tags do `pnpm local:images`. Usa só o GITHUB_TOKEN.
+# Sem alvos no grupo "images" do docker/docker-bake.hcl, termina sem construir nada.
+name: Images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/backoffice/**'
+      - 'apps/generator/**'
+      - 'packages/**'
+      - 'tooling/**'
+      - 'docker/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/images.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: images
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Construir e publicar
+    runs-on: ubuntu-latest
+    outputs:
+      names: ${{ steps.list.outputs.names }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bake do grupo images
+        env:
+          TAG: ${{ github.sha }}
+        run: docker/bake.sh images --push --set '*.cache-from=type=gha' --set '*.cache-to=type=gha,mode=max'
+      - name: Nomes das imagens
+        id: list
+        run: |
+          names=$(docker buildx bake --file docker/docker-bake.hcl --print images 2>/dev/null \
+            | jq -c '[.target[].tags[] | capture("/(?<n>[^/:]+):").n] | unique' || echo '[]')
+          echo "names=${names:-[]}" >> "$GITHUB_OUTPUT"
+
+  prune:
+    name: Manter as 30 versões mais recentes
+    needs: build
+    if: needs.build.outputs.names != '[]' && needs.build.outputs.names != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        name: ${{ fromJSON(needs.build.outputs.names) }}
+    steps:
+      - uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: ${{ matrix.name }}
+          package-type: container
+          min-versions-to-keep: 30

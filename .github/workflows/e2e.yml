@@ -1,0 +1,41 @@
+# E2E completo (ADR 0008): só manual. Sobe o ambiente local em containers, como no
+# `pnpm local:up`, e roda `pnpm local:e2e`.
+name: E2E
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+
+jobs:
+  e2e:
+    name: E2E ponta a ponta
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env.local
+      - run: pnpm local:up
+      - run: pnpm local:seed
+      - name: Navegador do Playwright
+        if: hashFiles('apps/blog/package.json') != ''
+        run: pnpm --filter @orakel/blog exec playwright install --with-deps chromium
+      - run: pnpm local:e2e
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playwright-report
+          path: '**/playwright-report/'
+          if-no-files-found: ignore
+      - if: always()
+        run: pnpm local:down

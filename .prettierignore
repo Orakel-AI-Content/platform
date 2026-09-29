@@ -1,0 +1,11 @@
+pnpm-lock.yaml
+.agents/
+.claude/skills/
+skills-lock.json
+**/dist/
+**/dist-examples/
+**/coverage/
+**/.turbo/
+**/.next/
+**/.astro/
+**/.wrangler/
