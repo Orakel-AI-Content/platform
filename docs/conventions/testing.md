@@ -34,6 +34,8 @@ export default mergeConfig(baseConfig, withCoverageThreshold(90)); // só nos pa
 
 - Conteúdo de exemplo em **NDJSON versionado**, válido contra o `content-model`. As
   mesmas fixtures alimentam os sites de exemplo no CI e o teste de contrato.
+- Ficam em `packages/content-model/fixtures/v<n>/`, expostas por
+  `@orakel/content-model/fixtures/v<n>/*`; o teste do pacote valida cada uma.
 - Mudou o schema? Atualize as fixtures no mesmo PR.
 
 ## Como rodar

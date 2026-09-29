@@ -1,0 +1,209 @@
+spec_version: 1
+scope: unit
+inherits: ../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: 06f9e91d0f9ae0efd7f1dfd90077bff69d0dba6e39a0010dbbdbd35d7ca4f44b
+  summary: >-
+    Linha packages/content-model do bloco de scaffold do monorepo (12.0, seção 11.1) mais a
+    etapa L1 do mesmo documento (seção 6) como entrada complementar. Texto em
+    docs/decisions/0001-entrada.md.
+project:
+  name: content-model
+  type: [lib]
+  goal: >-
+    Contrato único de conteúdo e configuração de site: o Backoffice valida o que envia e o
+    build valida o que consome, com schemas Zod versionados, recursos suportados por versão
+    e validação semântica.
+  scale: mvp
+
+decisions:
+  # Bloco 0/1
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime:
+    {
+      value: sem runtime próprio (fonte TS compilada por quem consome),
+      source: inferred,
+      input_ref: 'ADR 0003 da raiz — pacotes internos como fonte TypeScript',
+    }
+  stack.framework:
+    {
+      value: not_applicable,
+      rationale: 'Lib sem framework; dependência principal Zod 4.6.5 (JSON Schema nativo)',
+      source: recommended,
+      input_ref: '11.1 — "Schemas Zod"',
+    }
+
+  # Bloco 2
+  architecture.macro:
+    {
+      value: 'Pacote de domínio compartilhado, dono do contrato de conteúdo e configuração; consumidores: backoffice, content-client, blog, build-site',
+      source: input,
+      input_ref: '11.1; mapa de contratos da raiz',
+    }
+  architecture.communication:
+    {
+      value: 'Expõe schemas, tipos, schemaVersion, recursos suportados, SnapshotLineSchema e validação semântica; não consome pacotes internos',
+      source: input,
+      input_ref: '11.1; L1',
+    }
+  architecture.code_design:
+    {
+      value: 'Camada domain, funções puras; validação semântica devolve Result ({ ok, issues }) e nunca lança; objetos com o comportamento padrão do Zod 4 (descarta chave desconhecida)',
+      source: inherited,
+      input_ref: 'ADR 0003 e 0008 da raiz; 11.1 — "o parse ignora campos desconhecidos"',
+    }
+  architecture.versioning:
+    {
+      value: 'Pasta por versão (src/v1/…) com subcaminho @orakel/content-model/v1; o "." só com SUPPORTED_SCHEMA_VERSIONS, Result e Issue; versão antiga só recebe mudanças aditivas; removida quando nenhum site depende dela',
+      source: recommended,
+      input_ref: '11.1 — "mudança incompatível cria a versão seguinte"; N-1 da raiz',
+    }
+  architecture.snapshot_lines:
+    {
+      value: 'SnapshotLineSchema por versão: união discriminada por type — header (schemaVersion, site, pendingChangeIds), { type, data } por entidade, end (counts)',
+      source: recommended,
+      input_ref: 'L1 — API de exportação v1',
+    }
+  architecture.identifiers_language:
+    {
+      value: 'Estrutura (campos, type) em inglês; valores escolhidos na configuração em português; indexavel mantido',
+      source: recommended,
+    }
+  architecture.folder_structure: { value: aprovada (ver structure.tree), source: user }
+
+  # Bloco U
+  integration.path: { value: packages/content-model, source: inferred }
+  integration.name: { value: '@orakel/content-model', source: inferred }
+  integration.dependencies:
+    {
+      value: 'zod (catalog:); sem dependências internas em runtime; devDependencies @orakel/tsconfig, eslint-config e vitest-config',
+      source: inferred,
+    }
+  integration.tasks: { value: 'lint, typecheck, test (sem build)', source: inferred }
+  integration.ci: { value: 'coberto pelo filtro packages/** do ci.yml', source: inherited }
+  integration.compose: { value: not_applicable, rationale: Sem processo, source: inferred }
+  integration.env: { value: not_applicable, rationale: Sem variáveis de ambiente, source: inferred }
+
+  # Blocos 3 e 4
+  data.persistence: { value: not_applicable, rationale: Pacote sem persistência, source: inferred }
+  security.authentication: { value: not_applicable, rationale: Lib, source: inferred }
+  security.authorization: { value: not_applicable, rationale: Lib, source: inferred }
+  security.validation: { value: Zod 4.6.5, source: input, input_ref: '11.1' }
+  security.config_and_secrets: { value: not_applicable, rationale: Lib, source: inferred }
+
+  # Bloco 5 (lib como pacote interno)
+  lib.consumption: { value: fonte TypeScript via exports, source: inherited }
+  lib.public_api: { value: 'exports ".", "./v1", "./fixtures/v1/*"', source: recommended }
+  lib.publication:
+    { value: not_applicable, rationale: Pacote interno, não publicado, source: inherited }
+  design: { value: not_applicable, rationale: Não é lib de UI, source: inferred }
+
+  # Bloco 6
+  quality.tests:
+    {
+      value: 'Vitest; testes de cada schema, de cada regra semântica e de todas as fixtures; 90% de linhas e branches',
+      source: inherited,
+    }
+  quality.lint_format: { value: "ESLint layer('domain') + Prettier", source: inherited }
+  quality.typecheck: { value: tsc --noEmit, source: inherited }
+  quality.git_hooks: { value: lefthook (raiz), source: inherited }
+  quality.git_conventions:
+    {
+      value: 'Conventional Commits, escopo content-model; schema incompatível = major do core',
+      source: inherited,
+    }
+
+  # Bloco 7
+  ops.container:
+    {
+      value: 'Dockerfile só de teste (turbo prune → install → lint, typecheck, test); alvo content-model-test no bake, fora dos grupos images e release; fora do CI',
+      rationale: Teste reproduzível em ambiente limpo,
+      pedido pelo usuário,
+      source: user,
+    }
+  ops.error_handling: { value: 'Result com Issue; só bug lança', source: inherited }
+  ops.observability: { value: not_applicable, rationale: Sem processo, source: inferred }
+  ops.deploy:
+    {
+      value: not_applicable,
+      rationale: Não é publicado; chega ao ar dentro das imagens de quem consome,
+      source: inferred,
+    }
+
+  # Fora do catálogo
+  extra.site-config:
+    {
+      value: 'siteId, name, domains (o primeiro é o principal), language, timeZone, indexavel, theme, presets por tipo de página, variants por componente, featureFlags, crawlers (allow/block), institutionalTexts, integrations.ga4',
+      source: input,
+      input_ref: '11.1; L1',
+      provisional: true,
+    }
+  extra.block-catalog:
+    {
+      value: 'text (rich text restrito: paragraph, heading h2/h3, list; marcas bold/italic/code; link), toc, quote, image (alt ou decorative), faq; todo bloco com type e n',
+      source: input,
+      input_ref: '11.1; L1',
+    }
+  extra.rich-text:
+    {
+      value: 'Árvore própria e pequena, independente do editor do Backoffice',
+      source: recommended,
+      provisional: true,
+    }
+  extra.resources-v1:
+    {
+      value: 'blockTypes text/toc/quote/image/faq; presets padrao em home/artigo/categoria/autor; variants.articleCard vertical/horizontal; imageProfile 320/640/960/1280/1920 × avif/webp',
+      source: user,
+      input_ref: 'L1 — perfil de imagem v1 (proposta)',
+      provisional: true,
+    }
+  extra.semantic-validation:
+    {
+      value: 'estrutura do snapshot (header, end, uma config, contagens), referências a autor/taxonomia/mídia, slugs únicos por site e colisão com redirect, n único no artigo, recursos suportados (presets, variantes, tipos de bloco, variantes de imagem do perfil)',
+      source: input,
+      input_ref: '11.1; L1',
+    }
+  extra.fixtures:
+    {
+      value: 'fixtures/v1/exemplo-a.ndjson e exemplo-b.ndjson, expostas por exports e validadas por teste do pacote',
+      source: user,
+      rationale: 'Diverge da entrada do blog (apps/blog/fixtures/): backoffice e content-client também as usam (ADR 0003 da unidade)',
+    }
+
+commands:
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  test: pnpm test
+  test_one: pnpm vitest run <caminho>
+  from_root: pnpm turbo run lint typecheck test --filter=@orakel/content-model
+  docker_test: docker buildx bake content-model-test
+
+structure:
+  tree: |
+    packages/content-model/
+    ├── CLAUDE.md  README.md  package.json  tsconfig.json  eslint.config.js  vitest.config.ts  Dockerfile
+    ├── .claude/{settings.json, rules/{schema,semantic,fixtures}.md}
+    ├── docs/{README.md, project-spec.yaml, architecture/, conventions/testing.md, decisions/}
+    ├── fixtures/v1/{exemplo-a,exemplo-b}.ndjson
+    └── src/
+        ├── index.ts  result.ts  fixtures.test.ts
+        └── v1/
+            ├── index.ts  version.ts  resources.ts  common.ts  snapshot.ts  test-builders.ts
+            ├── blocks/{index,base,rich-text,text,toc,quote,image,faq}.ts
+            ├── entities/{index,site-config,author,taxonomy,menu,media,redirect,content}.ts
+            └── semantic/{index,types}.ts + rules/{snapshot-structure,references,unique-slugs,unique-block-n,supported-resources}.ts
+  paths:
+    schemas: src/v1/
+    semantic: src/v1/semantic/
+    fixtures: fixtures/
+
+open_questions:
+  - 'Formato do rich text do bloco text (árvore própria) — confirmar com o editor escolhido no backoffice (TipTap ou Lexical)'
+  - 'Forma exata dos campos de configuração e entidades além dos nomes da entrada (ex.: integrações só com GA4) — confirmar nas unidades backoffice e blog'
+  - 'Presets e variantes além do mínimo — acrescentados pelo blog como mudança aditiva da v1'
+  - 'Perfil de imagem v1 é proposta — calibrar na fase 0'
+  - 'Termos novos (recursos suportados, linha do snapshot, fixture) no glossário da raiz — não estavam nos diffs aprovados'
