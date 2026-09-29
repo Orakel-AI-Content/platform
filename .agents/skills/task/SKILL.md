@@ -240,8 +240,13 @@ Em modo não-interativo, não peça aprovação — siga direto para a Fase 5.
      --type Task \
      --title "<título curto, no imperativo>" \
      --body-file <arquivo com o corpo aprovado> \
-     --project "<Nome do Project>"
+     --project "<Nome do Project>" \
+     --assignee @me
    ```
+
+   `--assignee @me` atribui a issue a quem rodou a skill — o usuário
+   autenticado no `gh`, também quando a skill roda como subagente do
+   `/refine`.
 
    Acrescente `--parent <URL da issue de planejamento>` quando houver pai, e
    `--label sem-spec` quando a Fase 4 tiver marcado assim. Se a Fase 2 ou o

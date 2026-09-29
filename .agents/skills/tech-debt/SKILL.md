@@ -261,8 +261,13 @@ a Fase 5.
      --label tech-debt \
      --title "<título curto, no imperativo>" \
      --body-file <arquivo com o corpo aprovado> \
-     --project "<Nome do Project>"
+     --project "<Nome do Project>" \
+     --assignee @me
    ```
+
+   `--assignee @me` atribui a issue a quem rodou a skill — o usuário
+   autenticado no `gh`, também quando a skill roda como subagente do
+   `/refine`.
 
    O label `tech-debt` é obrigatório — é ele que torna a dívida visível e
    mensurável no board, do mesmo jeito que o `/planning` já marca Story de

@@ -271,8 +271,13 @@ a Fase 6.
      --type Bug \
      --title "<título curto: o sintoma, não a causa>" \
      --body-file <arquivo com o corpo aprovado> \
-     --project "<Nome do Project>"
+     --project "<Nome do Project>" \
+     --assignee @me
    ```
+
+   `--assignee @me` atribui a issue a quem rodou a skill — o usuário
+   autenticado no `gh`, também quando a skill roda como subagente do
+   `/refine`.
 
    Acrescente `--parent <URL da issue de planejamento>` quando houver pai, e
    `--label sem-spec` quando a Fase 5 tiver marcado assim.
