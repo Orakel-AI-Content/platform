@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "bug": {
+      "source": "andersoncouto/orakel",
+      "sourceType": "github",
+      "skillPath": "skills/bug/SKILL.md",
+      "computedHash": "cb3929e45c4be4de49ee9dd705a470d51909fec3d445de4eb22ce302f89a84d4"
+    },
+    "execute": {
+      "source": "andersoncouto/orakel",
+      "sourceType": "github",
+      "skillPath": "skills/execute/SKILL.md",
+      "computedHash": "5b7f4acf063dbfd81ceac973c95aed412be5231db4bfc66bdaa82eb227561663"
+    },
+    "spec": {
+      "source": "andersoncouto/orakel",
+      "sourceType": "github",
+      "skillPath": "skills/spec/SKILL.md",
+      "computedHash": "d24bcdea2968014ab251fbd8a69883546129f442aa8fcc84236f69db8ddba0dd"
+    },
+    "task": {
+      "source": "andersoncouto/orakel",
+      "sourceType": "github",
+      "skillPath": "skills/task/SKILL.md",
+      "computedHash": "b400e78454016fce1542a04e0c48afcf589cd5f4a58b3f9e316c028bf8af0cfd"
+    },
+    "tech-debt": {
+      "source": "andersoncouto/orakel",
+      "sourceType": "github",
+      "skillPath": "skills/tech-debt/SKILL.md",
+      "computedHash": "0e6ab76b53d48e9f5e6d71478ccee156e9131f337cd4e41c3cb7b00d343fd7f7"
+    }
+  }
+}
