@@ -417,7 +417,7 @@ units:
       path: packages/content-model,
       type: lib,
       role: 'Schemas Zod do conteúdo e da configuração de site; schemaVersion e validação semântica',
-      status: planned,
+      status: generated,
     }
   - {
       name: content-client,
@@ -471,4 +471,4 @@ open_questions:
   - 'Atualizar para Node 26 após 2026-10-28 (LTS) e para TypeScript 7.1 quando o typescript-eslint suportar'
   - 'Modo escuro — decidir na unidade tokens'
   - 'Autenticação Cloudflare Access no ambiente local — decidir na unidade backoffice'
-  - 'Fixtures NDJSON dos sites de exemplo: onde ficam e como o stub as serve — decidir nas unidades content-model e blog'
+  - 'Como o blog lê as fixtures NDJSON de @orakel/content-model/fixtures/v1 nos sites de exemplo — decidir na unidade blog'

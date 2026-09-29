@@ -27,6 +27,15 @@ target "_base" {
   }
 }
 
+# Imagens só de teste: fora dos grupos "images" e "release" (não são publicadas nem
+# rodam no images.yml). Uso: docker buildx bake content-model-test
+target "content-model-test" {
+  inherits   = ["_base"]
+  dockerfile = "packages/content-model/Dockerfile"
+  target     = "test"
+  output     = ["type=cacheonly"]
+}
+
 # Grupos: crie-os junto com o primeiro alvo de cada um (grupo vazio é erro no bake).
 #
 #   group "images"  { targets = ["backoffice"] }    # backoffice e serviços, a cada merge na main

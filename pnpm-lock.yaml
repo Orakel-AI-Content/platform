@@ -42,6 +42,9 @@ catalogs:
     vitest:
       specifier: 5.0.2
       version: 5.0.2
+    zod:
+      specifier: 4.6.5
+      version: 4.6.5
 
 importers:
 
@@ -71,6 +74,34 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+
+  packages/content-model:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@orakel/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint-config
+      '@orakel/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
+      '@orakel/vitest-config':
+        specifier: workspace:*
+        version: link:../../tooling/vitest-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
+      eslint:
+        specifier: 'catalog:'
+        version: 10.11.0
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@types/node@24.19.0)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@24.19.0))
 
   tooling/eslint-config:
     dependencies:
@@ -1196,6 +1227,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+
 snapshots:
 
   '@babel/helper-string-parser@7.29.7': {}
@@ -1981,3 +2015,5 @@ snapshots:
   word-wrap@1.2.5: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.6.5: {}

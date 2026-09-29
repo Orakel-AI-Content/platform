@@ -1,0 +1,13 @@
+# Contexto dos builds de imagem (a partir da raiz): sem dependências, saídas nem segredos.
+**/node_modules
+**/.turbo
+**/dist
+**/dist-examples
+**/coverage
+**/.next
+**/.astro
+**/.wrangler
+.git
+.env
+.env.*
+!.env.example

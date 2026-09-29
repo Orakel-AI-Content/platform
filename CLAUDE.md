@@ -19,9 +19,12 @@ sites é configuração.
 
 ## Unidades
 
-Nenhuma gerada ainda. Previstas (gere com `/scaffold` no caminho da unidade):
+Geradas:
 
 - `packages/content-model` – schemas Zod de conteúdo e configuração de site
+
+Previstas (gere com `/scaffold` no caminho da unidade):
+
 - `packages/content-client` – cliente da API de exportação (loader Astro, leitura ao vivo)
 - `packages/core` – SEO, sitemap, RSS, robots, `_redirects`, `_headers`
 - `packages/tokens` – temas → variáveis CSS com contraste AA
