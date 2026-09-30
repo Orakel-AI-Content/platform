@@ -48,9 +48,22 @@ group "images" {
   targets = ["backoffice"]
 }
 
-# Até existir o grupo "release" (site-builder), o default é só "images".
+# A release do core (ADR 0005): publicada pelo release.yml na tag core-vX.Y.Z, com TAG=X.Y.Z.
+target "site-builder" {
+  inherits   = ["_base"]
+  dockerfile = "docker/site-builder/Dockerfile"
+  tags       = tags("site-builder")
+  args = {
+    RELEASE = TAG
+  }
+}
+
+group "release" {
+  targets = ["site-builder"]
+}
+
 group "default" {
-  targets = ["images"]
+  targets = ["images", "release"]
 }
 
 # Imagens só de teste: fora dos grupos "images" e "release" (não são publicadas nem

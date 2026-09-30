@@ -466,7 +466,14 @@ units:
       name: build-site,
       path: tooling/build-site,
       type: cli,
-      role: 'Entrypoints render e publish; gera o wrangler.jsonc de cada site; base da imagem docker/site-builder',
+      role: 'Entrypoints render, publish e ssr da imagem docker/site-builder; gera o wrangler.jsonc de cada site; contrato do volume /build',
+      status: generated,
+    }
+  - {
+      name: edge-local,
+      path: infra/local/edge-local,
+      type: service,
+      role: 'Substituto local do deploy na Cloudflare: um Worker por site, versões imutáveis, API de administração (PUT/GET versions, POST rollback)',
       status: planned,
     }
 
@@ -475,5 +482,4 @@ open_questions:
   - 'Onde ficam os segredos de produção (VPS/Ansible, Cloudflare) — decidir no primeiro deploy'
   - 'Nomes das variáveis de ambiente e dos comandos local:* são proposta — confirmar ao implementar as unidades'
   - 'Atualizar para Node 26 após 2026-10-28 (LTS) e para TypeScript 7.1 quando o typescript-eslint suportar'
-  - 'build-site: gerar o wrangler.jsonc de cada site a partir de apps/blog/worker/wrangler.jsonc (base), sem ALLOW_COUNTRY_OVERRIDE no alvo cloudflare'
   - 'blog-worker: levar os testes do handler para o workerd quando o vitest-pool-workers suportar Vitest 5'

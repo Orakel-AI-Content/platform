@@ -1,6 +1,6 @@
 # Release do core (ADR 0005): a tag manual core-vX.Y.Z publica a imagem site-builder
-# com a tag X.Y.Z. Merge na main não cria release. Sem o grupo "release" no
-# docker/docker-bake.hcl (unidade build-site ainda não gerada), termina sem construir.
+# com a tag X.Y.Z. Merge na main não cria release. A imagem é testada em todo PR pelo
+# job "Imagem site-builder" do ci.yml.
 name: Release
 
 on:

@@ -1,0 +1,8 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // CLI rodado pelo Node 24 direto (node src/cli.ts), dentro da imagem site-builder.
+    "types": ["node"]
+  },
+  "include": ["src", "scripts", "*.ts"]
+}
