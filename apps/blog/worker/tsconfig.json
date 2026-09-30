@@ -1,0 +1,8 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // Tipos do runtime e dos bindings vêm só do worker-configuration.d.ts (`pnpm types`).
+    "types": []
+  },
+  "include": ["src", "*.ts", "worker-configuration.d.ts"]
+}

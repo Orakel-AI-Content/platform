@@ -1,0 +1,7 @@
+{
+  "formatVersion": 1,
+  "articles": [
+    { "id": 1, "path": "/guia-completo/" },
+    { "id": 2, "path": "/rotina-da-manha/" }
+  ]
+}

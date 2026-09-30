@@ -15,12 +15,14 @@ catalog:
   eslint: 10.11.0
   eslint-config-prettier: 10.1.8
   globals: 17.12.0
+  isbot: 5.2.2
   lefthook: 2.1.14
   prettier: 3.9.9
   turbo: 2.11.5
   typescript: 6.0.3
   typescript-eslint: 8.71.0
   vitest: 5.0.2
+  wrangler: 4.143.0
   zod: 4.6.5
 
 engineStrict: true
@@ -28,3 +30,6 @@ engineStrict: true
 minimumReleaseAge: 1440
 allowBuilds:
   lefthook: true
+  # Runtime local e bundler do wrangler (apps/blog/worker).
+  workerd: true
+  esbuild: true
