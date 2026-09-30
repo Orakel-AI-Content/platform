@@ -4,12 +4,23 @@
 	local_certs
 }
 
-admin.orakel.localhost {
-	# Login, callback e JWKS do access-mock, no mesmo caminho do Access real.
+# Host interno atrás do Access (import protected <upstream>): login, callback e JWKS do
+# access-mock no mesmo caminho do Access real; o resto passa pelo forward_auth. Os dois ficam
+# em blocos handle separados — fora deles, o forward_auth rodaria antes e prenderia o login.
+(protected) {
 	handle /cdn-cgi/access/* {
 		reverse_proxy access-mock:8788
 	}
+	handle {
+		forward_auth access-mock:8788 {
+			uri /cdn-cgi/access/authorize
+			copy_headers Cf-Access-Jwt-Assertion
+		}
+		reverse_proxy {args[0]}
+	}
+}
 
+admin.orakel.localhost {
 	# A API de exportação e a interna só existem na rede dos containers.
 	handle /api/export/* {
 		respond 404
@@ -17,35 +28,50 @@ admin.orakel.localhost {
 	handle /api/internal/* {
 		respond 404
 	}
-
-	handle {
-		forward_auth access-mock:8788 {
-			uri /cdn-cgi/access/authorize
-			copy_headers Cf-Access-Jwt-Assertion
-		}
-		reverse_proxy {$BACKOFFICE_UPSTREAM}
-	}
+	import protected {$BACKOFFICE_UPSTREAM}
 }
 
-# Visualização dos sites (apps/blog, SSR): /<site>/<caminho>, atrás do Access como o admin.
-# Até o build-site, aponta para o `pnpm --filter @orakel/blog preview` na máquina (ADR 0011
-# do blog); depois, para o container blog-preview.
+# Visualização dos sites (blog-preview, SSR): /<site>/<caminho>. BLOG_PREVIEW_UPSTREAM aponta
+# para o `pnpm --filter @orakel/blog preview` na máquina, se preciso (host.docker.internal).
 preview.orakel.localhost {
-	handle /cdn-cgi/access/* {
-		reverse_proxy access-mock:8788
-	}
+	import protected {$BLOG_PREVIEW_UPSTREAM}
+}
 
-	handle {
-		forward_auth access-mock:8788 {
-			uri /cdn-cgi/access/authorize
-			copy_headers Cf-Access-Jwt-Assertion
+# Console do armazenamento (SeaweedFS, weed admin).
+s3.orakel.localhost {
+	import protected s3-admin:23646
+}
+
+# Perfil observability: erros (GlitchTip) e heartbeats (Healthchecks).
+glitchtip.orakel.localhost {
+	import protected glitchtip:8000
+}
+
+hc.orakel.localhost {
+	import protected healthchecks:8000
+}
+
+# Perfil lighthouse: relatórios do Lighthouse CI.
+lhci.orakel.localhost {
+	import protected lhci-server:9001
+}
+
+# Mídia dos sites (ADR 0013 da raiz): media.<site>.localhost → bucket media-<site>, pelo filer
+# do SeaweedFS (sem leitura anônima no S3). Só leitura, com o cache do R2 de produção.
+# LOCAL_MEDIA_HOSTS lista os hosts, porque o curinga do Caddy só cobre um nível.
+{$LOCAL_MEDIA_HOSTS} {
+	@read method GET HEAD
+	handle @read {
+		rewrite * /buckets/media-{labels.1}{uri}
+		reverse_proxy s3:8888 {
+			header_down Cache-Control "public, max-age=31536000, immutable"
 		}
-		reverse_proxy {$BLOG_PREVIEW_UPSTREAM}
 	}
+	respond 405
 }
 
 # Sites publicados no edge-local (substituto da Cloudflare): <site>.localhost, público como
-# em produção. Os blocos admin. e preview. acima são mais específicos e têm prioridade.
+# em produção. Os blocos acima são mais específicos e têm prioridade.
 *.localhost {
 	reverse_proxy edge-local:8080
 }

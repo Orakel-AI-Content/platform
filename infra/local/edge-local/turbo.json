@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // O spike AE × ClickHouse só roda com um ClickHouse (serviço do CI ou o do compose).
+    "test": {
+      "passThroughEnv": [
+        "EDGE_LOCAL_TEST_CLICKHOUSE_URL",
+        "EDGE_LOCAL_TEST_CLICKHOUSE_USER",
+        "EDGE_LOCAL_TEST_CLICKHOUSE_PASSWORD"
+      ]
+    }
+  }
+}

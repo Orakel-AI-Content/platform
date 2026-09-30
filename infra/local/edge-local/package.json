@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@orakel/eslint-config": "workspace:*",
+    "@orakel/events": "workspace:*",
     "@orakel/tsconfig": "workspace:*",
     "@orakel/vitest-config": "workspace:*",
     "@types/node": "catalog:",

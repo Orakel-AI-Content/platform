@@ -1,13 +1,19 @@
 # Compose base da VPS (produção). O ambiente local aplica infra/local/compose.override.yaml
-# por cima deste arquivo (pnpm local:up). Os serviços das unidades entram aqui quando cada
-# unidade é gerada; o build-runner e o docker-socket-proxy entram com o build-site.
+# por cima deste arquivo (pnpm local:up), só com os substitutos da nuvem e as portas locais.
+#
+# Redes (ADR 0010 da raiz), com nome fixo: o build-runner cria os containers efêmeros do
+# site-builder (render, publish) nelas pelo nome.
+#   orakel-internal  serviços da VPS entre si
+#   orakel-export    API de exportação: backoffice-web, blog-preview e os render; sem internet
+#   orakel-publish   publish, destino do deploy e build-cache; nunca a API interna
+#   orakel-docker    só build-runner e docker-socket-proxy
 name: orakel
 
-# Imagem e ambiente comuns aos processos do backoffice (uma imagem, três comandos).
+# Imagem e ambiente comuns aos processos do backoffice (uma imagem, quatro comandos).
 x-backoffice: &backoffice
   image: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/backoffice:${BACKOFFICE_TAG:-local}
   restart: unless-stopped
-  environment:
+  environment: &backoffice-env
     NODE_ENV: production
     DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-orakel}
     ACCESS_TEAM_DOMAIN: ${ACCESS_TEAM_DOMAIN:?defina ACCESS_TEAM_DOMAIN}
@@ -21,6 +27,7 @@ x-backoffice: &backoffice
     S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?defina S3_SECRET_ACCESS_KEY}
     SENTRY_DSN: ${SENTRY_DSN:-}
     HEARTBEAT_BASE_URL: ${HEARTBEAT_BASE_URL:-}
+  networks: [internal]
 
 services:
   postgres:
@@ -33,6 +40,7 @@ services:
     volumes:
       # A imagem do Postgres 18 guarda os dados em /var/lib/postgresql/18/docker.
       - postgres-data:/var/lib/postgresql
+    networks: [internal]
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
@@ -51,6 +59,7 @@ services:
   backoffice-web:
     <<: *backoffice
     command: ['node', '.next/standalone/apps/backoffice/server.js']
+    networks: [internal, export]
     depends_on:
       backoffice-migrate:
         condition: service_completed_successfully
@@ -67,6 +76,85 @@ services:
     depends_on:
       backoffice-migrate:
         condition: service_completed_successfully
+
+  # Só a task build, dois builds por vez (ADR 0018 da plataforma). Fala com o Docker pelo
+  # docker-socket-proxy, nunca pelo socket; cria render e publish nas redes export e publish.
+  build-runner:
+    <<: *backoffice
+    command: ['node', 'src/bin/build-runner.ts']
+    environment:
+      <<: *backoffice-env
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      SITE_BUILDER_IMAGE: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/site-builder
+    networks: [internal, docker]
+    depends_on:
+      backoffice-migrate:
+        condition: service_completed_successfully
+      docker-socket-proxy:
+        condition: service_started
+
+  # API do Docker com permissão mínima (ADR 0011 da raiz): só as rotas que o build-runner
+  # usa — criar, iniciar, esperar, matar e apagar containers; criar e apagar volumes; ler.
+  # Recusa exec, pull, build, redes e o resto. O corpo do create é garantido pelo código.
+  docker-socket-proxy:
+    image: wollomatic/socket-proxy:1.13.1@sha256:3935b709275e4ec35d6ed5a5c4a1f0d01ed31eec5e7234efc3357ecd47689002
+    restart: unless-stopped
+    # Grupo do socket no host (0 no Docker Desktop; o gid do grupo docker na VPS).
+    user: '65534:${DOCKER_SOCKET_GID:-0}'
+    command:
+      - -loglevel=info
+      - -listenip=0.0.0.0
+      - -allowfrom=build-runner
+      - -allowHEAD=^(/v1\.[0-9]+)?/_ping$
+      - -allowGET=^(/v1\.[0-9]+)?/(_ping|version|containers/[a-zA-Z0-9_.-]+/(json|logs)|images/.+/json|volumes/[a-zA-Z0-9_.-]+)$
+      - -allowPOST=^(/v1\.[0-9]+)?/(containers/create|containers/[a-zA-Z0-9_.-]+/(start|wait|kill)|volumes/create)$
+      - -allowDELETE=^(/v1\.[0-9]+)?/(containers|volumes)/[a-zA-Z0-9_.-]+$
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [docker]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+
+  # Visualização dos rascunhos de todos os sites (site-builder, entrypoint ssr), com a
+  # imagem da release corrente; o backoffice a troca quando uma release é promovida.
+  blog-preview:
+    image: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/site-builder:${SITE_BUILDER_TAG:-local}
+    restart: unless-stopped
+    command: ['ssr']
+    environment:
+      CONTENT_SOURCE: api
+      EXPORT_API_URL: http://backoffice-web:3000
+      EXPORT_BUILD_TOKEN: ${EXPORT_BUILD_TOKEN:?defina EXPORT_BUILD_TOKEN}
+      PORT: '4321'
+    networks: [internal, export]
+    depends_on:
+      backoffice-web:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4321/').then(() => process.exit(0), () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+networks:
+  internal:
+    name: orakel-internal
+  export:
+    name: orakel-export
+    # Sem saída para a internet: o render só alcança a API de exportação.
+    internal: true
+  publish:
+    name: orakel-publish
+  docker:
+    name: orakel-docker
+    internal: true
 
 volumes:
   postgres-data:

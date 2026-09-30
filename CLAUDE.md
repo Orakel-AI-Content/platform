@@ -14,7 +14,7 @@ sites é configuração.
 - Uma unidade: `pnpm turbo run <tarefa> --filter=@orakel/<nome>`
 - Um teste (na pasta da unidade): `pnpm vitest run <caminho>`
 - Formatar: `pnpm format`
-- Ambiente local: `pnpm local:up` · `local:seed` · `local:down` · `local:e2e`
+- Ambiente local: `pnpm local:up` · `local:seed` · `local:check` · `local:publish <site>` · `local:load` · `local:down` · `local:e2e`
 - Compose direto: `infra/local/compose.sh <args>`
 
 ## Unidades
@@ -38,7 +38,7 @@ Previstas (gere com `/scaffold` no caminho da unidade):
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
 - `apps/generator` – geração com LLM (fase 2)
-- `apps/backoffice` (retomada) – task `build` real com `docker-socket-proxy`, redes `export`/`publish`/`edge`, `build-runner` e `blog-preview` no compose (próximo da fila; fecha a L3)
+- `apps/backoffice` (retomada) – task `build` real no `build-runner`: containers `render` e `publish` pelo `docker-socket-proxy`, nas redes do compose (próximo da fila; fecha a L3)
 
 ## Regras invioláveis
 
