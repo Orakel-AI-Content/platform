@@ -105,12 +105,12 @@ de ambiente (padrão: `.env.local`).
 
 ### Imagens
 
-| Comando                               | O que faz                                                                                                                        |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `docker/bake.sh [grupo]`              | Grupos `images` (backoffice), `release` (site-builder), `local` (edge-local), `default` (todos; é o `pnpm local:images`)         |
-| `docker buildx bake <alvo> --load`    | Uma imagem só (ex.: `site-builder`, `edge-local`)                                                                                |
-| `docker buildx bake <pacote>-test`    | Lint, tipos e testes de um pacote em container limpo (`content-model`, `content-client`, `core`, `tokens`, `elements`, `events`) |
-| `tooling/build-site/scripts/smoke.sh` | Fumaça da imagem `site-builder` (render e publish)                                                                               |
+| Comando                               | O que faz                                                                                                                                                                                                           |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker/bake.sh [grupo]`              | Grupos `images` (backoffice), `release` (site-builder), `local` (edge-local), `default` (todos; é o `pnpm local:images`). Local: arquitetura da máquina; CI: `linux/amd64` (a da VPS); `PLATFORM=linux/amd64` força |
+| `docker buildx bake <alvo> --load`    | Uma imagem só (ex.: `site-builder`, `edge-local`)                                                                                                                                                                   |
+| `docker buildx bake <pacote>-test`    | Lint, tipos e testes de um pacote em container limpo (`content-model`, `content-client`, `core`, `tokens`, `elements`, `events`)                                                                                    |
+| `tooling/build-site/scripts/smoke.sh` | Fumaça da imagem `site-builder` (render e publish)                                                                                                                                                                  |
 
 ## Ambiente local
 
@@ -286,8 +286,8 @@ Branches, commits e releases: [`docs/conventions/git.md`](docs/conventions/git.m
 - **Navegador recusa o certificado:** instale a CA do Caddy (veja "Primeira vez").
 - **`media.<site>.localhost` não responde:** o site precisa estar em `LOCAL_MEDIA_HOSTS`
   (recrie o `caddy`) e em `LOCAL_SITES` (rode `local:up`).
-- **Aviso de plataforma (`linux/amd64`) no `local:publish`:** a imagem local é de outra
-  arquitetura; reconstrua com `pnpm local:images`.
+- **Aviso de plataforma (`linux/amd64`) no `local:up` ou `local:publish`:** imagens de antes do
+  build nativo; reconstrua com `pnpm local:images`.
 - **Linux: `build-runner` sem acesso ao Docker:** `DOCKER_SOCKET_GID` = gid do grupo `docker`
   (`getent group docker`).
 

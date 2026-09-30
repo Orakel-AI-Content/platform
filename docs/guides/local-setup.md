@@ -114,5 +114,6 @@ Para ver ou desligar: acrescente o `--profile` ao `ps`, `logs` ou `down`.
   parado só é aceito se for one-shot (`backoffice-migrate`, `s3-init`, `glitchtip-db`).
 - **`media.<site>.localhost` não responde**: o site precisa estar em `LOCAL_MEDIA_HOSTS`
   (recrie o `caddy`: `infra/local/compose.sh up -d caddy`) e em `LOCAL_SITES` (rode `local:up` para criar o bucket).
-- **Aviso de plataforma (`linux/amd64`) no `local:publish`**: a imagem local foi construída
-  para outra arquitetura; reconstrua com `pnpm local:images`.
+- **Aviso de plataforma (`linux/amd64`) no `local:up` ou `local:publish`**: imagens de antes
+  do build nativo; reconstrua com `pnpm local:images` (usa a arquitetura da máquina; o CI
+  constrói amd64, a da VPS). Para testar amd64 no local: `PLATFORM=linux/amd64 pnpm local:images`.
