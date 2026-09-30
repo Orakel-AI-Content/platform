@@ -28,3 +28,8 @@ termos entram aqui no mesmo PR que os introduz.
 | **Agregador**            | Entrypoint do backoffice que consolida eventos da fila e do Analytics Engine no Postgres                                                                                     |
 | **Core**                 | Conjunto versionado por `core-vX.Y.Z` (schema, pacotes e imagem `site-builder`)                                                                                              |
 | **Unidade**              | App ou pacote do monorepo, com `package.json`, `CLAUDE.md` e `docs/` próprios                                                                                                |
+| **Recursos suportados**  | Tipos de bloco, presets, variantes e perfil de imagem que uma release sabe renderizar (`RESOURCES` do `content-model`); a validação usa os da release do site                |
+| **Linha do snapshot**    | Uma linha do NDJSON da API de exportação: `header`, `{ type, data }` por entidade, `end` com as contagens                                                                    |
+| **Fixture**              | Snapshot NDJSON de um site de exemplo, em `@orakel/content-model/fixtures/v<n>/`, validado pelo teste do pacote                                                              |
+| **Manifesto de eventos** | Arquivo gerado no build com os artigos publicados (ID e caminho), lido pelo Worker para validar eventos (`@orakel/events`)                                                   |
+| **Evento descartado**    | Requisição a `/_e/*` recusada (bot, origem, tamanho, schema, manifesto); vira um ponto `discard` no Analytics Engine, com o motivo                                           |

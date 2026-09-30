@@ -1,0 +1,30 @@
+{
+  "name": "@orakel/events",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Contrato dos eventos: payload, manifesto, layout do Analytics Engine e script do navegador, por versão do formato",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./v1": "./src/v1/index.ts",
+    "./v1/client": "./src/v1/client/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/v1/client",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/tsconfig": "workspace:*",
+    "@orakel/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
