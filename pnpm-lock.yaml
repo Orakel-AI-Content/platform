@@ -399,6 +399,9 @@ importers:
       '@orakel/eslint-config':
         specifier: workspace:*
         version: link:../../../tooling/eslint-config
+      '@orakel/events':
+        specifier: workspace:*
+        version: link:../../../packages/events
       '@orakel/tsconfig':
         specifier: workspace:*
         version: link:../../../tooling/tsconfig

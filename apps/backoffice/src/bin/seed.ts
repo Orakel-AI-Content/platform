@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { parseSnapshotLine, type SnapshotLine } from '@orakel/content-model/v1';
 
@@ -19,6 +21,31 @@ export const TEST_USERS = [
 
 const FIXTURES = ['exemplo-a', 'exemplo-b'];
 
+/**
+ * Só o que é local nos sites de exemplo (ADR 0015 da raiz): domínios <site>.localhost, para
+ * canonical, mídia e wrangler.jsonc apontarem para o ambiente local. Sem o arquivo, a
+ * fixture entra como está.
+ */
+const LOCAL_SEEDS_DIR =
+  process.env.LOCAL_SEEDS_DIR ??
+  fileURLToPath(new URL('../../../../infra/local/seeds/', import.meta.url));
+
+type LocalSites = Record<string, { domains?: string[] }>;
+
+export async function readLocalSites(dir = LOCAL_SEEDS_DIR): Promise<LocalSites> {
+  const text = await readFile(join(dir, 'sites.json'), 'utf8').catch(() => undefined);
+  return text === undefined ? {} : (JSON.parse(text) as LocalSites);
+}
+
+/** Aplica os domínios locais na linha de configuração do snapshot. */
+export function withLocalDomains(lines: SnapshotLine[], local: LocalSites): SnapshotLine[] {
+  return lines.map((line) => {
+    if (line.type !== 'config') return line;
+    const domains = local[line.data.siteId]?.domains;
+    return domains?.length ? { ...line, data: { ...line.data, domains } } : line;
+  });
+}
+
 export async function readFixture(site: string): Promise<SnapshotLine[]> {
   const url = import.meta.resolve(`@orakel/content-model/fixtures/v1/${site}.ndjson`);
   const text = await readFile(new URL(url), 'utf8');
@@ -38,13 +65,15 @@ export async function readFixture(site: string): Promise<SnapshotLine[]> {
 if (import.meta.main) {
   await runProcess('backoffice-seed', async (logger) => {
     const { pool, db } = getDb();
+    const local = await readLocalSites();
     for (const user of TEST_USERS) await upsertUser(db, user);
     for (const site of FIXTURES) {
       if (await siteExists(db, site)) {
         logger.info({ siteId: site }, 'site já existe; pulado');
         continue;
       }
-      const result = await importSnapshot(db, { ...SYSTEM_ACTOR }, await readFixture(site));
+      const lines = withLocalDomains(await readFixture(site), local);
+      const result = await importSnapshot(db, { ...SYSTEM_ACTOR }, lines);
       if (!result.ok) throw new Error(`Seed de ${site}: ${JSON.stringify(result.issues)}`);
       logger.info({ siteId: site }, 'site importado');
     }

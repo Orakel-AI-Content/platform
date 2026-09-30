@@ -1,14 +1,25 @@
-# Override do ambiente local (ADR 0008): portas no host, o emulador S3 e os substitutos do
-# Cloudflare Tunnel + Access (Caddy e access-mock). Em produção o armazenamento S3 é externo.
+# Override do ambiente local (ADR 0008): portas no host e os substitutos da nuvem — S3
+# (SeaweedFS), Tunnel + Access (Caddy e access-mock), deploy na Cloudflare (edge-local, com o
+# ae-sim) e Analytics Engine (ClickHouse). Em produção esses papéis são externos.
 # Caminhos relativos partem de infra/vps (pasta do primeiro arquivo do compose).
+#
+# Perfis opcionais (fora do pnpm local:up):
+#   infra/local/compose.sh --profile observability up -d   GlitchTip e Healthchecks
+#   infra/local/compose.sh --profile lighthouse up -d      LHCI server
 services:
   postgres:
     ports:
       - '127.0.0.1:5432:5432'
 
+  # S3 local (SeaweedFS, ADR 0012 da raiz): S3 em :8333, filer em :8888 (mídia pública pelo
+  # Caddy), master em :9333 (weed shell e console).
   s3:
     image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
-    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    # -ip=s3: o master anuncia o nome do serviço, que resolve em todas as redes do s3 (com o
+    # IP de uma rede só, o weed shell do s3-init, na internal, ficava esperando).
+    command: >-
+      server -dir=/data -ip=s3 -ip.bind=0.0.0.0 -s3 -s3.port=8333
+      -s3.config=/etc/seaweedfs/s3.json -filer.disableDirListing
     configs:
       - source: s3-identities
         target: /etc/seaweedfs/s3.json
@@ -16,11 +27,37 @@ services:
       - '127.0.0.1:8333:8333'
     volumes:
       - s3-data:/data
+    networks: [internal, publish, edge]
     healthcheck:
       test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8333/healthz || exit 1']
       interval: 5s
       timeout: 5s
       retries: 12
+
+  # Buckets de produção (ADR 0013 da raiz), a cada local:up; idempotente.
+  s3-init:
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    restart: 'no'
+    entrypoint: ['sh', '/init.sh']
+    environment:
+      LOCAL_SITES: ${LOCAL_SITES:-exemplo-a,exemplo-b}
+    volumes:
+      - ../local/s3/init.sh:/init.sh:ro
+    networks: [internal]
+    depends_on:
+      s3:
+        condition: service_healthy
+
+  # Console do armazenamento (weed admin), em https://s3.orakel.localhost.
+  s3-admin:
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    command: admin -port=23646 -masters=s3:9333 -dataDir=/data
+    volumes:
+      - s3-admin-data:/data
+    networks: [internal]
+    depends_on:
+      s3:
+        condition: service_healthy
 
   # Emissor de JWT com o contrato do Cloudflare Access (login de teste, JWKS, forward_auth).
   access-mock:
@@ -34,6 +71,7 @@ services:
       - ../local/access-mock/server.ts:/app/server.ts:ro
     ports:
       - '127.0.0.1:8788:8788'
+    networks: [internal]
     healthcheck:
       test:
         ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8788/cdn-cgi/access/certs || exit 1']
@@ -47,7 +85,8 @@ services:
     image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     environment:
       BACKOFFICE_UPSTREAM: ${BACKOFFICE_UPSTREAM:-backoffice-web:3000}
-      BLOG_PREVIEW_UPSTREAM: ${BLOG_PREVIEW_UPSTREAM:-host.docker.internal:4321}
+      BLOG_PREVIEW_UPSTREAM: ${BLOG_PREVIEW_UPSTREAM:-blog-preview:4321}
+      LOCAL_MEDIA_HOSTS: ${LOCAL_MEDIA_HOSTS:-media.exemplo-a.localhost, media.exemplo-b.localhost}
     volumes:
       - ../local/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -56,17 +95,27 @@ services:
       - '127.0.0.1:443:443'
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+    networks: [internal, edge]
     depends_on:
       access-mock:
         condition: service_healthy
 
   # Substituto do deploy na Cloudflare (12.0, L3): um Worker por site, versões e rollback.
-  # Sites pelo Caddy (*.localhost → :8080); administração (:8081) só para o publish.
+  # Sites pelo Caddy (*.localhost → :8080); administração (:8081) só na rede publish. O
+  # ae-sim grava os pontos do Analytics Engine no ClickHouse.
   edge-local:
     image: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/edge-local:${EDGE_LOCAL_TAG:-local}
     restart: unless-stopped
+    environment:
+      EDGE_LOCAL_CLICKHOUSE_URL: http://clickhouse:8123
+      EDGE_LOCAL_CLICKHOUSE_USER: ${CLICKHOUSE_USER:-orakel}
+      EDGE_LOCAL_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-orakel-local}
     volumes:
       - edge-local-data:/data
+    networks: [publish, edge]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -79,6 +128,28 @@ services:
       timeout: 5s
       retries: 12
 
+  # Analytics Engine local (ADR 0014 da raiz): tabela events no layout do AE.
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8.33.6@sha256:0152dd511befe6a2c2ef53e930726179669b08116da78500b37c51c96ff5ee77
+    environment:
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-orakel}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-orakel-local}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '0'
+    volumes:
+      - ../local/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - clickhouse-data:/var/lib/clickhouse
+    ports:
+      - '127.0.0.1:8123:8123'
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    networks: [edge]
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8123/ping || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   backoffice-web:
     environment:
       ACCESS_JWKS_URL: http://access-mock:8788/cdn-cgi/access/certs
@@ -87,6 +158,86 @@ services:
   backoffice-worker:
     environment:
       S3_ENDPOINT: http://s3:8333
+
+  build-runner:
+    environment:
+      S3_ENDPOINT: http://s3:8333
+
+  # --- Perfil observability (ADR 0015 da raiz) ---------------------------------------------
+  # Erros (GlitchTip, compatível com o Sentry) e heartbeats (Healthchecks). DSN e URL de ping
+  # vão no .env.local (SENTRY_DSN, HEARTBEAT_BASE_URL) com os hosts internos.
+  glitchtip-db:
+    image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    profiles: [observability]
+    restart: 'no'
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        psql -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB:-orakel} -tAc
+        "SELECT 1 FROM pg_database WHERE datname = 'glitchtip'" | grep -q 1 ||
+        psql -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB:-orakel} -c 'CREATE DATABASE glitchtip'
+    networks: [internal]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Web e worker no mesmo container (GLITCHTIP_EMBED_WORKER).
+  glitchtip:
+    image: glitchtip/glitchtip:6.2.6@sha256:a3d8eb1b36c1e1603d55ab32711ea3dd8115874742a781a57391a62a16e0dff6
+    profiles: [observability]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/glitchtip
+      REDIS_URL: redis://valkey:6379/0
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:-local-glitchtip-secret-000000000000000000}
+      GLITCHTIP_DOMAIN: https://glitchtip.orakel.localhost
+      GLITCHTIP_EMBED_WORKER: 'true'
+      DEFAULT_FROM_EMAIL: glitchtip@orakel.local
+      EMAIL_URL: consolemail://
+      ENABLE_USER_REGISTRATION: 'true'
+      PORT: '8000'
+    command: ['sh', '-c', './bin/run-migrate.sh && ./bin/start.sh']
+    networks: [internal]
+    depends_on:
+      glitchtip-db:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_started
+
+  valkey:
+    image: valkey/valkey:9.0.6-alpine@sha256:187679e3bd4036959631e3f03983ab2ba503ab21e6fd0454d508e909db2ee989
+    profiles: [observability]
+    networks: [internal]
+
+  healthchecks:
+    image: healthchecks/healthchecks:v4.4@sha256:aa08a61b0dcfd83f1332eab195d5cec1b595ae076eb8388cadf8a3d597114f9b
+    profiles: [observability]
+    environment:
+      DB: sqlite
+      DB_NAME: /data/hc.sqlite
+      SECRET_KEY: ${HEALTHCHECKS_SECRET_KEY:-local-healthchecks-secret-00000000000000}
+      SITE_ROOT: https://hc.orakel.localhost
+      ALLOWED_HOSTS: hc.orakel.localhost,healthchecks
+      REGISTRATION_OPEN: 'True'
+      PING_ENDPOINT: http://healthchecks:8000/ping/
+    volumes:
+      - healthchecks-data:/data
+    networks: [internal]
+
+  # --- Perfil lighthouse (ADR 0015 da raiz) --------------------------------------------------
+  # Guarda e compara os relatórios; a coleta é da promoção de release (módulo Releases).
+  lhci-server:
+    image: patrickhulce/lhci-server:0.15.1@sha256:10d29addcf6a9544e4cdb1d1b73af690050152200b59142e4d717c4944d946e1
+    profiles: [lighthouse]
+    volumes:
+      - lhci-data:/data
+    networks: [internal]
+
+networks:
+  edge:
+    name: orakel-edge
 
 configs:
   s3-identities:
@@ -106,4 +257,8 @@ configs:
 volumes:
   edge-local-data:
   s3-data:
+  s3-admin-data:
   caddy-data:
+  clickhouse-data:
+  healthchecks-data:
+  lhci-data:

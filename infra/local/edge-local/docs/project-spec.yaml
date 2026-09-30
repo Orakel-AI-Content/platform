@@ -43,7 +43,7 @@ decisions:
     }
   architecture.ae_sim:
     {
-      value: 'Worker ae-sim (WorkerEntrypoint) → supervisor → NDJSON em /data/events/<dia>.ndjson; ClickHouse com o agregador',
+      value: 'Worker ae-sim (WorkerEntrypoint) → supervisor → ClickHouse (analytics.events, com EDGE_LOCAL_CLICKHOUSE_URL) ou NDJSON em /data/events/<dia>.ndjson (sem); ADR 0007',
       source: user,
     }
   architecture.health:
@@ -85,13 +85,11 @@ structure:
   tree: |
     infra/local/edge-local/
     ├── package.json  tsconfig.json  eslint.config.js  vitest.config.ts  Dockerfile
-    └── src/{server,env,store,runtime,supervisor,proxy,admin,test-archive}.ts
-        + ae-sim/worker.js + *.test.ts (fidelity.test.ts = spike)
+    └── src/{server,env,store,runtime,supervisor,proxy,admin,ae-sink,test-archive}.ts
+        + ae-sim/worker.js + *.test.ts (fidelity.test.ts e clickhouse.test.ts = spikes)
   paths:
     service: src/
 
 open_questions:
-  - 'Redes publish e edge; publish do site-builder chamando EDGE_LOCAL_URL=http://edge-local:8081 pelo build-runner'
-  - 'ae-sim gravando no ClickHouse (init.sql do layout) com o agregador; spike AE × ClickHouse das consultas'
   - 'Verificar no piloto se uma 404 aciona o Worker na Cloudflare (não observável localmente)'
   - 'Imagem grande (workspace com build-site e dependências de desenvolvimento): enxugar se incomodar'

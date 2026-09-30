@@ -15,13 +15,20 @@ Consulte para preparar a máquina e subir o ambiente local ponta a ponta.
 corepack enable
 pnpm install               # instala e ativa os git hooks (lefthook)
 cp .env.example .env.local # valores locais; nunca commite .env.local
-pnpm local:images          # constrói as imagens (backoffice) com as tags de produção
-pnpm local:up              # sobe o compose e roda as migrações
-pnpm local:seed            # usuários de teste e os sites de exemplo
+pnpm local:images          # constrói as imagens (backoffice, site-builder, edge-local)
+pnpm local:up              # sobe o compose, cria os buckets e roda as migrações
+pnpm local:seed            # usuários de teste e os sites de exemplo (<site>.localhost)
+pnpm local:check           # confere serviços, hostnames, buckets, redes e o proxy do socket
+pnpm local:publish exemplo-a   # render + publish no edge-local → https://exemplo-a.localhost
 ```
 
 Já tinha um `.env.local`? Compare com o `.env.example` e acrescente as variáveis novas
-(backoffice e Access local); o compose avisa qual falta.
+(backoffice, Access local e o bloco "Ambiente local"); o compose avisa qual falta. Apague ou
+comente `BLOG_PREVIEW_UPSTREAM`: sem ela, `preview.orakel.localhost` vai para o container
+`blog-preview`. No Linux, `DOCKER_SOCKET_GID` é o gid do grupo `docker` (`getent group docker`).
+
+Outro arquivo de ambiente (ex.: uma cópia do `.env.example` para testar):
+`ORAKEL_ENV_FILE=/caminho/env pnpm local:check` — vale para o `compose.sh` e os scripts.
 
 **CA local do Caddy (uma vez):** o Caddy emite os certificados de `*.orakel.localhost` com
 uma CA interna. Para o navegador confiar, instale a raiz dela:
@@ -47,6 +54,9 @@ o `admin.orakel.localhost` apontar para o `next dev`.
 | `pnpm build` · `pnpm lint` · `pnpm typecheck` · `pnpm test` | Pipeline do Turborepo                                       |
 | `pnpm format`                                               | Prettier no repositório                                     |
 | `pnpm local:up`                                             | Sobe o compose (base + override local) e roda `db:migrate`  |
+| `pnpm local:check`                                          | Confere o ambiente; sai com 1 se algo falhar                |
+| `pnpm local:publish <site>`                                 | `render` (rede export) + `publish` (rede publish) no edge   |
+| `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere no ClickHouse         |
 | `pnpm local:seed`                                           | Roda `db:seed`                                              |
 | `pnpm local:down`                                           | Para os containers (mantém os dados)                        |
 | `pnpm local:reset`                                          | Para e **apaga os volumes**                                 |
@@ -56,19 +66,53 @@ o `admin.orakel.localhost` apontar para o `next dev`.
 
 ## Serviços locais
 
-| Serviço              | Endereço                         | Credenciais                                          |
-| -------------------- | -------------------------------- | ---------------------------------------------------- |
-| Postgres 18.6        | `localhost:5432`                 | `POSTGRES_*` do `.env.local`                         |
-| S3 (SeaweedFS 4.48)  | `http://localhost:8333`          | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`          |
-| Backoffice           | `https://admin.orakel.localhost` | Login de teste do access-mock (um usuário por papel) |
-| access-mock (Access) | `http://localhost:8788`          | JWKS em `/cdn-cgi/access/certs`                      |
-| Caddy (Tunnel)       | portas 80 e 443                  | CA interna (veja "Primeira vez")                     |
+| Serviço              | Endereço                                            | Credenciais                                          |
+| -------------------- | --------------------------------------------------- | ---------------------------------------------------- |
+| Postgres 18.6        | `localhost:5432`                                    | `POSTGRES_*` do `.env.local`                         |
+| S3 (SeaweedFS 4.48)  | `http://localhost:8333`                             | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`          |
+| Console do S3        | `https://s3.orakel.localhost`                       | Login de teste do access-mock                        |
+| Backoffice           | `https://admin.orakel.localhost`                    | Login de teste do access-mock (um usuário por papel) |
+| Visualização         | `https://preview.orakel.localhost/<site>/<caminho>` | Login de teste do access-mock                        |
+| Sites publicados     | `https://<site>.localhost`                          | Público (edge-local)                                 |
+| Mídia dos sites      | `https://media.<site>.localhost`                    | Público, só leitura (filer do SeaweedFS)             |
+| ClickHouse (AE)      | `http://localhost:8123`                             | `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD`            |
+| access-mock (Access) | `http://localhost:8788`                             | JWKS em `/cdn-cgi/access/certs`                      |
+| Caddy (Tunnel)       | portas 80 e 443                                     | CA interna (veja "Primeira vez")                     |
 
-As portas só escutam em `127.0.0.1`.
+As portas só escutam em `127.0.0.1`. Buckets (criados pelo `s3-init` a cada `local:up`):
+`media-originals`, `build-cache`, `backups`, `brasil` e `media-<site>` de `LOCAL_SITES`.
+
+## Redes
+
+`orakel-internal` (serviços da VPS), `orakel-export` (API de exportação, `blog-preview` e
+`render`; sem internet), `orakel-publish` (`publish`, `edge-local`, S3), `orakel-docker`
+(`build-runner` e `docker-socket-proxy`) e `orakel-edge` (Caddy, `edge-local`, ClickHouse, S3).
+Detalhes no ADR 0010; o proxy do socket, no ADR 0011.
+
+## Serviços opcionais
+
+```sh
+infra/local/compose.sh --profile observability up -d   # GlitchTip e Healthchecks
+infra/local/compose.sh --profile lighthouse up -d      # LHCI server
+```
+
+| Serviço      | Endereço                             | Uso                                                            |
+| ------------ | ------------------------------------ | -------------------------------------------------------------- |
+| GlitchTip    | `https://glitchtip.orakel.localhost` | Crie conta e projeto; `SENTRY_DSN` com o host `glitchtip:8000` |
+| Healthchecks | `https://hc.orakel.localhost`        | `HEARTBEAT_BASE_URL` com `http://healthchecks:8000/ping/`      |
+| LHCI server  | `https://lhci.orakel.localhost`      | Relatórios do Lighthouse da promoção de release                |
+
+Para ver ou desligar: acrescente o `--profile` ao `ps`, `logs` ou `down`.
 
 ## Problemas comuns
 
 - **`Falta .env.local`**: `cp .env.example .env.local`.
 - **`ERR_PNPM_NO_MATURE_MATCHING_VERSION`**: a versão pedida saiu há menos de 24 h;
   use a anterior no `catalog` ou espere.
-- **Porta ocupada**: pare o serviço local que usa 5432 ou 8333.
+- **Porta ocupada**: pare o serviço local que usa 5432, 8123 ou 8333.
+- **`local:check` falha em "Serviços"**: `infra/local/compose.sh logs <serviço>`. Um serviço
+  parado só é aceito se for one-shot (`backoffice-migrate`, `s3-init`, `glitchtip-db`).
+- **`media.<site>.localhost` não responde**: o site precisa estar em `LOCAL_MEDIA_HOSTS`
+  (reinicie o `caddy`) e em `LOCAL_SITES` (rode `local:up` para criar o bucket).
+- **Aviso de plataforma (`linux/amd64`) no `local:publish`**: a imagem local foi construída
+  para outra arquitetura; reconstrua com `pnpm local:images`.

@@ -2,7 +2,8 @@
 
 Substituto local do deploy na Cloudflare: recebe o `tar.gz` do `publish` do site-builder,
 guarda versões imutáveis e serve cada site em `https://<site>.localhost` (pelo Caddy), com troca
-sem queda e rollback. Inclui o `ae-sim`, que grava os pontos do Analytics Engine em NDJSON.
+sem queda e rollback. Inclui o `ae-sim`, que grava os pontos do Analytics Engine no ClickHouse
+(no compose) ou em NDJSON (na máquina).
 
 ```sh
 pnpm dev    # na máquina: sites :8080 (Host <site>.localhost), administração :8081, dados em /tmp/edge-local

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { startAdmin } from './admin.ts';
+import { clickhouseSink, ndjsonSink } from './ae-sink.ts';
 import { readEnv } from './env.ts';
 import { startProxy } from './proxy.ts';
 import { wranglerRuntime } from './runtime.ts';
@@ -49,13 +50,15 @@ export async function main() {
   });
   // A administração sobe antes (o ae-sim grava por ela), mas só fica saudável no fim.
   let ready = false;
-  const admin = startAdmin(
-    supervisor,
-    env.EDGE_LOCAL_DATA,
-    env.EDGE_LOCAL_ADMIN_PORT,
-    log,
-    () => ready,
-  );
+  const sink = env.EDGE_LOCAL_CLICKHOUSE_URL
+    ? clickhouseSink({
+        url: env.EDGE_LOCAL_CLICKHOUSE_URL,
+        user: env.EDGE_LOCAL_CLICKHOUSE_USER,
+        password: env.EDGE_LOCAL_CLICKHOUSE_PASSWORD,
+        database: env.EDGE_LOCAL_CLICKHOUSE_DATABASE,
+      })
+    : ndjsonSink(env.EDGE_LOCAL_DATA);
+  const admin = startAdmin(supervisor, sink, env.EDGE_LOCAL_ADMIN_PORT, log, () => ready);
   await supervisor.startAeSim(
     await writeAeSimConfig(env.EDGE_LOCAL_DATA, env.EDGE_LOCAL_ADMIN_PORT),
   );

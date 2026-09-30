@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { startAdmin } from './admin.ts';
+import { ndjsonSink } from './ae-sink.ts';
 import { startProxy } from './proxy.ts';
 import { wranglerRuntime } from './runtime.ts';
 import { writeAeSimConfig } from './server.ts';
@@ -79,7 +80,7 @@ beforeAll(async () => {
     keep: 10,
     log: () => undefined,
   });
-  admin = startAdmin(supervisor, dir, 0, () => undefined);
+  admin = startAdmin(supervisor, ndjsonSink(dir), 0, () => undefined);
   const adminPort = await portOf(admin);
   adminUrl = `http://127.0.0.1:${adminPort}`;
   await supervisor.startAeSim(await writeAeSimConfig(dir, adminPort));

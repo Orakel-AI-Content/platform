@@ -75,6 +75,23 @@ jobs:
     needs: changes
     if: needs.changes.outputs.sites == 'true' || needs.changes.outputs.backoffice == 'true' || needs.changes.outputs.workspace == 'true'
     runs-on: ubuntu-latest
+    # Spike AE × ClickHouse do edge-local (ADR 0014 da raiz): as consultas do agregador no
+    # ClickHouse, na mesma versão do ambiente local.
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.8.33.6@sha256:0152dd511befe6a2c2ef53e930726179669b08116da78500b37c51c96ff5ee77
+        env:
+          CLICKHOUSE_USER: orakel
+          CLICKHOUSE_PASSWORD: orakel-ci
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://127.0.0.1:8123/ping"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      EDGE_LOCAL_TEST_CLICKHOUSE_URL: http://localhost:8123
+      EDGE_LOCAL_TEST_CLICKHOUSE_USER: orakel
+      EDGE_LOCAL_TEST_CLICKHOUSE_PASSWORD: orakel-ci
     steps:
       - uses: actions/checkout@v7
         with:

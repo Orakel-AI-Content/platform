@@ -18,7 +18,8 @@ infraestrutura mínimo.
   (emulador S3), presos por tag + digest. O MinIO deixou de publicar imagens da edição
   comunitária.
 - **Comandos** (_proposta_): `pnpm local:up` (sobe e migra), `local:seed`,
-  `local:down`, `local:reset` (apaga volumes), `local:images`, `local:e2e`.
+  `local:down`, `local:reset` (apaga volumes), `local:images`, `local:e2e`; `local:check`,
+  `local:publish` e `local:load` no ADR 0015.
 - **CI (`ci.yml`):** filtros de caminho (`dorny/paths-filter`) em quatro grupos (sites e
   pacotes; backoffice e serviços; infra; só docs), `turbo --affected`, cancelamento de
   execuções antigas. Os jobs de contrato, sites de exemplo, axe e paridade chamam

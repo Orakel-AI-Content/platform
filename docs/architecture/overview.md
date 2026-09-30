@@ -94,8 +94,8 @@ passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`
 | Pasta/arquivo                                                    | Conteúdo                                           |
 | ---------------------------------------------------------------- | -------------------------------------------------- |
 | `tooling/{tsconfig,eslint-config,prettier-config,vitest-config}` | Configurações compartilhadas                       |
-| `infra/vps/compose.yaml`                                         | Compose base (produção)                            |
-| `infra/local/`                                                   | Override local (portas, SeaweedFS) e `compose.sh`  |
+| `infra/vps/compose.yaml`                                         | Compose base (produção) e redes (ADR 0010)         |
+| `infra/local/`                                                   | Override local, Caddy, init, seeds e `local:*`     |
 | `docker/docker-bake.hcl`, `docker/bake.sh`                       | Alvos e tags das imagens                           |
 | `.github/workflows/`                                             | `ci`, `images`, `release`, `e2e`, `add-to-project` |
 | `turbo.json`, `pnpm-workspace.yaml`                              | Tarefas e catálogo de versões                      |

@@ -2,12 +2,13 @@
 
 Substituto local do deploy na Cloudflare: supervisor Node que sobe um Worker por site com a API
 do wrangler (`unstable_startWorker`), atrás de um proxy por Host, com versões imutáveis,
-rollback e o `ae-sim` (Analytics Engine → NDJSON). Só no ambiente local. Parte do monorepo —
+rollback e o `ae-sim` (Analytics Engine → ClickHouse ou NDJSON). Só no ambiente local. Parte do monorepo —
 regras gerais no `CLAUDE.md` da raiz.
 
 ## Comandos (rodar nesta pasta)
 
-- Testar: `pnpm test` (inclui o spike de fidelidade com o runtime real, ~2 s)
+- Testar: `pnpm test` (inclui o spike de fidelidade com o runtime real, ~2 s; o spike AE ×
+  ClickHouse roda com `EDGE_LOCAL_TEST_CLICKHOUSE_URL`)
 - Lint / tipos: `pnpm lint` · `pnpm typecheck`
 - Rodar na máquina: `pnpm dev` · imagem (da raiz): `docker buildx bake edge-local --load`
 

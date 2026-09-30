@@ -4,11 +4,10 @@
 //   GET  /sites/{site}/versions   { active, versions: [{ id, createdAt, files, active }] }
 //   POST /sites/{site}/rollback   { id }? → { active }  (sem id: a anterior à ativa)
 //   GET  /healthz
-//   POST /_ae-sim/points          ponto do Analytics Engine → NDJSON em <data>/events/<dia>.ndjson
-import { appendFile, mkdir } from 'node:fs/promises';
+//   POST /_ae-sim/points          ponto do Analytics Engine → ClickHouse (ou NDJSON, sem ele)
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { join } from 'node:path';
 
+import type { DataPoint, Sink } from './ae-sink.ts';
 import { StoreError } from './store.ts';
 import type { Log, Supervisor } from './supervisor.ts';
 
@@ -33,7 +32,7 @@ function json(res: ServerResponse, status: number, data: unknown) {
 /** `ready`: versões ativas restauradas e proxy no ar — antes disso, /healthz responde 503. */
 export function adminHandler(
   supervisor: Supervisor,
-  dataDir: string,
+  sink: Sink,
   log: Log,
   ready: () => boolean = () => true,
 ) {
@@ -48,14 +47,8 @@ export function adminHandler(
         });
       }
       if (req.method === 'POST' && pathname === '/_ae-sim/points') {
-        const point = JSON.parse((await body(req, 64 * 1024)).toString('utf8')) as object;
-        const now = new Date();
-        const dir = join(dataDir, 'events');
-        await mkdir(dir, { recursive: true });
-        await appendFile(
-          join(dir, `${now.toISOString().slice(0, 10)}.ndjson`),
-          `${JSON.stringify({ receivedAt: now.toISOString(), ...point })}\n`,
-        );
+        const point = JSON.parse((await body(req, 64 * 1024)).toString('utf8')) as DataPoint;
+        await sink(point, new Date());
         res.writeHead(204).end();
         return;
       }
@@ -89,11 +82,11 @@ export function adminHandler(
 
 export function startAdmin(
   supervisor: Supervisor,
-  dataDir: string,
+  sink: Sink,
   port: number,
   log: Log,
   ready?: () => boolean,
 ) {
-  const handler = adminHandler(supervisor, dataDir, log, ready);
+  const handler = adminHandler(supervisor, sink, log, ready);
   return createServer((req, res) => void handler(req, res)).listen(port, '0.0.0.0');
 }

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { adminHandler } from './admin.ts';
+import { ndjsonSink } from './ae-sink.ts';
 import { siteOfHost } from './proxy.ts';
 import type { Runtime } from './runtime.ts';
 import { Store } from './store.ts';
@@ -107,7 +108,7 @@ describe('proxy e administração', () => {
 
   it('rotas, erros e pontos do ae-sim', async () => {
     const { sup, dir } = await supervisor();
-    const handler = adminHandler(sup, dir, () => undefined);
+    const handler = adminHandler(sup, ndjsonSink(dir), () => undefined);
     const call = async (method: string, path: string, body?: string | Uint8Array) => {
       const { createServer } = await import('node:http');
       const server = createServer((req, res) => void handler(req, res)).listen(0);
@@ -153,7 +154,7 @@ describe('proxy e administração', () => {
     let ready = false;
     const handler = adminHandler(
       sup,
-      dir,
+      ndjsonSink(dir),
       () => undefined,
       () => ready,
     );

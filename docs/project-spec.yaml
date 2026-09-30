@@ -265,10 +265,40 @@ decisions:
     }
   ops.container:
     {
-      value: 'compose base infra/vps/compose.yaml + override infra/local/compose.override.yaml; Postgres 18.6 e SeaweedFS 4.48 presos por tag + digest; comandos pnpm local:*',
+      value: 'compose base infra/vps/compose.yaml + override infra/local/compose.override.yaml; imagens de apoio presas por tag + digest; comandos pnpm local:*',
       source: input,
       input_ref: 'Estrutura; Comandos',
       provisional: true,
+    }
+  ops.networks:
+    {
+      value: 'orakel-internal, orakel-export (internal, sem internet), orakel-publish, orakel-docker (build-runner + proxy) no base; orakel-edge no local; ADR 0010',
+      source: input,
+      input_ref: '11.6 — Redes',
+    }
+  ops.docker_socket:
+    {
+      value: 'wollomatic/socket-proxy 1.13.1 com lista de rotas por método, só a partir do build-runner; ADR 0011',
+      source: user,
+      input_ref: '11.6 — Build; L0 — spike de isolamento',
+    }
+  ops.local_storage:
+    {
+      value: 'SeaweedFS 4.48 (S3 :8333, filer :8888, console weed admin em s3.orakel.localhost); buckets pelo s3-init; mídia pelo filer via Caddy em media.<site>.localhost; ADRs 0012 e 0013',
+      source: user,
+      input_ref: '11.6 — Substitutos da nuvem; Hostnames',
+    }
+  ops.local_analytics:
+    {
+      value: 'ClickHouse 25.8 com analytics.events no layout do AE; ae-sim do edge-local grava nela; spike AE × ClickHouse passou (mesma SQL); ADR 0014',
+      source: user,
+      input_ref: '11.6 — Substitutos da nuvem; L0 — spike AE × ClickHouse',
+    }
+  ops.local_tooling:
+    {
+      value: 'Seeds no db:seed do backoffice + infra/local/seeds/sites.json (domínios .localhost); local:check, local:publish, local:load (k6); perfis observability (GlitchTip, Healthchecks) e lighthouse (LHCI server); ADR 0015',
+      source: user,
+      input_ref: '11.6 — Seeds; Testes; Substitutos da nuvem',
     }
   ops.ci:
     {
@@ -360,6 +390,9 @@ commands:
   local_down: pnpm local:down
   local_reset: pnpm local:reset
   local_images: pnpm local:images
+  local_check: pnpm local:check
+  local_publish: pnpm local:publish <site>
+  local_load: pnpm local:load [<site>]
   local_e2e: pnpm local:e2e
 
 structure:
@@ -373,7 +406,7 @@ structure:
     ├── packages/             # unidades: content-model, content-client, core, tokens, elements, events, ui
     ├── adapters/             # unidade: astro
     ├── tooling/{tsconfig, eslint-config, prettier-config, vitest-config}   # + build-site (unidade)
-    ├── infra/{vps/compose.yaml, local/{compose.override.yaml, compose.sh}}
+    ├── infra/{vps/compose.yaml, local/{compose.override.yaml, compose.sh, Caddyfile, *.sh, s3/, clickhouse/, seeds/, load/, access-mock/, edge-local/}}
     ├── docker/{docker-bake.hcl, bake.sh}   # + site-builder/Dockerfile (com a unidade build-site)
     ├── .github/workflows/{ci, images, release, e2e, add-to-project}.yml
     └── docs/
@@ -478,7 +511,8 @@ units:
     }
 
 open_questions:
-  - 'Redes export, publish e edge do compose e o build-runner real (docker-socket-proxy, volume /build): scaffold da task build do backoffice'
+  - 'Task build real do build-runner (containers render e publish pela API do Docker, volume /build, retentativas): retomada do backoffice (L3)'
+  - 'Docker rootless no lugar do proxy do socket — reavaliar no primeiro deploy (ADR 0011)'
   - 'Provedor S3 de produção (R2?) — decidir no primeiro deploy'
   - 'Onde ficam os segredos de produção (VPS/Ansible, Cloudflare) — decidir no primeiro deploy'
   - 'Nomes das variáveis de ambiente e dos comandos local:* são proposta — confirmar ao implementar as unidades'

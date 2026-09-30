@@ -7,4 +7,4 @@
 - Bake: alvo `edge-local` no grupo `local` (só o `pnpm local:images`; o `images.yml` não publica).
 - `compose.override.yaml`: serviço `edge-local` com o volume `edge-local-data:/data`, healthcheck em `/healthz`, sem portas na máquina.
 - Caddy: `*.localhost` → `edge-local:8080` (os blocos `admin.` e `preview.` têm prioridade).
-- Redes `publish` e `edge`: entram com o `build-runner` (scaffold do backoffice/compose). Até lá, a administração está na rede padrão — aceitável só no local.
+- Redes `publish` (administração, pelo `publish` do site-builder) e `edge` (sites, pelo Caddy; ClickHouse), definidas no scaffold do ambiente local (ADR 0010 da raiz).
