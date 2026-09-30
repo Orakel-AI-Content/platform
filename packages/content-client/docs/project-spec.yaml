@@ -1,0 +1,112 @@
+spec_version: 1
+scope: unit
+inherits: ../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: 06f9e91d0f9ae0efd7f1dfd90077bff69d0dba6e39a0010dbbdbd35d7ca4f44b
+  summary: >-
+    Linha packages/content-client do bloco do monorepo (12.0, seção 11.1) e a etapa L1
+    (seção 6) como complemento. Texto em docs/decisions/0001-entrada.md.
+project:
+  name: content-client
+  type: [lib]
+  goal: >-
+    Cliente da API de exportação do Backoffice: lê o snapshot NDJSON em streaming, valida
+    cada linha pelo content-model e entrega os dados ao build do blog por loaders do
+    Content Layer do Astro.
+  scale: mvp
+
+decisions:
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime: { value: 'Node 24 (astro build e render do site-builder)', source: inferred }
+  stack.framework:
+    {
+      value: 'Astro 7.3.5 como peer do subcaminho /astro; fetch nativo',
+      rationale: 'Versão mantida hoje; live collections estáveis desde o 6. Vale também para o blog',
+      source: recommended,
+    }
+  architecture.versioning:
+    {
+      value: 'Subcaminhos ./v1 e ./v1/astro; "." com versões, snapshotUrl e failureKind',
+      source: inferred,
+    }
+  architecture.reading:
+    {
+      value: 'readSnapshot: streaming, linha a linha pelo parseSnapshotLine, conjunto pelo validateSnapshot; campos desconhecidos descartados',
+      source: input,
+      input_ref: '11.1; L1',
+    }
+  architecture.failures:
+    {
+      value: 'transitória (network, http 5xx/429, truncated, snapshot-structure) × permanente (401, 403, 404, json, schema, semântica)',
+      source: inferred,
+      input_ref: 'bloco do site-builder — códigos de saída 20 e 10',
+    }
+  architecture.loaders:
+    {
+      value: 'snapshotLoaders: um loader por coleção, uma leitura compartilhada por build, metaFile com { header, end }; sem schema do Astro',
+      source: user,
+    }
+  architecture.live_preview:
+    {
+      value: not_applicable,
+      rationale: 'Adiada: entra com as rotas config, routes e listing do backoffice, num PR com as duas pontas',
+      source: user,
+    }
+  architecture.folder_structure: { value: aprovada (ver structure.tree), source: user }
+  integration.dependencies:
+    { value: '@orakel/content-model; astro (peer, opcional)', source: inferred }
+  integration.tasks: { value: 'lint, typecheck, test', source: inferred }
+  integration.env:
+    {
+      value: not_applicable,
+      rationale: 'URL e token chegam por parâmetro; quem lê o env é o blog ou o render',
+      source: inferred,
+    }
+  data.persistence: { value: not_applicable, rationale: Lib, source: inferred }
+  security.config_and_secrets:
+    { value: 'Token do build por parâmetro; nunca logado', source: inferred }
+  quality.tests:
+    {
+      value: 'Vitest com servidor HTTP local servindo as fixtures em pedaços; loaders com store falso; sem meta de cobertura',
+      source: inferred,
+    }
+  quality.lint_format:
+    { value: "ESLint layer('domain') + exceção do Astro em src/v*/astro/**", source: inherited }
+  ops.container:
+    {
+      value: 'Dockerfile só de teste; alvo content-client-test fora dos grupos publicados e do CI',
+      source: user,
+    }
+  ops.deploy:
+    {
+      value: not_applicable,
+      rationale: 'Chega às imagens do site-builder e do blog-preview',
+      source: inferred,
+    }
+
+commands:
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  from_root: pnpm turbo run lint typecheck test --filter=@orakel/content-client
+  docker_test: docker buildx bake content-client-test
+
+structure:
+  tree: |
+    packages/content-client/
+    ├── package.json  tsconfig.json  eslint.config.js  vitest.config.ts  Dockerfile
+    └── src/
+        ├── index.ts  failures.ts
+        └── v1/{index,ndjson,read-snapshot,meta-file,test-server}.ts + astro/{index,loaders}.ts
+  paths:
+    client: src/
+    astro: src/v1/astro/
+
+open_questions:
+  - 'Leitura ao vivo (live loader) com as rotas config, routes e listing do backoffice'
+  - 'metaFile: o render passa caminho absoluto (relativo resolve pelo diretório do astro build)'
+  - 'Teste de contrato N-1 no CI (content-client da última tag contra a API do commit) — quando existir a primeira tag core-v*'

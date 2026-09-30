@@ -1,0 +1,8 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // Roda no Node 24 (astro build e render do site-builder); testes usam node:http.
+    "types": ["node"]
+  },
+  "include": ["src", "*.ts"]
+}

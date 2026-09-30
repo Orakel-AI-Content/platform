@@ -22,13 +22,13 @@ sites é configuração.
 Geradas:
 
 - `packages/content-model` – schemas Zod de conteúdo e configuração de site
+- `packages/content-client` – cliente da API de exportação: snapshot em streaming e loaders do Astro
 - `packages/events` – formato versionado dos eventos, manifesto e script do navegador
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
 - `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner
 
 Previstas (gere com `/scaffold` no caminho da unidade):
 
-- `packages/content-client` – cliente da API de exportação (loader Astro, leitura ao vivo)
 - `packages/core` – SEO, sitemap, RSS, robots, `_redirects`, `_headers`
 - `packages/tokens` – temas → variáveis CSS com contraste AA
 - `packages/elements` – Web Components

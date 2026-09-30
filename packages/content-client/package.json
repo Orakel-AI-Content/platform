@@ -1,0 +1,39 @@
+{
+  "name": "@orakel/content-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cliente da API de exportação do Backoffice: snapshot NDJSON em streaming e loaders do Content Layer do Astro",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./v1": "./src/v1/index.ts",
+    "./v1/astro": "./src/v1/astro/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@orakel/content-model": "workspace:*"
+  },
+  "peerDependencies": {
+    "astro": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "astro": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/tsconfig": "workspace:*",
+    "@orakel/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "astro": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
