@@ -8,6 +8,10 @@
       "env": ["SITE_ID", "CONTENT_SOURCE", "EXPORT_API_URL", "SNAPSHOT_META_FILE", "BLOG_OUTPUT"],
       "passThroughEnv": ["EXPORT_BUILD_TOKEN"],
       "outputs": ["dist/**", "dist-preview/**"]
+    },
+    // O lint com tipos lê os tipos do @orakel/tokens, que vêm do build dele (dist/).
+    "lint": {
+      "dependsOn": ["^build"]
     }
   }
 }
