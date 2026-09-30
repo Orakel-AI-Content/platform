@@ -8,5 +8,7 @@ export default [
   },
   ...layer('app', import.meta.dirname),
   nextPlugin.configs['core-web-vitals'],
+  // O lefthook roda o ESLint a partir da raiz: o plugin do Next precisa saber onde está o app.
+  { settings: { next: { rootDir: import.meta.dirname } } },
   reactHooks.configs.flat.recommended,
 ];
