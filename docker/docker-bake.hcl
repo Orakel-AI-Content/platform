@@ -76,6 +76,13 @@ target "tokens-test" {
   output     = ["type=cacheonly"]
 }
 
+target "core-test" {
+  inherits   = ["_base"]
+  dockerfile = "packages/core/Dockerfile"
+  target     = "test"
+  output     = ["type=cacheonly"]
+}
+
 target "events-test" {
   inherits   = ["_base"]
   dockerfile = "packages/events/Dockerfile"

@@ -1,0 +1,123 @@
+spec_version: 1
+scope: unit
+inherits: ../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+    - Orakel-AI-Content/workspace:docs/platform-requirements/10-politicas-e-conformidade.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: 06f9e91d0f9ae0efd7f1dfd90077bff69d0dba6e39a0010dbbdbd35d7ca4f44b
+    Orakel-AI-Content/workspace:docs/platform-requirements/10-politicas-e-conformidade.md: 211221166a9ceb8444e08777af67b8d5dd5b334fda05dc86c39dd05cdcc39904
+  summary: >-
+    Linha packages/core do 11.1 e o bloco "SEO técnico e arquivos da borda" da L2 (12.0);
+    P10 (10); complementos citados: 05 seções 3.2 e 3.4, 12.1 seção 4, 02 seção 2.3.
+    Texto em docs/decisions/0001-entrada.md.
+project:
+  name: core
+  type: [lib]
+  goal: >-
+    SEO técnico e arquivos da borda dos sites, em funções puras sobre o snapshot v1: rotas,
+    head e JSON-LD, sitemap, RSS, robots.txt, _redirects e _headers.
+  scale: mvp
+
+decisions:
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime:
+    { value: 'Node 24 (render e SSR do blog); fonte TS exportada, sem build', source: inherited }
+  stack.framework: { value: 'Nenhum; só @orakel/content-model (tipos v1)', source: inferred }
+  architecture.versioning:
+    {
+      value: './v1 para as funções sobre os tipos v1; "." para o neutro (head, crawlers, políticas)',
+      source: user,
+    }
+  architecture.routes:
+    {
+      value: 'Core é a fonte única das rotas; barra final; /pagina/<n>/; routeConflicts (slug reservado, institucional, redirect sobre página viva) é falha permanente',
+      source: user,
+    }
+  architecture.head:
+    { value: 'seoHead → HeadTag[]; renderHead escapa atributos e JSON-LD', source: user }
+  architecture.event_manifest:
+    {
+      value: 'Fica no @orakel/events; o core só fornece contentPath',
+      source: user,
+      input_ref: 'L2 — diverge da lista da L1',
+    }
+  seo.robots:
+    {
+      value: 'CRAWLERS versionado no core; bloqueia treinamento de IA; sobrescrita do site; sem bloquear rastreio com indexavel desligado',
+      source: user,
+      input_ref: P10,
+    }
+  seo.sitemap:
+    {
+      value: 'Índice + por tipo; sem paginação, busca e 404; vazio com indexavel desligado; divisão em 50.000',
+      source: user,
+    }
+  seo.rss:
+    {
+      value: 'RSS 2.0, 20 artigos, só resumo, guid <siteId>:<id>, lastBuildDate pela publicação mais recente',
+      source: user,
+    }
+  seo.json_ld:
+    {
+      value: 'Article, Person, BreadcrumbList, Organization (nome, URL, @id) num @graph; logo e perfis pendentes no content-model',
+      source: user,
+    }
+  edge.redirects:
+    {
+      value: 'Estático × dinâmico; 2.000 / 100; alerta 75%; excesso é falha permanente; uso volta para o result.json',
+      source: input,
+      input_ref: '05 seção 3.2',
+    }
+  edge.headers:
+    {
+      value: 'immutable só com hash (_astro, fonts, pagefind index/fragment/filter); segurança mínima em /*; X-Robots-Tag com indexavel desligado; HSTS na zona; CSP pendente',
+      source: user,
+    }
+  integration.dependencies: { value: '@orakel/content-model (workspace)', source: inferred }
+  integration.tasks: { value: 'lint, typecheck, test', source: inherited }
+  integration.env: { value: not_applicable, rationale: Funções puras, source: inferred }
+  data.persistence: { value: not_applicable, rationale: Lib, source: inferred }
+  quality.tests:
+    {
+      value: 'Vitest sobre as fixtures do content-model e casos montados; snapshots dos arquivos gerados; 90% de linhas e branches',
+      source: inherited,
+    }
+  quality.lint_format: { value: "ESLint layer('domain')", source: inherited }
+  ops.container:
+    { value: 'Dockerfile só de teste; alvo core-test fora dos grupos e do CI', source: user }
+  ops.deploy:
+    {
+      value: not_applicable,
+      rationale: 'Chega ao site-builder e ao blog-preview dentro do blog',
+      source: inherited,
+    }
+
+commands:
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  from_root: pnpm turbo run lint typecheck test --filter=@orakel/core
+  docker_test: docker buildx bake core-test
+
+structure:
+  tree: |
+    packages/core/
+    ├── package.json  tsconfig.json  eslint.config.js  vitest.config.ts  Dockerfile
+    └── src/
+        ├── index.ts  result.ts  head.ts  xml.ts  crawlers.ts  policy.ts
+        └── v1/{index,site,routes,seo,json-ld,sitemap,rss,robots,redirects,headers,files}.ts
+            + test-snapshots.ts, *.test.ts, __snapshots__/
+  paths:
+    neutral: src/
+    v1: src/v1/
+
+open_questions:
+  - 'content-model e backoffice: logo e perfis sociais na configuração do site (Organization)'
+  - 'Backoffice: recusar slugs reservados (RESERVED_SLUGS) ao salvar'
+  - 'Blog: integração que grava edgeFiles, seoHead no layout, rotas nos links, código 10 para os problemas do core'
+  - 'Fase 1: HSTS na zona (OpenTofu); validar no piloto as regras de _headers do Pagefind'
+  - 'Fase 2: CSP, começando em report-only'
+  - 'Fase 3: ads.txt, anúncios e afiliados'

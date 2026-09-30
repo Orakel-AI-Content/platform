@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`robotsTxt > libera tudo, bloqueia o treinamento de IA e aponta o sitemap 1`] = `
+"# Gerado pela plataforma (lista de crawlers revisada em 2026-09-30).
+User-agent: *
+Allow: /
+
+# Treinamento de IA
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: CCBot
+User-agent: Bytespider
+User-agent: meta-externalagent
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+Disallow: /
+
+Sitemap: https://exemplo-a.com.br/sitemap.xml
+"
+`;

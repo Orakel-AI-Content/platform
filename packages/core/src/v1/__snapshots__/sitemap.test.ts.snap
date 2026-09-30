@@ -1,0 +1,25 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`sitemaps > índice + um arquivo por tipo, só com páginas indexáveis 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>https://exemplo-a.com.br/sitemap-artigos.xml</loc><lastmod>2026-09-25T09:30:00-03:00</lastmod></sitemap>
+  <sitemap><loc>https://exemplo-a.com.br/sitemap-paginas.xml</loc><lastmod>2026-09-25T09:30:00-03:00</lastmod></sitemap>
+  <sitemap><loc>https://exemplo-a.com.br/sitemap-categorias.xml</loc><lastmod>2026-09-25T09:30:00-03:00</lastmod></sitemap>
+  <sitemap><loc>https://exemplo-a.com.br/sitemap-tags.xml</loc><lastmod>2026-09-25T09:30:00-03:00</lastmod></sitemap>
+  <sitemap><loc>https://exemplo-a.com.br/sitemap-series.xml</loc><lastmod>2026-09-25T09:30:00-03:00</lastmod></sitemap>
+  <sitemap><loc>https://exemplo-a.com.br/sitemap-autores.xml</loc><lastmod>2026-09-25T09:30:00-03:00</lastmod></sitemap>
+</sitemapindex>
+"
+`;
+
+exports[`sitemaps > índice + um arquivo por tipo, só com páginas indexáveis 2`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://exemplo-a.com.br/</loc><lastmod>2026-09-25T09:30:00-03:00</lastmod></url>
+  <url><loc>https://exemplo-a.com.br/privacidade/</loc></url>
+  <url><loc>https://exemplo-a.com.br/quem-somos/</loc><lastmod>2026-09-01T10:00:00-03:00</lastmod></url>
+  <url><loc>https://exemplo-a.com.br/sobre/</loc></url>
+</urlset>
+"
+`;

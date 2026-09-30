@@ -1,0 +1,29 @@
+{
+  "name": "@orakel/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SEO técnico e arquivos da borda dos sites: rotas, head, JSON-LD, sitemap, RSS, robots.txt, _redirects e _headers",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./v1": "./src/v1/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@orakel/content-model": "workspace:*"
+  },
+  "devDependencies": {
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/tsconfig": "workspace:*",
+    "@orakel/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

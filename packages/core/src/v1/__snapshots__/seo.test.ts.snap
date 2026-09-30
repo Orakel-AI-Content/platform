@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`seoHead — artigo > gera o head completo do artigo da fixture 1`] = `
+"<title>Guia completo para começar | Exemplo A</title>
+<meta name="description" content="Tudo o que você precisa para dar o primeiro passo.">
+<link rel="canonical" href="https://exemplo-a.com.br/guia-completo/">
+<meta property="og:site_name" content="Exemplo A — Guias">
+<meta property="og:title" content="Guia completo para começar | Exemplo A">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://exemplo-a.com.br/guia-completo/">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:description" content="Tudo o que você precisa para dar o primeiro passo.">
+<meta property="og:image" content="https://media.exemplo-a.com.br/exemplo-a/c0ffee01-1920.webp">
+<meta property="og:image:width" content="1920">
+<meta property="og:image:height" content="1080">
+<meta property="article:published_time" content="2026-09-20T12:00:00-03:00">
+<meta property="article:modified_time" content="2026-09-25T09:30:00-03:00">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Article","@id":"https://exemplo-a.com.br/guia-completo/#article","headline":"Guia completo para começar","description":"Tudo o que você precisa para dar o primeiro passo.","datePublished":"2026-09-20T12:00:00-03:00","dateModified":"2026-09-25T09:30:00-03:00","inLanguage":"pt-BR","mainEntityOfPage":"https://exemplo-a.com.br/guia-completo/","image":["https://media.exemplo-a.com.br/exemplo-a/c0ffee01-1920.webp"],"author":[{"@id":"https://exemplo-a.com.br/autor/ana-souza/#person"}],"publisher":{"@id":"https://exemplo-a.com.br/#organization"}},{"@type":"Person","@id":"https://exemplo-a.com.br/autor/ana-souza/#person","name":"Ana Souza","url":"https://exemplo-a.com.br/autor/ana-souza/","description":"Escreve guias práticos há dez anos.","image":"https://media.exemplo-a.com.br/exemplo-a/c0ffee02-1920.webp","knowsAbout":"Organização pessoal"},{"@type":"Organization","@id":"https://exemplo-a.com.br/#organization","name":"Exemplo A — Guias","url":"https://exemplo-a.com.br/"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Início","item":"https://exemplo-a.com.br/"},{"@type":"ListItem","position":2,"name":"Guias","item":"https://exemplo-a.com.br/categoria/guias/"},{"@type":"ListItem","position":3,"name":"Guia completo para começar","item":"https://exemplo-a.com.br/guia-completo/"}]}]}</script>"
+`;
