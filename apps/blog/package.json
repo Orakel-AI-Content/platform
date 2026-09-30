@@ -8,7 +8,7 @@
     "dev": "node --env-file-if-exists=../../.env.local node_modules/astro/bin/astro.mjs dev",
     "build": "astro build",
     "preview": "BLOG_OUTPUT=preview node --env-file-if-exists=../../.env.local node_modules/astro/bin/astro.mjs build && node --env-file-if-exists=../../.env.local dist-preview/server/entry.mjs",
-    "lint": "eslint .",
+    "lint": "CONTENT_SOURCE=fixture SITE_ID=exemplo-a astro sync && eslint .",
     "typecheck": "CONTENT_SOURCE=fixture SITE_ID=exemplo-a astro check && tsc --noEmit",
     "test": "vitest run",
     "build:examples": "node scripts/build-examples.ts",
