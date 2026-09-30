@@ -1,0 +1,203 @@
+spec_version: 1
+scope: unit
+inherits: ../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: 06f9e91d0f9ae0efd7f1dfd90077bff69d0dba6e39a0010dbbdbd35d7ca4f44b
+  summary: >-
+    Bloco de scaffold do Backoffice (12.0, seção 11.4), colado no comando. Texto integral em
+    docs/decisions/0001-entrada.md.
+project:
+  name: backoffice
+  type: [web, api, worker]
+  goal: >-
+    Ferramenta administrativa (não é CMS): fonte única do conteúdo e da configuração dos
+    sites, revisão humana, publicação, registro de sites e releases; dona do Postgres e da
+    API de exportação.
+  scale: mvp
+
+decisions:
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime: { value: Node.js 24.21.0, source: inherited }
+  stack.framework:
+    {
+      value: 'Next.js 16.3.6 (App Router, output standalone), React 19.3.0',
+      rationale: 'A 16.3.7 saiu há menos de 24 h (minimumReleaseAge)',
+      source: input,
+      input_ref: 'Framework',
+    }
+
+  architecture.scope:
+    {
+      value: 'Fundação completa + fluxo Sites → exportação; demais módulos são backlog (ADR 0002)',
+      source: user,
+    }
+  architecture.processes:
+    {
+      value: 'Uma imagem, três comandos: web (Next standalone), worker (Graphile Worker: jobs e agregador por cron), build-runner (task build, concorrência 2)',
+      rationale: 'Agregador como job do worker, como a entrada; substitui a parte do ADR 0004 da raiz (ADR 0009 da raiz)',
+      source: user,
+      input_ref: 'Processos',
+    }
+  architecture.code_design:
+    {
+      value: 'Regras em src/domain/<módulo>, chamadas por route handlers, jobs e processos; Result no domínio e problem+json nas rotas; recordPendingChange em toda gravação exportada, com teste de varredura',
+      source: input,
+      input_ref: 'Design de código',
+    }
+  architecture.communication:
+    {
+      value: 'API de exportação v1 só na rede interna (GET /api/export/v1/sites/{site}/snapshot, NDJSON em REPEATABLE READ, token do build); /api/export e /api/internal bloqueados no hostname público',
+      source: input,
+      input_ref: 'Comunicação',
+    }
+  architecture.folder_structure: { value: aprovada (ver structure.tree), source: user }
+
+  data.persistence: { value: Postgres 18.6 (dono do schema), source: inherited }
+  data.access:
+    {
+      value: 'Drizzle ORM 0.45.3 sobre pg 8.23.0, pool compartilhado com o Graphile Worker (job na mesma transação)',
+      source: input,
+      input_ref: 'Dados',
+    }
+  data.migrations:
+    {
+      value: 'drizzle-kit 0.31.11 (SQL em drizzle/), aplicadas por db:migrate com o schema graphile_worker; só aditivas',
+      source: input,
+      input_ref: 'Migrações',
+    }
+  data.ids:
+    {
+      value: 'IDs numéricos por site (site_sequences), estáveis e nunca reutilizados; próximo número de bloco por conteúdo',
+      source: recommended,
+      rationale: 'Os IDs das fixtures são por site e o identificador de reconciliação já inclui o site (ADR 0003)',
+    }
+  data.messaging: { value: Graphile Worker 0.18.0, source: input, input_ref: 'Filas e jobs' }
+  data.object_storage:
+    {
+      value: 'SeaweedFS (local) e R2 (produção) pelo @aws-sdk/client-s3; nesta geração só o cliente',
+      rationale: 'Diverge da entrada (MinIO): a raiz adotou SeaweedFS (ADR 0008 da raiz)',
+      source: user,
+      input_ref: 'Dados',
+    }
+
+  security.authentication:
+    {
+      value: 'JWT do Cloudflare Access validado com jose (JWKS remoto, iss, aud) em cada requisição; local: Caddy + access-mock com o mesmo contrato',
+      source: input,
+      input_ref: 'Autenticação',
+    }
+  security.authorization:
+    {
+      value: 'RBAC admin, editor, revisor, operacao (matriz proposta) em requireRole no domínio; proxy só redireciona',
+      source: input,
+      input_ref: 'Autorização',
+      provisional: true,
+    }
+  security.validation:
+    { value: 'Zod do @orakel/content-model/v1, contra os Resources da release', source: input }
+  security.config_and_secrets:
+    {
+      value: 'src/env.ts com Zod; tokens internos de 32+ caracteres; nada no GitHub',
+      source: inherited,
+    }
+
+  platform.rendering:
+    {
+      value: 'Server Components chamam o domínio; Client Components só com interação',
+      source: recommended,
+    }
+  design.design_system:
+    {
+      value: 'shadcn/ui (componentes copiados) + Tailwind 4.3.3',
+      source: input,
+      input_ref: 'UI e componentes',
+    }
+  design.tables: { value: TanStack Table 9.2.4, source: input }
+  design.accessibility: { value: WCAG 2.2 AA; axe no E2E, source: inherited }
+
+  quality.tests:
+    {
+      value: 'test (Vitest, sem banco), test:contract (Vitest + Postgres), test:e2e (Playwright + axe contra o ambiente local); sem meta de cobertura',
+      source: input,
+      input_ref: 'Testes',
+    }
+  quality.lint_format:
+    {
+      value: "ESLint layer('app') + @next/eslint-plugin-next + react-hooks; Prettier",
+      source: inherited,
+    }
+
+  ops.container:
+    {
+      value: 'Imagem backoffice (grupo images), layout do workspace (pacotes internos fora de node_modules para o Node remover tipos); backoffice-migrate, -web e -worker no compose; build-runner e docker-socket-proxy com o build-site',
+      source: user,
+    }
+  ops.observability:
+    {
+      value: 'pino JSON; Sentry só com SENTRY_DSN; heartbeat do worker por cron',
+      source: input,
+      input_ref: 'Observabilidade',
+    }
+  ops.deploy:
+    {
+      value: 'GHCR a cada merge (images.yml); playbook Ansible no primeiro deploy',
+      source: input,
+      input_ref: 'Deploy',
+    }
+
+  extra.site-lifecycle:
+    {
+      value: 'cadastrado → infra_aplicada → zona_ativa → publicado; estado ativo/promovendo/pausado com motivo',
+      source: input,
+    }
+  extra.publication-states:
+    { value: 'rascunho, em_revisao, aprovado, agendado, publicado, despublicado', source: input }
+  extra.build-window:
+    { value: '15 min em produção, 30 s no local (proposta)', source: input, provisional: true }
+
+commands:
+  dev: pnpm dev
+  build: pnpm build
+  start: pnpm start
+  worker: pnpm worker
+  test: pnpm test
+  test_contract: DATABASE_URL=… pnpm test:contract
+  test_e2e: pnpm test:e2e
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  db_generate: pnpm db:generate --name <nome>
+  db_migrate: pnpm db:migrate
+  db_seed: pnpm db:seed
+
+structure:
+  tree: |
+    apps/backoffice/
+    ├── Dockerfile  next.config.ts  drizzle.config.ts  components.json  playwright.config.ts
+    ├── vitest.config.ts  vitest.contract.config.ts  eslint.config.js  tsconfig.json
+    ├── drizzle/                 migrações SQL
+    ├── src/app/                 UI e route handlers (finos)
+    ├── src/domain/              access, pending-changes, sites, content, export, import
+    ├── src/db/                  pool, cliente, schema, site-ids
+    ├── src/auth/                JWT do Access, tokens internos, ator da requisição
+    ├── src/jobs/                tasks, crontab, enqueue
+    ├── src/bin/                 worker, build-runner, migrate, seed
+    ├── src/components/          ui/ (shadcn) e telas
+    ├── src/lib/                 logger, problem, heartbeat, s3, sentry, utils
+    └── test/{contract,e2e}/
+  paths:
+    domain: src/domain/
+    app: src/app/
+    db: src/db/
+    jobs: src/jobs/
+
+open_questions:
+  - 'Backlog: módulos Conteúdo (TipTap), Mídia (ingestão com sharp), Revisão, Publicação (limite diário, redirects, agendamento), Registro de instâncias (ações), geração básica, agregador, backup/restore, expurgo, promoção de release, rotas config/routes/listing, rota interna do motor, E2E completo'
+  - 'SDK do LLM da geração básica (provedor e modelo configuráveis) — decidir com o módulo Geração'
+  - 'build-runner real com docker-socket-proxy e rede export — com a unidade build-site'
+  - 'Streaming do snapshot lê entidade por entidade; para acervos grandes, cursor no Postgres (critério da L1: 1.000 artigos)'
+  - 'Imagem com ~1,1 GB (dependências de produção + standalone); otimizar (ex.: bundle dos processos Node)'
+  - 'Redes separadas no compose (internal, export) — com o build-site'

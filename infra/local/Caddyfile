@@ -1,0 +1,28 @@
+# Substituto local do Cloudflare Tunnel + Access (ADR 0008 da raiz; ADR 0004 do backoffice).
+# Certificados da CA interna do Caddy: instale a raiz uma vez (docs/guides/local-setup.md).
+{
+	local_certs
+}
+
+admin.orakel.localhost {
+	# Login, callback e JWKS do access-mock, no mesmo caminho do Access real.
+	handle /cdn-cgi/access/* {
+		reverse_proxy access-mock:8788
+	}
+
+	# A API de exportação e a interna só existem na rede dos containers.
+	handle /api/export/* {
+		respond 404
+	}
+	handle /api/internal/* {
+		respond 404
+	}
+
+	handle {
+		forward_auth access-mock:8788 {
+			uri /cdn-cgi/access/authorize
+			copy_headers Cf-Access-Jwt-Assertion
+		}
+		reverse_proxy {$BACKOFFICE_UPSTREAM}
+	}
+}

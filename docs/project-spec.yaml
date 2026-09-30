@@ -112,8 +112,8 @@ decisions:
       Três planos: conteúdo (Backoffice Next.js monolito modular + Postgres + S3, na VPS),
       entrega (sites estáticos na Cloudflare gerados pela imagem site-builder, SSR só para
       visualização) e eventos (Worker de borda /_e/* → Analytics Engine + fila → agregador).
-      O agregador é entrypoint do backoffice; uma imagem do backoffice serve web, worker,
-      build-runner e aggregator.
+      O agregador é job do backoffice-worker (ADR 0009); uma imagem do backoffice serve web,
+      worker e build-runner.
     source: user
     input_ref: 'Estrutura; packages/events; CI — images.yml'
   architecture.communication:
@@ -402,8 +402,8 @@ units:
       name: backoffice,
       path: apps/backoffice,
       type: [web, api, worker],
-      role: 'Next.js: UI, Publish API, API de exportação; entrypoints backoffice-worker, build-runner e aggregator',
-      status: planned,
+      role: 'Next.js: UI, Publish API, API de exportação; processos backoffice-worker (jobs e agregador) e build-runner',
+      status: generated,
     }
   - {
       name: generator,

@@ -24,6 +24,7 @@ Geradas:
 - `packages/content-model` – schemas Zod de conteúdo e configuração de site
 - `packages/events` – formato versionado dos eventos, manifesto e script do navegador
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
+- `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner
 
 Previstas (gere com `/scaffold` no caminho da unidade):
 
@@ -34,7 +35,6 @@ Previstas (gere com `/scaffold` no caminho da unidade):
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
 - `apps/blog` – sites Astro por `SITE_ID` (exclui `worker/` do tsconfig e do ESLint)
-- `apps/backoffice` – Next.js: UI, Publish API, exportação, worker, build-runner, aggregator
 - `apps/generator` – geração com LLM (fase 2)
 - `tooling/build-site` – render e publish; imagem `site-builder`
 

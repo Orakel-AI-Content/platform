@@ -1,7 +1,26 @@
 # Compose base da VPS (produção). O ambiente local aplica infra/local/compose.override.yaml
-# por cima deste arquivo (pnpm local:up). Os serviços das unidades (backoffice web,
-# worker, build-runner, aggregator) entram aqui quando cada unidade for gerada.
+# por cima deste arquivo (pnpm local:up). Os serviços das unidades entram aqui quando cada
+# unidade é gerada; o build-runner e o docker-socket-proxy entram com o build-site.
 name: orakel
+
+# Imagem e ambiente comuns aos processos do backoffice (uma imagem, três comandos).
+x-backoffice: &backoffice
+  image: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/backoffice:${BACKOFFICE_TAG:-local}
+  restart: unless-stopped
+  environment:
+    NODE_ENV: production
+    DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-orakel}
+    ACCESS_TEAM_DOMAIN: ${ACCESS_TEAM_DOMAIN:?defina ACCESS_TEAM_DOMAIN}
+    ACCESS_JWKS_URL: ${ACCESS_JWKS_URL:?defina ACCESS_JWKS_URL}
+    ACCESS_AUD: ${ACCESS_AUD:?defina ACCESS_AUD}
+    EXPORT_BUILD_TOKEN: ${EXPORT_BUILD_TOKEN:?defina EXPORT_BUILD_TOKEN}
+    EXPORT_PREVIEW_TOKEN: ${EXPORT_PREVIEW_TOKEN:?defina EXPORT_PREVIEW_TOKEN}
+    GENERATOR_TOKEN: ${GENERATOR_TOKEN:?defina GENERATOR_TOKEN}
+    S3_ENDPOINT: ${S3_ENDPOINT:?defina S3_ENDPOINT}
+    S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?defina S3_ACCESS_KEY_ID}
+    S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?defina S3_SECRET_ACCESS_KEY}
+    SENTRY_DSN: ${SENTRY_DSN:-}
+    HEARTBEAT_BASE_URL: ${HEARTBEAT_BASE_URL:-}
 
 services:
   postgres:
@@ -19,6 +38,35 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+
+  # Migrações do Drizzle e do Graphile Worker; sai depois de aplicar (só aditivas).
+  backoffice-migrate:
+    <<: *backoffice
+    restart: 'no'
+    command: ['node', 'src/bin/migrate.ts']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backoffice-web:
+    <<: *backoffice
+    command: ['node', '.next/standalone/apps/backoffice/server.js']
+    depends_on:
+      backoffice-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Graphile Worker: jobs gerais e agregador (cron).
+  backoffice-worker:
+    <<: *backoffice
+    command: ['node', 'src/bin/worker.ts']
+    depends_on:
+      backoffice-migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres-data:

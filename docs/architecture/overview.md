@@ -19,7 +19,7 @@ flowchart LR
     BO[Backoffice Next.js<br/>UI · Publish API · API de exportação]
     W[backoffice-worker]
     BR[build-runner]
-    AG[aggregator]
+    AG[agregador<br/>job do backoffice-worker]
     PG[(Postgres 18)]
     S3[(S3)]
     BO --- PG
@@ -46,8 +46,8 @@ flowchart LR
   AE -->|SQL| AG
 ```
 
-- **Conteúdo:** o Backoffice é um monolito modular. Uma única imagem atende quatro
-  comandos: web, `backoffice-worker`, `build-runner` e `aggregator`. É dono do schema
+- **Conteúdo:** o Backoffice é um monolito modular. Uma única imagem atende três
+  comandos: web, `backoffice-worker` (jobs gerais e agregador, ADR 0009) e `build-runner`. É dono do schema
   do Postgres e das migrações.
 - **Entrega:** a imagem `site-builder` lê a API de exportação e gera o site estático de
   cada `SITE_ID`; o `wrangler.jsonc` de cada site é gerado pelo `build-site`. O SSR do
@@ -61,7 +61,7 @@ flowchart LR
 | --------------------------------------------------------------- | ----------------------- | -------------------------------------------------------- |
 | Conteúdo e configuração de site (Zod, `schemaVersion`)          | `@orakel/content-model` | backoffice, content-client, blog, build-site             |
 | API de exportação (NDJSON em streaming, uma entidade por linha) | backoffice              | `@orakel/content-client` (loader Astro, leitura ao vivo) |
-| Formato de eventos (payload, layout do AE, mensagem de fila)    | `@orakel/events`        | blog-worker, aggregator                                  |
+| Formato de eventos (payload, layout do AE, mensagem de fila)    | `@orakel/events`        | blog-worker, agregador                                   |
 | Variáveis CSS dos temas                                         | `@orakel/tokens`        | elements, ui, blog                                       |
 
 Regras de evolução: aditiva dentro de uma versão; mudança incompatível cria a próxima
@@ -70,24 +70,24 @@ versão; o parse ignora campos desconhecidos. Release do core por tag `core-vX.Y
 
 ## Mapa das unidades
 
-Estado atual: a raiz, `packages/content-model`, `packages/events` e `apps/blog/worker`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
+Estado atual: a raiz, `packages/content-model`, `packages/events`, `apps/blog/worker` e `apps/backoffice`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
 passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`.
 
-| Caminho                   | Pacote                   | Camada ESLint              | Papel                                                                |
-| ------------------------- | ------------------------ | -------------------------- | -------------------------------------------------------------------- |
-| `apps/blog`               | `@orakel/blog`           | app                        | App Astro dos sites, por `SITE_ID` (estático + SSR de visualização)  |
-| `apps/blog/worker`        | `@orakel/blog-worker`    | app                        | Worker de borda `/_e/*`                                              |
-| `apps/backoffice`         | `@orakel/backoffice`     | app                        | UI, Publish API, API de exportação; worker, build-runner, aggregator |
-| `apps/generator`          | `@orakel/generator`      | app                        | Geração com LLM (fase 2)                                             |
-| `packages/content-model`  | `@orakel/content-model`  | domain                     | Schemas Zod de conteúdo e configuração                               |
-| `packages/content-client` | `@orakel/content-client` | domain (`/astro`: adapter) | Cliente da API de exportação                                         |
-| `packages/core`           | `@orakel/core`           | domain                     | SEO, sitemap, RSS, robots, `_redirects`, `_headers`                  |
-| `packages/tokens`         | `@orakel/tokens`         | domain                     | Temas → variáveis CSS, contraste AA                                  |
-| `packages/elements`       | `@orakel/elements`       | domain                     | Web Components                                                       |
-| `packages/events`         | `@orakel/events`         | domain                     | Formato versionado dos eventos                                       |
-| `packages/ui`             | `@orakel/ui`             | ui                         | Ilhas React (último recurso)                                         |
-| `adapters/astro`          | `@orakel/astro`          | adapter                    | Integração Astro                                                     |
-| `tooling/build-site`      | `@orakel/build-site`     | app                        | Render e publish; base de `docker/site-builder`                      |
+| Caminho                   | Pacote                   | Camada ESLint              | Papel                                                                  |
+| ------------------------- | ------------------------ | -------------------------- | ---------------------------------------------------------------------- |
+| `apps/blog`               | `@orakel/blog`           | app                        | App Astro dos sites, por `SITE_ID` (estático + SSR de visualização)    |
+| `apps/blog/worker`        | `@orakel/blog-worker`    | app                        | Worker de borda `/_e/*`                                                |
+| `apps/backoffice`         | `@orakel/backoffice`     | app                        | UI, Publish API, API de exportação; worker (e agregador), build-runner |
+| `apps/generator`          | `@orakel/generator`      | app                        | Geração com LLM (fase 2)                                               |
+| `packages/content-model`  | `@orakel/content-model`  | domain                     | Schemas Zod de conteúdo e configuração                                 |
+| `packages/content-client` | `@orakel/content-client` | domain (`/astro`: adapter) | Cliente da API de exportação                                           |
+| `packages/core`           | `@orakel/core`           | domain                     | SEO, sitemap, RSS, robots, `_redirects`, `_headers`                    |
+| `packages/tokens`         | `@orakel/tokens`         | domain                     | Temas → variáveis CSS, contraste AA                                    |
+| `packages/elements`       | `@orakel/elements`       | domain                     | Web Components                                                         |
+| `packages/events`         | `@orakel/events`         | domain                     | Formato versionado dos eventos                                         |
+| `packages/ui`             | `@orakel/ui`             | ui                         | Ilhas React (último recurso)                                           |
+| `adapters/astro`          | `@orakel/astro`          | adapter                    | Integração Astro                                                       |
+| `tooling/build-site`      | `@orakel/build-site`     | app                        | Render e publish; base de `docker/site-builder`                        |
 
 ## Raiz do repositório
 

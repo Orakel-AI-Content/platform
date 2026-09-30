@@ -103,6 +103,7 @@ jobs:
       POSTGRES_USER: orakel
       POSTGRES_PASSWORD: orakel-ci
       POSTGRES_DB: orakel
+      DATABASE_URL: postgres://orakel:orakel-ci@localhost:5432/orakel
     steps:
       - uses: actions/checkout@v7
         with:
