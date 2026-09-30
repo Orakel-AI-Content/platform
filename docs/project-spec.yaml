@@ -424,7 +424,7 @@ units:
       path: packages/content-client,
       type: lib,
       role: 'Cliente da API de exportação: loader do Content Layer do Astro (subcaminho /astro) e leitura ao vivo',
-      status: planned,
+      status: generated,
     }
   - {
       name: core,

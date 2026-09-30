@@ -62,6 +62,13 @@ target "content-model-test" {
   output     = ["type=cacheonly"]
 }
 
+target "content-client-test" {
+  inherits   = ["_base"]
+  dockerfile = "packages/content-client/Dockerfile"
+  target     = "test"
+  output     = ["type=cacheonly"]
+}
+
 target "events-test" {
   inherits   = ["_base"]
   dockerfile = "packages/events/Dockerfile"
