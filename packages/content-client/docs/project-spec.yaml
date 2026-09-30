@@ -108,5 +108,5 @@ structure:
 
 open_questions:
   - 'Leitura ao vivo (live loader) com as rotas config, routes e listing do backoffice'
-  - 'metaFile: o render passa caminho absoluto (relativo resolve pelo diretório do astro build)'
+  - 'metaFile: o render do build-site passa SNAPSHOT_META_FILE absoluto (o blog já o exige) e lê header, end e redirectUsage para o result.json'
   - 'Teste de contrato N-1 no CI (content-client da última tag contra a API do commit) — quando existir a primeira tag core-v*'

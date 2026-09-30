@@ -121,7 +121,6 @@ structure:
     generator: src/
 
 open_questions:
-  - 'Blog: copiar dist/fonts/ para /fonts/, preload da fonte do texto, /fonts/* immutable no _headers, código 10 para tema inexistente'
   - 'Backoffice: seletor de tema com THEME_IDS na configuração do site'
   - 'Ajuste de métricas do fallback (size-adjust) para reduzir o CLS'
   - 'Modo escuro (modes.dark) quando um site pedir'
