@@ -20,7 +20,8 @@
       "outputs": []
     },
     "test:contract": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "build:examples": {
       "dependsOn": ["^build"],
@@ -37,10 +38,12 @@
       "cache": false
     },
     "db:migrate": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "db:seed": {
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL"]
     },
     "//#lint:root": {}
   }

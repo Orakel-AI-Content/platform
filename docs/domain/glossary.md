@@ -25,7 +25,7 @@ termos entram aqui no mesmo PR que os introduz.
 | **Visualização**         | Renderização SSR de um conteúdo ainda não publicado, para revisão                                                                                                            |
 | **Build de site**        | Execução da imagem `site-builder` (render + publish) para um `SITE_ID`                                                                                                       |
 | **Evento**               | Registro anônimo de interação enviado a `/_e/*`; formato em `@orakel/events`                                                                                                 |
-| **Agregador**            | Entrypoint do backoffice que consolida eventos da fila e do Analytics Engine no Postgres                                                                                     |
+| **Agregador**            | Job horário do `backoffice-worker` que consolida eventos da fila e do Analytics Engine no Postgres (ADR 0009)                                                                |
 | **Core**                 | Conjunto versionado por `core-vX.Y.Z` (schema, pacotes e imagem `site-builder`)                                                                                              |
 | **Unidade**              | App ou pacote do monorepo, com `package.json`, `CLAUDE.md` e `docs/` próprios                                                                                                |
 | **Recursos suportados**  | Tipos de bloco, presets, variantes e perfil de imagem que uma release sabe renderizar (`RESOURCES` do `content-model`); a validação usa os da release do site                |

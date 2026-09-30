@@ -1,6 +1,6 @@
 # 0004 – Arquitetura em três planos e o agregador
 
-- Status: aceito
+- Status: aceito (o agregador foi substituído pelo 0009: é job do `backoffice-worker`)
 - Data: 2026-09-29
 
 ## Contexto

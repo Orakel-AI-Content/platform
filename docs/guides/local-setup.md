@@ -15,9 +15,29 @@ Consulte para preparar a máquina e subir o ambiente local ponta a ponta.
 corepack enable
 pnpm install               # instala e ativa os git hooks (lefthook)
 cp .env.example .env.local # valores locais; nunca commite .env.local
-pnpm local:up              # sobe Postgres e S3 e roda as migrações
-pnpm local:seed            # dados de exemplo
+pnpm local:images          # constrói as imagens (backoffice) com as tags de produção
+pnpm local:up              # sobe o compose e roda as migrações
+pnpm local:seed            # usuários de teste e os sites de exemplo
 ```
+
+Já tinha um `.env.local`? Compare com o `.env.example` e acrescente as variáveis novas
+(backoffice e Access local); o compose avisa qual falta.
+
+**CA local do Caddy (uma vez):** o Caddy emite os certificados de `*.orakel.localhost` com
+uma CA interna. Para o navegador confiar, instale a raiz dela:
+
+```sh
+infra/local/compose.sh cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt
+# macOS
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt
+```
+
+Depois, `https://admin.orakel.localhost` abre o Backoffice; o login de teste (access-mock)
+oferece um usuário por papel.
+
+**Backoffice em modo dev:** `pnpm --filter @orakel/backoffice dev` na máquina e
+`BACKOFFICE_UPSTREAM=host.docker.internal:3000` no `.env.local` (reinicie o `caddy`), para
+o `admin.orakel.localhost` apontar para o `next dev`.
 
 ## Comandos
 
@@ -36,10 +56,13 @@ pnpm local:seed            # dados de exemplo
 
 ## Serviços locais
 
-| Serviço             | Endereço                | Credenciais                                 |
-| ------------------- | ----------------------- | ------------------------------------------- |
-| Postgres 18.6       | `localhost:5432`        | `POSTGRES_*` do `.env.local`                |
-| S3 (SeaweedFS 4.48) | `http://localhost:8333` | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` |
+| Serviço              | Endereço                         | Credenciais                                          |
+| -------------------- | -------------------------------- | ---------------------------------------------------- |
+| Postgres 18.6        | `localhost:5432`                 | `POSTGRES_*` do `.env.local`                         |
+| S3 (SeaweedFS 4.48)  | `http://localhost:8333`          | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`          |
+| Backoffice           | `https://admin.orakel.localhost` | Login de teste do access-mock (um usuário por papel) |
+| access-mock (Access) | `http://localhost:8788`          | JWKS em `/cdn-cgi/access/certs`                      |
+| Caddy (Tunnel)       | portas 80 e 443                  | CA interna (veja "Primeira vez")                     |
 
 As portas só escutam em `127.0.0.1`.
 
