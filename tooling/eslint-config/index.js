@@ -7,6 +7,7 @@
 // app (apps/*). Exceções pontuais (ex.: o subcaminho /astro de content-client)
 // ficam num bloco extra no eslint.config.js da própria unidade.
 import js from '@eslint/js';
+import astroPlugin from 'eslint-plugin-astro';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -20,6 +21,7 @@ const ignores = {
     '**/.next/**',
     '**/.astro/**',
     '**/.wrangler/**',
+    '**/dist-preview/**',
   ],
 };
 
@@ -83,3 +85,12 @@ export function layer(name, tsconfigRootDir) {
     prettier,
   );
 }
+
+/**
+ * Componentes .astro (apps/blog): regras do eslint-plugin-astro, sem as que exigem tipos
+ * (o typecheck dos .astro é do `astro check`). Use depois de `layer('app', …)`.
+ */
+export const astroComponents = tseslint.config(...astroPlugin.configs['flat/recommended'], {
+  files: ['**/*.astro'],
+  extends: [tseslint.configs.disableTypeChecked],
+});

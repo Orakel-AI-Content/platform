@@ -1,0 +1,95 @@
+---
+// Documento de toda página: head do core (SEO e JSON-LD), tema do tokens embutido, preload
+// da fonte do texto, Consent Mode antes de qualquer tag e, no estático, o script de eventos.
+import { renderHead, type HeadTag } from '@orakel/core';
+import { seoHead, type SeoPage } from '@orakel/core/v1';
+import { themeCss, themeFonts } from '@orakel/tokens';
+
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import PageviewScript from '../components/PageviewScript.astro';
+import { BuildError } from '../data/errors.ts';
+import type { PageContext } from '../data/site-source.ts';
+import { consentSnippet, ga4Snippet } from '../measurement/consent.ts';
+import { pageType } from '../render/page-type.ts';
+import type { PageModel } from '../routing/resolve.ts';
+import '../styles/global.css';
+
+interface Props {
+  ctx: PageContext;
+  model: PageModel;
+}
+const { ctx, model } = Astro.props;
+const { config } = ctx.site;
+
+const css = themeCss(config.theme);
+if (css === undefined) {
+  throw new BuildError(`Tema "${config.theme}" não existe nesta release`, 'permanent');
+}
+const preloads = (themeFonts(config.theme) ?? []).filter((font) => font.preload);
+
+function seoPage(page: PageModel): SeoPage | undefined {
+  switch (page.type) {
+    case 'home':
+      return { type: 'home', page: page.page };
+    case 'content':
+      return { type: 'content', content: page.content };
+    case 'taxonomy':
+      return { type: 'taxonomy', taxonomy: page.taxonomy, page: page.page };
+    case 'author':
+      return { type: 'author', author: page.author, page: page.page };
+    case 'institutional':
+      return { type: 'institutional', key: page.key };
+    case 'search':
+      return { type: 'search' };
+    case 'not-found':
+      return undefined;
+  }
+}
+
+const seo = seoPage(model);
+const tags: HeadTag[] = seo
+  ? seoHead(seo, ctx.site)
+  : [
+      { tag: 'title', text: `Página não encontrada | ${config.name}` },
+      { tag: 'meta', attrs: { name: 'robots', content: 'noindex' } },
+    ];
+// A visualização nunca é indexada; o site não indexável já recebe o noindex do core.
+if (ctx.preview && !tags.some((tag) => tag.tag === 'meta' && tag.attrs.name === 'robots')) {
+  tags.push({ tag: 'meta', attrs: { name: 'robots', content: 'noindex' } });
+}
+const ga4 = config.integrations.ga4;
+const articleId =
+  model.type === 'content' && model.content.kind === 'article' ? model.content.id : undefined;
+---
+
+<!doctype html>
+<html lang={config.language} data-page-type={pageType(model)} data-article-id={articleId}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <Fragment set:html={renderHead(tags)} />
+    {preloads.map((font) => (
+      <link rel="preload" href={font.url} as="font" type="font/woff2" crossorigin />
+    ))}
+    <style is:inline set:html={css} />
+    <script is:inline set:html={consentSnippet()} />
+    {ga4.enabled && ga4.measurementId && (
+      <script is:inline set:html={ga4Snippet(ga4.measurementId)} />
+    )}
+    {!ctx.preview && (
+      <link rel="alternate" type="application/rss+xml" title={config.name} href="/rss.xml" />
+    )}
+  </head>
+  <body>
+    <a class="skip-link" href="#conteudo">
+      Pular para o conteúdo
+    </a>
+    <Header ctx={ctx} />
+    <main id="conteudo" class="container">
+      <slot />
+    </main>
+    <Footer ctx={ctx} />
+    {!ctx.preview && <PageviewScript />}
+  </body>
+</html>

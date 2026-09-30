@@ -1,0 +1,20 @@
+---
+// Aplica as marcas de fora para dentro: bold → <strong>, italic → <em>, code → <code>.
+type Mark = 'bold' | 'italic' | 'code';
+interface Props {
+  text: string;
+  marks: readonly Mark[];
+}
+const { text, marks } = Astro.props;
+const [mark, ...rest] = marks;
+const Tag =
+  mark === 'bold' ? 'strong' : mark === 'italic' ? 'em' : mark === 'code' ? 'code' : undefined;
+---
+
+{Tag ? (
+  <Tag>
+    <Astro.self text={text} marks={rest} />
+  </Tag>
+) : (
+  text
+)}

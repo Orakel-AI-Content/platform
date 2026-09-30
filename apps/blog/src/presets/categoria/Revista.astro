@@ -1,0 +1,64 @@
+---
+// Listagem `revista`: faixa com a cor de destaque e grade.
+import { taxonomyPath } from '@orakel/core/v1';
+
+import ArticleCard from '../../components/ArticleCard.astro';
+import Pagination from '../../components/Pagination.astro';
+import type { PresetProps } from '../types.ts';
+
+type Props = PresetProps<'taxonomy'>;
+const { ctx, model } = Astro.props;
+const { taxonomy } = model;
+const variant = ctx.site.config.variants.articleCard;
+---
+
+<header class="band">
+  <h1>{taxonomy.name}</h1>
+  {taxonomy.description && <p>{taxonomy.description}</p>}
+</header>
+<ul class="grid">
+  {model.items.map((content) => (
+    <li>
+      <ArticleCard ctx={ctx} content={content} variant={variant} />
+    </li>
+  ))}
+</ul>
+{model.items.length === 0 && <p>Nenhum artigo aqui ainda.</p>}
+<Pagination
+  base={ctx.base}
+  page={model.page}
+  totalPages={model.totalPages}
+  pathFor={(page) => taxonomyPath(taxonomy, page)}
+/>
+
+<style>
+  .band {
+    margin-block: var(--space-5);
+    padding: var(--space-6) var(--space-5);
+    border-radius: var(--radius-lg);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+  .band h1,
+  .band p {
+    margin: 0;
+    color: inherit;
+  }
+  .grid {
+    display: grid;
+    gap: var(--space-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 40rem) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (min-width: 64rem) {
+    .grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+</style>

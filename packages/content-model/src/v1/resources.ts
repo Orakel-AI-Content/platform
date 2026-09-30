@@ -40,10 +40,10 @@ export const RESOURCES = {
   schemaVersion: SCHEMA_VERSION,
   blockTypes: [...BLOCK_TYPES],
   presets: {
-    home: ['padrao'],
-    artigo: ['padrao'],
-    categoria: ['padrao'],
-    autor: ['padrao'],
+    home: ['padrao', 'revista'],
+    artigo: ['padrao', 'revista'],
+    categoria: ['padrao', 'revista'],
+    autor: ['padrao', 'revista'],
   },
   variants: {
     articleCard: ['vertical', 'horizontal'],

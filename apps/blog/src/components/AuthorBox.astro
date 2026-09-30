@@ -1,0 +1,41 @@
+---
+// Autor real com página própria (E-E-A-T): nome, área, bio e link para a página do autor.
+import type { Author } from '@orakel/content-model/v1';
+import { authorPath } from '@orakel/core/v1';
+
+import type { PageContext } from '../data/site-source.ts';
+import { sitePath } from '../render/links.ts';
+
+interface Props {
+  ctx: PageContext;
+  author: Author;
+}
+const { ctx, author } = Astro.props;
+---
+
+<aside class="author" aria-label={`Sobre ${author.name}`}>
+  <p class="name">
+    <a href={sitePath(ctx.base, authorPath(author))}>{author.name}</a>
+  </p>
+  {author.expertise && <p class="expertise">{author.expertise}</p>}
+  {author.bio && <p>{author.bio}</p>}
+</aside>
+
+<style>
+  .author {
+    padding: var(--space-4);
+    border-inline-start: 4px solid var(--color-accent);
+    background: var(--color-surface);
+    border-radius: var(--radius-sm);
+  }
+  p {
+    margin: 0 0 var(--space-2);
+  }
+  .name {
+    font-weight: 700;
+  }
+  .expertise {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+</style>

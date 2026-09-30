@@ -1,0 +1,77 @@
+---
+// Escolhe a view de cada modelo: presets da configuração para home, artigo, listagens e
+// autor; views fixas para página de conteúdo, institucionais, busca e 404 (ADR 0006 da
+// unidade). Preset novo: o componente aqui + o nome em PRESET_NAMES e em
+// RESOURCES.presets do content-model, no mesmo PR.
+import type { PageType } from '@orakel/content-model/v1';
+
+import { BuildError } from '../data/errors.ts';
+import type { PageContext } from '../data/site-source.ts';
+import ArtigoPadrao from '../presets/artigo/Padrao.astro';
+import ArtigoRevista from '../presets/artigo/Revista.astro';
+import AutorPadrao from '../presets/autor/Padrao.astro';
+import AutorRevista from '../presets/autor/Revista.astro';
+import CategoriaPadrao from '../presets/categoria/Padrao.astro';
+import CategoriaRevista from '../presets/categoria/Revista.astro';
+import HomePadrao from '../presets/home/Padrao.astro';
+import HomeRevista from '../presets/home/Revista.astro';
+import type { PageModel } from '../routing/resolve.ts';
+import Institutional from './Institutional.astro';
+import NotFound from './NotFound.astro';
+import Page from './Page.astro';
+import Search from './Search.astro';
+
+interface Props {
+  ctx: PageContext;
+  model: PageModel;
+}
+const { ctx, model } = Astro.props;
+
+const PRESET_NAMES = ['padrao', 'revista'] as const;
+
+/** Preset da configuração; nome que esta release não conhece é falha permanente. */
+function preset(pageType: PageType): (typeof PRESET_NAMES)[number] {
+  const name = ctx.site.config.presets[pageType];
+  const known = PRESET_NAMES.find((item) => item === name);
+  if (!known) {
+    throw new BuildError(`Preset "${name}" de ${pageType} não existe nesta release`, 'permanent');
+  }
+  return known;
+}
+---
+
+{model.type === 'home' ? (
+  preset('home') === 'revista' ? (
+    <HomeRevista ctx={ctx} model={model} />
+  ) : (
+    <HomePadrao ctx={ctx} model={model} />
+  )
+) : model.type === 'content' ? (
+  model.content.kind === 'article' ? (
+    preset('artigo') === 'revista' ? (
+      <ArtigoRevista ctx={ctx} model={model} />
+    ) : (
+      <ArtigoPadrao ctx={ctx} model={model} />
+    )
+  ) : (
+    <Page ctx={ctx} content={model.content} />
+  )
+) : model.type === 'taxonomy' ? (
+  preset('categoria') === 'revista' ? (
+    <CategoriaRevista ctx={ctx} model={model} />
+  ) : (
+    <CategoriaPadrao ctx={ctx} model={model} />
+  )
+) : model.type === 'author' ? (
+  preset('autor') === 'revista' ? (
+    <AutorRevista ctx={ctx} model={model} />
+  ) : (
+    <AutorPadrao ctx={ctx} model={model} />
+  )
+) : model.type === 'institutional' ? (
+  <Institutional ctx={ctx} title={model.title} text={model.text} />
+) : model.type === 'search' ? (
+  <Search ctx={ctx} />
+) : (
+  <NotFound ctx={ctx} />
+)}

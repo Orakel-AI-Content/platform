@@ -6,6 +6,7 @@ node_modules/
 # Saídas de build e testes
 dist/
 dist-examples/
+dist-preview/
 coverage/
 .next/
 .astro/

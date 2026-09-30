@@ -1,0 +1,34 @@
+---
+// Carrossel no degrau 1: rolagem nativa com scroll-snap, focável pelo teclado. Os botões de
+// anterior e próximo entram como Web Component do elements (<ok-carousel>), envolvendo
+// este mesmo HTML.
+interface Props {
+  label: string;
+}
+const { label } = Astro.props;
+---
+
+<section class="carousel" aria-label={label}>
+  <ul class="track" tabindex="0">
+    <slot />
+  </ul>
+</section>
+
+<style>
+  .track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: min(80%, 20rem);
+    gap: var(--space-4);
+    margin: 0;
+    padding: 0 0 var(--space-3);
+    list-style: none;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline mandatory;
+    scroll-padding-inline: var(--space-1);
+  }
+  .track > :global(li) {
+    scroll-snap-align: start;
+  }
+</style>

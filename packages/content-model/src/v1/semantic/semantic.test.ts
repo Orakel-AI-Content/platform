@@ -179,7 +179,7 @@ describe('validateSiteConfig', () => {
   it.each([
     [
       'preset desconhecido',
-      buildConfig({ presets: { ...buildConfig().presets, home: 'revista' } }),
+      buildConfig({ presets: { ...buildConfig().presets, home: 'mosaico' } }),
       ['presets', 'home'],
     ],
     [

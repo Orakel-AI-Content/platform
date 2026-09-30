@@ -1,0 +1,74 @@
+---
+// Autor `revista`: faixa com a cor de destaque e grade.
+import { authorPath } from '@orakel/core/v1';
+
+import ArticleCard from '../../components/ArticleCard.astro';
+import Image from '../../components/Image.astro';
+import Pagination from '../../components/Pagination.astro';
+import type { PresetProps } from '../types.ts';
+
+type Props = PresetProps<'author'>;
+const { ctx, model } = Astro.props;
+const { author } = model;
+const avatar = ctx.site.media.find((media) => media.id === author.avatarMediaId);
+const variant = ctx.site.config.variants.articleCard;
+---
+
+<header class="band">
+  {avatar && <Image class="avatar" media={avatar} config={ctx.site.config} alt="" sizes="5rem" />}
+  <div>
+    <h1>{author.name}</h1>
+    {author.expertise && <p>{author.expertise}</p>}
+    {author.bio && <p>{author.bio}</p>}
+  </div>
+</header>
+<h2>Artigos</h2>
+<ul class="grid">
+  {model.items.map((content) => (
+    <li>
+      <ArticleCard ctx={ctx} content={content} variant={variant} headingLevel={3} />
+    </li>
+  ))}
+</ul>
+<Pagination
+  base={ctx.base}
+  page={model.page}
+  totalPages={model.totalPages}
+  pathFor={(page) => authorPath(author, page)}
+/>
+
+<style>
+  .band {
+    display: flex;
+    gap: var(--space-5);
+    align-items: center;
+    margin-block: var(--space-5);
+    padding: var(--space-5);
+    border-radius: var(--radius-lg);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+  .band :global(.avatar) {
+    width: 5rem;
+    flex: none;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+  .band h1,
+  .band p {
+    margin: 0 0 var(--space-1);
+    color: inherit;
+  }
+  .grid {
+    display: grid;
+    gap: var(--space-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 40rem) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+</style>

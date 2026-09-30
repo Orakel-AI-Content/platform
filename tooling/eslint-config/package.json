@@ -10,6 +10,7 @@
   "dependencies": {
     "@eslint/js": "catalog:",
     "eslint-config-prettier": "catalog:",
+    "eslint-plugin-astro": "catalog:",
     "globals": "catalog:",
     "typescript-eslint": "catalog:"
   },

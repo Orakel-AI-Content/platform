@@ -1,0 +1,10 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": [".astro/types.d.ts", "src", "scripts", "e2e", "*.ts"],
+  // O Worker de borda é outra unidade, com tsconfig próprio (regra da raiz).
+  "exclude": ["node_modules", "dist", "dist-preview", "dist-examples", "worker"]
+}

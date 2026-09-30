@@ -1,0 +1,114 @@
+---
+// Card de artigo com as variantes da configuração (`variants.articleCard`): `vertical`
+// (imagem acima) e `horizontal` (imagem ao lado quando o espaço deixa). O layout responde
+// ao container, não à tela: o mesmo card serve a qualquer preset (ADR 0008 da unidade).
+import type { Content } from '@orakel/content-model/v1';
+import { contentPath } from '@orakel/core/v1';
+
+import type { PageContext } from '../data/site-source.ts';
+import { formatDate } from '../render/dates.ts';
+import { sitePath } from '../render/links.ts';
+import Image from './Image.astro';
+
+interface Props {
+  ctx: PageContext;
+  content: Content;
+  variant: string;
+  headingLevel?: 2 | 3;
+  priority?: boolean;
+}
+const { ctx, content, variant, headingLevel = 2, priority = false } = Astro.props;
+const { site } = ctx;
+const cover =
+  content.coverMediaId === undefined
+    ? undefined
+    : site.media.find((media) => media.id === content.coverMediaId);
+const category = content.taxonomyIds
+  .map((id) => site.taxonomies.find((taxonomy) => taxonomy.id === id))
+  .find((taxonomy) => taxonomy?.kind === 'category');
+const authors = content.authorIds
+  .map((id) => site.authors.find((author) => author.id === id)?.name)
+  .filter(Boolean);
+const Heading = `h${headingLevel}` as 'h2' | 'h3';
+const known = variant === 'horizontal' ? 'horizontal' : 'vertical';
+---
+
+<div class="card-wrap">
+  <article class:list={['card', known]}>
+    {cover && (
+      <Image
+        class="cover"
+        media={cover}
+        config={site.config}
+        alt=""
+        sizes={
+          known === 'horizontal'
+            ? '(min-width: 40rem) 20rem, 100vw'
+            : '(min-width: 64rem) 36rem, 100vw'
+        }
+        priority={priority}
+      />
+    )}
+    <div class="body">
+      {category && <p class="kicker">{category.name}</p>}
+      <Heading class="title">
+        <a href={sitePath(ctx.base, contentPath(content))}>{content.title}</a>
+      </Heading>
+      {content.description && <p class="summary">{content.description}</p>}
+      <p class="meta">
+        <time datetime={content.publishedAt}>{formatDate(content.publishedAt, site.config)}</time>
+        {authors.length > 0 && <span> · {authors.join(', ')}</span>}
+      </p>
+    </div>
+  </article>
+</div>
+
+<style>
+  .card-wrap {
+    container-type: inline-size;
+  }
+  .card {
+    display: grid;
+    gap: var(--space-3);
+    height: 100%;
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .cover {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .kicker {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .title {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    line-height: var(--font-line-height-lg);
+  }
+  .title a {
+    color: var(--color-text);
+  }
+  .summary,
+  .meta {
+    margin: 0;
+  }
+  .meta {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+  /* Horizontal: imagem ao lado a partir de 32rem de container. */
+  @container (min-width: 32rem) {
+    .horizontal {
+      grid-template-columns: minmax(10rem, 2fr) 3fr;
+      align-items: start;
+    }
+  }
+</style>

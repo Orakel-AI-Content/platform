@@ -1,0 +1,107 @@
+---
+// Corpo do conteúdo: cada bloco pelo seu componente. O sumário (toc) pode ser tirado do
+// fluxo pelo preset, que o mostra ao lado (`omitToc`).
+import type { Block } from '@orakel/content-model/v1';
+
+import type { PageContext } from '../../data/site-source.ts';
+import Image from '../Image.astro';
+import Inlines from './Inlines.astro';
+import RichText from './RichText.astro';
+import Toc from './Toc.astro';
+
+interface Props {
+  ctx: PageContext;
+  blocks: readonly Block[];
+  omitToc?: boolean;
+}
+const { ctx, blocks, omitToc = false } = Astro.props;
+const media = (id: number) => ctx.site.media.find((item) => item.id === id);
+---
+
+{blocks.map((block) => {
+  switch (block.type) {
+    case 'text':
+      return <RichText nodes={block.content} base={ctx.base} blockN={block.n} />;
+    case 'toc':
+      return omitToc ? null : <Toc blocks={blocks} title={block.title} />;
+    case 'quote':
+      return (
+        <figure class="quote">
+          <blockquote cite={block.sourceUrl}>
+            <p>
+              <Inlines inlines={block.content} base={ctx.base} />
+            </p>
+          </blockquote>
+          {block.attribution && <figcaption>— {block.attribution}</figcaption>}
+        </figure>
+      );
+    case 'image': {
+      const item = media(block.mediaId);
+      return item ? (
+        <figure class="image">
+          <Image
+            media={item}
+            config={ctx.site.config}
+            alt={block.decorative ? '' : (block.alt ?? '')}
+            sizes="(min-width: 48rem) 45rem, 100vw"
+          />
+          {block.caption && (
+            <figcaption>
+              <Inlines inlines={block.caption} base={ctx.base} />
+            </figcaption>
+          )}
+        </figure>
+      ) : null;
+    }
+    case 'faq':
+      return (
+        <section class="faq" aria-label="Perguntas frequentes">
+          {block.items.map((item) => (
+            <details>
+              <summary>{item.question}</summary>
+              <p>
+                <Inlines inlines={item.answer} base={ctx.base} />
+              </p>
+            </details>
+          ))}
+        </section>
+      );
+  }
+})}
+
+<style>
+  .quote {
+    margin-inline: 0;
+    padding-inline-start: var(--space-5);
+    border-inline-start: 4px solid var(--color-accent);
+  }
+  .quote blockquote {
+    margin: 0;
+    font-family: var(--font-family-heading);
+    font-size: var(--font-size-lg);
+  }
+  figcaption {
+    margin-block-start: var(--space-2);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+  .image {
+    margin-inline: 0;
+  }
+  .image :global(img) {
+    border-radius: var(--radius-md);
+  }
+  .faq {
+    display: grid;
+    gap: var(--space-2);
+  }
+  .faq details {
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  .faq summary {
+    font-weight: 700;
+    cursor: pointer;
+  }
+</style>

@@ -4,11 +4,14 @@
  */
 export async function* ndjsonLines(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
   let buffer = '';
-  const reader = stream.pipeThrough(new TextDecoderStream()).getReader();
+  // TextDecoder com `stream: true` (e não TextDecoderStream): mesmo resultado, com tipos
+  // iguais no DOM e no Node — o pacote compila nos consumidores que usam os dois.
+  const decoder = new TextDecoder();
+  const reader = stream.getReader();
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += value;
+    buffer += decoder.decode(value, { stream: true });
     let newline = buffer.indexOf('\n');
     while (newline !== -1) {
       const line = buffer.slice(0, newline).replace(/\r$/, '');
@@ -17,6 +20,7 @@ export async function* ndjsonLines(stream: ReadableStream<Uint8Array>): AsyncGen
       newline = buffer.indexOf('\n');
     }
   }
+  buffer += decoder.decode();
   const last = buffer.replace(/\r$/, '');
   if (last.trim() !== '') yield last;
 }

@@ -1,0 +1,47 @@
+---
+// Artigo `padrao` (editorial): coluna de leitura de ~68 caracteres, capa abaixo do título,
+// sumário onde o bloco toc estiver.
+import AuthorBox from '../../components/AuthorBox.astro';
+import Image from '../../components/Image.astro';
+import Blocks from '../../components/blocks/Blocks.astro';
+import type { PresetProps } from '../types.ts';
+import ArticleHeader from './ArticleHeader.astro';
+
+type Props = PresetProps<'content'>;
+const { ctx, model } = Astro.props;
+const { content } = model;
+const cover = ctx.site.media.find((media) => media.id === content.coverMediaId);
+const authors = content.authorIds.flatMap(
+  (id) => ctx.site.authors.find((author) => author.id === id) ?? [],
+);
+---
+
+<article class="article prose" data-pagefind-body>
+  <ArticleHeader ctx={ctx} content={content} />
+  {cover && (
+    <Image
+      class="cover"
+      media={cover}
+      config={ctx.site.config}
+      alt=""
+      sizes="(min-width: 48rem) 45rem, 100vw"
+      priority
+    />
+  )}
+  <Blocks ctx={ctx} blocks={content.blocks} />
+  {authors.map((author) => (
+    <AuthorBox ctx={ctx} author={author} />
+  ))}
+</article>
+
+<style>
+  .article {
+    display: grid;
+    gap: var(--space-5);
+    padding-block: var(--space-6);
+  }
+  .article :global(.cover) {
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+</style>

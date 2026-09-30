@@ -1,0 +1,41 @@
+{
+  "name": "@orakel/blog",
+  "version": "0.0.0",
+  "private": true,
+  "description": "App Astro dos sites: gera cada site por SITE_ID (estático) e atende a visualização de todos (SSR)",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env.local node_modules/astro/bin/astro.mjs dev",
+    "build": "astro build",
+    "preview": "BLOG_OUTPUT=preview node --env-file-if-exists=../../.env.local node_modules/astro/bin/astro.mjs build && node --env-file-if-exists=../../.env.local dist-preview/server/entry.mjs",
+    "lint": "CONTENT_SOURCE=fixture SITE_ID=exemplo-a astro sync && eslint .",
+    "typecheck": "CONTENT_SOURCE=fixture SITE_ID=exemplo-a astro check && tsc --noEmit",
+    "test": "vitest run",
+    "build:examples": "node scripts/build-examples.ts",
+    "test:a11y": "E2E_PORT_BASE=4400 playwright test e2e/a11y.spec.ts",
+    "test:parity": "E2E_PORT_BASE=4500 playwright test e2e/parity.spec.ts"
+  },
+  "dependencies": {
+    "@astrojs/node": "catalog:",
+    "@orakel/content-client": "workspace:*",
+    "@orakel/content-model": "workspace:*",
+    "@orakel/core": "workspace:*",
+    "@orakel/events": "workspace:*",
+    "@orakel/tokens": "workspace:*",
+    "astro": "catalog:",
+    "pagefind": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@astrojs/check": "catalog:",
+    "@axe-core/playwright": "catalog:",
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/tsconfig": "workspace:*",
+    "@orakel/vitest-config": "workspace:*",
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

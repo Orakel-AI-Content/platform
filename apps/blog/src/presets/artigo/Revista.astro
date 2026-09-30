@@ -1,0 +1,77 @@
+---
+// Artigo `revista`: capa larga acima do título; sumário lateral a partir de 64rem.
+import AuthorBox from '../../components/AuthorBox.astro';
+import Image from '../../components/Image.astro';
+import Blocks from '../../components/blocks/Blocks.astro';
+import Toc from '../../components/blocks/Toc.astro';
+import type { PresetProps } from '../types.ts';
+import ArticleHeader from './ArticleHeader.astro';
+
+type Props = PresetProps<'content'>;
+const { ctx, model } = Astro.props;
+const { content } = model;
+const cover = ctx.site.media.find((media) => media.id === content.coverMediaId);
+const tocBlock = content.blocks.find((block) => block.type === 'toc');
+const authors = content.authorIds.flatMap(
+  (id) => ctx.site.authors.find((author) => author.id === id) ?? [],
+);
+---
+
+<article class="article" data-pagefind-body>
+  {cover && (
+    <Image class="cover" media={cover} config={ctx.site.config} alt="" sizes="100vw" priority />
+  )}
+  <div class="layout">
+    <div class="main prose">
+      <ArticleHeader ctx={ctx} content={content} />
+      <Blocks ctx={ctx} blocks={content.blocks} omitToc />
+      {authors.map((author) => (
+        <AuthorBox ctx={ctx} author={author} />
+      ))}
+    </div>
+    {tocBlock && (
+      <div class="side">
+        <Toc blocks={content.blocks} title={tocBlock.type === 'toc' ? tocBlock.title : undefined} />
+      </div>
+    )}
+  </div>
+</article>
+
+<style>
+  .article {
+    padding-block: var(--space-5);
+  }
+  .article :global(.cover) {
+    margin-block-end: var(--space-6);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    aspect-ratio: 21 / 9;
+  }
+  .article :global(.cover img) {
+    height: 100%;
+    object-fit: cover;
+  }
+  .layout {
+    display: grid;
+    gap: var(--space-6);
+  }
+  .main {
+    display: grid;
+    gap: var(--space-5);
+  }
+  .side {
+    order: -1;
+  }
+  @media (min-width: 64rem) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr) 16rem;
+    }
+    .side {
+      order: 0;
+    }
+    .side :global(.toc) {
+      position: sticky;
+      top: var(--space-4);
+    }
+  }
+</style>

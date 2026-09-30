@@ -1,0 +1,15 @@
+---
+// Script de eventos (@orakel/events): pageview para /_e/* do próprio site. Só no estático:
+// a visualização não tem o Worker de borda.
+---
+
+<script>
+  import { startPageviewTracking } from '@orakel/events/v1/client';
+
+  const { articleId, pageType } = document.documentElement.dataset;
+  startPageviewTracking(
+    articleId
+      ? { articleId: Number(articleId) }
+      : { pageType: pageType ?? 'outra', path: location.pathname },
+  );
+</script>

@@ -389,7 +389,7 @@ units:
       path: apps/blog,
       type: web,
       role: 'App Astro dos sites, parametrizado por SITE_ID (estático + SSR de visualização)',
-      status: planned,
+      status: generated,
     }
   - {
       name: blog-worker,

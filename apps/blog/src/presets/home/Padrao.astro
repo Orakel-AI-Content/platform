@@ -1,0 +1,48 @@
+---
+// Home `padrao` (editorial): lista em coluna única, cards na variante do site.
+import ArticleCard from '../../components/ArticleCard.astro';
+import Pagination from '../../components/Pagination.astro';
+import type { PresetProps } from '../types.ts';
+import { homePath } from '@orakel/core/v1';
+
+type Props = PresetProps<'home'>;
+const { ctx, model } = Astro.props;
+const variant = ctx.site.config.variants.articleCard;
+---
+
+<header class="intro">
+  <h1>{ctx.site.config.name}</h1>
+  {model.page > 1 && (
+    <p>
+      Página {model.page} de {model.totalPages}
+    </p>
+  )}
+</header>
+<ul class="list">
+  {model.items.map((content, index) => (
+    <li>
+      <ArticleCard
+        ctx={ctx}
+        content={content}
+        variant={variant}
+        priority={index === 0 && model.page === 1}
+      />
+    </li>
+  ))}
+</ul>
+{model.items.length === 0 && <p>Nenhum artigo publicado ainda.</p>}
+<Pagination base={ctx.base} page={model.page} totalPages={model.totalPages} pathFor={homePath} />
+
+<style>
+  .intro {
+    padding-block: var(--space-6) var(--space-4);
+  }
+  .list {
+    display: grid;
+    gap: var(--space-5);
+    max-width: 48rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+</style>

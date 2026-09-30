@@ -1,0 +1,63 @@
+---
+// Imagem da mídia do site: <picture> com um <source> por formato do perfil (AVIF antes de
+// WebP) e srcset por largura; width/height do original evitam CLS. A imagem principal da
+// página vai com fetchpriority="high" e sem lazy.
+import type { Media, SiteConfig } from '@orakel/content-model/v1';
+import { mediaUrl } from '@orakel/core/v1';
+
+interface Props {
+  media: Media;
+  config: Pick<SiteConfig, 'domains'>;
+  /** Texto alternativo; string vazia marca a imagem como decorativa. */
+  alt: string;
+  sizes: string;
+  priority?: boolean;
+  class?: string;
+}
+const { media, config, alt, sizes, priority = false, class: className } = Astro.props;
+
+const FORMAT_ORDER = ['avif', 'webp'];
+const formats = [...new Set(media.variants.map((variant) => variant.format))].sort(
+  (a, b) => (FORMAT_ORDER.indexOf(a) + 1 || 99) - (FORMAT_ORDER.indexOf(b) + 1 || 99),
+);
+const srcset = (format: string) =>
+  media.variants
+    .filter((variant) => variant.format === format)
+    .sort((a, b) => a.width - b.width)
+    .map((variant) => `${mediaUrl(config, variant.path)} ${variant.width}w`)
+    .join(', ');
+const fallbackFormat = formats.at(-1) ?? 'webp';
+const fallback =
+  media.variants
+    .filter((variant) => variant.format === fallbackFormat)
+    .sort((a, b) => a.width - b.width)
+    .find((variant) => variant.width >= 960) ?? media.variants[0];
+---
+
+<picture class={className}>
+  {formats.map((format) => (
+    <source type={`image/${format}`} srcset={srcset(format)} sizes={sizes} />
+  ))}
+  <img
+    src={fallback ? mediaUrl(config, fallback.path) : undefined}
+    alt={alt}
+    width={media.width}
+    height={media.height}
+    loading={priority ? 'eager' : 'lazy'}
+    decoding="async"
+    fetchpriority={priority ? 'high' : undefined}
+  />
+</picture>
+
+<style>
+  picture,
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  img {
+    border-radius: inherit;
+    background: var(--color-surface);
+  }
+</style>

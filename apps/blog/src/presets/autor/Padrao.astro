@@ -1,0 +1,68 @@
+---
+// Autor `padrao`: nome, área e bio, e os artigos em lista.
+import { authorPath } from '@orakel/core/v1';
+
+import ArticleCard from '../../components/ArticleCard.astro';
+import Image from '../../components/Image.astro';
+import Pagination from '../../components/Pagination.astro';
+import type { PresetProps } from '../types.ts';
+
+type Props = PresetProps<'author'>;
+const { ctx, model } = Astro.props;
+const { author } = model;
+const avatar = ctx.site.media.find((media) => media.id === author.avatarMediaId);
+const variant = ctx.site.config.variants.articleCard;
+---
+
+<header class="profile">
+  {avatar && <Image class="avatar" media={avatar} config={ctx.site.config} alt="" sizes="6rem" />}
+  <div>
+    <h1>{author.name}</h1>
+    {author.expertise && <p class="expertise">{author.expertise}</p>}
+    {author.bio && <p>{author.bio}</p>}
+  </div>
+</header>
+<h2>Artigos</h2>
+<ul class="list">
+  {model.items.map((content) => (
+    <li>
+      <ArticleCard ctx={ctx} content={content} variant={variant} headingLevel={3} />
+    </li>
+  ))}
+</ul>
+<Pagination
+  base={ctx.base}
+  page={model.page}
+  totalPages={model.totalPages}
+  pathFor={(page) => authorPath(author, page)}
+/>
+
+<style>
+  .profile {
+    display: flex;
+    gap: var(--space-5);
+    align-items: center;
+    padding-block: var(--space-6);
+  }
+  .profile :global(.avatar) {
+    width: 6rem;
+    flex: none;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+  h1,
+  p {
+    margin: 0 0 var(--space-2);
+  }
+  .expertise {
+    color: var(--color-text-muted);
+  }
+  .list {
+    display: grid;
+    gap: var(--space-5);
+    max-width: 48rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+</style>

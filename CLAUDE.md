@@ -26,15 +26,15 @@ Geradas:
 - `packages/core` – rotas, head e JSON-LD, sitemap, RSS, robots.txt, `_redirects` e `_headers`
 - `packages/tokens` – temas DTCG → variáveis CSS e fontes, contraste AA verificado no build
 - `packages/events` – formato versionado dos eventos, manifesto e script do navegador
+- `apps/blog` – sites Astro por `SITE_ID` (estático) e visualização SSR (`/<site>/<caminho>`); exclui `worker/` do tsconfig e do ESLint
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
 - `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner
 
 Previstas (gere com `/scaffold` no caminho da unidade):
 
-- `packages/elements` – Web Components
+- `packages/elements` – Web Components (próximo: degrau 2 do blog)
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
-- `apps/blog` – sites Astro por `SITE_ID` (exclui `worker/` do tsconfig e do ESLint)
 - `apps/generator` – geração com LLM (fase 2)
 - `tooling/build-site` – render e publish; imagem `site-builder`
 
