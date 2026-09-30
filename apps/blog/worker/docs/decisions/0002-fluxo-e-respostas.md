@@ -22,7 +22,7 @@ detalhes, e a entrada diz que falha na rota perde o evento, nunca a página.
   `/_e/pageview`, `405` fora de `POST`; sempre `cache-control: no-store`.
 - Exceção inesperada (ex.: manifesto ilegível) é registrada nos Workers Logs e responde
   `204`.
-- `writeDataPoint` sem `await`: a gravação não atrasa a resposta.
+- `writeDataPoint` sem `await`, dentro de `ctx.waitUntil`: a gravação não atrasa a resposta. O `waitUntil` é para o `ae-sim` local, um service binding (RPC) que seria descartado quando a resposta termina (spike do edge-local, ADR 0004 dele); no Analytics Engine a chamada é síncrona e o `waitUntil` recebe uma promessa já resolvida.
 
 ## Alternativas consideradas
 

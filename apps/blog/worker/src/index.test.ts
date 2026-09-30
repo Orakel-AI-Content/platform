@@ -23,9 +23,20 @@ function setup(options: { manifestStatus?: number; allowOverride?: string } = {}
     ASSETS: { fetch: assetsFetch },
   } as unknown as Env;
 
+  // waitUntil guarda as promessas; os testes esperam por elas antes de conferir os pontos.
+  const pending: Promise<unknown>[] = [];
+  const ctx = {
+    waitUntil: (promise: Promise<unknown>) => void pending.push(promise),
+    passThroughOnException: () => undefined,
+  } as unknown as ExecutionContext;
+
   const call = (path: string, init: RequestInit = {}, cf: object = { country: 'BR' }) => {
     const request = Object.assign(new Request(`https://exemplo-a.com.br${path}`, init), { cf });
-    return worker.fetch(request as unknown as Request<unknown, IncomingRequestCfProperties>, env);
+    return worker.fetch(
+      request as unknown as Request<unknown, IncomingRequestCfProperties>,
+      env,
+      ctx,
+    );
   };
 
   const post = (body: string, headers: Record<string, string> = {}, cf?: object) =>

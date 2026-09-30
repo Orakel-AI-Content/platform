@@ -24,4 +24,4 @@ Consulte ao escrever ou revisar código em `src/`. Convenções gerais: `docs/co
 
 - Ler o corpo antes de conferir bot e origem.
 - Confiar em site, país ou horário vindos do payload.
-- `await` no `writeDataPoint` ou qualquer chamada a servidor externo.
+- `await` no `writeDataPoint` ou qualquer chamada a servidor externo (a escrita vai num `ctx.waitUntil`, sem segurar a resposta).

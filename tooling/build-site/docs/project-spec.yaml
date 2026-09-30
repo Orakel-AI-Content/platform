@@ -47,7 +47,7 @@ decisions:
     }
   architecture.publish:
     {
-      value: 'cloudflare: wrangler deploy (versão por WRANGLER_OUTPUT_FILE_PATH); local: PUT /sites/{site}/versions; tar.gz no build-cache',
+      value: 'tar.gz com site/, worker/index.js (bundle da release) e wrangler.jsonc; cloudflare: wrangler deploy (versão por WRANGLER_OUTPUT_FILE_PATH); local: PUT /sites/{site}/versions no edge-local; tar.gz no build-cache',
       source: input,
     }
   architecture.render_build:
@@ -102,7 +102,6 @@ structure:
     image: ../../docker/site-builder/
 
 open_questions:
-  - 'edge-local (infra/local/edge-local): implementar o contrato PUT/GET /sites/{site}/versions e POST rollback; o alvo local usa EVENTS pelo ae-sim'
   - 'Backoffice: task build real (docker-socket-proxy, redes export e publish, volume /build, retentativas, trava), blog-preview e build-runner no compose, upstream do Caddy'
   - 'Rollback no alvo cloudflare (wrangler rollback) e no local: operação do backoffice (L4) sobre a versionId do publish.json'
   - 'Imagem com ~1,2 GB (workspace inteiro com dependências de desenvolvimento): enxugar depois'

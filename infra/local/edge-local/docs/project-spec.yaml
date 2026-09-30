@@ -1,0 +1,97 @@
+spec_version: 1
+scope: unit
+inherits: ../../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: fd37f6f549f4069bfb4143d72af3093962e95daa939d083581fa75d5ec4ccc67
+  summary: >-
+    edge-local na L3 (API de administração, diretório imutável por versão, um Worker por site),
+    bloco 11.6 (substitutos da nuvem, redes, hostnames) e o spike de fidelidade da L0. Texto
+    em docs/decisions/0001-entrada.md.
+project:
+  name: edge-local
+  type: [service]
+  goal: >-
+    Substituto local do deploy na Cloudflare: recebe o artefato do publish, guarda versões
+    imutáveis, serve cada site em <site>.localhost e faz rollback, sem queda na troca.
+  scale: mvp
+
+decisions:
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime:
+    {
+      value: 'Node 24 (node src/server.ts) + wrangler (unstable_startWorker, workerd)',
+      source: user,
+    }
+  architecture.runtime:
+    {
+      value: 'Uma instância do wrangler por versão ativa, registro de dev compartilhado; proxy por Host (:8080) e administração (:8081)',
+      source: user,
+    }
+  architecture.versions:
+    {
+      value: 'ID <UTC>-<hash8>, sempre crescente; versões sem escrita; active atômico; 10 por site sem apagar a ativa; rollback como o wrangler',
+      source: user,
+    }
+  architecture.archive:
+    {
+      value: 'tar.gz do publish: site/, worker/index.js (bundle da release), wrangler.jsonc com name orakel-<site>',
+      source: recommended,
+    }
+  architecture.ae_sim:
+    {
+      value: 'Worker ae-sim (WorkerEntrypoint) → supervisor → NDJSON em /data/events/<dia>.ndjson; ClickHouse com o agregador',
+      source: user,
+    }
+  architecture.health:
+    { value: '/healthz 503 até as versões ativas subirem e o proxy abrir', source: recommended }
+  architecture.workspace:
+    {
+      value: 'Pacote @orakel/edge-local em infra/local/edge-local, linha explícita no pnpm-workspace.yaml',
+      source: user,
+    }
+  ops.image:
+    { value: 'bookworm-slim por digest; grupo local do bake; nunca publicada', source: user }
+  ops.compose:
+    {
+      value: 'Serviço no compose.override.yaml, volume /data, sem portas na máquina; *.localhost no Caddy',
+      source: user,
+    }
+  ops.networks:
+    { value: 'publish e edge com o build-runner (scaffold do backoffice/compose)', source: user }
+  quality.tests:
+    {
+      value: 'Vitest: unidade com runtime falso + spike de fidelidade com o runtime real, no pnpm test (~2 s)',
+      source: user,
+    }
+  security.secrets:
+    {
+      value: not_applicable,
+      rationale: 'Só local; administração só na rede publish',
+      source: input,
+    }
+
+commands:
+  dev: pnpm dev
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  image: docker buildx bake edge-local --load
+
+structure:
+  tree: |
+    infra/local/edge-local/
+    ├── package.json  tsconfig.json  eslint.config.js  vitest.config.ts  Dockerfile
+    └── src/{server,env,store,runtime,supervisor,proxy,admin,test-archive}.ts
+        + ae-sim/worker.js + *.test.ts (fidelity.test.ts = spike)
+  paths:
+    service: src/
+
+open_questions:
+  - 'Redes publish e edge; publish do site-builder chamando EDGE_LOCAL_URL=http://edge-local:8081 pelo build-runner'
+  - 'ae-sim gravando no ClickHouse (init.sql do layout) com o agregador; spike AE × ClickHouse das consultas'
+  - 'Verificar no piloto se uma 404 aciona o Worker na Cloudflare (não observável localmente)'
+  - 'Imagem grande (workspace com build-site e dependências de desenvolvimento): enxugar se incomodar'

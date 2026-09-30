@@ -77,6 +77,16 @@ export const PublishResultSchema = z.discriminatedUnion('status', [
 ]);
 export type PublishResult = z.infer<typeof PublishResultSchema>;
 
+/**
+ * Conteúdo do tar.gz do publish (edge-local e build-cache): o artefato, o Worker já
+ * empacotado (o mesmo bundle da release) e o wrangler.jsonc do alvo apontando para ele.
+ */
+export const ARCHIVE_LAYOUT = {
+  site: 'site',
+  worker: 'worker/index.js',
+  config: 'wrangler.jsonc',
+} as const;
+
 /** Resposta do `PUT /sites/{site}/versions` do edge-local (12.0, L3). */
 export const EdgeLocalVersionSchema = z.object({ id: z.string().min(1) });
 

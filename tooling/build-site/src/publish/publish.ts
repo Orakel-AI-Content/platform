@@ -13,12 +13,12 @@ import {
 } from '../contract.ts';
 import type { PublishEnv } from '../env.ts';
 import { ClassifiedError, classify } from '../failures.ts';
-import { archiveBuild } from './archive.ts';
+import { archiveBuild, configFileOf, type Target } from './archive.ts';
 import type { CacheConfig } from './build-cache.ts';
 import { cacheKey } from './build-cache.ts';
 
 export type PublishDeps = {
-  archive: (buildDir: string, wranglerFile: string, file: string) => Promise<void>;
+  archive: (buildDir: string, target: Target, file: string) => Promise<void>;
   deployCloudflare: (
     configPath: string,
     credentials: { apiToken: string; accountId: string },
@@ -42,14 +42,12 @@ export async function publish(env: PublishEnv, deps: PublishDeps): Promise<Publi
   let result: PublishResult;
   try {
     await assertRendered(env.BUILD_DIR, env.SITE_ID);
-    const wranglerFile =
-      env.DEPLOY_TARGET === 'cloudflare' ? PATHS.wranglerCloudflare : PATHS.wranglerLocal;
     const archive = join(work, 'build.tar.gz');
-    await deps.archive(env.BUILD_DIR, wranglerFile, archive);
+    await deps.archive(env.BUILD_DIR, env.DEPLOY_TARGET, archive);
 
     const versionId =
       env.DEPLOY_TARGET === 'cloudflare'
-        ? await deps.deployCloudflare(join(env.BUILD_DIR, wranglerFile), {
+        ? await deps.deployCloudflare(join(env.BUILD_DIR, configFileOf('cloudflare')), {
             apiToken: env.CLOUDFLARE_API_TOKEN,
             accountId: env.CLOUDFLARE_ACCOUNT_ID,
           })

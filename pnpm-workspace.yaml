@@ -4,6 +4,8 @@ packages:
   - packages/*
   - adapters/*
   - tooling/*
+  # Substituto local do deploy na Cloudflare (o resto de infra/local não é pacote).
+  - infra/local/edge-local
 
 # Uma versão por dependência no repositório (ADR 0003).
 # Adicione aqui primeiro e use "catalog:" no package.json da unidade.
