@@ -154,7 +154,6 @@ structure:
     config: wrangler.jsonc
 
 open_questions:
-  - 'build-site gera o wrangler.jsonc de cada site a partir do wrangler.jsonc base (nome, domínio, SITE_ID, assets; sem ALLOW_COUNTRY_OVERRIDE no alvo cloudflare)'
   - 'Levar os testes do handler para o workerd quando o vitest-pool-workers suportar Vitest 5'
   - 'Carga sintética (L6) com user-agent de navegador comum: o isbot descarta HeadlessChrome'
   - 'Sinal de consentimento para emitir sessão no EEE, Reino Unido e Suíça — fase 3, com o CMP'

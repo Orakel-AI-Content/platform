@@ -99,7 +99,7 @@ decisions:
     { value: 'content-model, content-client, core, tokens, events, elements', source: input }
   ops.local_access:
     {
-      value: 'preview.orakel.localhost no Caddy (forward_auth) → host.docker.internal:4321; container blog-preview com o build-site',
+      value: 'preview.orakel.localhost no Caddy (forward_auth) → host.docker.internal:4321; container blog-preview no compose com a task build do backoffice (imagem site-builder, entrypoint ssr)',
       source: user,
     }
   ops.deploy:
@@ -139,4 +139,4 @@ open_questions:
   - 'Página de teste da ilha React: packages/ui'
   - 'Workspace: revisar a ADR-012 e o 12.0 com o limite de 130 kB da busca'
   - 'Snippet do Consent Mode: a P4 o põe no core; mover quando a medição for ligada (fase 2)'
-  - 'Container blog-preview e troca do upstream do Caddy: build-site'
+  - 'Container blog-preview (site-builder ssr) e troca do upstream do Caddy: scaffold do backoffice/compose, depois do edge-local'

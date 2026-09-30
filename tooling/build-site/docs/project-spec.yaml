@@ -1,0 +1,110 @@
+spec_version: 1
+scope: unit
+inherits: ../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: fd37f6f549f4069bfb4143d72af3093962e95daa939d083581fa75d5ec4ccc67
+  summary: >-
+    Bloco de scaffold da imagem site-builder (12.0, seção Scaffold) colado no comando, com a
+    etapa L3 (execução do build, trava de segurança, edge-local, medições) como complemento.
+    Texto em docs/decisions/0001-entrada.md.
+project:
+  name: build-site
+  type: [cli]
+  goal: >-
+    Entrypoints da imagem site-builder — render, publish e ssr — que constroem, publicam e
+    visualizam os sites; a imagem é a release do core.
+  scale: mvp
+
+decisions:
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime:
+    { value: 'Node 24 (node src/cli.ts), dentro da imagem site-builder', source: inherited }
+  stack.framework:
+    { value: 'Astro (API de build), wrangler, @aws-sdk/client-s3, zod', source: input }
+  architecture.scope:
+    {
+      value: 'Só a imagem; edge-local (infra/local/edge-local) e a task build real do backoffice vêm depois',
+      source: user,
+    }
+  architecture.contract:
+    {
+      value: 'Volume /build: site/, wrangler.{cloudflare,local}.jsonc, result.json (sempre), publish.json; schemas em ./contract; códigos 0/10/20',
+      source: user,
+    }
+  architecture.page_drop:
+    {
+      value: 'ACTIVE_PAGE_COUNT, PAGE_DROP_TOLERANCE (0,2), ALLOW_MASS_UNPUBLISH do build-runner; regra no render; queda = permanente',
+      source: user,
+    }
+  architecture.wrangler_targets:
+    {
+      value: 'orakel-<site>; cloudflare com domínio próprio e Analytics Engine, sem ALLOW_COUNTRY_OVERRIDE nem ae-sim; local com EVENTS pelo ae-sim',
+      source: input,
+    }
+  architecture.publish:
+    {
+      value: 'cloudflare: wrangler deploy (versão por WRANGLER_OUTPUT_FILE_PATH); local: PUT /sites/{site}/versions; tar.gz no build-cache',
+      source: input,
+    }
+  architecture.render_build:
+    {
+      value: 'Astro in-process (erros com kind); build numa pasta do container e cópia para /build (rename não atravessa volumes)',
+      source: recommended,
+    }
+  ops.image:
+    {
+      value: 'node:24.21.0-bookworm-slim por digest; turbo prune build-site + blog + blog-worker; usuário node; ~1,2 GB',
+      source: user,
+    }
+  ops.ci:
+    {
+      value: 'Job "Imagem site-builder": bake --load + smoke.sh (render, wrangler --dry-run, ssr)',
+      source: user,
+    }
+  quality.tests:
+    {
+      value: 'Vitest com dependências falsas (render, publish, edge-local com servidor real); fumaça na imagem; sem meta de cobertura',
+      source: inherited,
+    }
+  quality.measurements:
+    { value: 'scripts/measure.ts manual; resultados em docs/measurements.md', source: user }
+  security.secrets:
+    {
+      value: 'Token do build só no render, token de deploy só no publish, por variável; nunca em log, erro ou volume',
+      source: input,
+    }
+
+commands:
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  measure: pnpm measure
+  image: docker buildx bake site-builder --load
+  smoke: tooling/build-site/scripts/smoke.sh
+
+structure:
+  tree: |
+    tooling/build-site/
+    ├── package.json  tsconfig.json  eslint.config.js  vitest.config.ts
+    ├── src/{cli,contract,env,failures,paths,ssr}.ts
+    ├── src/render/{render,astro-build,count,page-drop}.ts
+    ├── src/wrangler/{jsonc,targets}.ts
+    ├── src/publish/{publish,archive,cloudflare,edge-local,build-cache}.ts
+    ├── scripts/{snapshot-server,synthetic-snapshot,measure}.ts + smoke.sh
+    └── docs/measurements.md
+    docker/site-builder/Dockerfile
+  paths:
+    cli: src/
+    image: ../../docker/site-builder/
+
+open_questions:
+  - 'edge-local (infra/local/edge-local): implementar o contrato PUT/GET /sites/{site}/versions e POST rollback; o alvo local usa EVENTS pelo ae-sim'
+  - 'Backoffice: task build real (docker-socket-proxy, redes export e publish, volume /build, retentativas, trava), blog-preview e build-runner no compose, upstream do Caddy'
+  - 'Rollback no alvo cloudflare (wrangler rollback) e no local: operação do backoffice (L4) sobre a versionId do publish.json'
+  - 'Imagem com ~1,2 GB (workspace inteiro com dependências de desenvolvimento): enxugar depois'
+  - 'Cache do build da imagem no CI (hoje sem cache)'
+  - 'Medir de novo na VPS (--cpus=3 --memory=6g) no piloto'

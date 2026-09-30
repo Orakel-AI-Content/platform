@@ -30,13 +30,14 @@ Geradas:
 - `apps/blog` – sites Astro por `SITE_ID` (estático) e visualização SSR (`/<site>/<caminho>`); exclui `worker/` do tsconfig e do ESLint
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
 - `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner
+- `tooling/build-site` – entrypoints `render`, `publish` e `ssr` da imagem `site-builder`; contrato do volume `/build`
 
 Previstas (gere com `/scaffold` no caminho da unidade):
 
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
 - `apps/generator` – geração com LLM (fase 2)
-- `tooling/build-site` – render e publish; imagem `site-builder` (próximo da fila)
+- `infra/local/edge-local` – Workers locais por site, versões e API de administração (próximo da fila)
 
 ## Regras invioláveis
 

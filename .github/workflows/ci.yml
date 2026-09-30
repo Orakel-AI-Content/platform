@@ -29,6 +29,7 @@ jobs:
       sites: ${{ steps.filter.outputs.sites }}
       backoffice: ${{ steps.filter.outputs.backoffice }}
       infra: ${{ steps.filter.outputs.infra }}
+      site-builder: ${{ steps.filter.outputs.site-builder }}
       workspace: ${{ steps.filter.outputs.workspace }}
     steps:
       - uses: actions/checkout@v7
@@ -50,6 +51,14 @@ jobs:
             infra:
               - 'infra/**'
               - 'docker/**'
+            site-builder:
+              - 'tooling/build-site/**'
+              - 'docker/site-builder/**'
+              - 'docker/docker-bake.hcl'
+              - 'apps/blog/**'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
             workspace:
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -141,6 +150,23 @@ jobs:
         if: hashFiles('apps/blog/package.json') != ''
         run: pnpm --filter @orakel/blog exec playwright install --with-deps chromium
       - run: pnpm turbo run build:examples test:a11y test:parity --affected
+
+  # A release do core não deve ser o primeiro build da imagem (ADR 0007 do build-site):
+  # build local da site-builder e fumaça de render, wrangler --dry-run e ssr.
+  site-builder:
+    name: Imagem site-builder (build e fumaça)
+    needs: changes
+    if: needs.changes.outputs.site-builder == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build da imagem
+        env:
+          TAG: ci
+        run: docker buildx bake --file docker/docker-bake.hcl site-builder --load
+      - name: Fumaça
+        run: tooling/build-site/scripts/smoke.sh ghcr.io/orakel-ai-content/site-builder:ci
 
   infra:
     name: Compose e imagens
