@@ -70,7 +70,7 @@ versão; o parse ignora campos desconhecidos. Release do core por tag `core-vX.Y
 
 ## Mapa das unidades
 
-Estado atual: a raiz e `packages/content-model`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
+Estado atual: a raiz, `packages/content-model` e `packages/events`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
 passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`.
 
 | Caminho                   | Pacote                   | Camada ESLint              | Papel                                                                |

@@ -1,0 +1,10 @@
+{
+  // Script do navegador (ADR 0004): tipos do DOM, sem os do Node. Fica nesta pasta para o
+  // projectService do ESLint e o tsc (-p src/v1/client) o encontrarem.
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM"],
+    "types": []
+  },
+  "include": ["."]
+}

@@ -22,6 +22,7 @@ sites é configuração.
 Geradas:
 
 - `packages/content-model` – schemas Zod de conteúdo e configuração de site
+- `packages/events` – formato versionado dos eventos, manifesto e script do navegador
 
 Previstas (gere com `/scaffold` no caminho da unidade):
 
@@ -29,7 +30,6 @@ Previstas (gere com `/scaffold` no caminho da unidade):
 - `packages/core` – SEO, sitemap, RSS, robots, `_redirects`, `_headers`
 - `packages/tokens` – temas → variáveis CSS com contraste AA
 - `packages/elements` – Web Components
-- `packages/events` – formato versionado dos eventos
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
 - `apps/blog` – sites Astro por `SITE_ID`; `apps/blog/worker` – Worker `/_e/*`

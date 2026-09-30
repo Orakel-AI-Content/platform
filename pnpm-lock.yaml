@@ -103,6 +103,34 @@ importers:
         specifier: 'catalog:'
         version: 5.0.2(@types/node@24.19.0)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@24.19.0))
 
+  packages/events:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@orakel/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint-config
+      '@orakel/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
+      '@orakel/vitest-config':
+        specifier: workspace:*
+        version: link:../../tooling/vitest-config
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.0
+      eslint:
+        specifier: 'catalog:'
+        version: 10.11.0
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.2(@types/node@24.19.0)(@vitest/coverage-v8@5.0.2)(vite@8.3.1(@types/node@24.19.0))
+
   tooling/eslint-config:
     dependencies:
       '@eslint/js':

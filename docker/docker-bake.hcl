@@ -36,6 +36,13 @@ target "content-model-test" {
   output     = ["type=cacheonly"]
 }
 
+target "events-test" {
+  inherits   = ["_base"]
+  dockerfile = "packages/events/Dockerfile"
+  target     = "test"
+  output     = ["type=cacheonly"]
+}
+
 # Grupos: crie-os junto com o primeiro alvo de cada um (grupo vazio é erro no bake).
 #
 #   group "images"  { targets = ["backoffice"] }    # backoffice e serviços, a cada merge na main

@@ -1,0 +1,10 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // Só os testes usam APIs do Node. O código roda no Worker (workerd) e no agregador (Node).
+    "types": ["node"]
+  },
+  "include": ["src", "*.ts"],
+  // O script do navegador usa tipos do DOM e tem tsconfig próprio (src/v1/client).
+  "exclude": ["src/v1/client"]
+}
