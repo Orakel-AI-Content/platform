@@ -1,0 +1,33 @@
+{
+  "name": "@orakel/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Temas dos sites em DTCG → variáveis CSS, com contraste WCAG AA verificado no build",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./themes/*.css": "./dist/themes/*.css",
+    "./fonts/*": "./dist/fonts/*"
+  },
+  "scripts": {
+    "build": "node src/build.ts",
+    "fonts": "node scripts/subset-fonts.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/tsconfig": "workspace:*",
+    "@orakel/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  }
+}

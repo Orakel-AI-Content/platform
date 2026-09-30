@@ -1,0 +1,127 @@
+spec_version: 1
+scope: unit
+inherits: ../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+    - Orakel-AI-Content/workspace:docs/platform-requirements/10-politicas-e-conformidade.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: 06f9e91d0f9ae0efd7f1dfd90077bff69d0dba6e39a0010dbbdbd35d7ca4f44b
+    Orakel-AI-Content/workspace:docs/platform-requirements/10-politicas-e-conformidade.md: 211221166a9ceb8444e08777af67b8d5dd5b334fda05dc86c39dd05cdcc39904
+  summary: >-
+    Linha packages/tokens do 11.1, "Temas e composição" da L1 e as linhas Estilização,
+    Temas e tokens e Acessibilidade do bloco do blog (12.0); P14 (10). Texto em
+    docs/decisions/0001-entrada.md.
+project:
+  name: tokens
+  type: [lib]
+  goal: >-
+    Temas dos sites: um JSON DTCG por tema vira variáveis CSS e @font-face, com o contraste
+    WCAG AA dos pares fixos verificado no build — tema abaixo de AA quebra o build.
+  scale: mvp
+
+decisions:
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime: { value: 'Node 24 (node src/build.ts, sem compilação)', source: inherited }
+  stack.framework:
+    {
+      value: 'Nenhum; Zod só no build (devDependency); saída sem dependências',
+      source: recommended,
+    }
+  architecture.format:
+    {
+      value: 'DTCG 2025.10 (subconjunto: color srgb, dimension, fontFamily, number, shadow); um theme.tokens.json por tema',
+      source: user,
+    }
+  architecture.generator:
+    {
+      value: 'Gerador próprio: flatten → aliases → valores (Zod) → conjunto fixo → contraste → CSS; erros agregados, nada gravado se houver erro',
+      source: user,
+    }
+  architecture.delivery:
+    {
+      value: 'dist/themes/<id>.css + dist/index.js (THEME_IDS, isThemeId, themeCss, themeFonts; CSS embutido); o blog injeta num <style> no <head>',
+      source: user,
+    }
+  architecture.dark_mode:
+    {
+      value: 'Um esquema por tema, color-scheme declarado; modes.dark depois, de forma aditiva',
+      source: user,
+    }
+  architecture.contrast:
+    {
+      value: 'Pares fixos no gerador; 4,5:1 texto, texto secundário, link, texto sobre destaque; 3:1 foco e borda; sem transparência',
+      source: user,
+      input_ref: '12.0 L1; P14',
+    }
+  architecture.naming:
+    {
+      value: 'Caminho → variável (color.text-muted → --color-text-muted), sem prefixo; só semânticos; conjunto fixo de 38 tokens',
+      source: user,
+    }
+  architecture.fonts:
+    {
+      value: 'woff2 em subset latino + licença em themes/<id>/fonts/ (Fontsource via npm pack, script manual); @font-face com swap; dist/fonts/ com hash',
+      source: user,
+      input_ref: 'bloco do blog — Imagens e fontes',
+    }
+  architecture.unknown_theme:
+    {
+      value: 'Build do blog falha como permanente (código 10); backoffice oferece seletor com THEME_IDS; content-model continua slug',
+      source: user,
+    }
+  architecture.folder_structure: { value: aprovada (ver structure.tree), source: user }
+  integration.dependencies:
+    { value: 'Nenhuma em runtime; zod em devDependencies', source: inferred }
+  integration.tasks:
+    {
+      value: 'build (dist/**), lint, typecheck, test; consumidores dependem de ^build',
+      source: inherited,
+    }
+  integration.env: { value: not_applicable, rationale: Lib sem configuração, source: inferred }
+  data.persistence: { value: not_applicable, rationale: Lib, source: inferred }
+  quality.tests:
+    {
+      value: 'Vitest: valores de referência da WCAG, aliases, CSS, build dos temas reais e de temas inválidos; sem meta de cobertura',
+      source: inherited,
+    }
+  quality.lint_format: { value: "ESLint layer('domain')", source: inherited }
+  ops.container:
+    {
+      value: 'Dockerfile só de teste com build; alvo tokens-test fora dos grupos e do CI',
+      source: user,
+    }
+  ops.deploy:
+    {
+      value: not_applicable,
+      rationale: 'Chega ao site-builder e ao blog-preview dentro do blog',
+      source: inherited,
+    }
+
+commands:
+  build: pnpm build
+  fonts: pnpm fonts
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  from_root: pnpm turbo run build lint typecheck test --filter=@orakel/tokens
+  docker_test: docker buildx bake tokens-test
+
+structure:
+  tree: |
+    packages/tokens/
+    ├── package.json  tsconfig.json  eslint.config.js  vitest.config.ts  Dockerfile
+    ├── themes/<id>/{theme.tokens.json, fonts/*.woff2 + *.LICENSE.txt}
+    ├── scripts/subset-fonts.ts
+    ├── src/{schema,resolve,contrast,css,fonts,build}.ts + *.test.ts
+    └── dist/ (gerado)
+  paths:
+    themes: themes/
+    generator: src/
+
+open_questions:
+  - 'Blog: copiar dist/fonts/ para /fonts/, preload da fonte do texto, /fonts/* immutable no _headers, código 10 para tema inexistente'
+  - 'Backoffice: seletor de tema com THEME_IDS na configuração do site'
+  - 'Ajuste de métricas do fallback (size-adjust) para reduzir o CLS'
+  - 'Modo escuro (modes.dark) quando um site pedir'

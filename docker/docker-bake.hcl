@@ -69,6 +69,13 @@ target "content-client-test" {
   output     = ["type=cacheonly"]
 }
 
+target "tokens-test" {
+  inherits   = ["_base"]
+  dockerfile = "packages/tokens/Dockerfile"
+  target     = "test"
+  output     = ["type=cacheonly"]
+}
+
 target "events-test" {
   inherits   = ["_base"]
   dockerfile = "packages/events/Dockerfile"

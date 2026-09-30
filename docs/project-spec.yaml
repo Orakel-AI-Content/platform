@@ -193,7 +193,7 @@ decisions:
     }
   design.themes:
     {
-      value: Um tema por site via configuração; modo escuro decidido na unidade tokens,
+      value: 'Um tema por site via configuração; sem modo escuro por ora, cada tema declara color-scheme (ADR 0008 do tokens)',
       source: input,
       input_ref: 'packages/content-model — configuração do site',
     }
@@ -437,8 +437,8 @@ units:
       name: tokens,
       path: packages/tokens,
       type: lib,
-      role: 'Temas JSON → variáveis CSS com verificação de contraste WCAG AA',
-      status: planned,
+      role: 'Temas DTCG → variáveis CSS e fontes, com verificação de contraste WCAG AA no build',
+      status: generated,
     }
   - { name: elements, path: packages/elements, type: lib, role: 'Web Components', status: planned }
   - {
