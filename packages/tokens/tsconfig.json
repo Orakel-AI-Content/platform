@@ -1,0 +1,8 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // O gerador roda no Node 24 (node src/build.ts), sem compilação.
+    "types": ["node"]
+  },
+  "include": ["src", "scripts", "*.ts"]
+}

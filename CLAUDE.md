@@ -23,6 +23,7 @@ Geradas:
 
 - `packages/content-model` – schemas Zod de conteúdo e configuração de site
 - `packages/content-client` – cliente da API de exportação: snapshot em streaming e loaders do Astro
+- `packages/tokens` – temas DTCG → variáveis CSS e fontes, contraste AA verificado no build
 - `packages/events` – formato versionado dos eventos, manifesto e script do navegador
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
 - `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner
@@ -30,7 +31,6 @@ Geradas:
 Previstas (gere com `/scaffold` no caminho da unidade):
 
 - `packages/core` – SEO, sitemap, RSS, robots, `_redirects`, `_headers`
-- `packages/tokens` – temas → variáveis CSS com contraste AA
 - `packages/elements` – Web Components
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
