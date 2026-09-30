@@ -1,0 +1,27 @@
+{
+  "name": "@orakel/blog-worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Worker de borda dos sites: rota /_e/* que valida pageviews e grava no Workers Analytics Engine",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "types": "wrangler types --strict-vars=false",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@orakel/events": "workspace:*",
+    "isbot": "catalog:"
+  },
+  "devDependencies": {
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/tsconfig": "workspace:*",
+    "@orakel/vitest-config": "workspace:*",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

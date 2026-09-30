@@ -9,3 +9,4 @@ skills-lock.json
 **/.next/
 **/.astro/
 **/.wrangler/
+**/worker-configuration.d.ts

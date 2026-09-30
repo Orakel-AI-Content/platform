@@ -1,0 +1,26 @@
+// Configuração BASE do Worker de borda (ADR 0004): usada por `wrangler dev` e por
+// `wrangler types`. O `wrangler.jsonc` de cada site é gerado no build pelo build-site, a
+// partir desta base, por alvo (`local` e `cloudflare`), trocando nome, domínio, SITE_ID e
+// assets. No alvo `cloudflare`, ALLOW_COUNTRY_OVERRIDE nunca existe.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "orakel-blog-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-22",
+  "assets": {
+    "directory": "./dev-assets",
+    "binding": "ASSETS",
+    // Só a rota de eventos executa código; o resto é estático e não conta execuções.
+    "run_worker_first": ["/_e/*"],
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+  },
+  "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "events" }],
+  "vars": {
+    "SITE_ID": "exemplo-a",
+    // Só no desenvolvimento e no alvo local: aceita o cabeçalho X-Test-Country.
+    "ALLOW_COUNTRY_OVERRIDE": "true",
+  },
+  // Exceções nos Workers Logs, com amostragem.
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+}

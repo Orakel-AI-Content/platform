@@ -1,0 +1,160 @@
+spec_version: 1
+scope: unit
+inherits: ../../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: 06f9e91d0f9ae0efd7f1dfd90077bff69d0dba6e39a0010dbbdbd35d7ca4f44b
+  summary: >-
+    Bloco de scaffold do Worker de borda (12.0, seção 11.3). O scaffold foi pausado para
+    gerar antes o @orakel/events, que absorveu o formato, o manifesto e o script. Texto em
+    docs/decisions/0001-entrada.md.
+project:
+  name: blog-worker
+  type: [worker]
+  goal: >-
+    Único código executado na borda: recebe o pageview em /_e/pageview, valida, emite a
+    sessão e grava no Workers Analytics Engine. Falha na rota perde o evento, nunca a página.
+  scale: mvp
+
+decisions:
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime:
+    {
+      value: Cloudflare Workers (workerd),
+      rationale: Diverge do Node da raiz por natureza,
+      source: input,
+      input_ref: 'Tipo',
+    }
+  stack.framework: { value: nenhum (fetch handler), source: inferred }
+  stack.tooling:
+    {
+      value: 'wrangler 4.143.0; compatibility_date 2026-09-22; tipos por wrangler types --strict-vars=false',
+      rationale: 'A 4.144.0 confirmada saiu no mesmo dia e a raiz exige 24 h de maturidade (minimumReleaseAge)',
+      source: recommended,
+    }
+
+  architecture.macro:
+    {
+      value: 'Plano de eventos, na borda; publicado junto com cada site pela etapa publish do build; não chama nenhum servidor',
+      source: input,
+      input_ref: 'Comunicação; Deploy',
+    }
+  architecture.communication:
+    {
+      value: 'POST /_e/pageview; 200 { sid? }; descartes sem corpo: bot 204, origin 403, size 413, schema 400, manifest 422; 404 e 405 fora da rota; cache-control no-store',
+      source: inferred,
+      input_ref: 'Validação; raiz — status sem vazar detalhes',
+    }
+  architecture.code_design:
+    {
+      value: 'index.ts só traduz env e request; pageview.ts é o fluxo com dependências injetadas; uma regra por módulo (bot, origin, country, device); manifesto em memória por isolate',
+      source: recommended,
+    }
+  architecture.folder_structure: { value: aprovada (ver structure.tree), source: user }
+
+  integration.path: { value: apps/blog/worker, source: inherited }
+  integration.name: { value: '@orakel/blog-worker', source: inherited }
+  integration.dependencies:
+    { value: '@orakel/events (workspace:*), isbot 5.2.2, wrangler (dev)', source: recommended }
+  integration.tasks: { value: 'dev, types, lint, typecheck, test (sem build)', source: inferred }
+  integration.ci: { value: 'filtro "sites" (apps/blog/**) do ci.yml', source: inherited }
+  integration.compose:
+    { value: not_applicable, rationale: 'Roda via site-builder e edge-local', source: user }
+  integration.env:
+    {
+      value: 'Bindings e vars do Worker: SITE_ID, EVENTS (dataset events), ASSETS, ALLOW_COUNTRY_OVERRIDE (só local)',
+      source: input,
+      input_ref: 'Configuração e segredos',
+    }
+
+  data.persistence:
+    {
+      value: 'Workers Analytics Engine pelo binding EVENTS, no layout de @orakel/events/v1',
+      source: input,
+      input_ref: 'Dados',
+    }
+  data.cache:
+    { value: 'Índice do manifesto em memória por isolate', source: input, input_ref: 'Validação' }
+  security.authentication: { value: not_applicable, rationale: Rota pública, source: inferred }
+  security.validation:
+    {
+      value: 'isbot → Sec-Fetch-Site/Origin → Content-Length → parseEventBody → manifesto; site de SITE_ID; país de cf.country; nunca o IP',
+      source: input,
+      input_ref: 'Validação; Privacidade',
+    }
+  worker.bots: { value: isbot 5.2.2; sem user-agent conta como bot, source: user }
+  worker.session:
+    {
+      value: 'canIssueSession(país): sid recebido (UUID) ou crypto.randomUUID(); nenhum no EEE, Reino Unido e Suíça',
+      source: input,
+      input_ref: 'Privacidade',
+    }
+
+  quality.tests:
+    {
+      value: 'Vitest 5 em Node: regras, fluxo e index.ts com env falso; workerd real validado no ambiente local e no piloto; sem meta de cobertura',
+      rationale: '@cloudflare/vitest-pool-workers 0.22 exige Vitest ^4.1',
+      source: user,
+    }
+  quality.lint_format:
+    {
+      value: "ESLint layer('app'); worker-configuration.d.ts fora do lint e do Prettier",
+      source: inherited,
+    }
+  quality.typecheck: { value: 'tsc --noEmit com worker-configuration.d.ts', source: recommended }
+
+  ops.container:
+    {
+      value: not_applicable,
+      rationale: 'Roda no workerd; localmente via site-builder e edge-local',
+      source: user,
+    }
+  ops.observability:
+    {
+      value: 'Descartes como pontos discard; exceções nos Workers Logs (head_sampling_rate 0.1); console JSON',
+      source: input,
+      input_ref: 'Observabilidade',
+    }
+  ops.error_handling:
+    {
+      value: 'Descarte = status sem corpo; exceção = registrada e 204',
+      source: input,
+      input_ref: 'Comunicação',
+    }
+  ops.deploy:
+    {
+      value: 'Etapa publish do build: wrangler deploy na Cloudflare; API do edge-local no local',
+      source: input,
+      input_ref: 'Deploy',
+    }
+
+commands:
+  dev: pnpm dev
+  types: pnpm types
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  test: pnpm test
+  test_one: pnpm vitest run <caminho>
+  from_root: pnpm turbo run lint typecheck test --filter=@orakel/blog-worker
+
+structure:
+  tree: |
+    apps/blog/worker/
+    ├── CLAUDE.md  README.md  package.json  tsconfig.json  eslint.config.js  vitest.config.ts
+    ├── wrangler.jsonc  worker-configuration.d.ts
+    ├── dev-assets/{index.html, 404.html, _data/events-manifest.json}
+    ├── .claude/{settings.json, rules/{worker,wrangler}.md}
+    ├── docs/
+    └── src/{index,pageview,bot,origin,country,device,manifest-cache,test-builders}.ts + testes
+  paths:
+    src: src/
+    config: wrangler.jsonc
+
+open_questions:
+  - 'build-site gera o wrangler.jsonc de cada site a partir do wrangler.jsonc base (nome, domínio, SITE_ID, assets; sem ALLOW_COUNTRY_OVERRIDE no alvo cloudflare)'
+  - 'Levar os testes do handler para o workerd quando o vitest-pool-workers suportar Vitest 5'
+  - 'Carga sintética (L6) com user-agent de navegador comum: o isbot descarta HeadlessChrome'
+  - 'Sinal de consentimento para emitir sessão no EEE, Reino Unido e Suíça — fase 3, com o CMP'

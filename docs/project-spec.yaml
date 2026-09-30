@@ -396,7 +396,7 @@ units:
       path: apps/blog/worker,
       type: worker,
       role: 'Worker de borda da rota /_e/* (eventos → Analytics Engine + fila)',
-      status: planned,
+      status: generated,
     }
   - {
       name: backoffice,
@@ -471,5 +471,7 @@ open_questions:
   - 'Atualizar para Node 26 após 2026-10-28 (LTS) e para TypeScript 7.1 quando o typescript-eslint suportar'
   - 'Modo escuro — decidir na unidade tokens'
   - 'Autenticação Cloudflare Access no ambiente local — decidir na unidade backoffice'
-  - 'Worker de borda (blog-worker): @cloudflare/vitest-pool-workers 0.22 exige Vitest ^4.1 e o catalog tem 5.0.2 — decidir na unidade'
+  - 'build-site: gerar o wrangler.jsonc de cada site a partir de apps/blog/worker/wrangler.jsonc (base), sem ALLOW_COUNTRY_OVERRIDE no alvo cloudflare'
+  - 'blog: excluir worker/ do tsconfig e do ESLint da unidade'
+  - 'blog-worker: levar os testes do handler para o workerd quando o vitest-pool-workers suportar Vitest 5'
   - 'Como o blog lê as fixtures NDJSON de @orakel/content-model/fixtures/v1 nos sites de exemplo — decidir na unidade blog'
