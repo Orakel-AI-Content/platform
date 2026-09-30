@@ -23,5 +23,6 @@ servidor já mandou (light DOM): sem JavaScript, o degrau 1 continua funcionando
 </script>
 ```
 
-Comandos (nesta pasta): `pnpm test` · `pnpm lint` · `pnpm typecheck`. Contrato de cada
-elemento: `docs/decisions/0003-componentes.md`.
+Comandos (nesta pasta): `pnpm test` · `pnpm lint` · `pnpm typecheck`. Container limpo (da
+raiz): `docker buildx bake elements-test`. Contrato de cada elemento:
+`docs/decisions/0003-componentes.md`. Documentação: `docs/README.md`.

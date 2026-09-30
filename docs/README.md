@@ -15,4 +15,4 @@ de repeti-los.
 | `conventions/git.md`       | Branches, commits, PRs, releases do core                                       |
 | `guides/local-setup.md`    | Pré-requisitos, instalação, ambiente local em containers                       |
 | `guides/claude-code.md`    | Como o repositório está organizado para o Claude Code                          |
-| `decisions/`               | ADRs: por que cada escolha foi feita                                           |
+| `decisions/`               | ADRs: por que cada escolha foi feita (0010–0015: ambiente local)               |

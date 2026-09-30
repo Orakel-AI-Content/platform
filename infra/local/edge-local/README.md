@@ -13,5 +13,7 @@ curl localhost:8081/sites/exemplo-a/versions
 curl -X POST localhost:8081/sites/exemplo-a/rollback
 ```
 
-No compose local, sobe com `pnpm local:up` (imagem do `pnpm local:images`). Só para
-desenvolvimento. Documentação: `docs/README.md`.
+No compose local, sobe com `pnpm local:up` (imagem do `pnpm local:images`), nas redes
+`orakel-publish` (administração) e `orakel-edge` (sites, pelo Caddy); `pnpm local:publish <site>`
+publica e `pnpm local:load` gera pageviews. Com `EDGE_LOCAL_CLICKHOUSE_URL`, o `ae-sim` grava
+no ClickHouse; sem ela (`pnpm dev`), em NDJSON. Só para desenvolvimento. Documentação: `docs/README.md`.
