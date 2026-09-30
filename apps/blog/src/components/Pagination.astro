@@ -1,0 +1,73 @@
+---
+// Paginação das listagens: anterior, páginas e próxima. A página 1 nunca tem /pagina/1/.
+import { sitePath } from '../render/links.ts';
+
+interface Props {
+  base: string;
+  page: number;
+  totalPages: number;
+  /** Caminho da página n (rotas do core). */
+  pathFor: (page: number) => string;
+}
+const { base, page, totalPages, pathFor } = Astro.props;
+const pages = Array.from({ length: totalPages }, (_, index) => index + 1);
+---
+
+{totalPages > 1 && (
+  <nav class="pagination" aria-label="Paginação">
+    <ul>
+      {page > 1 && (
+        <li>
+          <a href={sitePath(base, pathFor(page - 1))} rel="prev">
+            Anterior
+          </a>
+        </li>
+      )}
+      {pages.map((n) => (
+        <li>
+          {n === page ? (
+            <span aria-current="page">{n}</span>
+          ) : (
+            <a href={sitePath(base, pathFor(n))}>
+              <span class="sr-only">Página </span>
+              {n}
+            </a>
+          )}
+        </li>
+      ))}
+      {page < totalPages && (
+        <li>
+          <a href={sitePath(base, pathFor(page + 1))} rel="next">
+            Próxima
+          </a>
+        </li>
+      )}
+    </ul>
+  </nav>
+)}
+
+<style>
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: var(--space-6) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  a,
+  span[aria-current] {
+    display: inline-grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  span[aria-current] {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    border-color: var(--color-accent);
+  }
+</style>

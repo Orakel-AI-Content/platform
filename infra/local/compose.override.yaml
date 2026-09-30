@@ -47,6 +47,7 @@ services:
     image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     environment:
       BACKOFFICE_UPSTREAM: ${BACKOFFICE_UPSTREAM:-backoffice-web:3000}
+      BLOG_PREVIEW_UPSTREAM: ${BLOG_PREVIEW_UPSTREAM:-host.docker.internal:4321}
     volumes:
       - ../local/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

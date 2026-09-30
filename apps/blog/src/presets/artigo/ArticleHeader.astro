@@ -1,0 +1,79 @@
+---
+// Cabeçalho comum aos presets de artigo: categoria, título, resumo, autores e datas.
+import type { Content } from '@orakel/content-model/v1';
+import { authorPath, taxonomyPath } from '@orakel/core/v1';
+
+import type { PageContext } from '../../data/site-source.ts';
+import { formatDate } from '../../render/dates.ts';
+import { sitePath } from '../../render/links.ts';
+
+interface Props {
+  ctx: PageContext;
+  content: Content;
+}
+const { ctx, content } = Astro.props;
+const { site } = ctx;
+const category = content.taxonomyIds
+  .map((id) => site.taxonomies.find((taxonomy) => taxonomy.id === id))
+  .find((taxonomy) => taxonomy?.kind === 'category');
+const authors = content.authorIds.flatMap(
+  (id) => site.authors.find((author) => author.id === id) ?? [],
+);
+---
+
+<header class="article-header">
+  {category && (
+    <p class="kicker">
+      <a href={sitePath(ctx.base, taxonomyPath(category))}>{category.name}</a>
+    </p>
+  )}
+  <h1>{content.title}</h1>
+  {content.description && <p class="lede">{content.description}</p>}
+  <p class="meta">
+    {authors.length > 0 && (
+      <span>
+        Por{' '}
+        {authors.map((author, index) => (
+          <>
+            {index > 0 && ', '}
+            <a href={sitePath(ctx.base, authorPath(author))}>{author.name}</a>
+          </>
+        ))}
+        {' · '}
+      </span>
+    )}
+    <time datetime={content.publishedAt}>{formatDate(content.publishedAt, site.config)}</time>
+    {content.updatedAt && (
+      <span>
+        {' · atualizado em '}
+        <time datetime={content.updatedAt}>{formatDate(content.updatedAt, site.config)}</time>
+      </span>
+    )}
+  </p>
+</header>
+
+<style>
+  .article-header {
+    display: grid;
+    gap: var(--space-3);
+  }
+  .kicker,
+  .lede,
+  .meta,
+  h1 {
+    margin: 0;
+  }
+  .kicker {
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .lede {
+    font-size: var(--font-size-lg);
+    color: var(--color-text-muted);
+  }
+  .meta {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+  }
+</style>

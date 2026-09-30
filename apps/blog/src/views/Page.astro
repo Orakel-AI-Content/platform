@@ -1,0 +1,24 @@
+---
+// Página de conteúdo (`kind: page`): título e blocos, sem autor nem data.
+import type { Content } from '@orakel/content-model/v1';
+
+import Blocks from '../components/blocks/Blocks.astro';
+import type { PageContext } from '../data/site-source.ts';
+
+interface Props {
+  ctx: PageContext;
+  content: Content;
+}
+const { ctx, content } = Astro.props;
+---
+
+<article class="prose page" data-pagefind-body>
+  <h1>{content.title}</h1>
+  <Blocks ctx={ctx} blocks={content.blocks} />
+</article>
+
+<style>
+  .page {
+    padding-block: var(--space-6);
+  }
+</style>

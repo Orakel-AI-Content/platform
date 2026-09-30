@@ -1,0 +1,26 @@
+---
+// Trechos de texto com marcas (negrito, itálico, código) e links. Links internos ganham o
+// prefixo do site na visualização. Nunca HTML livre.
+import type { Inline } from '@orakel/content-model/v1';
+
+import { sitePath } from '../../render/links.ts';
+import Marked from './Marked.astro';
+
+interface Props {
+  inlines: readonly Inline[];
+  base: string;
+}
+const { inlines, base } = Astro.props;
+---
+
+{inlines.map((inline) =>
+  inline.type === 'text' ? (
+    <Marked text={inline.text} marks={inline.marks ?? []} />
+  ) : (
+    <a href={sitePath(base, inline.href)}>
+      {inline.children.map((child) => (
+        <Marked text={child.text} marks={child.marks ?? []} />
+      ))}
+    </a>
+  ),
+)}

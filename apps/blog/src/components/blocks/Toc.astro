@@ -1,0 +1,47 @@
+---
+// Sumário a partir dos intertítulos dos blocos de texto (links para os ids estáveis).
+import type { Block } from '@orakel/content-model/v1';
+
+import { tocEntries } from '../../render/toc.ts';
+
+interface Props {
+  blocks: readonly Block[];
+  title?: string | undefined;
+}
+const { blocks, title = 'Neste artigo' } = Astro.props;
+const entries = tocEntries(blocks);
+---
+
+{entries.length > 0 && (
+  <nav class="toc" aria-label={title}>
+    <p class="toc-title">{title}</p>
+    <ol>
+      {entries.map((entry) => (
+        <li class={`level-${entry.level}`}>
+          <a href={`#${entry.id}`}>{entry.text}</a>
+        </li>
+      ))}
+    </ol>
+  </nav>
+)}
+
+<style>
+  .toc {
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+  .toc-title {
+    margin: 0 0 var(--space-2);
+    font-weight: 700;
+  }
+  ol {
+    margin: 0;
+    padding-inline-start: var(--space-5);
+  }
+  .level-3 {
+    margin-inline-start: var(--space-4);
+    list-style-type: circle;
+  }
+</style>

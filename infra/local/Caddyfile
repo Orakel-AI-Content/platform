@@ -26,3 +26,20 @@ admin.orakel.localhost {
 		reverse_proxy {$BACKOFFICE_UPSTREAM}
 	}
 }
+
+# Visualização dos sites (apps/blog, SSR): /<site>/<caminho>, atrás do Access como o admin.
+# Até o build-site, aponta para o `pnpm --filter @orakel/blog preview` na máquina (ADR 0011
+# do blog); depois, para o container blog-preview.
+preview.orakel.localhost {
+	handle /cdn-cgi/access/* {
+		reverse_proxy access-mock:8788
+	}
+
+	handle {
+		forward_auth access-mock:8788 {
+			uri /cdn-cgi/access/authorize
+			copy_headers Cf-Access-Jwt-Assertion
+		}
+		reverse_proxy {$BLOG_PREVIEW_UPSTREAM}
+	}
+}

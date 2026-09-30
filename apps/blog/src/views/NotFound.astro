@@ -1,0 +1,23 @@
+---
+import type { PageContext } from '../data/site-source.ts';
+import { sitePath } from '../render/links.ts';
+
+interface Props {
+  ctx: PageContext;
+}
+const { ctx } = Astro.props;
+---
+
+<section class="prose not-found">
+  <h1>Página não encontrada</h1>
+  <p>O endereço pode ter mudado ou a página foi removida.</p>
+  <p>
+    <a href={sitePath(ctx.base, '/')}>Voltar para o início</a>
+  </p>
+</section>
+
+<style>
+  .not-found {
+    padding-block: var(--space-8);
+  }
+</style>

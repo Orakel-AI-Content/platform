@@ -1,0 +1,51 @@
+---
+// Texto estruturado: parágrafos, intertítulos (com id estável para o sumário) e listas.
+import type { RichText } from '@orakel/content-model/v1';
+
+import { headingId } from '../../render/toc.ts';
+import Inlines from './Inlines.astro';
+
+interface Props {
+  nodes: RichText;
+  base: string;
+  /** Número do bloco: base dos ids dos intertítulos. Ausente em textos da configuração. */
+  blockN?: number;
+}
+const { nodes, base, blockN } = Astro.props;
+let heading = -1;
+const idFor = () => {
+  heading += 1;
+  return blockN === undefined ? undefined : headingId(blockN, heading);
+};
+---
+
+{nodes.map((node) => {
+  switch (node.type) {
+    case 'paragraph':
+      return (
+        <p>
+          <Inlines inlines={node.children} base={base} />
+        </p>
+      );
+    case 'heading': {
+      const Tag = node.level === 2 ? 'h2' : 'h3';
+      return (
+        <Tag id={idFor()}>
+          <Inlines inlines={node.children} base={base} />
+        </Tag>
+      );
+    }
+    case 'list': {
+      const List = node.ordered ? 'ol' : 'ul';
+      return (
+        <List>
+          {node.items.map((item) => (
+            <li>
+              <Inlines inlines={item} base={base} />
+            </li>
+          ))}
+        </List>
+      );
+    }
+  }
+})}

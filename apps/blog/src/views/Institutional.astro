@@ -1,0 +1,25 @@
+---
+// Institucionais (/sobre/, /privacidade/…): texto da configuração do site.
+import type { RichText as RichTextNodes } from '@orakel/content-model/v1';
+
+import RichText from '../components/blocks/RichText.astro';
+import type { PageContext } from '../data/site-source.ts';
+
+interface Props {
+  ctx: PageContext;
+  title: string;
+  text: RichTextNodes;
+}
+const { ctx, title, text } = Astro.props;
+---
+
+<article class="prose page">
+  <h1>{title}</h1>
+  <RichText nodes={text} base={ctx.base} />
+</article>
+
+<style>
+  .page {
+    padding-block: var(--space-6);
+  }
+</style>

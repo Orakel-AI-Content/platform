@@ -1,0 +1,71 @@
+---
+// Home `revista`: destaque grande do mais recente, carrossel com os seguintes (degrau 1) e
+// grade com o resto. Nas páginas seguintes, só a grade.
+import { homePath } from '@orakel/core/v1';
+
+import ArticleCard from '../../components/ArticleCard.astro';
+import Carousel from '../../components/Carousel.astro';
+import Pagination from '../../components/Pagination.astro';
+import type { PresetProps } from '../types.ts';
+
+type Props = PresetProps<'home'>;
+const { ctx, model } = Astro.props;
+const variant = ctx.site.config.variants.articleCard;
+const first = model.page === 1;
+const [lead, ...others] = model.items;
+const carousel = first && others.length >= 3 ? others.slice(0, 4) : [];
+const grid = first ? others.slice(carousel.length) : model.items;
+---
+
+<h1 class:list={[first && 'sr-only']}>{ctx.site.config.name}</h1>
+{first && lead && (
+  <section class="lead" aria-label="Destaque">
+    <ArticleCard ctx={ctx} content={lead} variant="horizontal" priority />
+  </section>
+)}
+{carousel.length > 0 && (
+  <Carousel label="Mais recentes">
+    {carousel.map((content) => (
+      <li>
+        <ArticleCard ctx={ctx} content={content} variant="vertical" headingLevel={3} />
+      </li>
+    ))}
+  </Carousel>
+)}
+{grid.length > 0 && (
+  <ul class="grid">
+    {grid.map((content) => (
+      <li>
+        <ArticleCard ctx={ctx} content={content} variant={variant} />
+      </li>
+    ))}
+  </ul>
+)}
+{model.items.length === 0 && <p>Nenhum artigo publicado ainda.</p>}
+<Pagination base={ctx.base} page={model.page} totalPages={model.totalPages} pathFor={homePath} />
+
+<style>
+  .lead {
+    padding-block: var(--space-6);
+  }
+  .lead :global(.title) {
+    font-size: var(--font-size-2xl);
+  }
+  .grid {
+    display: grid;
+    gap: var(--space-5);
+    margin: var(--space-6) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  @media (min-width: 40rem) {
+    .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (min-width: 64rem) {
+    .grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+</style>

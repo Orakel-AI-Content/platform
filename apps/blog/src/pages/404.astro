@@ -1,0 +1,14 @@
+---
+// 404 do build estático (o Worker usa `not_found_handling: 404-page`). Na visualização, a
+// rota única responde 404 com a mesma view.
+import { loadBuildSite } from '../data/collections.ts';
+import Base from '../layouts/Base.astro';
+import PageView from '../views/PageView.astro';
+
+const ctx = { site: await loadBuildSite(), path: '/404/', base: '', preview: false };
+const model = { type: 'not-found' } as const;
+---
+
+<Base ctx={ctx} model={model}>
+  <PageView ctx={ctx} model={model} />
+</Base>

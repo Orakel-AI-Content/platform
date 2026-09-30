@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // O build lê o site e a fonte do conteúdo do ambiente (src/env.ts). O token entra por
+    // passThroughEnv: não vai para o hash do cache.
+    "build": {
+      "env": ["SITE_ID", "CONTENT_SOURCE", "EXPORT_API_URL", "SNAPSHOT_META_FILE", "BLOG_OUTPUT"],
+      "passThroughEnv": ["EXPORT_BUILD_TOKEN"],
+      "outputs": ["dist/**", "dist-preview/**"]
+    }
+  }
+}

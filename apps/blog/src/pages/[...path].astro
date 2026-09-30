@@ -1,0 +1,29 @@
+---
+// Rota única dos sites (ADR 0004 da unidade). No estático, uma página por caminho do site
+// de SITE_ID; na visualização, o middleware já resolveu `/<site>/<caminho>`.
+import { loadBuildSite } from '../data/collections.ts';
+import type { PageContext } from '../data/site-source.ts';
+import Base from '../layouts/Base.astro';
+import { enumeratePaths, resolvePath } from '../routing/resolve.ts';
+import PageView from '../views/PageView.astro';
+
+export async function getStaticPaths() {
+  const site = await loadBuildSite();
+  return enumeratePaths(site).map((path) => ({
+    params: { path: path === '/' ? undefined : path.slice(1, -1) },
+  }));
+}
+
+const ctx: PageContext = Astro.locals.page ?? {
+  site: await loadBuildSite(),
+  path: Astro.url.pathname,
+  base: '',
+  preview: false,
+};
+const model = resolvePath(ctx.site, ctx.path);
+if (model.type === 'not-found') Astro.response.status = 404;
+---
+
+<Base ctx={ctx} model={model}>
+  <PageView ctx={ctx} model={model} />
+</Base>

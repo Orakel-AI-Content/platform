@@ -4,6 +4,7 @@ pnpm-lock.yaml
 skills-lock.json
 **/dist/
 **/dist-examples/
+**/dist-preview/
 **/coverage/
 **/.turbo/
 **/.next/

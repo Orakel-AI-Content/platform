@@ -1,0 +1,139 @@
+spec_version: 1
+scope: unit
+inherits: ../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+    - Orakel-AI-Content/workspace:docs/platform-requirements/10-politicas-e-conformidade.md
+    - Orakel-AI-Content/workspace:docs/platform-requirements/07-analytics-e-medicao.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: 06f9e91d0f9ae0efd7f1dfd90077bff69d0dba6e39a0010dbbdbd35d7ca4f44b
+    Orakel-AI-Content/workspace:docs/platform-requirements/10-politicas-e-conformidade.md: 211221166a9ceb8444e08777af67b8d5dd5b334fda05dc86c39dd05cdcc39904
+    Orakel-AI-Content/workspace:docs/platform-requirements/07-analytics-e-medicao.md: 01bd4bd46d8429322a242d4d1175218decbbc6c7352700fb9df95fd23f5f0a28
+  summary: >-
+    Bloco de scaffold do apps/blog (12.0, seção Scaffold) colado no comando; complementos
+    citados: P4 e P14 (10), Consent Mode e orçamento de JS (07). Texto em
+    docs/decisions/0001-entrada.md.
+project:
+  name: blog
+  type: [web]
+  goal: >-
+    Um app Astro genérico que gera cada site da rede por SITE_ID (estático, servido como
+    Worker com Static Assets) e atende a visualização de todos os sites (SSR).
+  scale: mvp
+
+decisions:
+  stack.language: { value: TypeScript 6 estrito, source: inherited }
+  stack.runtime: { value: Node 24, source: inherited }
+  stack.framework:
+    {
+      value: 'Astro 7.3.5; @astrojs/node 11.1.6 (visualização); Pagefind 1.5.2',
+      source: input,
+      input_ref: 'Framework; Busca',
+    }
+  architecture.outputs:
+    {
+      value: 'static por SITE_ID (dist/) e preview SSR multi-site (dist-preview/), escolhidos por BLOG_OUTPUT',
+      source: input,
+      input_ref: Renderização,
+    }
+  architecture.site_source:
+    {
+      value: 'SiteSource: coleções do snapshotLoaders no build; readSnapshot por site com cache de 10 s no SSR; rascunhos ao vivo depois',
+      source: user,
+    }
+  architecture.routing:
+    {
+      value: '[...path].astro único; mapa caminho → PageModel pelas rotas do core, igual no estático e no SSR',
+      source: recommended,
+    }
+  architecture.build_end:
+    {
+      value: 'orakel-edge.json (mesma leitura) → integração: edgeFiles, manifesto de eventos, fontes, Pagefind, orçamento de JS, redirectUsage no metaFile',
+      source: recommended,
+    }
+  architecture.failures:
+    {
+      value: 'BuildError com kind transient/permanent; o render traduz para 20/10',
+      source: inherited,
+    }
+  design.presets:
+    {
+      value: 'padrao (exemplo-a, editorial) e revista (exemplo-b); cards vertical e horizontal por @container',
+      source: user,
+    }
+  design.responsive:
+    {
+      value: 'Mobile first; 40rem e 64rem; cards por container query; clamp() nos títulos',
+      source: user,
+    }
+  design.interactivity:
+    { value: 'Degrau 1 (details, scroll-snap); degrau 2 com packages/elements', source: user }
+  design.icons: { value: 'SVGs do Lucide copiados (ISC), aria-hidden, com texto', source: user }
+  quality.js_budget:
+    {
+      value: 'kB gzip por data-page-type: artigo, página, institucional, 404 ≤ 15; home e listagens ≤ 20; busca ≤ 130 (WASM do Pagefind)',
+      source: user,
+      input_ref: 'Verificações no build — busca era 80',
+    }
+  quality.tests:
+    {
+      value: 'Vitest (rotas, fontes, orçamento, env, consent); Playwright: axe em 375 e 1280 px, paridade estático × SSR; idempotência no build:examples',
+      source: input,
+    }
+  quality.lint_format:
+    {
+      value: "ESLint layer('app') + astroComponents; Prettier com prettier-plugin-astro; astro check",
+      source: inherited,
+    }
+  integration.env:
+    {
+      value: 'SITE_ID, CONTENT_SOURCE (api|fixture, sem padrão), EXPORT_API_URL, EXPORT_BUILD_TOKEN, SNAPSHOT_META_FILE, PORT',
+      source: user,
+    }
+  integration.dependencies:
+    { value: 'content-model, content-client, core, tokens, events', source: input }
+  ops.local_access:
+    {
+      value: 'preview.orakel.localhost no Caddy (forward_auth) → host.docker.internal:4321; container blog-preview com o build-site',
+      source: user,
+    }
+  ops.deploy:
+    {
+      value: 'Pela imagem site-builder (render, publish, ssr); o blog não é implantado sozinho',
+      source: input,
+    }
+  data.persistence:
+    { value: not_applicable, rationale: 'Sem banco: conteúdo da API de exportação', source: input }
+
+commands:
+  dev: pnpm dev
+  build: 'SITE_ID=<site> CONTENT_SOURCE=fixture pnpm build'
+  preview: pnpm preview
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  examples: pnpm build:examples
+  e2e: 'pnpm test:a11y && pnpm test:parity'
+
+structure:
+  tree: |
+    apps/blog/
+    ├── package.json astro.config.ts tsconfig.json eslint.config.js vitest.config.ts playwright.config.ts turbo.json
+    ├── src/{env.ts, content.config.ts, middleware.ts, astro-env.d.ts}
+    ├── src/{data,routing,render,measurement,checks,integrations}/   lógica do app (TS)
+    ├── src/{pages,layouts,views,presets,components,styles}/         Astro
+    ├── scripts/build-examples.ts
+    └── e2e/{a11y,parity}.spec.ts + static-server.ts + normalize.ts
+  paths:
+    components: src/components/
+    presets: src/presets/
+
+open_questions:
+  - 'Rascunhos na visualização: fonte ao vivo no SSR com as rotas de visualização do backoffice e o live loader do content-client'
+  - 'Degrau 2 (carrossel com botões, menu com script, copiar link): packages/elements, logo depois do blog'
+  - 'Página de teste da ilha React: packages/ui'
+  - 'Workspace: revisar a ADR-012 e o 12.0 com o limite de 130 kB da busca'
+  - 'Snippet do Consent Mode: a P4 o põe no core; mover quando a medição for ligada (fase 2)'
+  - 'Container blog-preview e troca do upstream do Caddy: build-site'

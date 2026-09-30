@@ -1,0 +1,87 @@
+/* Base dos sites: tudo pelas variáveis do tema (@orakel/tokens), embutido no <head>. */
+@import './layout.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-md);
+  line-height: var(--font-line-height-md);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-family-heading);
+  line-height: var(--font-line-height-xl);
+  text-wrap: balance;
+}
+/* Tipografia fluida só nos títulos, sobre os tamanhos do tema. */
+h1 {
+  font-size: clamp(var(--font-size-2xl), 4vw + 1rem, var(--font-size-3xl));
+  line-height: var(--font-line-height-3xl);
+}
+h2 {
+  font-size: clamp(var(--font-size-xl), 2vw + 1rem, var(--font-size-2xl));
+}
+h3 {
+  font-size: var(--font-size-lg);
+}
+
+a {
+  color: var(--color-link);
+  text-underline-offset: 0.15em;
+}
+
+code {
+  font-family: var(--font-family-mono);
+  font-size: 0.9em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: var(--space-4);
+  top: -100%;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: var(--radius-md);
+  z-index: 10;
+}
+.skip-link:focus {
+  top: var(--space-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}

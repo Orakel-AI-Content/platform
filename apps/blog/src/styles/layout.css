@@ -1,0 +1,21 @@
+/*
+ * Estrutura responsiva, igual em todos os sites (ADR 0008 da unidade). Mobile first.
+ *
+ * Breakpoints de layout (variável CSS não funciona em @media; use estes valores):
+ *   40rem (640 px)  — listagens em 2 colunas, navegação no cabeçalho em linha
+ *   64rem (1024 px) — grade de 3 colunas no preset revista, sumário lateral no artigo
+ *
+ * Cards e componentes que mudam com o espaço usam @container, não @media.
+ */
+.container {
+  width: min(100% - 2 * var(--space-4), 72rem);
+  margin-inline: auto;
+}
+
+/* Coluna de leitura: ~68 caracteres. */
+.prose {
+  max-width: 68ch;
+}
+.prose :where(p, ul, ol) {
+  margin-block: 0 var(--space-4);
+}

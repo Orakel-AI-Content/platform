@@ -1,0 +1,42 @@
+---
+// Busca: UI do Pagefind (sem React) só nesta página; o índice é gerado no fim do build.
+// A caixa do cabeçalho manda ?q=, que dispara a consulta.
+import type { PageContext } from '../data/site-source.ts';
+
+interface Props {
+  ctx: PageContext;
+}
+const { ctx } = Astro.props;
+---
+
+<section class="search-page">
+  <h1>Busca</h1>
+  {ctx.preview ? (
+    <p>A busca usa o índice gerado no build publicado; na visualização ela não está disponível.</p>
+  ) : (
+    <>
+      <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+      <div id="busca" />
+      <script is:inline src="/pagefind/pagefind-ui.js" />
+      <script is:inline>
+        {
+          `const ui = new PagefindUI({ element: '#busca', showImages: false, resetStyles: false });
+const q = new URLSearchParams(location.search).get('q');
+if (q) ui.triggerSearch(q);`;
+        }
+      </script>
+    </>
+  )}
+</section>
+
+<style>
+  .search-page {
+    padding-block: var(--space-6);
+    --pagefind-ui-primary: var(--color-link);
+    --pagefind-ui-text: var(--color-text);
+    --pagefind-ui-background: var(--color-background);
+    --pagefind-ui-border: var(--color-border);
+    --pagefind-ui-tag: var(--color-surface);
+    --pagefind-ui-font: var(--font-family-body);
+  }
+</style>
