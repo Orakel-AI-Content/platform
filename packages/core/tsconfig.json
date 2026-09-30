@@ -1,0 +1,8 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // Só os testes usam Node (leitura das fixtures); o código é puro.
+    "types": ["node"]
+  },
+  "include": ["src", "*.ts"]
+}

@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`rss > gera o feed dos artigos da fixture 1`] = `
+"<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Exemplo A — Guias</title>
+    <link>https://exemplo-a.com.br/</link>
+    <description>Exemplo A — Guias</description>
+    <language>pt-BR</language>
+    <lastBuildDate>Tue, 22 Sep 2026 11:00:00 GMT</lastBuildDate>
+    <atom:link href="https://exemplo-a.com.br/rss.xml" rel="self" type="application/rss+xml"/>
+    <item><title>Uma rotina da manhã possível</title><link>https://exemplo-a.com.br/rotina-da-manha/</link><guid isPermaLink="false">exemplo-a:2</guid><pubDate>Tue, 22 Sep 2026 11:00:00 GMT</pubDate><dc:creator>Bruno Lima</dc:creator><category>Guias</category></item>
+    <item><title>Guia completo para começar</title><link>https://exemplo-a.com.br/guia-completo/</link><guid isPermaLink="false">exemplo-a:1</guid><pubDate>Sun, 20 Sep 2026 15:00:00 GMT</pubDate><description>Tudo o que você precisa para dar o primeiro passo.</description><dc:creator>Ana Souza</dc:creator><category>Guias</category><category>Iniciantes</category><category>Primeiros passos</category></item>
+  </channel>
+</rss>
+"
+`;
