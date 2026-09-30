@@ -14,6 +14,9 @@ SITE_ID=exemplo-a SITE_DOMAIN=exemplo-a.com.br EXPORT_API_URL=http://127.0.0.1:8
   node src/cli.ts render     # 0 ok · 10 permanente · 20 transitória; ver /tmp/build/result.json
 ```
 
+Render e publish pelas redes do compose local, como o `build-runner` fará (da raiz):
+`pnpm local:publish <site>` → `https://<site>.localhost`.
+
 Contrato do volume `/build` (lido pelo backoffice): `@orakel/build-site/contract`.
 Comandos: `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm measure`. Documentação:
 `docs/README.md`.

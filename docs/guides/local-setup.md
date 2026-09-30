@@ -43,7 +43,7 @@ Depois, `https://admin.orakel.localhost` abre o Backoffice; o login de teste (ac
 oferece um usuário por papel.
 
 **Backoffice em modo dev:** `pnpm --filter @orakel/backoffice dev` na máquina e
-`BACKOFFICE_UPSTREAM=host.docker.internal:3000` no `.env.local` (reinicie o `caddy`), para
+`BACKOFFICE_UPSTREAM=host.docker.internal:3000` no `.env.local` (recrie o `caddy`: `infra/local/compose.sh up -d caddy`), para
 o `admin.orakel.localhost` apontar para o `next dev`.
 
 ## Comandos
@@ -113,6 +113,6 @@ Para ver ou desligar: acrescente o `--profile` ao `ps`, `logs` ou `down`.
 - **`local:check` falha em "Serviços"**: `infra/local/compose.sh logs <serviço>`. Um serviço
   parado só é aceito se for one-shot (`backoffice-migrate`, `s3-init`, `glitchtip-db`).
 - **`media.<site>.localhost` não responde**: o site precisa estar em `LOCAL_MEDIA_HOSTS`
-  (reinicie o `caddy`) e em `LOCAL_SITES` (rode `local:up` para criar o bucket).
+  (recrie o `caddy`: `infra/local/compose.sh up -d caddy`) e em `LOCAL_SITES` (rode `local:up` para criar o bucket).
 - **Aviso de plataforma (`linux/amd64`) no `local:publish`**: a imagem local foi construída
   para outra arquitetura; reconstrua com `pnpm local:images`.

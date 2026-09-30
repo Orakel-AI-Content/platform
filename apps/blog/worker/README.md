@@ -16,7 +16,9 @@ Engine. Formato dos eventos em `@orakel/events`.
 | `pnpm typecheck` | `tsc --noEmit`                                           |
 
 O deploy não é feito daqui: a etapa `publish` do build publica o Worker junto com cada
-site, com um `wrangler.jsonc` gerado a partir do `wrangler.jsonc` desta pasta.
+site, com um `wrangler.jsonc` gerado a partir do `wrangler.jsonc` desta pasta. No ambiente
+local, `pnpm local:publish <site>` (na raiz) o publica no `edge-local`, onde o binding `EVENTS`
+vai para o `ae-sim` (ClickHouse), e `pnpm local:load` gera pageviews com países variados.
 
 ## Documentação
 
