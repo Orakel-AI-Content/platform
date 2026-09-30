@@ -2,13 +2,14 @@
 // eventos (trazidos por /orakel-edge.json, gerado com a mesma leitura do snapshot), copia as
 // fontes do tema, gera o índice do Pagefind, confere o orçamento de JS e acrescenta o uso de
 // redirects ao metaFile do render.
+import { execFile } from 'node:child_process';
 import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import type { AstroIntegration, AstroIntegrationLogger } from 'astro';
-import * as pagefind from 'pagefind';
 
 import { measureBudgets } from '../checks/js-budget.ts';
 import { BuildError } from '../data/errors.ts';
@@ -24,17 +25,23 @@ async function writeAt(dir: string, path: string, content: string | Uint8Array) 
   await writeFile(target, content);
 }
 
+/**
+ * Índice do Pagefind pela CLI, num processo filho: quando o processo termina, todos os
+ * arquivos estão gravados. A API Node (`writeFiles` + `close`) às vezes encerrava o
+ * processo do Pagefind antes do fim da escrita, e o build deixava de ser idempotente.
+ */
 async function indexSearch(dir: string, logger: AstroIntegrationLogger) {
-  const { index, errors } = await pagefind.createIndex({});
-  if (!index) throw new BuildError(`Pagefind: ${errors.join('; ')}`, 'permanent');
-  const added = await index.addDirectory({ path: dir });
-  if (added.errors.length > 0)
-    throw new BuildError(`Pagefind: ${added.errors.join('; ')}`, 'permanent');
-  const written = await index.writeFiles({ outputPath: join(dir, 'pagefind') });
-  if (written.errors.length > 0)
-    throw new BuildError(`Pagefind: ${written.errors.join('; ')}`, 'permanent');
-  await pagefind.close();
-  logger.info(`Pagefind: ${added.page_count} páginas indexadas`);
+  // O pacote só exporta a API ESM; a CLI fica no node_modules do app (layout do workspace).
+  const cli = fileURLToPath(
+    new URL('../../node_modules/pagefind/lib/runner/bin.cjs', import.meta.url),
+  );
+  try {
+    await promisify(execFile)(process.execPath, [cli, '--site', dir, '--silent']);
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr ?? String(error);
+    throw new BuildError(`Pagefind: ${stderr.trim()}`, 'permanent');
+  }
+  logger.info('Pagefind: índice gerado');
 }
 
 export async function finishSite(dir: string, logger: AstroIntegrationLogger): Promise<void> {

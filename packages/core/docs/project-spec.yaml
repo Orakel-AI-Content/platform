@@ -117,7 +117,6 @@ structure:
 open_questions:
   - 'content-model e backoffice: logo e perfis sociais na configuração do site (Organization)'
   - 'Backoffice: recusar slugs reservados (RESERVED_SLUGS) ao salvar'
-  - 'Blog: integração que grava edgeFiles, seoHead no layout, rotas nos links, código 10 para os problemas do core'
   - 'Fase 1: HSTS na zona (OpenTofu); validar no piloto as regras de _headers do Pagefind'
   - 'Fase 2: CSP, começando em report-only'
   - 'Fase 3: ads.txt, anúncios e afiliados'
