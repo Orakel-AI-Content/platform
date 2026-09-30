@@ -1,0 +1,76 @@
+spec_version: 1
+scope: unit
+inherits: ../../../docs/project-spec.yaml
+input:
+  kind: payload
+  paths:
+    - Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md
+  sha256:
+    Orakel-AI-Content/workspace:docs/platform-requirements/12.0-fase-0-ambiente-local.md: 06f9e91d0f9ae0efd7f1dfd90077bff69d0dba6e39a0010dbbdbd35d7ca4f44b
+  summary: >-
+    Linha packages/elements do 11.1 e a linha Interatividade do bloco do blog (12.0); escada
+    de interatividade (01 seção 4, ADR-004); ADR 0009 do blog. Texto em
+    docs/decisions/0001-entrada.md.
+project:
+  name: elements
+  type: [lib]
+  goal: >-
+    Web Components do degrau 2 da escada de interatividade: comportamento sobre o HTML que o
+    servidor já mandou, sem tirar nada do degrau 1.
+  scale: mvp
+
+decisions:
+  stack.language: { value: 'TypeScript 6 estrito, lib DOM', source: inherited }
+  stack.runtime: { value: 'Navegador; empacotado pelo blog (Vite)', source: inherited }
+  stack.framework: { value: 'Nenhum: custom elements puros com a base OkElement', source: user }
+  architecture.dom: { value: 'Light DOM; só comportamento; estilo e textos no blog', source: user }
+  architecture.naming: { value: 'Prefixo ok-; atributos data-ok-*; eventos ok-*', source: user }
+  architecture.components:
+    {
+      value: 'ok-carousel, ok-menu, ok-copy-link, ok-share',
+      source: user,
+      input_ref: 'Interatividade — degrau 2',
+    }
+  architecture.registration:
+    {
+      value: '"." sem efeito colateral; ./carousel, ./menu, ./copy-link, ./share registram; sideEffects só em src/register/*',
+      source: recommended,
+    }
+  architecture.lifecycle:
+    {
+      value: 'setup depois que os filhos existem (DOMContentLoaded ou microtask); listeners num AbortController',
+      source: recommended,
+    }
+  quality.tests:
+    {
+      value: 'Vitest com happy-dom no pacote; Playwright no blog (e2e/interactions.spec.ts)',
+      source: user,
+    }
+  quality.lint_format: { value: "ESLint layer('domain')", source: inherited }
+  integration.consumers: { value: 'apps/blog: Carousel, Header, ShareLinks', source: user }
+  integration.env: { value: not_applicable, rationale: Código de navegador, source: inferred }
+  ops.container:
+    { value: 'Dockerfile só de teste; alvo elements-test fora dos grupos e do CI', source: user }
+  ops.deploy:
+    { value: not_applicable, rationale: 'Chega aos sites no bundle do blog', source: inherited }
+
+commands:
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck
+  from_root: pnpm turbo run lint typecheck test --filter=@orakel/elements
+  docker_test: docker buildx bake elements-test
+
+structure:
+  tree: |
+    packages/elements/
+    ├── package.json  tsconfig.json  eslint.config.js  vitest.config.ts  Dockerfile
+    └── src/{index,base,define,motion,carousel,menu,copy-link,share,test-dom}.ts
+        + register/{carousel,menu,copy-link,share}.ts + *.test.ts
+  paths:
+    elements: src/
+    register: src/register/
+
+open_questions:
+  - 'Carrossel em navegador real: nenhuma página dos sites de exemplo tem carrossel (home revista exige 4+ artigos; a fixture exemplo-b tem 1)'
+  - 'Rolagem do carrossel em RTL (scrollLeft negativo): nenhum site da rede é RTL hoje'

@@ -26,5 +26,6 @@ flowchart LR
 | `core`           | Rotas, `seoHead`/`renderHead`, `edgeFiles`, `mediaUrl`                   |
 | `tokens`         | `themeCss` no `<head>`, `themeFonts` (preload e cópia para `/fonts/`)    |
 | `events`         | Script do pageview, `buildEventManifest`                                 |
+| `elements`       | `ok-carousel`, `ok-menu`, `ok-copy-link`, `ok-share` (degrau 2)          |
 
 Falhas saem como `BuildError` (`transient`/`permanent`), e o render do `build-site` traduz para 20/10.

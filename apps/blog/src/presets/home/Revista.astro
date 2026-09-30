@@ -24,7 +24,7 @@ const grid = first ? others.slice(carousel.length) : model.items;
   </section>
 )}
 {carousel.length > 0 && (
-  <Carousel label="Mais recentes">
+  <Carousel label="Mais recentes" id="mais-recentes">
     {carousel.map((content) => (
       <li>
         <ArticleCard ctx={ctx} content={content} variant="vertical" headingLevel={3} />
