@@ -25,6 +25,7 @@ Geradas:
 - `packages/content-client` – cliente da API de exportação: snapshot em streaming e loaders do Astro
 - `packages/core` – rotas, head e JSON-LD, sitemap, RSS, robots.txt, `_redirects` e `_headers`
 - `packages/tokens` – temas DTCG → variáveis CSS e fontes, contraste AA verificado no build
+- `packages/elements` – Web Components do degrau 2: carrossel, menu, copiar link, compartilhar
 - `packages/events` – formato versionado dos eventos, manifesto e script do navegador
 - `apps/blog` – sites Astro por `SITE_ID` (estático) e visualização SSR (`/<site>/<caminho>`); exclui `worker/` do tsconfig e do ESLint
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
@@ -32,11 +33,10 @@ Geradas:
 
 Previstas (gere com `/scaffold` no caminho da unidade):
 
-- `packages/elements` – Web Components (próximo: degrau 2 do blog)
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
 - `apps/generator` – geração com LLM (fase 2)
-- `tooling/build-site` – render e publish; imagem `site-builder`
+- `tooling/build-site` – render e publish; imagem `site-builder` (próximo da fila)
 
 ## Regras invioláveis
 

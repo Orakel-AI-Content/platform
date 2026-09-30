@@ -1,0 +1,9 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // Roda no navegador: DOM, sem tipos do Node.
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src", "*.ts"]
+}

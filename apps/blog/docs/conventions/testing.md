@@ -4,7 +4,7 @@
 | --------------------- | ------------------------------------------------------------------------------------------------- |
 | `pnpm test`           | Vitest: rotas, links, sumário, datas, fontes de dados, orçamento, env, Consent Mode, idempotência |
 | `pnpm build:examples` | Sites de exemplo (2 builds cada, comparados) + SSR em `dist-examples/`                            |
-| `pnpm test:a11y`      | axe em 375 e 1280 px (precisa do `build:examples`)                                                |
+| `pnpm test:a11y`      | axe em 375 e 1280 px e interações do degrau 2 (precisa do `build:examples`)                       |
 | `pnpm test:parity`    | Estático × SSR, HTML normalizado (precisa do `build:examples`)                                    |
 
 - Primeira vez: `pnpm exec playwright install chromium`.

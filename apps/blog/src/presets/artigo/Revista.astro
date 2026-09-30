@@ -2,6 +2,7 @@
 // Artigo `revista`: capa larga acima do título; sumário lateral a partir de 64rem.
 import AuthorBox from '../../components/AuthorBox.astro';
 import Image from '../../components/Image.astro';
+import ShareLinks from '../../components/ShareLinks.astro';
 import Blocks from '../../components/blocks/Blocks.astro';
 import Toc from '../../components/blocks/Toc.astro';
 import type { PresetProps } from '../types.ts';
@@ -25,6 +26,7 @@ const authors = content.authorIds.flatMap(
     <div class="main prose">
       <ArticleHeader ctx={ctx} content={content} />
       <Blocks ctx={ctx} blocks={content.blocks} omitToc />
+      <ShareLinks content={content} config={ctx.site.config} />
       {authors.map((author) => (
         <AuthorBox ctx={ctx} author={author} />
       ))}

@@ -83,6 +83,13 @@ target "core-test" {
   output     = ["type=cacheonly"]
 }
 
+target "elements-test" {
+  inherits   = ["_base"]
+  dockerfile = "packages/elements/Dockerfile"
+  target     = "test"
+  output     = ["type=cacheonly"]
+}
+
 target "events-test" {
   inherits   = ["_base"]
   dockerfile = "packages/events/Dockerfile"

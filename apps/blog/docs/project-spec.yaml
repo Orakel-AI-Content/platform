@@ -69,7 +69,10 @@ decisions:
       source: user,
     }
   design.interactivity:
-    { value: 'Degrau 1 (details, scroll-snap); degrau 2 com packages/elements', source: user }
+    {
+      value: 'Degrau 1 (details, scroll-snap, campo do link) + degrau 2 do @orakel/elements (ok-carousel, ok-menu, ok-copy-link, ok-share)',
+      source: user,
+    }
   design.icons: { value: 'SVGs do Lucide copiados (ISC), aria-hidden, com texto', source: user }
   quality.js_budget:
     {
@@ -93,7 +96,7 @@ decisions:
       source: user,
     }
   integration.dependencies:
-    { value: 'content-model, content-client, core, tokens, events', source: input }
+    { value: 'content-model, content-client, core, tokens, events, elements', source: input }
   ops.local_access:
     {
       value: 'preview.orakel.localhost no Caddy (forward_auth) → host.docker.internal:4321; container blog-preview com o build-site',
@@ -132,7 +135,7 @@ structure:
 
 open_questions:
   - 'Rascunhos na visualização: fonte ao vivo no SSR com as rotas de visualização do backoffice e o live loader do content-client'
-  - 'Degrau 2 (carrossel com botões, menu com script, copiar link): packages/elements, logo depois do blog'
+  - 'Carrossel em navegador real: uma fixture com 4+ artigos num site revista'
   - 'Página de teste da ilha React: packages/ui'
   - 'Workspace: revisar a ADR-012 e o 12.0 com o limite de 130 kB da busca'
   - 'Snippet do Consent Mode: a P4 o põe no core; mover quando a medição for ligada (fase 2)'

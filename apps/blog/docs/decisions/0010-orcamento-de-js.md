@@ -13,6 +13,10 @@ A entrada fixa artigo ≤ 15, home e categoria ≤ 20 e busca ≤ 80 kB gzip, in
 - Mede por `data-page-type`: scripts externos (seguindo imports entre chunks e `modulepreload`) e inline; JSON-LD fora; na busca, a API, o worker e o WASM do idioma do Pagefind. Scripts de terceiros (GA4) carregam depois do `load` e ficam fora.
 - Estouro, página sem tipo ou script ausente: falha permanente.
 
+## Medição com o degrau 2 (elements)
+
+Artigo ~2,0/15 kB; home ~1,5/20 kB; busca ~126,1/130 kB.
+
 ## Consequências
 
 Revisar a ADR-012 e o `12.0` no workspace com esta medição. Uma atualização do Pagefind que engorde o bundle em mais de ~4,5 kB quebra o build.

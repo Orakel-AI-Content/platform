@@ -1,18 +1,38 @@
 ---
-// Carrossel no degrau 1: rolagem nativa com scroll-snap, focável pelo teclado. Os botões de
-// anterior e próximo entram como Web Component do elements (<ok-carousel>), envolvendo
-// este mesmo HTML.
+// Carrossel: rolagem nativa com scroll-snap, focável pelo teclado (degrau 1). O
+// <ok-carousel> do elements mostra os botões de anterior e próximo (degrau 2); sem JS,
+// eles continuam ocultos e a trilha continua rolando.
+import Icon from './icons/Icon.astro';
+
 interface Props {
   label: string;
+  /** Único na página: liga os botões à trilha (aria-controls). */
+  id: string;
 }
-const { label } = Astro.props;
+const { label, id } = Astro.props;
 ---
 
 <section class="carousel" aria-label={label}>
-  <ul class="track" tabindex="0">
-    <slot />
-  </ul>
+  <ok-carousel>
+    <ul class="track" id={id} tabindex="0" data-ok-track>
+      <slot />
+    </ul>
+    <div class="controls">
+      <button type="button" data-ok-prev hidden>
+        <Icon name="chevron-left" />
+        <span class="sr-only">Anterior</span>
+      </button>
+      <button type="button" data-ok-next hidden>
+        <Icon name="chevron-right" />
+        <span class="sr-only">Próximo</span>
+      </button>
+    </div>
+  </ok-carousel>
 </section>
+
+<script>
+  import '@orakel/elements/carousel';
+</script>
 
 <style>
   .track {
@@ -30,5 +50,31 @@ const { label } = Astro.props;
   }
   .track > :global(li) {
     scroll-snap-align: start;
+  }
+  ok-carousel {
+    display: block;
+  }
+  .controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+  .controls button {
+    display: inline-grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .controls button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .controls button[hidden] {
+    display: none;
   }
 </style>

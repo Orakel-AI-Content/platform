@@ -1,0 +1,91 @@
+---
+// Compartilhar o artigo. Degrau 1: o link num campo selecionável. Degrau 2 (elements):
+// <ok-copy-link> mostra o botão de copiar e anuncia o resultado; <ok-share> mostra o
+// compartilhamento nativo onde o navegador oferece (celulares).
+import type { Content, SiteConfig } from '@orakel/content-model/v1';
+import { absoluteUrl, contentPath } from '@orakel/core/v1';
+
+interface Props {
+  content: Content;
+  config: SiteConfig;
+}
+const { content, config } = Astro.props;
+const url = absoluteUrl(config, contentPath(content));
+const fieldId = `link-${content.id}`;
+---
+
+<section class="share" aria-label="Compartilhar">
+  <ok-copy-link data-copied="Link copiado" data-failed="Selecione o link e copie">
+    <label for={fieldId}>Link deste artigo</label>
+    <div class="row">
+      <input id={fieldId} type="url" value={url} readonly data-ok-url />
+      <button type="button" data-ok-copy hidden>
+        Copiar link
+      </button>
+    </div>
+    <span class="status" role="status" data-ok-status></span>
+  </ok-copy-link>
+  <ok-share data-title={content.title} data-url={url}>
+    <button type="button" data-ok-share hidden>
+      Compartilhar
+    </button>
+  </ok-share>
+</section>
+
+<script>
+  import '@orakel/elements/copy-link';
+  import '@orakel/elements/share';
+</script>
+
+<style>
+  .share {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  ok-copy-link,
+  ok-share {
+    display: block;
+  }
+  label {
+    display: block;
+    margin-block-end: var(--space-2);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+  }
+  .row {
+    display: flex;
+    gap: var(--space-2);
+  }
+  input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding-inline: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-background);
+    color: var(--color-text);
+    font: inherit;
+  }
+  button {
+    min-height: 44px;
+    padding-inline: var(--space-4);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    font: inherit;
+    cursor: pointer;
+  }
+  button[hidden] {
+    display: none;
+  }
+  .status {
+    display: block;
+    min-height: 1.5em;
+    font-size: var(--font-size-sm);
+  }
+</style>

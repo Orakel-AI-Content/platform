@@ -1,7 +1,7 @@
 # blog
 
 App Astro 7 dos sites: um build estático por `SITE_ID` e a visualização SSR de todos os
-sites (`/<site>/<caminho>`). Consome content-client, content-model, core, tokens e events.
+sites (`/<site>/<caminho>`). Consome content-client, content-model, core, tokens, events e elements.
 O `worker/` é outra unidade. Parte do monorepo — regras gerais no `CLAUDE.md` da raiz.
 
 ## Comandos (rodar nesta pasta)

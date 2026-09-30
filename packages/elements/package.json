@@ -1,0 +1,31 @@
+{
+  "name": "@orakel/elements",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Web Components do degrau 2 da escada de interatividade: comportamento sobre o HTML do servidor",
+  "type": "module",
+  "sideEffects": [
+    "./src/register/*.ts"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./carousel": "./src/register/carousel.ts",
+    "./menu": "./src/register/menu.ts",
+    "./copy-link": "./src/register/copy-link.ts",
+    "./share": "./src/register/share.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/tsconfig": "workspace:*",
+    "@orakel/vitest-config": "workspace:*",
+    "eslint": "catalog:",
+    "happy-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

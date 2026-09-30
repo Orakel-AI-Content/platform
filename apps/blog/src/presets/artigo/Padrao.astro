@@ -3,6 +3,7 @@
 // sumário onde o bloco toc estiver.
 import AuthorBox from '../../components/AuthorBox.astro';
 import Image from '../../components/Image.astro';
+import ShareLinks from '../../components/ShareLinks.astro';
 import Blocks from '../../components/blocks/Blocks.astro';
 import type { PresetProps } from '../types.ts';
 import ArticleHeader from './ArticleHeader.astro';
@@ -29,6 +30,7 @@ const authors = content.authorIds.flatMap(
     />
   )}
   <Blocks ctx={ctx} blocks={content.blocks} />
+  <ShareLinks content={content} config={ctx.site.config} />
   {authors.map((author) => (
     <AuthorBox ctx={ctx} author={author} />
   ))}

@@ -1,6 +1,7 @@
 ---
 // Cabeçalho: nome do site, navegação do menu `principal` e busca (formulário GET, sem JS).
-// No celular, a navegação fica num <details> (degrau 1); o menu com script vem do elements.
+// No celular, a navegação fica num <details> (degrau 1); o <ok-menu> do elements fecha com
+// Esc e com clique fora (degrau 2).
 import type { PageContext } from '../data/site-source.ts';
 import { sitePath } from '../render/links.ts';
 import { searchEnabled } from '../routing/resolve.ts';
@@ -34,29 +35,35 @@ const search = searchEnabled(config);
     )}
     {search && <SearchForm ctx={ctx} class="search-wide" />}
     {(items.length > 0 || search) && (
-      <details class="nav-narrow">
-        <summary>
-          <Icon name="menu" />
-          <span>Menu</span>
-        </summary>
-        <div class="panel">
-          {items.length > 0 && (
-            <nav aria-label="Principal (menu)">
-              <ul>
-                {items.map((item) => (
-                  <li>
-                    <a href={sitePath(ctx.base, item.href)}>{item.label}</a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          )}
-          {search && <SearchForm ctx={ctx} />}
-        </div>
-      </details>
+      <ok-menu class="nav-narrow">
+        <details>
+          <summary>
+            <Icon name="menu" />
+            <span>Menu</span>
+          </summary>
+          <div class="panel">
+            {items.length > 0 && (
+              <nav aria-label="Principal (menu)">
+                <ul>
+                  {items.map((item) => (
+                    <li>
+                      <a href={sitePath(ctx.base, item.href)}>{item.label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
+            {search && <SearchForm ctx={ctx} />}
+          </div>
+        </details>
+      </ok-menu>
     )}
   </div>
 </header>
+
+<script>
+  import '@orakel/elements/menu';
+</script>
 
 <style>
   .site-header {
@@ -112,8 +119,11 @@ const search = searchEnabled(config);
   .panel ul {
     flex-direction: column;
   }
-  .nav-narrow[open] {
+  .nav-narrow:has(details[open]) {
     flex-basis: 100%;
+  }
+  ok-menu {
+    display: block;
   }
   /* Breakpoint 40rem (src/styles/layout.css). */
   @media (min-width: 40rem) {

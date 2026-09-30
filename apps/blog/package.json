@@ -12,7 +12,7 @@
     "typecheck": "CONTENT_SOURCE=fixture SITE_ID=exemplo-a astro check && tsc --noEmit",
     "test": "vitest run",
     "build:examples": "node scripts/build-examples.ts",
-    "test:a11y": "E2E_PORT_BASE=4400 playwright test e2e/a11y.spec.ts",
+    "test:a11y": "E2E_PORT_BASE=4400 playwright test e2e/a11y.spec.ts e2e/interactions.spec.ts",
     "test:parity": "E2E_PORT_BASE=4500 playwright test e2e/parity.spec.ts"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "@orakel/content-client": "workspace:*",
     "@orakel/content-model": "workspace:*",
     "@orakel/core": "workspace:*",
+    "@orakel/elements": "workspace:*",
     "@orakel/events": "workspace:*",
     "@orakel/tokens": "workspace:*",
     "astro": "catalog:",

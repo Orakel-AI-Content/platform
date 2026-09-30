@@ -440,7 +440,13 @@ units:
       role: 'Temas DTCG → variáveis CSS e fontes, com verificação de contraste WCAG AA no build',
       status: generated,
     }
-  - { name: elements, path: packages/elements, type: lib, role: 'Web Components', status: planned }
+  - {
+      name: elements,
+      path: packages/elements,
+      type: lib,
+      role: 'Web Components do degrau 2 (ok-carousel, ok-menu, ok-copy-link, ok-share)',
+      status: generated,
+    }
   - {
       name: events,
       path: packages/events,
