@@ -43,6 +43,8 @@ jobs:
               - 'packages/**'
               - 'adapters/**'
               - 'tooling/**'
+              # O edge-local serve os sites no ambiente local: lint, tipos e testes (com o spike).
+              - 'infra/local/edge-local/**'
             backoffice:
               - 'apps/backoffice/**'
               - 'apps/generator/**'
