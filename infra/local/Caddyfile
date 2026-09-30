@@ -43,3 +43,9 @@ preview.orakel.localhost {
 		reverse_proxy {$BLOG_PREVIEW_UPSTREAM}
 	}
 }
+
+# Sites publicados no edge-local (substituto da Cloudflare): <site>.localhost, público como
+# em produção. Os blocos admin. e preview. acima são mais específicos e têm prioridade.
+*.localhost {
+	reverse_proxy edge-local:8080
+}

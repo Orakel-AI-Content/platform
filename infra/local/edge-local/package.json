@@ -1,0 +1,27 @@
+{
+  "name": "@orakel/edge-local",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Substituto local do deploy na Cloudflare: um Worker por site, versões imutáveis e API de administração",
+  "type": "module",
+  "scripts": {
+    "dev": "EDGE_LOCAL_DATA=/tmp/edge-local node src/server.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@orakel/build-site": "workspace:*",
+    "wrangler": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@orakel/eslint-config": "workspace:*",
+    "@orakel/tsconfig": "workspace:*",
+    "@orakel/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

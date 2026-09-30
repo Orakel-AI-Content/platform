@@ -62,8 +62,20 @@ group "release" {
   targets = ["site-builder"]
 }
 
+# Imagens só do ambiente local (substitutos da nuvem): construídas pelo pnpm local:images,
+# nunca publicadas.
+target "edge-local" {
+  inherits   = ["_base"]
+  dockerfile = "infra/local/edge-local/Dockerfile"
+  tags       = tags("edge-local")
+}
+
+group "local" {
+  targets = ["edge-local"]
+}
+
 group "default" {
-  targets = ["images", "release"]
+  targets = ["images", "release", "local"]
 }
 
 # Imagens só de teste: fora dos grupos "images" e "release" (não são publicadas nem

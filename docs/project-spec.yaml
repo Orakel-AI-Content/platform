@@ -473,11 +473,12 @@ units:
       name: edge-local,
       path: infra/local/edge-local,
       type: service,
-      role: 'Substituto local do deploy na Cloudflare: um Worker por site, versões imutáveis, API de administração (PUT/GET versions, POST rollback)',
-      status: planned,
+      role: 'Substituto local do deploy na Cloudflare: um Worker por site, versões imutáveis, API de administração (PUT/GET versions, POST rollback) e ae-sim',
+      status: generated,
     }
 
 open_questions:
+  - 'Redes export, publish e edge do compose e o build-runner real (docker-socket-proxy, volume /build): scaffold da task build do backoffice'
   - 'Provedor S3 de produção (R2?) — decidir no primeiro deploy'
   - 'Onde ficam os segredos de produção (VPS/Ansible, Cloudflare) — decidir no primeiro deploy'
   - 'Nomes das variáveis de ambiente e dos comandos local:* são proposta — confirmar ao implementar as unidades'

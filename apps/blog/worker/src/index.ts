@@ -18,7 +18,7 @@ function respond(outcome: Outcome): Response {
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname !== PAGEVIEW_ENDPOINT) return respond({ status: 404 });
     if (request.method !== 'POST') {
@@ -54,7 +54,9 @@ export default {
         {
           site: env.SITE_ID,
           getManifest: manifest,
-          write: (point) => env.EVENTS.writeDataPoint(point),
+          // waitUntil: no Analytics Engine o writeDataPoint é síncrono, mas no ae-sim local é um
+          // service binding (RPC), que seria descartado quando a resposta termina.
+          write: (point) => ctx.waitUntil(Promise.resolve(env.EVENTS.writeDataPoint(point))),
           uuid: () => crypto.randomUUID(),
         },
       );

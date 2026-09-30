@@ -70,7 +70,7 @@ versão; o parse ignora campos desconhecidos. Release do core por tag `core-vX.Y
 
 ## Mapa das unidades
 
-Estado atual: a raiz, `packages/content-model`, `packages/content-client`, `packages/core`, `packages/elements`, `packages/tokens`, `packages/events`, `apps/blog`, `apps/blog/worker`, `apps/backoffice` e `tooling/build-site`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
+Estado atual: a raiz, `packages/content-model`, `packages/content-client`, `packages/core`, `packages/elements`, `packages/tokens`, `packages/events`, `apps/blog`, `apps/blog/worker`, `apps/backoffice`, `tooling/build-site` e `infra/local/edge-local`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
 passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`.
 
 | Caminho                   | Pacote                   | Camada ESLint              | Papel                                                                  |

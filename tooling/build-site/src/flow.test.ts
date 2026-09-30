@@ -160,7 +160,7 @@ describe('publish', () => {
       EDGE_LOCAL_URL: 'http://edge',
     };
     const result = await publish(env, d);
-    expect(d.archive).toHaveBeenCalledWith(dir, 'wrangler.local.jsonc', expect.any(String));
+    expect(d.archive).toHaveBeenCalledWith(dir, 'local', expect.any(String));
     expect(d.uploadBuildCache).toHaveBeenCalledWith(
       expect.objectContaining({ bucket: 'build-cache' }),
       'exemplo-a/local-version.tar.gz',

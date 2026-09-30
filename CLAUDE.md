@@ -31,13 +31,14 @@ Geradas:
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
 - `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner
 - `tooling/build-site` – entrypoints `render`, `publish` e `ssr` da imagem `site-builder`; contrato do volume `/build`
+- `infra/local/edge-local` – substituto local do deploy: um Worker por site, versões, rollback e `ae-sim`
 
 Previstas (gere com `/scaffold` no caminho da unidade):
 
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
 - `apps/generator` – geração com LLM (fase 2)
-- `infra/local/edge-local` – Workers locais por site, versões e API de administração (próximo da fila)
+- `apps/backoffice` (retomada) – task `build` real com `docker-socket-proxy`, redes `export`/`publish`/`edge`, `build-runner` e `blog-preview` no compose (próximo da fila; fecha a L3)
 
 ## Regras invioláveis
 

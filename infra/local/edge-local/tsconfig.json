@@ -1,0 +1,10 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // Supervisor em Node 24 (node src/server.ts). O Worker do ae-sim (src/ae-sim/worker.js)
+    // roda no workerd e fica fora daqui.
+    "types": ["node"]
+  },
+  "include": ["src", "*.ts"],
+  "exclude": ["src/ae-sim"]
+}
