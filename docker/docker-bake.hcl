@@ -30,9 +30,16 @@ function "tags" {
   result = concat(["${IMAGE_REGISTRY}/${name}:${TAG}"], CI == "" ? ["${IMAGE_REGISTRY}/${name}:local"] : [])
 }
 
+# Plataforma da VPS no CI (images.yml, release.yml). Fora dele (pnpm local:images), a da
+# máquina: as imagens locais nunca são publicadas e, num Mac com Apple Silicon, amd64 rodaria
+# emulado. Forçar amd64 no local: PLATFORM=linux/amd64 pnpm local:images.
+variable "PLATFORM" {
+  default = ""
+}
+
 target "_base" {
   context   = "."
-  platforms = ["linux/amd64"]
+  platforms = PLATFORM != "" ? [PLATFORM] : CI != "" ? ["linux/amd64"] : []
   labels = {
     "org.opencontainers.image.source" = "https://github.com/Orakel-AI-Content/platform"
   }
@@ -126,6 +133,7 @@ target "events-test" {
 #
 #   group "images"  { targets = ["backoffice"] }    # backoffice e serviços, a cada merge na main
 #   group "release" { targets = ["site-builder"] }  # na tag core-vX.Y.Z
-#   group "default" { targets = ["images", "release"] }
+#   group "local"   { targets = ["edge-local"] }    # só o pnpm local:images
+#   group "default" { targets = ["images", "release", "local"] }
 #
 # docker/bake.sh trata grupo inexistente como "nada a construir".

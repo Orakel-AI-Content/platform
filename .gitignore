@@ -18,8 +18,8 @@ test-results/
 
 # Ambiente e segredos (use .env.example como referência)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Claude Code — arquivos pessoais
 CLAUDE.local.md
