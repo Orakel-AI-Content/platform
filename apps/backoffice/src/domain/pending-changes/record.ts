@@ -1,5 +1,6 @@
 import type { Executor } from '../../db/client.ts';
 import { pendingChanges } from '../../db/schema/index.ts';
+import { scheduleBuild } from '../builds/schedule.ts';
 
 /** De onde vem a mudança (entidades que a API de exportação entrega a um site). */
 export type PendingOrigin =
@@ -31,9 +32,9 @@ export const EXPORTED_TABLES = [
 ] as const;
 
 /**
- * Registra, na transação da gravação, que o site tem uma mudança a publicar. O próximo
- * build bem-sucedido a baixa pela lista de IDs do snapshot. O agendamento do build entra
- * com o módulo Publicação (jobs/enqueue.ts).
+ * Registra, na transação da gravação, que o site tem uma mudança a publicar, e agenda o build
+ * (12.0, L3): os dois entram ou saem juntos. O próximo build bem-sucedido baixa a mudança
+ * pela lista de IDs do snapshot.
  */
 export async function recordPendingChange(
   tx: Executor,
@@ -46,5 +47,6 @@ export async function recordPendingChange(
     .values({ siteId, origin, reference })
     .returning({ id: pendingChanges.id });
   if (row === undefined) throw new Error('Falha ao registrar a mudança pendente');
+  await scheduleBuild(tx, siteId);
   return row.id;
 }

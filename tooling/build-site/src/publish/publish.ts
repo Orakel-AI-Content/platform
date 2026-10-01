@@ -10,7 +10,7 @@ import {
   PublishResultSchema,
   ResultSchema,
   type PublishResult,
-} from '../contract.ts';
+} from '@orakel/build-contract';
 import type { PublishEnv } from '../env.ts';
 import { ClassifiedError, classify } from '../failures.ts';
 import { archiveBuild, configFileOf, type Target } from './archive.ts';

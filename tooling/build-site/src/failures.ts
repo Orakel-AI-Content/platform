@@ -1,7 +1,7 @@
 // Classificação das falhas (ADR 0002 da unidade). Os erros do blog e do content-client
 // trazem `kind`; o Astro às vezes os embrulha, então a busca segue a cadeia de `cause`.
 // Erro sem classificação é transitório: tentar de novo é mais seguro que pausar o site.
-import type { Failure } from './contract.ts';
+import type { Failure } from '@orakel/build-contract';
 
 export class ClassifiedError extends Error {
   readonly kind: Failure['kind'];

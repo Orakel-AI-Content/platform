@@ -9,7 +9,7 @@ import { cpus, tmpdir, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { ResultSchema } from '../src/contract.ts';
+import { ResultSchema } from '@orakel/build-contract';
 import { SMOKE_TOKEN, startSnapshotServer } from './snapshot-server.ts';
 import { syntheticSnapshot } from './synthetic-snapshot.ts';
 

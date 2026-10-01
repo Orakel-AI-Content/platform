@@ -27,6 +27,8 @@ x-backoffice: &backoffice
     S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?defina S3_SECRET_ACCESS_KEY}
     SENTRY_DSN: ${SENTRY_DSN:-}
     HEARTBEAT_BASE_URL: ${HEARTBEAT_BASE_URL:-}
+    # Janela de agrupamento dos builds (12.0, L3): 900 em produção, 30 no local.
+    BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-900}
   networks: [internal]
 
 services:
@@ -78,7 +80,8 @@ services:
         condition: service_completed_successfully
 
   # Só a task build, dois builds por vez (ADR 0018 da plataforma). Fala com o Docker pelo
-  # docker-socket-proxy, nunca pelo socket; cria render e publish nas redes export e publish.
+  # docker-socket-proxy, nunca pelo socket; cria render e publish nas redes export e publish
+  # (ADR 0008 do backoffice). Único serviço com o token de deploy, repassado só ao publish.
   build-runner:
     <<: *backoffice
     command: ['node', 'src/bin/build-runner.ts']
@@ -86,6 +89,11 @@ services:
       <<: *backoffice-env
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       SITE_BUILDER_IMAGE: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/site-builder
+      # Tag até a primeira promoção registrar a release do site.
+      SITE_BUILDER_TAG: ${SITE_BUILDER_TAG:-local}
+      DEPLOY_TARGET: ${DEPLOY_TARGET:?defina DEPLOY_TARGET}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
     networks: [internal, docker]
     depends_on:
       backoffice-migrate:
@@ -94,8 +102,9 @@ services:
         condition: service_started
 
   # API do Docker com permissão mínima (ADR 0011 da raiz): só as rotas que o build-runner
-  # usa — criar, iniciar, esperar, matar e apagar containers; criar e apagar volumes; ler.
-  # Recusa exec, pull, build, redes e o resto. O corpo do create é garantido pelo código.
+  # usa — criar, iniciar, matar e apagar containers; criar e apagar volumes; ler o estado e
+  # os arquivos de resultado (archive). Recusa exec, pull, build, redes e o resto. O corpo
+  # do create é garantido pelo código.
   docker-socket-proxy:
     image: wollomatic/socket-proxy:1.13.1@sha256:3935b709275e4ec35d6ed5a5c4a1f0d01ed31eec5e7234efc3357ecd47689002
     restart: unless-stopped
@@ -106,7 +115,7 @@ services:
       - -listenip=0.0.0.0
       - -allowfrom=build-runner
       - -allowHEAD=^(/v1\.[0-9]+)?/_ping$
-      - -allowGET=^(/v1\.[0-9]+)?/(_ping|version|containers/[a-zA-Z0-9_.-]+/(json|logs)|images/.+/json|volumes/[a-zA-Z0-9_.-]+)$
+      - -allowGET=^(/v1\.[0-9]+)?/(_ping|version|containers/[a-zA-Z0-9_.-]+/(json|logs|archive)|images/.+/json|volumes/[a-zA-Z0-9_.-]+)$
       - -allowPOST=^(/v1\.[0-9]+)?/(containers/create|containers/[a-zA-Z0-9_.-]+/(start|wait|kill)|volumes/create)$
       - -allowDELETE=^(/v1\.[0-9]+)?/(containers|volumes)/[a-zA-Z0-9_.-]+$
     volumes:

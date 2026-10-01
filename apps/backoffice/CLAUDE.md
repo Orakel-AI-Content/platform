@@ -17,7 +17,10 @@ Stack: Next.js 16 (App Router) + Drizzle/Postgres + Graphile Worker; contratos e
 
 - Regra de negócio só em `src/domain/<módulo>`; rotas, telas, Server Actions, jobs e o
   `proxy.ts` só delegam. Permissão com `requireRole` no domínio, nunca só na interface.
-- Gravou numa tabela que vai para um site? `recordPendingChange` na mesma transação.
+- Gravou numa tabela que vai para um site? `recordPendingChange` na mesma transação (ele
+  também agenda o build). Coluna só operacional do site: `domain/builds/site-state.ts`.
+- Docker só pela interface `ContainerRuntime`; rota nova da API do Docker → lista do
+  `docker-socket-proxy` no compose (ADR 0011 da raiz).
 - Migração só aditiva (expand/contract); gere com `db:generate` e revise o SQL.
 - Domínio, banco, auth, jobs e bin importam por caminho relativo com `.ts` (o Node os roda
   direto); o alias `@/` só na interface.
@@ -35,5 +38,5 @@ relevantes e leia-os primeiro.
 - `docs/architecture/folder-structure.md` – como acrescentar módulo, tabela, tela, rota ou job
 - `docs/conventions/testing.md` – unitários, contrato com Postgres, E2E
 - `docs/design/design-system.md` – shadcn/ui, tokens, tabelas
-- `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog)
+- `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog; 0008: task build)
 - `docs/project-spec.yaml` – decisões desta unidade (herda as da raiz)

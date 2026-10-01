@@ -11,8 +11,9 @@ host. Spike da L0: proxy com permissões mínimas ou Docker rootless.
 ## Decisão
 
 - `wollomatic/socket-proxy` 1.13.1 (tag + digest), com uma lista de rotas por método (regex):
-  - `HEAD`/`GET`: `_ping`, `version`, `containers/<id>/(json|logs)`, `images/<nome>/json`,
-    `volumes/<nome>`;
+  - `HEAD`/`GET`: `_ping`, `version`, `containers/<id>/(json|logs|archive)`,
+    `images/<nome>/json`, `volumes/<nome>` (`archive`: leitura do `result.json` e do
+    `publish.json` do volume, desde a L3 — ADR 0008 do backoffice);
   - `POST`: `containers/create`, `containers/<id>/(start|wait|kill)`, `volumes/create`;
   - `DELETE`: `containers/<id>`, `volumes/<nome>`.
 - Recusa todo o resto: `exec`, `pull`, `build`, redes, `system`, plugins.

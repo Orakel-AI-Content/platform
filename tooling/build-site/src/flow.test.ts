@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { PublishResultSchema, ResultSchema } from './contract.ts';
+import { PublishResultSchema, ResultSchema } from '@orakel/build-contract';
 import type { PublishEnv, RenderEnv } from './env.ts';
 import { WORKER_BASE_CONFIG } from './paths.ts';
 import { uploadEdgeLocal } from './publish/edge-local.ts';

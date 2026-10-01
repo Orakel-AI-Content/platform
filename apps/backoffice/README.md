@@ -13,6 +13,11 @@ atende quatro serviços: `backoffice-migrate`, `backoffice-web`, `backoffice-wor
 `<site>.localhost` de `infra/local/seeds/sites.json` aos sites das fixtures. Detalhes, CA local e
 modo dev atrás do Caddy: `README.md` e `docs/guides/local-setup.md` da raiz.
 
+**Builds (ADR 0008):** toda gravação que vai para um site agenda o build dele; depois da janela
+(`BUILD_WINDOW_SECONDS`, 30 s no local) o `build-runner` roda o `render` e o `publish` e o site
+é atualizado em `https://<site>.localhost`. Em `/sites`, "Publicar agora" antecipa o build e a
+coluna "Último build" mostra o resultado; falha permanente pausa o site com o motivo.
+
 ## Comandos (nesta pasta)
 
 | Comando                            | O que faz                                           |
@@ -20,7 +25,7 @@ modo dev atrás do Caddy: `README.md` e `docs/guides/local-setup.md` da raiz.
 | `pnpm dev`                         | `next dev` (use com `BACKOFFICE_UPSTREAM` no Caddy) |
 | `pnpm build` · `pnpm start`        | Build standalone e servidor                         |
 | `pnpm worker`                      | Graphile Worker (jobs e agregador)                  |
-| `pnpm build-runner`                | Graphile Worker só com a task `build`               |
+| `pnpm build-runner`                | Task `build` (precisa do Docker pelo proxy)         |
 | `pnpm test`                        | Unitários                                           |
 | `pnpm test:contract`               | Contrato com Postgres (`DATABASE_URL`)              |
 | `pnpm test:e2e`                    | Playwright contra o ambiente local                  |

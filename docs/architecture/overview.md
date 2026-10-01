@@ -57,12 +57,13 @@ flowchart LR
 
 ## Contratos entre unidades
 
-| Contrato                                                        | Dono                    | Consumidores                                             |
-| --------------------------------------------------------------- | ----------------------- | -------------------------------------------------------- |
-| Conteúdo e configuração de site (Zod, `schemaVersion`)          | `@orakel/content-model` | backoffice, content-client, blog, build-site             |
-| API de exportação (NDJSON em streaming, uma entidade por linha) | backoffice              | `@orakel/content-client` (loader Astro, leitura ao vivo) |
-| Formato de eventos (payload, layout do AE, mensagem de fila)    | `@orakel/events`        | blog-worker, agregador                                   |
-| Variáveis CSS dos temas                                         | `@orakel/tokens`        | elements, ui, blog                                       |
+| Contrato                                                          | Dono                     | Consumidores                                                 |
+| ----------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------ |
+| Conteúdo e configuração de site (Zod, `schemaVersion`)            | `@orakel/content-model`  | backoffice, content-client, blog, build-site                 |
+| API de exportação (NDJSON em streaming, uma entidade por linha)   | backoffice               | `@orakel/content-client` (loader Astro, leitura ao vivo)     |
+| Formato de eventos (payload, layout do AE, mensagem de fila)      | `@orakel/events`         | blog-worker, agregador                                       |
+| Volume `/build` (`result.json`, `publish.json`, códigos de saída) | `@orakel/build-contract` | build-site (escreve), build-runner do backoffice, edge-local |
+| Variáveis CSS dos temas                                           | `@orakel/tokens`         | elements, ui, blog                                           |
 
 Regras de evolução: aditiva dentro de uma versão; mudança incompatível cria a próxima
 versão; o parse ignora campos desconhecidos. Release do core por tag `core-vX.Y.Z`
@@ -70,7 +71,7 @@ versão; o parse ignora campos desconhecidos. Release do core por tag `core-vX.Y
 
 ## Mapa das unidades
 
-Estado atual: a raiz, `packages/content-model`, `packages/content-client`, `packages/core`, `packages/elements`, `packages/tokens`, `packages/events`, `apps/blog`, `apps/blog/worker`, `apps/backoffice`, `tooling/build-site` e `infra/local/edge-local`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
+Estado atual: a raiz, `packages/content-model`, `packages/content-client`, `packages/core`, `packages/elements`, `packages/tokens`, `packages/events`, `packages/build-contract`, `apps/blog`, `apps/blog/worker`, `apps/backoffice`, `tooling/build-site` e `infra/local/edge-local`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
 passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`.
 
 | Caminho                   | Pacote                   | Camada ESLint              | Papel                                                                  |
@@ -85,6 +86,7 @@ passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`
 | `packages/tokens`         | `@orakel/tokens`         | domain                     | Temas → variáveis CSS, contraste AA                                    |
 | `packages/elements`       | `@orakel/elements`       | domain                     | Web Components                                                         |
 | `packages/events`         | `@orakel/events`         | domain                     | Formato versionado dos eventos                                         |
+| `packages/build-contract` | `@orakel/build-contract` | domain                     | Contrato do volume `/build` do site-builder                            |
 | `packages/ui`             | `@orakel/ui`             | ui                         | Ilhas React (último recurso)                                           |
 | `adapters/astro`          | `@orakel/astro`          | adapter                    | Integração Astro                                                       |
 | `tooling/build-site`      | `@orakel/build-site`     | app                        | Render e publish; base de `docker/site-builder`                        |

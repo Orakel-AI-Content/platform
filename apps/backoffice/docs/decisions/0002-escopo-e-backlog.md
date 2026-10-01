@@ -16,7 +16,7 @@ Gerado:
 - Drizzle, migração inicial, `db:migrate` e `db:seed` (usuários de teste e os sites das
   fixtures do `content-model`).
 - Graphile Worker com os processos `worker` (heartbeat por cron) e `build-runner` (task
-  `build` registrada, ainda sem a imagem `site-builder`), e `scheduleBuild`/`buildNow`.
+  `build` registrada; real desde o ADR 0008), e `scheduleBuild`/`buildNow`.
 - Fluxo: domínio de sites e conteúdo com `recordPendingChange`, importação de snapshot,
   `GET /api/export/v1/sites/{site}/snapshot` e a tela de sites.
 - Contrato: o snapshot de cada site do seed passa no `content-model` e reproduz a fixture.

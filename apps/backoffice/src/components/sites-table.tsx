@@ -1,6 +1,7 @@
 'use client';
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
+import { useState, useTransition } from 'react';
 
 import type { SiteSummary } from '../domain/sites/sites.ts';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +25,58 @@ const LIFECYCLE_LABEL: Record<SiteSummary['lifecycle'], string> = {
   zona_ativa: 'Zona ativa',
   publicado: 'Publicado',
 };
+
+type PublishNow = (siteId: string) => Promise<{ ok: boolean; message: string }>;
+
+const dateTime = new Intl.DateTimeFormat('pt-BR', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+  timeZone: 'America/Sao_Paulo',
+});
+
+function LastBuildCell({ build }: { build: SiteSummary['lastBuild'] }) {
+  if (build === null) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className="flex flex-col gap-0.5">
+      {build.status === 'ok' ? (
+        <Badge variant="outline">Publicado</Badge>
+      ) : (
+        <Badge variant="destructive">Falhou</Badge>
+      )}
+      <span className="text-xs text-muted-foreground">
+        {dateTime.format(new Date(build.finishedAt))}
+        {build.versionId ? ` · ${build.versionId}` : ''}
+      </span>
+    </span>
+  );
+}
+
+/** Enfileira o build já, com o retorno anunciado para leitores de tela. */
+function PublishNowButton({ siteId, action }: { siteId: string; action: PublishNow }) {
+  const [pending, startTransition] = useTransition();
+  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  return (
+    <span className="flex flex-col items-start gap-1">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => startTransition(async () => setStatus(await action(siteId)))}
+        className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+      >
+        {pending ? 'Enfileirando…' : 'Publicar agora'}
+        <span className="sr-only"> {siteId}</span>
+      </button>
+      <span
+        role="status"
+        className={
+          status?.ok === false ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'
+        }
+      >
+        {status?.message}
+      </span>
+    </span>
+  );
+}
 
 const columns = column.columns([
   column.accessor('id', { header: 'SITE_ID' }),
@@ -55,11 +108,16 @@ const columns = column.columns([
     cell: (info) => (info.getValue() ? 'Sim' : 'Não'),
   }),
   column.accessor('pendingChanges', { header: 'Mudanças pendentes' }),
+  column.accessor('lastBuild', {
+    header: 'Último build',
+    cell: (info) => <LastBuildCell build={info.getValue()} />,
+  }),
 ]);
 
 /** Registro de instâncias em tabela (TanStack Table + tabela do shadcn/ui). */
-export function SitesTable({ rows }: { rows: SiteSummary[] }) {
+export function SitesTable({ rows, publishNow }: { rows: SiteSummary[]; publishNow?: PublishNow }) {
   const table = useTable({ features, columns, data: rows });
+  const colSpan = columns.length + (publishNow ? 1 : 0);
   return (
     <Table>
       <TableCaption>{rows.length === 1 ? '1 site' : `${rows.length} sites`}</TableCaption>
@@ -71,6 +129,11 @@ export function SitesTable({ rows }: { rows: SiteSummary[] }) {
                 <table.FlexRender header={header} />
               </TableHead>
             ))}
+            {publishNow && (
+              <TableHead scope="col">
+                <span className="sr-only">Ações</span>
+              </TableHead>
+            )}
           </TableRow>
         ))}
       </TableHeader>
@@ -82,11 +145,18 @@ export function SitesTable({ rows }: { rows: SiteSummary[] }) {
                 <table.FlexRender cell={cell} />
               </TableCell>
             ))}
+            {publishNow && (
+              <TableCell>
+                {row.original.state !== 'pausado' && (
+                  <PublishNowButton siteId={row.original.id} action={publishNow} />
+                )}
+              </TableCell>
+            )}
           </TableRow>
         ))}
         {rows.length === 0 && (
           <TableRow>
-            <TableCell colSpan={columns.length} className="text-center text-muted-foreground">
+            <TableCell colSpan={colSpan} className="text-center text-muted-foreground">
               Nenhum site cadastrado.
             </TableCell>
           </TableRow>

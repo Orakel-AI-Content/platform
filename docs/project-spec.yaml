@@ -496,10 +496,17 @@ units:
     }
   - { name: astro, path: adapters/astro, type: lib, role: 'Integração Astro', status: planned }
   - {
+      name: build-contract,
+      path: packages/build-contract,
+      type: lib,
+      role: 'Contrato do volume /build (result.json, publish.json, códigos de saída, layout do tar.gz), só Zod; lido pelo build-runner e pelo edge-local',
+      status: generated,
+    }
+  - {
       name: build-site,
       path: tooling/build-site,
       type: cli,
-      role: 'Entrypoints render, publish e ssr da imagem docker/site-builder; gera o wrangler.jsonc de cada site; contrato do volume /build',
+      role: 'Entrypoints render, publish e ssr da imagem docker/site-builder; gera o wrangler.jsonc de cada site',
       status: generated,
     }
   - {
@@ -511,7 +518,6 @@ units:
     }
 
 open_questions:
-  - 'Task build real do build-runner (containers render e publish pela API do Docker, volume /build, retentativas): retomada do backoffice (L3)'
   - 'Docker rootless no lugar do proxy do socket — reavaliar no primeiro deploy (ADR 0011)'
   - 'Provedor S3 de produção (R2?) — decidir no primeiro deploy'
   - 'Onde ficam os segredos de produção (VPS/Ansible, Cloudflare) — decidir no primeiro deploy'

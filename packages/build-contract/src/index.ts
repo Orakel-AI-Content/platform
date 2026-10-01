@@ -1,5 +1,6 @@
 // Contrato do volume /build entre o render, o publish e o build-runner do backoffice
-// (ADR 0002 da unidade). O backoffice importa este subcaminho para validar o que lê.
+// (ADR 0002 do build-site). Pacote à parte, só com Zod, para quem lê o volume não levar as
+// dependências do site-builder (astro, wrangler) para a própria imagem.
 //
 //   /build/site/                     artefato estático
 //   /build/wrangler.cloudflare.jsonc alvo de produção

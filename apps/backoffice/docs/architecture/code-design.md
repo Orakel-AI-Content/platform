@@ -30,4 +30,5 @@ Consulte ao escrever código em `src/`. Convenções gerais (nomes, erros, logs)
 - Regra de negócio em Server Action, no `proxy.ts` ou num componente.
 - Gravar numa tabela exportada sem `recordPendingChange` (o teste de varredura quebra).
 - Checar permissão só na interface.
-- `process.env` fora de `src/env.ts` (exceto `NODE_ENV`/`SENTRY_DSN` no `instrumentation.ts`).
+- `process.env` fora de `src/env.ts` (exceto `NODE_ENV`/`NEXT_RUNTIME`/`SENTRY_DSN` no
+  `instrumentation.ts`).

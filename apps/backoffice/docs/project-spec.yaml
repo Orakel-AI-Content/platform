@@ -180,13 +180,13 @@ structure:
     ├── vitest.config.ts  vitest.contract.config.ts  eslint.config.js  tsconfig.json
     ├── drizzle/                 migrações SQL
     ├── src/app/                 UI e route handlers (finos)
-    ├── src/domain/              access, pending-changes, sites, content, export, import
+    ├── src/domain/              access, pending-changes, sites, content, export, import, builds
     ├── src/db/                  pool, cliente, schema, site-ids
     ├── src/auth/                JWT do Access, tokens internos, ator da requisição
-    ├── src/jobs/                tasks, crontab, enqueue
+    ├── src/jobs/                tasks (build, heartbeat), crontab
     ├── src/bin/                 worker, build-runner, migrate, seed
     ├── src/components/          ui/ (shadcn) e telas
-    ├── src/lib/                 logger, problem, heartbeat, s3, sentry, utils
+    ├── src/lib/                 logger, problem, heartbeat, s3, sentry, utils, docker, tar
     └── test/{contract,e2e}/
   paths:
     domain: src/domain/
@@ -197,7 +197,7 @@ structure:
 open_questions:
   - 'Backlog: módulos Conteúdo (TipTap), Mídia (ingestão com sharp), Revisão, Publicação (limite diário, redirects, agendamento), Registro de instâncias (ações), geração básica, agregador, backup/restore, expurgo, promoção de release, rotas config/routes/listing, rota interna do motor, E2E completo'
   - 'SDK do LLM da geração básica (provedor e modelo configuráveis) — decidir com o módulo Geração'
-  - 'build-runner real com docker-socket-proxy e rede export — com a unidade build-site'
   - 'Streaming do snapshot lê entidade por entidade; para acervos grandes, cursor no Postgres (critério da L1: 1.000 artigos)'
   - 'Imagem com ~1,1 GB (dependências de produção + standalone); otimizar (ex.: bundle dos processos Node)'
-  - 'Redes separadas no compose (internal, export) — com o build-site'
+  - 'Retomar site pausado, rollback e reconstruir em outra release: ações do Registro de instâncias (L4)'
+  - 'Janela de agrupamento por site (hoje global, BUILD_WINDOW_SECONDS)'

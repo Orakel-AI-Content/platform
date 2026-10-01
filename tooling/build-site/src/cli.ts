@@ -2,7 +2,7 @@
 // O código de saída segue o contrato: 0 sucesso, 10 permanente, 20 transitória.
 import { readFile } from 'node:fs/promises';
 
-import { CONTRACT_VERSION, EXIT_CODES, exitCodeOf } from './contract.ts';
+import { CONTRACT_VERSION, EXIT_CODES, exitCodeOf } from '@orakel/build-contract';
 import { PublishEnvSchema, RenderEnvSchema, parseEnv } from './env.ts';
 import { classify } from './failures.ts';
 import { WORKER_BASE_CONFIG, WORKER_MAIN } from './paths.ts';

@@ -4,9 +4,6 @@
   "private": true,
   "description": "Entrypoints da imagem site-builder: render, publish e ssr dos sites",
   "type": "module",
-  "exports": {
-    "./contract": "./src/contract.ts"
-  },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -15,6 +12,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
+    "@orakel/build-contract": "workspace:*",
     "@orakel/content-model": "workspace:*",
     "astro": "catalog:",
     "wrangler": "catalog:",

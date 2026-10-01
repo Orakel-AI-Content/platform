@@ -18,6 +18,10 @@ test('login pelo Access e registro de instâncias', async ({ page }) => {
   await expect(table.getByRole('cell', { name: 'exemplo-a', exact: true })).toBeVisible();
   await expect(table.getByRole('cell', { name: 'exemplo-b', exact: true })).toBeVisible();
 
+  // Operação enfileira o build do site sem esperar a janela (12.0, L3).
+  await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+  await expect(page.getByText('Build de exemplo-a enfileirado.')).toBeVisible();
+
   const accessibility = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
     .analyze();

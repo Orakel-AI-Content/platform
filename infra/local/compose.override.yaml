@@ -151,11 +151,13 @@ services:
       retries: 12
 
   # Quem usa o S3 espera os buckets. A dependência também faz o `up --wait` aceitar o s3-init
-  # terminado (one-shot sem dependente conta como falha).
+  # terminado (one-shot sem dependente conta como falha). No local, a janela dos builds é de
+  # 30 s (12.0, L3), mesmo sem BUILD_WINDOW_SECONDS no .env.local.
   backoffice-web:
     environment:
       ACCESS_JWKS_URL: http://access-mock:8788/cdn-cgi/access/certs
       S3_ENDPOINT: http://s3:8333
+      BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-30}
     depends_on:
       s3-init:
         condition: service_completed_successfully
@@ -163,6 +165,7 @@ services:
   backoffice-worker:
     environment:
       S3_ENDPOINT: http://s3:8333
+      BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-30}
     depends_on:
       s3-init:
         condition: service_completed_successfully
@@ -170,6 +173,9 @@ services:
   build-runner:
     environment:
       S3_ENDPOINT: http://s3:8333
+      BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-30}
+      # Destino do publish no local; o container publish o alcança pela rede publish.
+      EDGE_LOCAL_URL: http://edge-local:8081
     depends_on:
       s3-init:
         condition: service_completed_successfully

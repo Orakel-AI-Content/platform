@@ -18,6 +18,8 @@ export const EnvSchema = z.object({
   S3_ENDPOINT: z.url(),
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
+  /** Janela de agrupamento dos builds: 900 em produção, 30 no local. */
+  BUILD_WINDOW_SECONDS: z.coerce.number().int().min(0).default(900),
   SENTRY_DSN: z.union([z.url(), z.literal('')]).optional(),
   HEARTBEAT_BASE_URL: z.union([z.url(), z.literal('')]).optional(),
 });
@@ -29,6 +31,59 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
   if (parsed.success) return parsed.data;
   const lines = parsed.error.issues.map((issue) => `- ${issue.path.join('.')}: ${issue.message}`);
   throw new Error(`Variáveis de ambiente inválidas ou ausentes:\n${lines.join('\n')}`);
+}
+
+/**
+ * Só o build-runner (12.0, L3): como criar os containers do site-builder e o que entregar a
+ * cada um. O token de deploy da Cloudflare só existe aqui e só vai para o container publish.
+ */
+/** Vazio conta como ausente: o compose repassa variável não definida como ''. */
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
+
+export const BuildRunnerEnvSchema = z
+  .object({
+    /** API do Docker, sempre pelo docker-socket-proxy (ADR 0011 da raiz). */
+    DOCKER_HOST: z.string().regex(/^(tcp|http):\/\/[^/]+$/, 'Use tcp://host:porta'),
+    /** Imagem sem tag; a tag é a release do site (ou SITE_BUILDER_TAG antes da primeira). */
+    SITE_BUILDER_IMAGE: z.string().min(1),
+    SITE_BUILDER_TAG: z.string().min(1).default('local'),
+    BUILD_EXPORT_NETWORK: z.string().min(1).default('orakel-export'),
+    BUILD_PUBLISH_NETWORK: z.string().min(1).default('orakel-publish'),
+    /** API de exportação vista da rede export. */
+    BUILD_EXPORT_API_URL: z.url().default('http://backoffice-web:3000'),
+    BUILD_PAGE_DROP_TOLERANCE: z.coerce.number().min(0).max(1).default(0.2),
+    DEPLOY_TARGET: z.enum(['local', 'cloudflare']).default('local'),
+    EDGE_LOCAL_URL: optional(z.url()),
+    CLOUDFLARE_API_TOKEN: optional(z.string().min(32)),
+    CLOUDFLARE_ACCOUNT_ID: optional(z.string().regex(/^[0-9a-f]{32}$/)),
+  })
+  .refine((env) => env.DEPLOY_TARGET !== 'local' || env.EDGE_LOCAL_URL !== undefined, {
+    message: 'Defina EDGE_LOCAL_URL com DEPLOY_TARGET=local',
+    path: ['EDGE_LOCAL_URL'],
+  })
+  .refine(
+    (env) =>
+      env.DEPLOY_TARGET !== 'cloudflare' ||
+      (env.CLOUDFLARE_API_TOKEN !== undefined && env.CLOUDFLARE_ACCOUNT_ID !== undefined),
+    {
+      message: 'Defina CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID com DEPLOY_TARGET=cloudflare',
+      path: ['DEPLOY_TARGET'],
+    },
+  );
+
+export type BuildRunnerEnv = z.infer<typeof BuildRunnerEnvSchema>;
+
+export function parseBuildRunnerEnv(source: Record<string, string | undefined>): BuildRunnerEnv {
+  const parsed = BuildRunnerEnvSchema.safeParse(source);
+  if (parsed.success) return parsed.data;
+  const lines = parsed.error.issues.map((issue) => `- ${issue.path.join('.')}: ${issue.message}`);
+  throw new Error(`Variáveis do build-runner inválidas ou ausentes:\n${lines.join('\n')}`);
+}
+
+/** Ambiente do build-runner; só esse processo o lê. */
+export function getBuildRunnerEnv(): BuildRunnerEnv {
+  return parseBuildRunnerEnv(process.env);
 }
 
 let cached: Env | undefined;
