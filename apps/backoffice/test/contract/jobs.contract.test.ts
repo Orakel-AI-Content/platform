@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { buildNow, scheduleBuild } from '../../src/jobs/enqueue.ts';
+import { buildNow, scheduleBuild } from '../../src/domain/builds/schedule.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
 let db: Db;

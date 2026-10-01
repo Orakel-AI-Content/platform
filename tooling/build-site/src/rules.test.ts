@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EXIT_CODES, ResultSchema, exitCodeOf } from './contract.ts';
+import { EXIT_CODES, ResultSchema, exitCodeOf } from '@orakel/build-contract';
 import { PublishEnvSchema, RenderEnvSchema, parseEnv } from './env.ts';
 import { ClassifiedError, classify } from './failures.ts';
 import { versionFromOutput } from './publish/cloudflare.ts';

@@ -92,4 +92,4 @@ structure:
 
 open_questions:
   - 'Verificar no piloto se uma 404 aciona o Worker na Cloudflare (não observável localmente)'
-  - 'Imagem grande (workspace com build-site e dependências de desenvolvimento): enxugar se incomodar'
+  - 'Imagem grande (workspace com dependências de desenvolvimento): enxugar se incomodar'

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { ARCHIVE_LAYOUT, PATHS } from '../contract.ts';
+import { ARCHIVE_LAYOUT, PATHS } from '@orakel/build-contract';
 import { ClassifiedError } from '../failures.ts';
 import { WRANGLER_BIN } from '../paths.ts';
 import { parseJsonc } from '../wrangler/jsonc.ts';

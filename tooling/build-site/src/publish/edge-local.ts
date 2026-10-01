@@ -2,7 +2,7 @@
 // saída compactada (12.0, L3). Resposta: { id } da versão, que passa a ser servida.
 import { readFile } from 'node:fs/promises';
 
-import { EdgeLocalVersionSchema } from '../contract.ts';
+import { EdgeLocalVersionSchema } from '@orakel/build-contract';
 import { ClassifiedError } from '../failures.ts';
 
 export async function uploadEdgeLocal(

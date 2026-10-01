@@ -7,7 +7,7 @@ import { join } from 'node:path';
 
 import { z } from 'zod';
 
-import { CONTRACT_VERSION, PATHS, ResultSchema, type Result } from '../contract.ts';
+import { CONTRACT_VERSION, PATHS, ResultSchema, type Result } from '@orakel/build-contract';
 import type { RenderEnv } from '../env.ts';
 import { ClassifiedError, classify } from '../failures.ts';
 import {

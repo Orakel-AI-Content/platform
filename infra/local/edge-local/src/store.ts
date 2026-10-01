@@ -11,7 +11,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/p
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { ARCHIVE_LAYOUT } from '@orakel/build-site/contract';
+import { ARCHIVE_LAYOUT } from '@orakel/build-contract';
 
 const run = promisify(execFile);
 const SITE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

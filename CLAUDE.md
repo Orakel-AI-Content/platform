@@ -29,8 +29,9 @@ Geradas:
 - `packages/events` – formato versionado dos eventos, manifesto e script do navegador
 - `apps/blog` – sites Astro por `SITE_ID` (estático) e visualização SSR (`/<site>/<caminho>`); exclui `worker/` do tsconfig e do ESLint
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
-- `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner
-- `tooling/build-site` – entrypoints `render`, `publish` e `ssr` da imagem `site-builder`; contrato do volume `/build`
+- `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner (task `build`: render e publish pelo `docker-socket-proxy`)
+- `packages/build-contract` – contrato do volume `/build` (`result.json`, `publish.json`), só Zod
+- `tooling/build-site` – entrypoints `render`, `publish` e `ssr` da imagem `site-builder`
 - `infra/local/edge-local` – substituto local do deploy: um Worker por site, versões, rollback e `ae-sim`
 
 Previstas (gere com `/scaffold` no caminho da unidade):
@@ -38,7 +39,7 @@ Previstas (gere com `/scaffold` no caminho da unidade):
 - `packages/ui` – ilhas React (último recurso)
 - `adapters/astro` – integração Astro
 - `apps/generator` – geração com LLM (fase 2)
-- `apps/backoffice` (retomada) – task `build` real no `build-runner`: containers `render` e `publish` pelo `docker-socket-proxy`, nas redes do compose (próximo da fila; fecha a L3)
+- `apps/backoffice` (retomada) – módulos da L4: Conteúdo, Mídia, Revisão, Publicação e ações do Registro de instâncias (retomar, rollback) (próximo da fila)
 
 ## Regras invioláveis
 

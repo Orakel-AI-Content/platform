@@ -11,6 +11,7 @@ import { and, count, desc, eq, isNull } from 'drizzle-orm';
 import type { Executor } from '../../db/client.ts';
 import { pendingChanges, siteConfigs, sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
+import { lastBuilds, type LastBuild } from '../builds/builds.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 
 export type SiteSummary = {
@@ -23,6 +24,7 @@ export type SiteSummary = {
   release: string | null;
   indexavel: boolean;
   pendingChanges: number;
+  lastBuild: LastBuild | null;
 };
 
 /** Cadastra um site com a configuração v1, validada contra os recursos da release. */
@@ -94,6 +96,7 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
     .where(isNull(pendingChanges.resolvedAt))
     .groupBy(pendingChanges.siteId);
   const pendingBySite = new Map(pending.map((row) => [row.siteId, row.total]));
+  const buildsBySite = await lastBuilds(db);
 
   const summaries = await Promise.all(
     rows.map(async (site): Promise<SiteSummary> => {
@@ -108,6 +111,7 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
         release: site.release,
         indexavel: config?.indexavel ?? false,
         pendingChanges: pendingBySite.get(site.id) ?? 0,
+        lastBuild: buildsBySite.get(site.id) ?? null,
       };
     }),
   );

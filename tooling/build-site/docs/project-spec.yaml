@@ -90,7 +90,7 @@ structure:
   tree: |
     tooling/build-site/
     ├── package.json  tsconfig.json  eslint.config.js  vitest.config.ts
-    ├── src/{cli,contract,env,failures,paths,ssr}.ts
+    ├── src/{cli,env,failures,paths,ssr}.ts   # contrato: packages/build-contract
     ├── src/render/{render,astro-build,count,page-drop}.ts
     ├── src/wrangler/{jsonc,targets}.ts
     ├── src/publish/{publish,archive,cloudflare,edge-local,build-cache}.ts
@@ -102,7 +102,6 @@ structure:
     image: ../../docker/site-builder/
 
 open_questions:
-  - 'Backoffice: task build real (docker-socket-proxy, redes export e publish, volume /build, retentativas, trava), blog-preview e build-runner no compose, upstream do Caddy'
   - 'Rollback no alvo cloudflare (wrangler rollback) e no local: operação do backoffice (L4) sobre a versionId do publish.json'
   - 'Imagem com ~1,2 GB (workspace inteiro com dependências de desenvolvimento): enxugar depois'
   - 'Cache do build da imagem no CI (hoje sem cache)'

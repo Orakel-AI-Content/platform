@@ -22,6 +22,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
     "@next/env": "catalog:",
+    "@orakel/build-contract": "workspace:*",
     "@orakel/content-model": "workspace:*",
     "@sentry/nextjs": "catalog:",
     "@sentry/node": "catalog:",

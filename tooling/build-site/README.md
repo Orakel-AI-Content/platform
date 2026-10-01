@@ -17,6 +17,8 @@ SITE_ID=exemplo-a SITE_DOMAIN=exemplo-a.com.br EXPORT_API_URL=http://127.0.0.1:8
 Render e publish pelas redes do compose local, como o `build-runner` fará (da raiz):
 `pnpm local:publish <site>` → `https://<site>.localhost`.
 
-Contrato do volume `/build` (lido pelo backoffice): `@orakel/build-site/contract`.
+Contrato do volume `/build` (lido pelo backoffice e pelo edge-local): `@orakel/build-contract`.
+No ambiente local, o `build-runner` do backoffice roda o `render` e o `publish` sozinho a cada
+mudança (ADR 0008 do backoffice).
 Comandos: `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm measure`. Documentação:
 `docs/README.md`.

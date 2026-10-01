@@ -1,0 +1,8 @@
+{
+  "extends": "@orakel/tsconfig/library.json",
+  "compilerOptions": {
+    // Lido no Node 24: site-builder (render, publish), build-runner e edge-local.
+    "types": ["node"]
+  },
+  "include": ["src", "*.ts"]
+}

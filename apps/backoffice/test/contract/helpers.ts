@@ -26,6 +26,7 @@ export async function setupDatabase(): Promise<{ db: Db; close: () => Promise<vo
 }
 
 const TABLES = [
+  'builds',
   'pending_changes',
   'content_versions',
   'contents',

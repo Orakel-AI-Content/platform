@@ -8,8 +8,8 @@ revisão humana.
 - **Sites:** Astro estático na Cloudflare (um Worker com Static Assets por site),
   parametrizado por `SITE_ID`.
 - **Backoffice:** Next.js + Graphile Worker na VPS (Docker Compose).
-- **Estado:** fase 0 — tudo roda localmente em containers, antes do primeiro deploy. Próximo
-  passo: a task de build real do backoffice (L3).
+- **Estado:** fase 0 — tudo roda localmente em containers, antes do primeiro deploy. Build e
+  publicação pelo backoffice prontos (L3); próximo passo: os módulos do backoffice (L4).
 
 ## Sumário
 
@@ -176,17 +176,17 @@ O `pnpm local:check` confere esse isolamento e as recusas do proxy (`exec`, `pul
 Referência completa e comentada: [`.env.example`](.env.example). Cada unidade valida as que
 usa em `src/env.ts` (Zod) e falha no boot se faltar alguma.
 
-| Grupo            | Variáveis                                                                                                                           |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Postgres         | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`                                                                 |
-| Tokens internos  | `EXPORT_BUILD_TOKEN`, `EXPORT_PREVIEW_TOKEN`, `GENERATOR_TOKEN`                                                                     |
-| Access           | `ACCESS_TEAM_DOMAIN`, `ACCESS_JWKS_URL`, `ACCESS_AUD`                                                                               |
-| S3               | `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`                                                                           |
-| Sites            | `CONTENT_SOURCE` (`api` ou `fixture`), `SITE_ID`, `EXPORT_API_URL`, `BLOG_PREVIEW_UPSTREAM` (opcional)                              |
-| Ambiente local   | `LOCAL_SITES`, `LOCAL_MEDIA_HOSTS`, `DOCKER_SOCKET_GID`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `BACKOFFICE_UPSTREAM` (opcional) |
-| Deploy e imagens | `DEPLOY_TARGET` (`local` ou `cloudflare`), `IMAGE_REGISTRY`                                                                         |
-| Analytics Engine | `AE_SQL_TRANSPORT`, `AE_SQL_URL`                                                                                                    |
-| Operação         | `BR_BACKUP_ENDPOINT`, `HEARTBEAT_BASE_URL`, `SENTRY_DSN`, `LIGHTHOUSE_PROVIDER` (`local` ou `psi`)                                  |
+| Grupo            | Variáveis                                                                                                                                           |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Postgres         | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`                                                                                 |
+| Tokens internos  | `EXPORT_BUILD_TOKEN`, `EXPORT_PREVIEW_TOKEN`, `GENERATOR_TOKEN`                                                                                     |
+| Access           | `ACCESS_TEAM_DOMAIN`, `ACCESS_JWKS_URL`, `ACCESS_AUD`                                                                                               |
+| S3               | `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`                                                                                           |
+| Sites            | `CONTENT_SOURCE` (`api` ou `fixture`), `SITE_ID`, `EXPORT_API_URL`, `BLOG_PREVIEW_UPSTREAM` (opcional)                                              |
+| Ambiente local   | `LOCAL_SITES`, `LOCAL_MEDIA_HOSTS`, `DOCKER_SOCKET_GID`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `BACKOFFICE_UPSTREAM` (opcional)                 |
+| Deploy e imagens | `DEPLOY_TARGET` (`local` ou `cloudflare`), `IMAGE_REGISTRY`, `BUILD_WINDOW_SECONDS`, `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` (só produção) |
+| Analytics Engine | `AE_SQL_TRANSPORT`, `AE_SQL_URL`                                                                                                                    |
+| Operação         | `BR_BACKUP_ENDPOINT`, `HEARTBEAT_BASE_URL`, `SENTRY_DSN`, `LIGHTHOUSE_PROVIDER` (`local` ou `psi`)                                                  |
 
 `.env` e `.env.local` ficam fora do Git; nunca coloque valores reais nos arquivos
 versionados.
@@ -207,10 +207,17 @@ pnpm --filter @orakel/blog preview    # visualização SSR: http://localhost:432
 `next dev`. Para a visualização na máquina, o mesmo com
 `BLOG_PREVIEW_UPSTREAM=host.docker.internal:4321`.
 
-**Publicar e medir:**
+**Builds pelo backoffice:** toda gravação que vai para um site agenda o build dele; depois da
+janela (`BUILD_WINDOW_SECONDS`, 30 s no local) o `build-runner` roda o `render` e o `publish` e
+`https://<site>.localhost` é atualizado. Em `https://admin.orakel.localhost/sites`, "Publicar
+agora" antecipa o build e "Último build" mostra o resultado. Falha permanente (trava de
+segurança, orçamento de JS, configuração) pausa o site com o motivo; transitória é repetida até
+5 vezes. Acompanhe com `infra/local/compose.sh logs -f build-runner`.
+
+**Publicar à mão e medir:**
 
 ```sh
-pnpm local:publish exemplo-a   # nova versão em https://exemplo-a.localhost
+pnpm local:publish exemplo-a   # render + publish sem o backoffice (diagnóstico)
 pnpm local:load exemplo-a      # 1000 pageviews de BR, PT, DE e US → ClickHouse
 ```
 
@@ -242,6 +249,7 @@ domínios a `infra/local/seeds/sites.json`; depois `pnpm local:up`.
 | [`packages/tokens`](packages/tokens)                 | `@orakel/tokens`         | Temas DTCG → variáveis CSS e fontes, contraste AA verificado          |
 | [`packages/elements`](packages/elements)             | `@orakel/elements`       | Web Components: carrossel, menu, copiar link, compartilhar            |
 | [`packages/events`](packages/events)                 | `@orakel/events`         | Formato dos eventos, manifesto e script do navegador                  |
+| [`packages/build-contract`](packages/build-contract) | `@orakel/build-contract` | Contrato do volume `/build` (`result.json`, `publish.json`)           |
 | [`tooling/build-site`](tooling/build-site)           | `@orakel/build-site`     | Entrypoints `render`, `publish` e `ssr` da imagem `site-builder`      |
 | [`infra/local/edge-local`](infra/local/edge-local)   | `@orakel/edge-local`     | Substituto local do deploy na Cloudflare e `ae-sim`                   |
 
@@ -266,7 +274,7 @@ Branches, commits e releases: [`docs/conventions/git.md`](docs/conventions/git.m
 | Pasta                | Conteúdo                                                                                                                   |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `apps/`              | `backoffice`, `blog` (+ `worker`); `generator` previsto                                                                    |
-| `packages/`          | Domínio compartilhado: `content-model`, `content-client`, `core`, `tokens`, `elements`, `events`                           |
+| `packages/`          | Domínio compartilhado: `content-model`, `content-client`, `core`, `tokens`, `elements`, `events`, `build-contract`         |
 | `tooling/`           | Configurações compartilhadas (`tsconfig`, `eslint-config`, `prettier-config`, `vitest-config`) e `build-site`              |
 | `infra/vps/`         | Compose base (produção) e redes                                                                                            |
 | `infra/local/`       | Override local, `Caddyfile`, `access-mock`, `edge-local`, `s3/init.sh`, `clickhouse/init.sql`, `seeds/`, scripts `local:*` |

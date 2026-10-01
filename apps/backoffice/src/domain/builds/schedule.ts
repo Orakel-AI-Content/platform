@@ -1,23 +1,29 @@
 import { sql } from 'drizzle-orm';
 
-import type { Executor } from '../db/client.ts';
+import type { Executor } from '../../db/client.ts';
 
-/** Janela de agrupamento dos builds (proposta): 15 min em produção, 30 s no local. */
-export const BUILD_WINDOW_MS = process.env.NODE_ENV === 'production' ? 15 * 60_000 : 30_000;
+/**
+ * Janela de agrupamento dos builds (proposta): 15 min em produção, 30 s no local. Vem de
+ * BUILD_WINDOW_SECONDS, aplicada na partida de cada processo (runProcess e instrumentation
+ * do Next); o domínio não lê o ambiente.
+ */
+let windowMs = 15 * 60_000;
+
+export function configureBuildWindow(ms: number): void {
+  windowMs = ms;
+}
 
 /**
  * Agenda o build do site na mesma transação da gravação. `job_key` + fila nomeada: um build
  * por vez por site, e publicações dentro da janela caem no mesmo job (`preserve_run_at`
- * mantém o horário do primeiro agendamento). Usado pelo módulo Publicação (backlog).
+ * mantém o horário do primeiro agendamento). Chamado por recordPendingChange.
  */
 export async function scheduleBuild(
   tx: Executor,
   siteId: string,
   options: { windowMs?: number; now?: Date } = {},
 ): Promise<void> {
-  const runAt = new Date(
-    (options.now ?? new Date()).getTime() + (options.windowMs ?? BUILD_WINDOW_MS),
-  );
+  const runAt = new Date((options.now ?? new Date()).getTime() + (options.windowMs ?? windowMs));
   await tx.execute(sql`
     select graphile_worker.add_job(
       identifier => 'build',

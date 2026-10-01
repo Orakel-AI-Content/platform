@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@orakel/build-site": "workspace:*",
+    "@orakel/build-contract": "workspace:*",
     "wrangler": "catalog:",
     "zod": "catalog:"
   },

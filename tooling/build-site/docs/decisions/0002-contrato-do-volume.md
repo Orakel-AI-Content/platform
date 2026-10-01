@@ -10,7 +10,9 @@
 - `result.json` (`formatVersion: 1`) é escrito **sempre**: sucesso com `pendingChangeIds`, `pages`, `files`, `redirectUsage`, `durationMs`; falha com `failure: { kind, message }` — o motivo que o backoffice mostra ao pausar o site. `publish.json` segue o mesmo padrão, com `versionId` e `cacheKey`.
 - Código de saída e arquivo concordam: 0 `ok`, 10 `permanent`, 20 `transient`. Erro sem `kind` é transitório.
 - A classificação vem do erro, não do log: o render roda o Astro no mesmo processo e procura `kind` na cadeia de `cause` (o blog e o content-client põem `kind`; o Astro às vezes embrulha).
-- Schemas Zod em `@orakel/build-site/contract`, que o backoffice importa.
+- Schemas Zod em `@orakel/build-contract` (`packages/build-contract`, só Zod), que o backoffice
+  e o edge-local importam sem levar as dependências do site-builder. Até 2026-10-01 ficavam no
+  subcaminho `@orakel/build-site/contract`.
 
 ## Consequências
 

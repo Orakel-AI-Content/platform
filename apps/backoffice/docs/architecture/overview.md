@@ -21,12 +21,12 @@ flowchart LR
 
 ## Processos (uma imagem)
 
-| Processo             | Comando                                           | Faz                                                          |
-| -------------------- | ------------------------------------------------- | ------------------------------------------------------------ |
-| `backoffice-web`     | `node .next/standalone/apps/backoffice/server.js` | UI e route handlers (API de exportação, saúde)               |
-| `backoffice-worker`  | `node src/bin/worker.ts`                          | Jobs gerais e agregador pelo cron do Graphile Worker         |
-| `build-runner`       | `node src/bin/build-runner.ts`                    | Só a task `build`, concorrência 2 (entra com o `build-site`) |
-| `backoffice-migrate` | `node src/bin/migrate.ts`                         | Migrações do Drizzle e do Graphile Worker; sai ao terminar   |
+| Processo             | Comando                                           | Faz                                                        |
+| -------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| `backoffice-web`     | `node .next/standalone/apps/backoffice/server.js` | UI e route handlers (API de exportação, saúde)             |
+| `backoffice-worker`  | `node src/bin/worker.ts`                          | Jobs gerais e agregador pelo cron do Graphile Worker       |
+| `build-runner`       | `node src/bin/build-runner.ts`                    | Só a task `build`, concorrência 2 (ADR 0008)               |
+| `backoffice-migrate` | `node src/bin/migrate.ts`                         | Migrações do Drizzle e do Graphile Worker; sai ao terminar |
 
 ## Fluxo gerado: Sites → exportação
 
@@ -35,7 +35,23 @@ flowchart LR
 2. `GET /api/export/v1/sites/{site}/snapshot` (só rede interna, token do build) abre uma
    transação `REPEATABLE READ` só de leitura e devolve NDJSON: `header` com as mudanças
    pendentes visíveis, entidades, `end` com as contagens.
-3. A tela `/sites` lista o registro de instâncias para quem tem `site.read`.
+3. A tela `/sites` lista o registro de instâncias para quem tem `site.read`, com o último
+   build e, para `operations.run`, a ação "Publicar agora".
+
+## Fluxo de build (L3, ADR 0008)
+
+```mermaid
+flowchart LR
+  G[gravação no domínio] -->|recordPendingChange + scheduleBuild| J[(job build:site<br/>janela)]
+  J --> BR[build-runner]
+  BR -->|docker-socket-proxy| R[render · rede export]
+  R -->|result.json| BR
+  BR -->|docker-socket-proxy| PB[publish · rede publish]
+  PB -->|publish.json| BR
+  BR -->|builds + baixa das mudanças| PG[(Postgres)]
+```
+
+Transitória → o Graphile Worker repete (até 5); permanente → site pausado com o motivo.
 
 ## Regras
 

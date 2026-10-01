@@ -20,11 +20,19 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+/**
+ * Gravam só colunas operacionais de uma tabela exportada (estado do site), que não vão para o
+ * snapshot. Gerar mudança pendente ali faria cada build agendar outro.
+ */
+const OPERATIONAL_ONLY = [path.join('builds', 'site-state.ts')];
+
 const writes = new RegExp(`\\.(?:insert|update|delete)\\((?:${EXPORTED_TABLES.join('|')})\\)`);
 
 describe('mudanças pendentes', () => {
   const files = sourceFiles(domainDir).filter(
-    (file) => !file.includes(`${path.sep}pending-changes${path.sep}`),
+    (file) =>
+      !file.includes(`${path.sep}pending-changes${path.sep}`) &&
+      !OPERATIONAL_ONLY.includes(path.relative(domainDir, file)),
   );
 
   it('existem módulos de gravação para conferir', () => {

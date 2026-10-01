@@ -10,12 +10,12 @@ apps/backoffice/
 │   │   ├── (admin)/             área autenticada (layout confere o Access)
 │   │   └── api/                 export/v1 (rede interna), health
 │   ├── components/              ui/ (shadcn/ui) e componentes de tela
-│   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, export, import)
+│   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, export, import, builds)
 │   ├── db/                      client.ts, schema/, site-ids.ts
 │   ├── auth/                    access-jwt.ts, internal-tokens.ts, request-actor.ts
-│   ├── jobs/                    task-lists.ts, enqueue.ts, tasks/
+│   ├── jobs/                    task-lists.ts, tasks/ (build, heartbeat)
 │   ├── bin/                     worker, build-runner, migrate, seed
-│   ├── lib/                     logger, problem, heartbeat, s3, sentry, utils
+│   ├── lib/                     logger, problem, heartbeat, s3, sentry, utils, docker, tar
 │   ├── env.ts  proxy.ts  instrumentation.ts
 └── test/
     ├── contract/                Vitest + Postgres
