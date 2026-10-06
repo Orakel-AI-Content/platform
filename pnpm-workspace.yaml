@@ -27,6 +27,19 @@ catalog:
   '@testing-library/dom': 10.4.2
   '@testing-library/react': 16.3.3
   '@testing-library/user-event': 14.6.7
+  '@tiptap/core': 3.31.4
+  '@tiptap/extension-bold': 3.31.4
+  '@tiptap/extension-code': 3.31.4
+  '@tiptap/extension-document': 3.31.4
+  '@tiptap/extension-heading': 3.31.4
+  '@tiptap/extension-italic': 3.31.4
+  '@tiptap/extension-link': 3.31.4
+  '@tiptap/extension-list': 3.31.4
+  '@tiptap/extension-paragraph': 3.31.4
+  '@tiptap/extension-text': 3.31.4
+  '@tiptap/extensions': 3.31.4
+  '@tiptap/pm': 3.31.4
+  '@tiptap/react': 3.31.4
   '@types/node': 24.19.0
   '@types/pg': 8.23.1
   '@types/react': 19.3.0
