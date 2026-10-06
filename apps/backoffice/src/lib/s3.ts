@@ -1,9 +1,15 @@
-import { S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  NoSuchKey,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 
+import type { ObjectStore } from '../domain/media/store.ts';
 import type { Env } from '../env.ts';
 
 // Cliente S3 único para SeaweedFS (local) e R2 (produção): só o protocolo muda de endpoint.
-// A ingestão de imagens (originais e variantes) é backlog do módulo Mídia.
 export function createS3Client(
   env: Pick<Env, 'S3_ENDPOINT' | 'S3_ACCESS_KEY_ID' | 'S3_SECRET_ACCESS_KEY'>,
 ) {
@@ -13,4 +19,33 @@ export function createS3Client(
     forcePathStyle: true,
     credentials: { accessKeyId: env.S3_ACCESS_KEY_ID, secretAccessKey: env.S3_SECRET_ACCESS_KEY },
   });
+}
+
+/** Armazenamento de objetos da ingestão de mídia sobre o S3. */
+export function s3ObjectStore(client: S3Client): ObjectStore {
+  return {
+    async put(bucket, key, body, length, contentType) {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentLength: length,
+          ContentType: contentType,
+        }),
+      );
+    },
+    async get(bucket, key) {
+      try {
+        const object = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+        return object.Body ? await object.Body.transformToByteArray() : undefined;
+      } catch (error) {
+        if (error instanceof NoSuchKey) return undefined;
+        throw error;
+      }
+    },
+    async delete(bucket, key) {
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    },
+  };
 }
