@@ -18,6 +18,9 @@ modo dev atrás do Caddy: `README.md` e `docs/guides/local-setup.md` da raiz.
 é atualizado em `https://<site>.localhost`. Em `/sites`, "Publicar agora" antecipa o build e a
 coluna "Último build" mostra o resultado; falha permanente pausa o site com o motivo.
 
+**Sites do OpenTofu (ADR 0011):** em `/sites`, admin e operação baixam o
+`sites.auto.tfvars.json` (todos os sites e seus domínios) para versionar na raiz do OpenTofu.
+
 ## Comandos (nesta pasta)
 
 | Comando                            | O que faz                                           |

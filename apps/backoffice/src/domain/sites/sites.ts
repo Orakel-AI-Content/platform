@@ -186,6 +186,27 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
   return { ok: true, value: summaries };
 }
 
+/** Nome do arquivo de sites da raiz do OpenTofu (ADR 0011). */
+export const TFVARS_FILENAME = 'sites.auto.tfvars.json';
+
+/**
+ * `sites.auto.tfvars.json` (ADR 0011): objeto `sites` por SITE_ID, pronto para `for_each`, com
+ * os domínios de cada site (o principal primeiro). Sites em ordem de SITE_ID e serialização
+ * fixa: o mesmo registro gera os mesmos bytes.
+ */
+export async function exportSitesTfvars(db: Executor, actor: Actor): Promise<Result<string>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  // Ordem por código, não pela collation do banco: a mesma em qualquer ambiente.
+  const ids = (await db.select({ id: sites.id }).from(sites)).map((row) => row.id).sort();
+  const entries: Record<string, { domains: string[] }> = {};
+  for (const id of ids) {
+    entries[id] = { domains: (await currentConfig(db, id))?.domains ?? [] };
+  }
+  return { ok: true, value: `${JSON.stringify({ sites: entries }, null, 2)}\n` };
+}
+
 /** Mudanças pendentes ainda não baixadas por um build. */
 export async function unresolvedPendingChangeIds(db: Executor, siteId: string): Promise<number[]> {
   const rows = await db
