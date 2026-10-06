@@ -134,7 +134,7 @@ services:
     environment:
       CONTENT_SOURCE: api
       EXPORT_API_URL: http://backoffice-web:3000
-      EXPORT_BUILD_TOKEN: ${EXPORT_BUILD_TOKEN:?defina EXPORT_BUILD_TOKEN}
+      EXPORT_PREVIEW_TOKEN: ${EXPORT_PREVIEW_TOKEN:?defina EXPORT_PREVIEW_TOKEN}
       PORT: '4321'
     networks: [internal, export]
     depends_on:
