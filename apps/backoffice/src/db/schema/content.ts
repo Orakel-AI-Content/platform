@@ -55,6 +55,9 @@ export const media = pgTable(
     id: integer().notNull(),
     width: integer().notNull(),
     height: integer().notNull(),
+    /** Original normalizado em `media-originals` (`<site>/<sha256>.<ext>`); só operacional,
+     * fora do snapshot. Nulo nas mídias importadas, que não têm original guardado. */
+    originalKey: text(),
   },
   (t) => [primaryKey({ columns: [t.siteId, t.id] })],
 );

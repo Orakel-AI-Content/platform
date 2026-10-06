@@ -24,9 +24,9 @@ describe('linhas do banco → entidades do contrato', () => {
     });
   });
 
-  it('mídia leva só largura, formato e caminho das variantes', () => {
+  it('mídia leva só largura, formato e caminho das variantes (sem o original)', () => {
     expect(
-      toMedia({ siteId: 's', id: 3, width: 100, height: 50 }, [
+      toMedia({ siteId: 's', id: 3, width: 100, height: 50, originalKey: 's/abc.jpg' }, [
         { siteId: 's', mediaId: 3, width: 320, format: 'avif', path: 's/x-320.avif' },
       ]),
     ).toEqual({

@@ -12,6 +12,7 @@ Stack: Next.js 16 (App Router) + Drizzle/Postgres + Graphile Worker; contratos e
 - Contrato (Postgres): `DATABASE_URL=… pnpm test:contract` · E2E: `pnpm test:e2e`
 - Lint / tipos: `pnpm lint` · `pnpm typecheck`
 - Banco: `pnpm db:generate --name <nome>` · `pnpm db:migrate` · `pnpm db:seed`
+- Mídia: `pnpm media:reprocess [site]` (variantes que faltam no perfil de imagem)
 
 ## Regras invioláveis
 
@@ -38,5 +39,5 @@ relevantes e leia-os primeiro.
 - `docs/architecture/folder-structure.md` – como acrescentar módulo, tabela, tela, rota ou job
 - `docs/conventions/testing.md` – unitários, contrato com Postgres, E2E
 - `docs/design/design-system.md` – shadcn/ui, tokens, tabelas
-- `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog; 0008: task build; 0010: janela por site; 0011: sites.auto.tfvars.json; 0012: envio e ingestão de imagens; 0013: variantes e registro da mídia)
+- `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog; 0008: task build; 0010: janela por site; 0011: sites.auto.tfvars.json; 0012: envio e ingestão de imagens; 0013: variantes e registro da mídia; 0014: reprocessamento)
 - `docs/project-spec.yaml` – decisões desta unidade (herda as da raiz)

@@ -13,8 +13,8 @@ apps/backoffice/
 │   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, media, export, import, builds)
 │   ├── db/                      client.ts, schema/, site-ids.ts
 │   ├── auth/                    access-jwt.ts, internal-tokens.ts, request-actor.ts
-│   ├── jobs/                    task-lists.ts, tasks/ (build, heartbeat, ingest-media, media-variants)
-│   ├── bin/                     worker, build-runner, migrate, seed
+│   ├── jobs/                    task-lists.ts, tasks/ (build, heartbeat, ingest-media, media-variants, media-reprocess)
+│   ├── bin/                     worker, build-runner, migrate, seed, reprocess-media
 │   ├── lib/                     logger, problem, heartbeat, s3, sentry, utils, docker, tar
 │   ├── env.ts  proxy.ts  instrumentation.ts
 └── test/

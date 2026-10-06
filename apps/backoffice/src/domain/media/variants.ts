@@ -29,17 +29,27 @@ export type VariantsPayload = {
 /** Bucket de mídia do site (um por site, como no R2). */
 export const mediaBucket = (siteId: string) => `media-${siteId}`;
 
+export type VariantSpec = { width: number; format: string };
+
+/** Variantes que o perfil exige de um original com esta largura (regra do content-model). */
+export function profileVariants(width: number, resources: Resources = RESOURCES): VariantSpec[] {
+  return requiredImageWidths(width, resources).flatMap((w) =>
+    resources.imageProfile.formats.map((format) => ({ width: w, format })),
+  );
+}
+
 export type GeneratedVariants =
   { status: 'generated'; media: Omit<Media, 'id'>; written: number } | { status: 'missing' };
 
 /**
- * Gera as variantes que ainda não existem no bucket do site. Variante já gravada (reenvio
- * da mesma imagem, ou repetição do job) é mantida: o nome é imutável.
+ * Gera as variantes pedidas (por padrão, as do perfil) que ainda não existem no bucket do
+ * site. Variante já gravada (reenvio da mesma imagem, ou repetição do job) é mantida: o
+ * nome é imutável.
  */
 export async function generateVariants(
   store: ObjectStore,
   payload: VariantsPayload,
-  resources: Resources = RESOURCES,
+  specs: VariantSpec[] = profileVariants(payload.width),
 ): Promise<GeneratedVariants> {
   const original = await store.get(ORIGINALS_BUCKET, payload.originalKey);
   if (original === undefined) return { status: 'missing' };
@@ -49,18 +59,16 @@ export async function generateVariants(
   const bucket = mediaBucket(payload.siteId);
   const variants: Media['variants'] = [];
   let written = 0;
-  for (const width of requiredImageWidths(payload.width, resources)) {
-    for (const format of resources.imageProfile.formats) {
-      const path = `${payload.siteId}/${hash}-${width}.${format}`;
-      variants.push({ width, format, path });
-      if (await store.exists(bucket, path)) continue;
-      const data = await sharp(original)
-        .resize({ width, withoutEnlargement: true })
-        .toFormat(format as keyof FormatEnum)
-        .toBuffer();
-      await store.put(bucket, path, data, data.byteLength, `image/${format}`);
-      written += 1;
-    }
+  for (const { width, format } of specs) {
+    const path = `${payload.siteId}/${hash}-${width}.${format}`;
+    variants.push({ width, format, path });
+    if (await store.exists(bucket, path)) continue;
+    const data = await sharp(original)
+      .resize({ width, withoutEnlargement: true })
+      .toFormat(format as keyof FormatEnum)
+      .toBuffer();
+    await store.put(bucket, path, data, data.byteLength, `image/${format}`);
+    written += 1;
   }
   return {
     status: 'generated',
@@ -80,7 +88,9 @@ export async function registerMediaVariants(
   const generated = await generateVariants(deps.store, payload);
   if (generated.status === 'missing') return generated;
   const created = await deps.db.transaction((tx) =>
-    createMedia(tx, SYSTEM_ACTOR, payload.siteId, generated.media),
+    createMedia(tx, SYSTEM_ACTOR, payload.siteId, generated.media, {
+      originalKey: payload.originalKey,
+    }),
   );
   if (!created.ok) {
     // Variantes geradas pela própria regra do perfil: recusa aqui é bug, não conteúdo.
