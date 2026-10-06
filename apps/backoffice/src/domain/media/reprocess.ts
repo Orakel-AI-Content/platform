@@ -1,10 +1,13 @@
+import type { Result } from '@orakel/content-model';
 import { RESOURCES, type Media, type Resources } from '@orakel/content-model/v1';
 import { asc, eq, sql } from 'drizzle-orm';
 
 import type { Db, Executor } from '../../db/client.ts';
-import { media, mediaVariants } from '../../db/schema/index.ts';
+import { media, mediaVariants, sites } from '../../db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../access/rbac.ts';
 import { addMediaVariants } from '../content/media.ts';
+import { refuse } from '../content/write.ts';
+import { siteExists } from '../sites/sites.ts';
 import type { ObjectStore } from './store.ts';
 import { generateVariants, profileVariants, type VariantSpec } from './variants.ts';
 
@@ -119,4 +122,20 @@ export async function enqueueReprocess(db: Executor, siteId: string): Promise<vo
       job_key => ${`${REPROCESS_TASK}:${siteId}`},
       job_key_mode => 'preserve_run_at'
     )`);
+}
+
+/** Enfileira o reprocessamento de um site, ou de todos os cadastrados (comando da operação). */
+export async function scheduleMediaReprocess(
+  db: Executor,
+  siteId?: string,
+): Promise<Result<string[]>> {
+  if (siteId !== undefined && !(await siteExists(db, siteId))) {
+    return refuse('site.not_found', `Site ${siteId} não encontrado`);
+  }
+  const ids =
+    siteId !== undefined
+      ? [siteId]
+      : (await db.select({ id: sites.id }).from(sites).orderBy(asc(sites.id))).map((s) => s.id);
+  for (const id of ids) await enqueueReprocess(db, id);
+  return { ok: true, value: ids };
 }
