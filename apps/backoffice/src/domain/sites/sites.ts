@@ -1,4 +1,5 @@
 import {
+  InstitutionalTextsSchema,
   SiteConfigSchema,
   validateSiteConfig,
   RESOURCES,
@@ -15,6 +16,9 @@ import { lastBuilds, type LastBuild } from '../builds/builds.ts';
 import { effectiveBuildWindowMs } from '../builds/schedule.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 import { hasPolicyTrigger } from './policy-triggers.ts';
+
+/** Textos das páginas institucionais (o content-model só exporta o schema). */
+export type InstitutionalTexts = NonNullable<SiteConfig['institutionalTexts']>;
 
 export type SiteSummary = {
   id: string;
@@ -152,11 +156,63 @@ export async function updateSiteConfig(
   const indexing = await checkIndexing(tx, config);
   if (!indexing.ok) return indexing;
 
-  const version = current.version + 1;
+  return writeConfigVersion(tx, siteId, current.version + 1, config);
+}
+
+/** Grava a versão nova da configuração (a anterior fica intacta) e a mudança pendente. */
+async function writeConfigVersion(
+  tx: Executor,
+  siteId: string,
+  version: number,
+  config: SiteConfig,
+): Promise<Result<{ version: number }>> {
   await tx.insert(siteConfigs).values({ siteId, version, config });
   await tx.update(sites).set({ name: config.name }).where(eq(sites.id, siteId));
   await recordPendingChange(tx, siteId, 'config', `v${version}`);
   return { ok: true, value: { version } };
+}
+
+/**
+ * Textos institucionais do site, editados por quem escreve conteúdo (`content.write`): a
+ * versão N+1 da configuração é a N com só esse campo trocado. Os demais campos continuam
+ * exigindo `site.configure` (updateSiteConfig).
+ */
+export async function updateInstitutionalTexts(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  texts: InstitutionalTexts,
+): Promise<Result<{ version: number }>> {
+  const allowed = requireRole(actor, 'content.write');
+  if (!allowed.ok) return allowed;
+  const parsed = InstitutionalTextsSchema.safeParse(texts);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      issues: parsed.error.issues.map((i) => ({
+        code: `schema.${i.code}`,
+        message: i.message,
+        path: ['institutionalTexts', ...i.path],
+      })),
+    };
+  }
+
+  const [current] = await tx
+    .select({ version: siteConfigs.version, config: siteConfigs.config })
+    .from(siteConfigs)
+    .where(eq(siteConfigs.siteId, siteId))
+    .orderBy(desc(siteConfigs.version))
+    .limit(1);
+  if (current === undefined) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  return writeConfigVersion(tx, siteId, current.version + 1, {
+    ...current.config,
+    institutionalTexts: parsed.data,
+  });
 }
 
 export async function siteExists(db: Executor, siteId: string): Promise<boolean> {
