@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { currentActor } from '../../auth/request-actor.ts';
+import { currentActor } from '@/auth/request-actor.ts';
 
 // Área autenticada: toda página daqui exige o JWT do Access e um usuário com papel. O
 // domínio confere de novo a permissão de cada ação (nunca só aqui nem no proxy).

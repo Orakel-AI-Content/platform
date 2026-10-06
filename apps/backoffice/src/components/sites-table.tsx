@@ -3,7 +3,6 @@
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import { useState, useTransition } from 'react';
 
-import type { SiteSummary } from '../domain/sites/sites.ts';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -14,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
 const features = tableFeatures({});

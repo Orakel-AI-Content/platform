@@ -1,9 +1,10 @@
-import { currentActor } from '../../../auth/request-actor.ts';
-import { getDb } from '../../../db/client.ts';
-import { can } from '../../../domain/access/rbac.ts';
-import { listSites } from '../../../domain/sites/sites.ts';
-import { publishNow } from './actions.ts';
+import { currentActor } from '@/auth/request-actor.ts';
 import { SitesTable } from '@/components/sites-table';
+import { getDb } from '@/db/client.ts';
+import { can } from '@/domain/access/rbac.ts';
+import { listSites } from '@/domain/sites/sites.ts';
+
+import { publishNow } from './actions.ts';
 
 export const dynamic = 'force-dynamic';
 
