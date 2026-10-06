@@ -31,6 +31,7 @@
     "local:check": "infra/local/check.sh",
     "local:publish": "infra/local/publish.sh",
     "local:load": "infra/local/load.sh",
+    "local:trust": "infra/local/trust-ca.sh",
     "prepare": "lefthook install"
   },
   "prettier": "@orakel/prettier-config",

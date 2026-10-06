@@ -45,18 +45,20 @@ cp .env.example .env.local     # valores locais; nunca commite .env.local
 pnpm local:images              # constrói backoffice, site-builder e edge-local
 pnpm local:up                  # sobe o compose, cria os buckets e migra o banco
 pnpm local:seed                # usuários de teste e os sites exemplo-a e exemplo-b
+pnpm local:trust               # CA do Caddy no Keychain (macOS; pede a senha)
 pnpm local:check               # confere o ambiente inteiro
 pnpm local:publish exemplo-a   # build + publicação → https://exemplo-a.localhost
 ```
 
-**CA local do Caddy (uma vez):** os hosts `*.localhost` usam HTTPS com a CA interna do Caddy.
-Para o navegador confiar:
+**CA local do Caddy:** os hosts `.localhost` usam HTTPS com a CA interna do Caddy. Para o
+navegador confiar, instale a raiz no Keychain do sistema (macOS; pede a senha) e feche o Chrome
+por completo (⌘Q):
 
 ```sh
-infra/local/compose.sh cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt
-# macOS
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt
+pnpm local:trust
 ```
+
+Repita depois de cada `pnpm local:reset`, que recria a CA.
 
 Já tinha um `.env.local`? Compare com o `.env.example` e acrescente o que falta (o compose
 avisa qual variável falta); comente `BLOG_PREVIEW_UPSTREAM` para a visualização usar o
@@ -92,6 +94,7 @@ Antes de concluir qualquer mudança: `pnpm lint`, `pnpm typecheck` e `pnpm test`
 | `pnpm local:check`              | Serviços, hostnames, buckets, ClickHouse, isolamento das redes e proxy do socket; sai com 1 se algo falhar |
 | `pnpm local:publish <site>`     | `render` (rede export) + `publish` (rede publish) no `edge-local`, como o `build-runner`                   |
 | `pnpm local:load [<site>]`      | Carga k6 de pageviews com países variados; confere os pontos no ClickHouse                                 |
+| `pnpm local:trust`              | Instala a CA atual do Caddy no Keychain do sistema (macOS) e remove as antigas                             |
 | `pnpm local:e2e`                | E2E com Playwright contra o ambiente local                                                                 |
 | `pnpm local:down`               | Para os containers (mantém os dados)                                                                       |
 | `pnpm local:reset`              | Para e **apaga os volumes** (banco, buckets, ClickHouse)                                                   |
@@ -118,22 +121,37 @@ O compose de produção (`infra/vps/compose.yaml`) é a base; `infra/local/compo
 acrescenta as portas locais e os substitutos da nuvem. Só as variáveis do `.env.example`
 mudam entre local e produção.
 
-### Endereços
+### Endereços e acessos
 
-| Endereço                                            | Serviço                                       | Acesso                                              |
-| --------------------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
-| `https://admin.orakel.localhost`                    | Backoffice (`backoffice-web`)                 | Login de teste do access-mock, um usuário por papel |
-| `https://preview.orakel.localhost/<site>/<caminho>` | Visualização de rascunhos (`blog-preview`)    | Login de teste                                      |
-| `https://<site>.localhost`                          | Sites publicados (`edge-local`)               | Público                                             |
-| `https://media.<site>.localhost`                    | Mídia do site (bucket `media-<site>`)         | Público, só leitura, cache imutável                 |
-| `https://s3.orakel.localhost`                       | Console do SeaweedFS                          | Login de teste                                      |
-| `https://glitchtip.orakel.localhost`                | GlitchTip (perfil `observability`)            | Login de teste + conta no GlitchTip                 |
-| `https://hc.orakel.localhost`                       | Healthchecks (perfil `observability`)         | Login de teste + conta no Healthchecks              |
-| `https://lhci.orakel.localhost`                     | LHCI server (perfil `lighthouse`)             | Login de teste                                      |
-| `localhost:5432`                                    | Postgres 18.6                                 | `POSTGRES_*`                                        |
-| `http://localhost:8333`                             | S3 (SeaweedFS 4.48)                           | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`         |
-| `http://localhost:8123`                             | ClickHouse (Analytics Engine local)           | `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD`           |
-| `http://localhost:8788`                             | access-mock (JWKS em `/cdn-cgi/access/certs`) | —                                                   |
+Valores padrão do `.env.example`. Se o seu `.env.local` mudar algum, vale o dele. Todas as
+credenciais abaixo são só do ambiente local.
+
+| Endereço                                                  | Serviço                                       | Usuário / senha                                                    |
+| --------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------ |
+| https://admin.orakel.localhost                            | Backoffice (`backoffice-web`)                 | Login de teste (abaixo), um usuário por papel                      |
+| https://preview.orakel.localhost/exemplo-a/guia-completo/ | Visualização de rascunhos (`blog-preview`)    | Login de teste                                                     |
+| https://exemplo-a.localhost · https://exemplo-b.localhost | Sites publicados (`edge-local`)               | Público (depois de `pnpm local:publish <site>`)                    |
+| https://media.exemplo-a.localhost                         | Mídia do site (bucket `media-<site>`)         | Público, só leitura                                                |
+| https://s3.orakel.localhost                               | Console do SeaweedFS                          | Login de teste                                                     |
+| https://glitchtip.orakel.localhost                        | GlitchTip (perfil `observability`)            | Login de teste + conta criada na primeira visita (cadastro aberto) |
+| https://hc.orakel.localhost                               | Healthchecks (perfil `observability`)         | Login de teste + conta criada na primeira visita (cadastro aberto) |
+| https://lhci.orakel.localhost                             | LHCI server (perfil `lighthouse`)             | Login de teste                                                     |
+| `localhost:5432`                                          | Postgres 18.6 (banco `orakel`)                | `orakel` / `orakel-local`                                          |
+| http://localhost:8333                                     | S3 (SeaweedFS 4.48)                           | access key `orakel-local` / secret `orakel-local-secret`           |
+| http://localhost:8123/play                                | ClickHouse (Analytics Engine local)           | `orakel` / `orakel-local`                                          |
+| http://localhost:8788                                     | access-mock (JWKS em `/cdn-cgi/access/certs`) | —                                                                  |
+
+**Login de teste (access-mock):** sem senha. A tela "Login de teste" lista os usuários, e basta
+clicar em um:
+
+| Usuário                 | Papel    |
+| ----------------------- | -------- |
+| `admin@orakel.local`    | admin    |
+| `editor@orakel.local`   | editor   |
+| `revisor@orakel.local`  | revisor  |
+| `operacao@orakel.local` | operação |
+
+Postgres pela linha de comando: `psql postgres://orakel:orakel-local@localhost:5432/orakel`.
 
 Subdomínios de `.localhost` resolvem sem editar o `/etc/hosts`. As portas só escutam em
 `127.0.0.1`.
@@ -291,7 +309,9 @@ Branches, commits e releases: [`docs/conventions/git.md`](docs/conventions/git.m
 - **Porta ocupada:** pare o serviço da máquina que usa 5432, 8123, 8333, 8788, 80 ou 443.
 - **`local:check` falha em "Serviços":** `infra/local/compose.sh logs <serviço>`. Só
   `backoffice-migrate`, `s3-init` e `glitchtip-db` podem estar parados.
-- **Navegador recusa o certificado:** instale a CA do Caddy (veja "Primeira vez").
+- **`ERR_CERT_AUTHORITY_INVALID` no Chrome:** `pnpm local:trust` e ⌘Q no Chrome. Se o
+  `local:check` mostra "CA atual do Caddy no Keychain" com ✗, a raiz instalada é de uma CA
+  antiga (depois de um `local:reset`); o mesmo comando troca.
 - **`media.<site>.localhost` não responde:** o site precisa estar em `LOCAL_MEDIA_HOSTS`
   (recrie o `caddy`) e em `LOCAL_SITES` (rode `local:up`).
 - **Aviso de plataforma (`linux/amd64`) no `local:up` ou `local:publish`:** imagens de antes do

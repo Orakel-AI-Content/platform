@@ -393,6 +393,7 @@ commands:
   local_check: pnpm local:check
   local_publish: pnpm local:publish <site>
   local_load: pnpm local:load [<site>]
+  local_trust: pnpm local:trust
   local_e2e: pnpm local:e2e
 
 structure:

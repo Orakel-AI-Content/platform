@@ -18,6 +18,7 @@ cp .env.example .env.local # valores locais; nunca commite .env.local
 pnpm local:images          # constrói as imagens (backoffice, site-builder, edge-local)
 pnpm local:up              # sobe o compose, cria os buckets e roda as migrações
 pnpm local:seed            # usuários de teste e os sites de exemplo (<site>.localhost)
+pnpm local:trust           # CA do Caddy no Keychain do sistema (macOS; pede a senha)
 pnpm local:check           # confere serviços, hostnames, buckets, redes e o proxy do socket
 pnpm local:publish exemplo-a   # render + publish no edge-local → https://exemplo-a.localhost
 ```
@@ -30,14 +31,18 @@ comente `BLOG_PREVIEW_UPSTREAM`: sem ela, `preview.orakel.localhost` vai para o 
 Outro arquivo de ambiente (ex.: uma cópia do `.env.example` para testar):
 `ORAKEL_ENV_FILE=/caminho/env pnpm local:check` — vale para o `compose.sh` e os scripts.
 
-**CA local do Caddy (uma vez):** o Caddy emite os certificados de `*.orakel.localhost` com
-uma CA interna. Para o navegador confiar, instale a raiz dela:
+**CA local do Caddy:** o Caddy emite os certificados dos hosts `.localhost` com uma CA
+interna, criada no primeiro `local:up` e guardada no volume `caddy-data`. Para o navegador
+confiar, instale a raiz dela no Keychain do sistema (macOS; pede a senha):
 
 ```sh
-infra/local/compose.sh cp caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt
-# macOS
-sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/caddy-root.crt
+pnpm local:trust
 ```
+
+Repita depois de cada `pnpm local:reset`: o volume é recriado e a CA muda. Todas as raízes do
+Caddy têm o mesmo nome; o comando troca pela impressão digital, remove as antigas e avisa se a
+atual já está instalada. Feche o Chrome por completo (⌘Q) depois. O `pnpm local:check` acusa
+quando a raiz instalada não é a em uso. No Linux, o comando mostra como importar no navegador.
 
 Depois, `https://admin.orakel.localhost` abre o Backoffice; o login de teste (access-mock)
 oferece um usuário por papel.
@@ -57,6 +62,7 @@ o `admin.orakel.localhost` apontar para o `next dev`.
 | `pnpm local:check`                                          | Confere o ambiente; sai com 1 se algo falhar                |
 | `pnpm local:publish <site>`                                 | `render` (rede export) + `publish` (rede publish) no edge   |
 | `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere no ClickHouse         |
+| `pnpm local:trust`                                          | Instala a CA atual do Caddy no Keychain (macOS)             |
 | `pnpm local:seed`                                           | Roda `db:seed`                                              |
 | `pnpm local:down`                                           | Para os containers (mantém os dados)                        |
 | `pnpm local:reset`                                          | Para e **apaga os volumes**                                 |

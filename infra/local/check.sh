@@ -51,6 +51,27 @@ expect "s3.orakel.localhost pede login" "$(status_of https://s3.orakel.localhost
 expect "exemplo-a.localhost chega ao edge-local" "$(status_of https://exemplo-a.localhost/)" '200|404'
 expect "media.exemplo-a.localhost chega ao filer" "$(status_of https://media.exemplo-a.localhost/nao-existe.webp)" '404'
 
+echo "Certificados (CA interna do Caddy)"
+# Nome exato em cada host: o Chrome recusa o curinga *.localhost, que o OpenSSL e o curl aceitam.
+names_of() {
+  echo | openssl s_client -connect 127.0.0.1:443 -servername "$1" 2>/dev/null |
+    openssl x509 -noout -ext subjectAltName 2>/dev/null | tail -1 | tr -d ' '
+}
+for host in admin.orakel.localhost exemplo-a.localhost media.exemplo-a.localhost; do
+  expect "$host com certificado próprio" "$(names_of "$host")" "DNS:$host"
+done
+# No macOS, a raiz em uso precisa estar no Keychain do sistema (muda a cada local:reset).
+if command -v security >/dev/null 2>&1; then
+  root=$(compose exec -T caddy cat /data/caddy/pki/authorities/local/root.crt |
+    openssl x509 -noout -fingerprint -sha256 | sed 's/.*=//; s/://g')
+  installed=$(security find-certificate -a -c "Caddy Local Authority" -Z /Library/Keychains/System.keychain 2>/dev/null |
+    sed -n 's/^SHA-256 hash: //p')
+  case "$installed" in
+    *"$root"*) ok "CA atual do Caddy no Keychain do sistema" ;;
+    *) ko "CA atual do Caddy no Keychain do sistema" "instale-a (docs/guides/local-setup.md, \"CA local\")" ;;
+  esac
+fi
+
 echo "Armazenamento e analytics"
 buckets=$(compose exec -T s3 sh -c 'echo s3.bucket.list | weed shell -master=localhost:9333 -filer=localhost:8888' 2>/dev/null)
 for bucket in media-originals build-cache backups brasil $(env_or LOCAL_SITES exemplo-a,exemplo-b | tr ',' ' ' | sed 's/[^ ][^ ]*/media-&/g'); do
