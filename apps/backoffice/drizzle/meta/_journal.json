@@ -15,6 +15,13 @@
       "when": 1790825471028,
       "tag": "0001_builds",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791296859297,
+      "tag": "0002_janela_por_site",
+      "breakpoints": true
     }
   ]
 }

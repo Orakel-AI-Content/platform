@@ -1,5 +1,5 @@
-// Colunas operacionais do site (estado, motivo da pausa, ciclo de vida), gravadas pelo build
-// e pelas etapas manuais do ciclo de vida. Não vão para o snapshot: gravar aqui não gera
+// Colunas operacionais do site (estado, motivo da pausa, ciclo de vida, janela dos builds),
+// gravadas pelo build e pela operação. Não vão para o snapshot: gravar aqui não gera
 // mudança pendente — senão cada build agendaria outro. Único módulo fora de pending-changes
 // liberado no teste de varredura.
 import type { Result } from '@orakel/content-model';
@@ -74,4 +74,44 @@ export async function advanceLifecycle(
       },
     ],
   };
+}
+
+/**
+ * Define a janela de agrupamento dos builds do site, em segundos; `null` volta à padrão
+ * (BUILD_WINDOW_SECONDS). Vale da próxima publicação em diante: um build já agendado mantém
+ * o horário.
+ */
+export async function setBuildWindow(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  seconds: number | null,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+  if (seconds !== null && !(Number.isInteger(seconds) && seconds >= 0)) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'site.build_window_invalid',
+          message: `A janela é um número inteiro de segundos, 0 ou mais; recebido ${seconds}`,
+          path: ['buildWindowSeconds'],
+        },
+      ],
+    };
+  }
+
+  const updated = await tx
+    .update(sites)
+    .set({ buildWindowSeconds: seconds })
+    .where(eq(sites.id, siteId))
+    .returning({ id: sites.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  return { ok: true, value: undefined };
 }

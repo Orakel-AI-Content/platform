@@ -1,0 +1,2 @@
+ALTER TABLE "sites" ADD COLUMN "build_window_seconds" integer;--> statement-breakpoint
+ALTER TABLE "sites" ADD CONSTRAINT "sites_build_window_seconds_check" CHECK ("sites"."build_window_seconds" >= 0);
