@@ -8,10 +8,10 @@ import { runProcess } from './run-process.ts';
 
 // backoffice-worker: jobs gerais (ingestão de mídia) e agregador (cron). Encerra com SIGTERM/SIGINT.
 await runProcess('backoffice-worker', async (logger) => {
-  const { pool } = getDb();
+  const { pool, db } = getDb();
   const runner = await run({
     pgPool: pool,
-    taskList: workerTasks({ store: s3ObjectStore(createS3Client(getEnv())) }),
+    taskList: workerTasks({ db, store: s3ObjectStore(createS3Client(getEnv())) }),
     crontab: WORKER_CRONTAB,
     concurrency: 4,
   });
