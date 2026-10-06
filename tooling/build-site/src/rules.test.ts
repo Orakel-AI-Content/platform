@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EXIT_CODES, ResultSchema, exitCodeOf } from '@orakel/build-contract';
 import { PublishEnvSchema, RenderEnvSchema, parseEnv } from './env.ts';
@@ -11,6 +11,7 @@ import { versionFromOutput } from './publish/cloudflare.ts';
 import { cacheKey } from './publish/build-cache.ts';
 import { countArtifact } from './render/count.ts';
 import { checkPageDrop } from './render/page-drop.ts';
+import { ssr } from './ssr.ts';
 
 const dirs: string[] = [];
 afterEach(async () => {
@@ -143,6 +144,22 @@ describe('env', () => {
     expect(classify(error).kind).toBe('permanent');
     expect((error as Error).message).toContain('EXPORT_BUILD_TOKEN');
     expect((error as Error).message).not.toContain('segredo-curto');
+  });
+  it('ssr: sem o token da visualização sai permanente sem subir o servidor', async () => {
+    const start = vi.fn().mockResolvedValue(0);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const api = { CONTENT_SOURCE: 'api', EXPORT_API_URL: 'http://backoffice-web:3000' };
+    expect(await ssr({ ...api, EXPORT_BUILD_TOKEN: 'x'.repeat(32) }, start)).toBe(
+      EXIT_CODES.permanent,
+    );
+    expect(await ssr({ ...api, EXPORT_PREVIEW_TOKEN: 'segredo-curto' }, start)).toBe(
+      EXIT_CODES.permanent,
+    );
+    expect(JSON.stringify(vi.mocked(console.log).mock.calls)).not.toContain('segredo-curto');
+    expect(start).not.toHaveBeenCalled();
+    expect(await ssr({ ...api, EXPORT_PREVIEW_TOKEN: 'p'.repeat(32) }, start)).toBe(0);
+    expect(start).toHaveBeenCalledOnce();
+    vi.restoreAllMocks();
   });
   it('publish: cada alvo exige as suas credenciais', () => {
     const s3 = {
