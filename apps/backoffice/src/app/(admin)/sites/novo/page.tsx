@@ -1,7 +1,7 @@
 import { RESOURCES } from '@orakel/content-model/v1';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import { emptyFormValues } from '@/components/site-config-form-values.ts';
+import { emptySiteConfig } from '@/components/site-config-form-values.ts';
 import { SiteConfigForm } from '@/components/site-config-form';
 import { can } from '@/domain/access/rbac.ts';
 
@@ -25,7 +25,7 @@ export default async function NewSitePage() {
       </h1>
       <SiteConfigForm
         mode="create"
-        defaultValues={emptyFormValues(RESOURCES)}
+        defaultValues={emptySiteConfig(RESOURCES)}
         options={{ presets: RESOURCES.presets, variants: RESOURCES.variants }}
         action={createSiteAction}
       />

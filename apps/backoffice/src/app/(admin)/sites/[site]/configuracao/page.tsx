@@ -2,7 +2,7 @@ import { RESOURCES } from '@orakel/content-model/v1';
 import { notFound } from 'next/navigation';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import { toFormValues } from '@/components/site-config-form-values.ts';
+import { editValues } from '@/components/site-config-form-values.ts';
 import { SiteConfigForm } from '@/components/site-config-form';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
@@ -34,7 +34,7 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
       </h1>
       <SiteConfigForm
         mode="edit"
-        defaultValues={toFormValues(config)}
+        defaultValues={editValues(config)}
         options={{ presets: RESOURCES.presets, variants: RESOURCES.variants }}
         action={updateSiteConfigAction.bind(null, site)}
       />
