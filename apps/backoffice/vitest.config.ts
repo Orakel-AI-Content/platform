@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import { baseConfig } from '@orakel/vitest-config';
 import { defineConfig } from 'vitest/config';
 
@@ -5,5 +7,7 @@ import { defineConfig } from 'vitest/config';
 // contrato). `include` substitui o da raiz (o mergeConfig somaria as listas).
 export default defineConfig({
   ...baseConfig,
+  // O alias `@/` da interface (tsconfig), para testar rotas e telas.
+  resolve: { alias: { '@': fileURLToPath(new URL('src', import.meta.url)) } },
   test: { ...baseConfig.test, include: ['src/**/*.test.ts'] },
 });

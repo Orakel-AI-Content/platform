@@ -25,7 +25,8 @@ Backlog (issues pelo workflow orakel): módulos Conteúdo (editor e TipTap), Mí
 (ingestão com sharp), Revisão, Publicação (limite diário, agendamento, troca de slug e
 achatamento de redirects, despublicação), ações do Registro de instâncias, geração básica,
 agregador, backup e restore, expurgo, promoção de release, rotas `config`, `routes` e
-`listing` da API de exportação, rota interna do motor e o E2E completo.
+`listing` da API de exportação (substituídas pelo snapshot de visualização no ADR 0009),
+rota interna do motor e o E2E completo.
 
 ## Alternativas consideradas
 

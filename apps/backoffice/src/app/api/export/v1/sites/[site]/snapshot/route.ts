@@ -1,8 +1,8 @@
-import { hasBearer } from '../../../../../../../auth/internal-tokens.ts';
-import { getDb } from '../../../../../../../db/client.ts';
-import { openSnapshot } from '../../../../../../../domain/export/snapshot.ts';
-import { getEnv } from '../../../../../../../env.ts';
-import { problem } from '../../../../../../../lib/problem.ts';
+import { hasBearer } from '@/auth/internal-tokens.ts';
+import { getDb } from '@/db/client.ts';
+import { openSnapshot } from '@/domain/export/snapshot.ts';
+import { getEnv } from '@/env.ts';
+import { problem } from '@/lib/problem.ts';
 
 export const dynamic = 'force-dynamic';
 

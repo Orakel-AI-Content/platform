@@ -35,6 +35,8 @@ flowchart LR
 2. `GET /api/export/v1/sites/{site}/snapshot` (só rede interna, token do build) abre uma
    transação `REPEATABLE READ` só de leitura e devolve NDJSON: `header` com as mudanças
    pendentes visíveis, entidades, `end` com as contagens.
+   `…/preview-snapshot` (token da visualização) devolve o mesmo formato com a versão mais
+   recente de cada conteúdo, rascunhos inclusive (ADR 0009).
 3. A tela `/sites` lista o registro de instâncias para quem tem `site.read`, com o último
    build e, para `operations.run`, a ação "Publicar agora".
 

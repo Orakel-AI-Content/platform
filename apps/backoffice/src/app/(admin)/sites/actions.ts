@@ -2,9 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { currentActor } from '../../../auth/request-actor.ts';
-import { getDb } from '../../../db/client.ts';
-import { requestBuildNow } from '../../../domain/builds/builds.ts';
+import { currentActor } from '@/auth/request-actor.ts';
+import { getDb } from '@/db/client.ts';
+import { requestBuildNow } from '@/domain/builds/builds.ts';
 
 export type ActionState = { ok: boolean; message: string };
 
