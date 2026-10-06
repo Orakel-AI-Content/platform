@@ -42,3 +42,10 @@ export const dateTime = new Intl.DateTimeFormat('pt-BR', {
   timeStyle: 'short',
   timeZone: 'America/Sao_Paulo',
 });
+
+/** Tipo de taxonomia (lista de taxonomias e seletor do editor). */
+export const TAXONOMY_KIND_LABEL: Record<'category' | 'tag' | 'series', string> = {
+  category: 'Categoria',
+  tag: 'Tag',
+  series: 'Série',
+};
