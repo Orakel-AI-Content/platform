@@ -8,7 +8,10 @@ import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
 import { setBuildWindow } from '../../src/domain/builds/site-state.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
-import { registerPolicyTrigger } from '../../src/domain/sites/policy-triggers.ts';
+import {
+  listPolicyTriggers,
+  registerPolicyTrigger,
+} from '../../src/domain/sites/policy-triggers.ts';
 import {
   createSite,
   exportSitesTfvars,
@@ -219,5 +222,68 @@ describe('gatilhos de política e indexação', () => {
         value: { siteId },
       });
     }
+  });
+});
+
+describe('leitura dos gatilhos de política', () => {
+  const operacao = { email: 'operacao@orakel.local', roles: ['operacao'] as const };
+
+  it('devolve o gatilho, quem registrou, quando e a observação', async () => {
+    const before = Date.now();
+    await db.transaction((tx) =>
+      registerPolicyTrigger(tx, operacao, 'exemplo-a', 'G1', 'Políticas publicadas'),
+    );
+
+    const result = await listPolicyTriggers(db, SYSTEM_ACTOR, 'exemplo-a');
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value).toHaveLength(1);
+    expect(result.value[0]).toMatchObject({
+      trigger: 'G1',
+      registeredBy: 'operacao@orakel.local',
+      note: 'Políticas publicadas',
+    });
+    expect(result.value[0]?.registeredAt).toBeInstanceOf(Date);
+    expect(result.value[0]?.registeredAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  it('lista vazia sem gatilhos, recusa site inexistente e não mistura sites', async () => {
+    await db.transaction((tx) => registerPolicyTrigger(tx, SYSTEM_ACTOR, 'exemplo-a', 'G1'));
+
+    expect(await listPolicyTriggers(db, SYSTEM_ACTOR, 'exemplo-b')).toEqual({
+      ok: true,
+      value: [],
+    });
+    expect(await listPolicyTriggers(db, SYSTEM_ACTOR, 'outro')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
+  });
+
+  it('ordena por gatilho: G1 antes de G2', async () => {
+    await db.transaction((tx) => registerPolicyTrigger(tx, SYSTEM_ACTOR, 'exemplo-a', 'G2'));
+    await db.transaction((tx) => registerPolicyTrigger(tx, SYSTEM_ACTOR, 'exemplo-a', 'G1'));
+
+    const result = await listPolicyTriggers(db, SYSTEM_ACTOR, 'exemplo-a');
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.map((record) => record.trigger)).toEqual(['G1', 'G2']);
+  });
+
+  it.each(['editor', 'revisor'] as const)('%s lê os gatilhos', async (role) => {
+    const actor = { email: `${role}@orakel.local`, roles: [role] };
+    expect(await listPolicyTriggers(db, actor, 'exemplo-a')).toEqual({ ok: true, value: [] });
+  });
+
+  it('sem papel, forbidden', async () => {
+    expect(
+      await listPolicyTriggers(db, { email: 'x@orakel.local', roles: [] }, 'exemplo-a'),
+    ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+  });
+
+  it('não grava nada nem cria mudança pendente', async () => {
+    const pending = await unresolvedPendingChangeIds(db, 'exemplo-a');
+    await listPolicyTriggers(db, SYSTEM_ACTOR, 'exemplo-a');
+
+    expect(await db.select().from(sitePolicyTriggers)).toEqual([]);
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(pending);
   });
 });
