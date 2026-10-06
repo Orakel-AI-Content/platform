@@ -40,6 +40,29 @@ export async function createMedia(
   return { ok: true, value: { id } };
 }
 
+/**
+ * Acrescenta variantes a uma mídia existente (reprocessamento após mudança do perfil de
+ * imagem), com a mudança pendente do site. Variante que já está registrada é ignorada.
+ */
+export async function addMediaVariants(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  mediaId: number,
+  variants: Media['variants'],
+): Promise<Result<{ added: number }>> {
+  const allowed = checkWrite(actor);
+  if (!allowed.ok) return allowed;
+  if (variants.length === 0) return { ok: true, value: { added: 0 } };
+  const inserted = await tx
+    .insert(mediaVariants)
+    .values(variants.map((variant) => ({ siteId, mediaId, ...variant })))
+    .onConflictDoNothing()
+    .returning({ width: mediaVariants.width });
+  if (inserted.length > 0) await recordPendingChange(tx, siteId, 'media', String(mediaId));
+  return { ok: true, value: { added: inserted.length } };
+}
+
 /** Mídias do site com as variantes, em ordem de ID (seletor do bloco de imagem). */
 export async function listMedia(
   db: Executor,
