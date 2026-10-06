@@ -20,10 +20,11 @@ export function mediaField(
   options: readonly PickerOption[],
   { optional = false }: { optional?: boolean } = {},
 ): FieldRenderer {
-  function MediaField({ id, value, onChange, invalid, describedBy }: FieldProps) {
+  function MediaField({ id, value, onChange, invalid, describedBy, ref }: FieldProps) {
     return (
       <select
         id={id}
+        ref={ref}
         className={selectClass}
         aria-invalid={invalid}
         aria-describedby={describedBy}

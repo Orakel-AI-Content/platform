@@ -38,6 +38,10 @@ export type FieldProps = {
   onChange: (value: unknown) => void;
   invalid: boolean;
   describedBy: string | undefined;
+  /** Ligue ao controle focável: o foco do erro (inclusive do servidor) chega até ele. */
+  ref: (element: HTMLElement | null) => void;
+  /** Caminho em `readOnly`: mostre o valor sem permitir mudança. */
+  readOnly: boolean;
 };
 
 export type FieldRenderer = (props: FieldProps) => ReactNode;
@@ -50,6 +54,8 @@ export type SchemaFormProps<T> = {
   hints?: Record<string, string>;
   /** Caminhos sem campo: o valor segue como veio (ex.: `n`, `type` dos blocos). */
   hidden?: string[];
+  /** Caminhos só leitura: o campo aparece com o valor, sem permitir mudança. */
+  readOnly?: string[];
   /** Campos especiais por caminho; têm prioridade sobre o desenho padrão. */
   fields?: Record<string, FieldRenderer>;
   submitLabel: string;
@@ -73,6 +79,7 @@ type Ctx = {
   labels: Record<string, string>;
   hints: Record<string, string>;
   hidden: ReadonlySet<string>;
+  readOnly: ReadonlySet<string>;
   fields: Record<string, FieldRenderer>;
 };
 
@@ -165,6 +172,8 @@ function Node({
                   onChange: field.onChange,
                   invalid,
                   describedBy,
+                  ref: field.ref,
+                  readOnly: ctx.readOnly.has(pattern(path)),
                 })}
               </>
             )}
@@ -186,7 +195,12 @@ function Node({
       return (
         <Field ctx={ctx} path={path} label={label}>
           {({ id, invalid, describedBy }) => (
-            <Input id={id} {...aria(invalid, describedBy)} {...ctx.register(path)} />
+            <Input
+              id={id}
+              readOnly={ctx.readOnly.has(pattern(path))}
+              {...aria(invalid, describedBy)}
+              {...ctx.register(path)}
+            />
           )}
         </Field>
       );
@@ -226,16 +240,26 @@ function Node({
     case 'boolean': {
       const fieldId = `${ctx.id}-${path}`;
       const message = messageAt(ctx.errors, path);
+      const hint = ctx.hints[pattern(path)];
+      const describedBy =
+        [hint ? `${fieldId}-hint` : '', message ? `${fieldId}-error` : '']
+          .filter(Boolean)
+          .join(' ') || undefined;
       return (
         <div className="space-y-1.5">
           <label htmlFor={fieldId} className="flex min-h-6 items-center gap-2 text-sm">
             <Checkbox
               id={fieldId}
-              {...aria(message !== undefined, message ? `${fieldId}-error` : undefined)}
+              {...aria(message !== undefined, describedBy)}
               {...ctx.register(path)}
             />
             {label}
           </label>
+          {hint && (
+            <p id={`${fieldId}-hint`} className="text-xs text-muted-foreground">
+              {hint}
+            </p>
+          )}
           {message && (
             <p id={`${fieldId}-error`} className="text-xs text-destructive">
               {message}
@@ -334,6 +358,7 @@ export type SchemaFieldsProps = {
   labels?: Record<string, string>;
   hints?: Record<string, string>;
   hidden?: string[];
+  readOnly?: string[];
   fields?: Record<string, FieldRenderer>;
 };
 
@@ -349,6 +374,7 @@ export function SchemaFields({
   labels = {},
   hints = {},
   hidden = [],
+  readOnly = [],
   fields = {},
 }: SchemaFieldsProps) {
   const id = useId();
@@ -366,6 +392,7 @@ export function SchemaFields({
     labels,
     hints,
     hidden: new Set(hidden),
+    readOnly: new Set(readOnly),
     fields,
   };
   return root.kind === 'object' ? (
@@ -382,6 +409,7 @@ export function SchemaForm<T>({
   labels,
   hints,
   hidden,
+  readOnly,
   fields,
   submitLabel,
   onSubmit,
@@ -437,6 +465,7 @@ export function SchemaForm<T>({
           labels={labels}
           hints={hints}
           hidden={hidden}
+          readOnly={readOnly}
           fields={fields}
         />
         <Button type="submit">{submitLabel}</Button>
