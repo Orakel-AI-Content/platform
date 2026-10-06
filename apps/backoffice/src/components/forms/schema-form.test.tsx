@@ -10,6 +10,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm, type FieldValues } from 'react-hook-form';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod';
 
 import { SchemaFields, SchemaForm, type FieldProps } from './schema-form.tsx';
 
@@ -309,5 +310,67 @@ describe('SchemaForm com o servidor', () => {
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]?.[0]).toEqual({ about: undefined });
+  });
+});
+
+describe('SchemaForm: foco, dica do boolean e só leitura', () => {
+  /** Campo registrado que liga o `ref` ao controle. */
+  function Choice({ id, value, onChange, invalid, describedBy, ref }: FieldProps) {
+    return (
+      <select
+        id={id}
+        ref={ref}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
+        value={typeof value === 'string' ? value : ''}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="padrao">padrao</option>
+        <option value="revista">revista</option>
+      </select>
+    );
+  }
+
+  const schema = z.object({ siteId: z.string(), preset: z.string(), indexavel: z.boolean() });
+
+  it('erro do servidor num campo registrado recebe o foco', async () => {
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ siteId: 'a', preset: 'padrao', indexavel: false }}
+        labels={{ preset: 'Preset' }}
+        fields={{ preset: Choice }}
+        submitLabel="Salvar"
+        onSubmit={() => [{ path: ['preset'], message: 'Preset não suportado' }]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    const preset = screen.getByLabelText('Preset');
+    await waitFor(() => expect(document.activeElement).toBe(preset));
+    expect(preset.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('a dica do boolean fica ligada por aria-describedby; só leitura vira readonly', () => {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ siteId: 'a', preset: 'padrao', indexavel: false }}
+        labels={{ siteId: 'SITE_ID', preset: 'Preset', indexavel: 'Indexável' }}
+        hints={{ indexavel: 'Ligar exige o G1 registrado.' }}
+        readOnly={['siteId']}
+        fields={{ preset: Choice }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const indexavel = screen.getByLabelText('Indexável');
+    expect(
+      document.getElementById(indexavel.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe('Ligar exige o G1 registrado.');
+    expect(screen.getByLabelText('SITE_ID').hasAttribute('readonly')).toBe(true);
   });
 });

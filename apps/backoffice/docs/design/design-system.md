@@ -28,7 +28,10 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   editor de conteúdo monta cada bloco. Referências do site: `mediaField(opções)` (`<select>`,
   `{ optional: true }` para capa) e `entityField(opções, aviso)` (caixas de seleção para
   `authorIds` e `taxonomyIds`), em `src/components/forms/picker-fields.tsx`.
-  Formulário escrito à mão (como o da configuração do site, #29) só até migrar (#47).
+  Campos registrados recebem `ref` (ligue ao controle focável, para o foco do erro chegar) e
+  `readOnly` (caminhos em `readOnly`). Para listas de texto, feature flags e opções de
+  `RESOURCES`: `linesField`, `flagsField` e `choiceField` (`src/components/forms/site-fields.tsx`).
+  Nenhum formulário é escrito à mão: o da configuração do site também usa o gerador (#47).
 - **Rich text:** TipTap só com o que o `RichTextSchema` aceita (`src/components/forms/`).
   Registre `richTextField('richText')` para texto e textos institucionais, e
   `richTextField('inlines')` (um parágrafo, sem intertítulo nem lista) para citação, resposta
