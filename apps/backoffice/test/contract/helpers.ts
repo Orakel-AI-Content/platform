@@ -37,6 +37,7 @@ const TABLES = [
   'taxonomies',
   'authors',
   'site_sequences',
+  'site_policy_triggers',
   'site_configs',
   'sites',
   'user_roles',

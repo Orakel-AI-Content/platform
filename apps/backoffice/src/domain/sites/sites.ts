@@ -14,6 +14,7 @@ import { requireRole, type Actor } from '../access/rbac.ts';
 import { lastBuilds, type LastBuild } from '../builds/builds.ts';
 import { effectiveBuildWindowMs } from '../builds/schedule.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
+import { hasPolicyTrigger } from './policy-triggers.ts';
 
 export type SiteSummary = {
   id: string;
@@ -48,6 +49,26 @@ function parseSiteConfig(input: SiteConfig, resources: Resources): Result<SiteCo
   return validateSiteConfig(parsed.data, resources);
 }
 
+/**
+ * Indexação só depois do G1 (RN-SIT-07): `indexavel: true` exige o gatilho registrado para o
+ * site. Desligar é sempre aceito; um site novo ainda não tem G1.
+ */
+async function checkIndexing(tx: Executor, config: SiteConfig): Promise<Result<void>> {
+  if (!config.indexavel || (await hasPolicyTrigger(tx, config.siteId, 'G1'))) {
+    return { ok: true, value: undefined };
+  }
+  return {
+    ok: false,
+    issues: [
+      {
+        code: 'site.g1_required',
+        message: `O site ${config.siteId} só pode ficar indexável depois do G1 registrado`,
+        path: ['indexavel'],
+      },
+    ],
+  };
+}
+
 /** Cadastra um site com a configuração v1, validada contra os recursos da release. */
 export async function createSite(
   tx: Executor,
@@ -61,6 +82,8 @@ export async function createSite(
   const validated = parseSiteConfig(input, resources);
   if (!validated.ok) return validated;
   const config = validated.value;
+  const indexing = await checkIndexing(tx, config);
+  if (!indexing.ok) return indexing;
 
   const existing = await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, config.siteId));
   if (existing.length > 0) {
@@ -126,6 +149,8 @@ export async function updateSiteConfig(
   const validated = parseSiteConfig(candidate, resources);
   if (!validated.ok) return validated;
   const config = validated.value;
+  const indexing = await checkIndexing(tx, config);
+  if (!indexing.ok) return indexing;
 
   const version = current.version + 1;
   await tx.insert(siteConfigs).values({ siteId, version, config });
