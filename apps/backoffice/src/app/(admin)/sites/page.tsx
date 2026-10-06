@@ -2,7 +2,7 @@ import { currentActor } from '@/auth/request-actor.ts';
 import { SitesTable } from '@/components/sites-table';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
-import { listSites } from '@/domain/sites/sites.ts';
+import { listSites, TFVARS_FILENAME } from '@/domain/sites/sites.ts';
 
 import { publishNow } from './actions.ts';
 
@@ -20,9 +20,21 @@ export default async function SitesPage() {
   }
   return (
     <section aria-labelledby="sites-title" className="space-y-4">
-      <h1 id="sites-title" className="text-2xl font-semibold">
-        Sites
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 id="sites-title" className="text-2xl font-semibold">
+          Sites
+        </h1>
+        {can(actor.value, 'site.configure') ? (
+          // Rota de download (ADR 0011), não navegação: <a> com download, não <Link>.
+          <a
+            href="/sites/tfvars"
+            download={TFVARS_FILENAME}
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            Baixar {TFVARS_FILENAME}
+          </a>
+        ) : null}
+      </div>
       <SitesTable
         rows={sites.value}
         publishNow={can(actor.value, 'operations.run') ? publishNow : undefined}
