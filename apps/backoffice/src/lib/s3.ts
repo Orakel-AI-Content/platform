@@ -1,6 +1,8 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  NotFound,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -46,6 +48,15 @@ export function s3ObjectStore(client: S3Client): ObjectStore {
     },
     async delete(bucket, key) {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    },
+    async exists(bucket, key) {
+      try {
+        await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+        return true;
+      } catch (error) {
+        if (error instanceof NotFound) return false;
+        throw error;
+      }
     },
   };
 }

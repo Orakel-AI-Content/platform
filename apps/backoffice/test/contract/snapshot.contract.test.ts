@@ -1,9 +1,11 @@
 import {
+  MediaSchema,
   parseSnapshotLine,
   validateSnapshot,
   type Content,
   type SnapshotLine,
 } from '@orakel/content-model/v1';
+import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { readFixture } from '../../src/bin/seed.ts';
@@ -18,6 +20,8 @@ import {
   type VersionSelection,
 } from '../../src/domain/export/snapshot.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
+import { memoryStore, ORIGINALS_BUCKET } from '../../src/domain/media/store.ts';
+import { registerMediaVariants } from '../../src/domain/media/variants.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
 // Contrato da API de exportação (ADR 0005 da raiz): o snapshot que o Backoffice produz
@@ -161,4 +165,43 @@ describe('snapshot de visualização', () => {
     const end = lines.at(-1);
     expect(end?.type === 'end' && end.counts.content).toBe(contentsOf(lines).length);
   });
+});
+
+describe('mídia gerada pelo job de variantes', () => {
+  it.each([
+    [2560, 1440, 10],
+    [800, 600, 4],
+  ])(
+    'original de %i px aparece no snapshot e passa no content-model',
+    async (width, height, count) => {
+      const imported = await importSnapshot(db, SYSTEM_ACTOR, await readFixture('exemplo-a'));
+      expect(imported.ok).toBe(true);
+      const store = memoryStore();
+      const original = await sharp({
+        create: { width, height, channels: 3, background: '#6a8caf' },
+      })
+        .jpeg()
+        .toBuffer();
+      const originalKey = `exemplo-a/${'cd'.repeat(32)}.jpg`;
+      await store.put(ORIGINALS_BUCKET, originalKey, original, original.byteLength, 'image/jpeg');
+
+      const registered = await registerMediaVariants(
+        { db, store },
+        { siteId: 'exemplo-a', originalKey, width, height },
+      );
+      if (registered.status !== 'registered') throw new Error('original não encontrado');
+
+      const lines = await readSnapshot('exemplo-a');
+      expect(validateSnapshot(lines).ok).toBe(true);
+      const media = lines.flatMap((line) =>
+        line.type === 'media' && line.data.id === registered.id ? [line.data] : [],
+      );
+      expect(media).toHaveLength(1);
+      expect(MediaSchema.safeParse(media[0]).success).toBe(true);
+      expect(media[0]?.variants).toHaveLength(count);
+      expect(Math.max(...(media[0]?.variants ?? []).map((v) => v.width))).toBeLessThanOrEqual(
+        width,
+      );
+    },
+  );
 });

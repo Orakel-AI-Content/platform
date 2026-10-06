@@ -1,6 +1,6 @@
 import type { Issue } from '../../../result.ts';
 import type { Content, Media, SiteConfig } from '../../entities/index.ts';
-import type { Resources } from '../../resources.ts';
+import { requiredImageWidths, type Resources } from '../../resources.ts';
 
 const CODE = 'semantic.supported-resources';
 
@@ -47,8 +47,9 @@ export function checkContentResources(
 }
 
 /**
- * A mídia tem todas as variantes do perfil de imagem (largura × formato). Variante
- * faltando é falha permanente do build; variantes extras são ignoradas.
+ * A mídia tem as variantes do perfil de imagem (largura × formato) que cabem no original
+ * (`requiredImageWidths`): nenhuma é ampliada. Variante faltando é falha permanente do
+ * build; variantes extras são ignoradas.
  */
 export function checkMediaResources(
   media: Media,
@@ -57,7 +58,7 @@ export function checkMediaResources(
 ): Issue[] {
   const available = new Set(media.variants.map((variant) => `${variant.width}/${variant.format}`));
   const issues: Issue[] = [];
-  for (const width of resources.imageProfile.widths) {
+  for (const width of requiredImageWidths(media.width, resources)) {
     for (const format of resources.imageProfile.formats) {
       if (!available.has(`${width}/${format}`)) {
         issues.push({

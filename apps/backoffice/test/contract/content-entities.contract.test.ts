@@ -7,7 +7,7 @@ import { siteConfigs } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { createAuthor, listAuthors, updateAuthor } from '../../src/domain/content/authors.ts';
-import { listMedia } from '../../src/domain/content/media.ts';
+import { createMedia, listMedia } from '../../src/domain/content/media.ts';
 import { createMenu, listMenus, updateMenu } from '../../src/domain/content/menus.ts';
 import {
   createTaxonomy,
@@ -164,6 +164,39 @@ describe('listas por site', () => {
     expect(menus.value.map((menu) => menu.id)).toEqual(fixtureIds(site, 'menu'));
     expect(media.value.map((item) => item.id)).toEqual(fixtureIds(site, 'media'));
     for (const item of media.value) expect(item.variants.length).toBeGreaterThan(0);
+  });
+});
+
+describe('mídias', () => {
+  const variants = (widths: number[]) =>
+    widths.flatMap((width) =>
+      ['avif', 'webp'].map((format) => ({
+        width,
+        format,
+        path: `exemplo-a/f00d-${width}.${format}`,
+      })),
+    );
+
+  it('registra mídia de 800 px só com as variantes que cabem no original', async () => {
+    const created = await tx((t) =>
+      createMedia(t, editor, 'exemplo-a', {
+        width: 800,
+        height: 600,
+        variants: variants([320, 640]),
+      }),
+    );
+    expect(created.ok).toBe(true);
+  });
+
+  it('recusa variantes que não cobrem o perfil exigido, sem gravar', async () => {
+    const before = await listMedia(db, revisor, 'exemplo-a');
+    const created = await tx((t) =>
+      createMedia(t, editor, 'exemplo-a', { width: 2560, height: 1440, variants: variants([320]) }),
+    );
+    expect(created.ok ? [] : [...new Set(created.issues.map((issue) => issue.code))]).toEqual([
+      'semantic.supported-resources',
+    ]);
+    expect(await listMedia(db, revisor, 'exemplo-a')).toEqual(before);
   });
 });
 

@@ -1,5 +1,5 @@
 import type { Result } from '@orakel/content-model';
-import type { Media } from '@orakel/content-model/v1';
+import { MediaSchema, validateMedia, type Media } from '@orakel/content-model/v1';
 import { asc, eq } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
@@ -7,11 +7,14 @@ import { media, mediaVariants } from '../../db/schema/index.ts';
 import { allocateId } from '../../db/site-ids.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
-import { checkWrite, type WriteOptions } from './write.ts';
+import { checkWrite, parseInput, type WriteOptions } from './write.ts';
+
+const MediaInputSchema = MediaSchema.omit({ id: true });
 
 /**
- * Registra uma mídia já processada e as variantes dela. A ingestão (upload, original sem
- * EXIF, variantes pelo perfil de imagem com sharp) é backlog do módulo Mídia.
+ * Registra uma mídia já processada e as variantes dela (geradas pelo job `media-variants`
+ * ou vindas da importação). Recusa variantes que não cobrem o perfil de imagem exigido para
+ * a largura do original (`validateMedia`).
  */
 export async function createMedia(
   tx: Executor,
@@ -22,11 +25,16 @@ export async function createMedia(
 ): Promise<Result<{ id: number }>> {
   const allowed = checkWrite(actor);
   if (!allowed.ok) return allowed;
+  const parsed = parseInput(MediaInputSchema, input);
+  if (!parsed.ok) return parsed;
+  const valid = validateMedia({ id: options.id ?? 1, ...parsed.value });
+  if (!valid.ok) return valid;
+  const { width, height, variants } = parsed.value;
   const id = await allocateId(tx, siteId, 'media', options.id);
-  await tx.insert(media).values({ siteId, id, width: input.width, height: input.height });
+  await tx.insert(media).values({ siteId, id, width, height });
   await tx
     .insert(mediaVariants)
-    .values(input.variants.map((variant) => ({ siteId, mediaId: id, ...variant })));
+    .values(variants.map((variant) => ({ siteId, mediaId: id, ...variant })));
   await recordPendingChange(tx, siteId, 'media', String(id));
   return { ok: true, value: { id } };
 }

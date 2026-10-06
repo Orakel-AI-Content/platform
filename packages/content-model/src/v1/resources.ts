@@ -57,3 +57,12 @@ export const RESOURCES = {
   presets: Record<PageType, string[]>;
   variants: Record<VariantComponent, string[]>;
 };
+
+/**
+ * Larguras que uma mídia precisa ter (em cada formato do perfil): as do perfil que cabem
+ * no original, sem ampliar; se nenhuma cabe, a largura do próprio original.
+ */
+export function requiredImageWidths(mediaWidth: number, resources: Resources): number[] {
+  const widths = resources.imageProfile.widths.filter((width) => width <= mediaWidth);
+  return widths.length > 0 ? widths : [mediaWidth];
+}

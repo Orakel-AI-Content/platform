@@ -2,6 +2,7 @@ import type { Block } from '@orakel/content-model/v1';
 import { describe, expect, it } from 'vitest';
 
 import { formatDate } from './dates.ts';
+import { fallbackVariant, pictureFormats } from './image.ts';
 import { sitePath, splitPreviewPath } from './links.ts';
 import { pageType } from './page-type.ts';
 import { headingId, tocEntries } from './toc.ts';
@@ -70,5 +71,29 @@ describe('datas e tipos de página', () => {
         totalPages: 1,
       }),
     ).toBe('serie');
+  });
+});
+
+describe('imagem', () => {
+  const media = (width: number, widths: number[]) => ({
+    id: 1,
+    width,
+    height: width,
+    variants: widths.flatMap((w) =>
+      ['avif', 'webp'].map((format) => ({ width: w, format, path: `m1-${w}.${format}` })),
+    ),
+  });
+
+  it('AVIF antes de WebP nos <source>', () => {
+    expect(pictureFormats(media(1920, [320, 640]))).toEqual(['avif', 'webp']);
+  });
+
+  it('o <img> usa WebP a partir de 960 px', () => {
+    expect(fallbackVariant(media(2560, [320, 640, 960, 1280, 1920]))?.path).toBe('m1-960.webp');
+  });
+
+  it('mídia sem variante de 960 px: o <img> usa a maior WebP, nunca AVIF', () => {
+    expect(fallbackVariant(media(800, [320, 640]))?.path).toBe('m1-640.webp');
+    expect(fallbackVariant(media(200, [200]))?.path).toBe('m1-200.webp');
   });
 });

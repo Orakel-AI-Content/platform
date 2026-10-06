@@ -39,4 +39,4 @@ limitam o corpo a 1 MB, e uma foto de câmera passa de 10 MB.
 
 - Reenviar a mesma imagem cai no mesmo original (o nome é o hash).
 - Um envio cuja ingestão falhou de vez fica em `uploads/`; a limpeza fica para depois.
-- Registrar a mídia (`createMedia`) e gerar as variantes é o passo seguinte (platform#50).
+- Registrar a mídia (`createMedia`) e gerar as variantes é o passo seguinte (platform#50, ADR 0013).

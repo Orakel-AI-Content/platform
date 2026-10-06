@@ -1,5 +1,5 @@
 import { fail, ok, type Issue, type Result } from '../../result.ts';
-import type { Content, SiteConfig } from '../entities/index.ts';
+import type { Content, Media, SiteConfig } from '../entities/index.ts';
 import { RESOURCES, type Resources } from '../resources.ts';
 import type { SnapshotLine } from '../snapshot.ts';
 import { SCHEMA_VERSION } from '../version.ts';
@@ -56,6 +56,12 @@ export function validateContent(
     ...checkUniqueBlockN(content),
     ...checkContentResources(content, resources),
   ]);
+}
+
+/** Uma mídia isolada, como no registro pelo Backoffice: variantes do perfil de imagem. */
+export function validateMedia(media: Media, resources: Resources = RESOURCES): Result<Media> {
+  assertV1(resources);
+  return result(media, checkMediaResources(media, resources));
 }
 
 /** Snapshot inteiro de um site, como o build o recebe da API de exportação. */
