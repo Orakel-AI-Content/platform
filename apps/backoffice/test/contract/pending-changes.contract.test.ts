@@ -1,11 +1,17 @@
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
+import { siteConfigs, sites } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
+import { advanceLifecycle } from '../../src/domain/builds/site-state.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
-import { createSite, unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
+import {
+  createSite,
+  unresolvedPendingChangeIds,
+  updateSiteConfig,
+} from '../../src/domain/sites/sites.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
@@ -95,4 +101,142 @@ describe('IDs por site', () => {
     ).rows;
     expect(row).toEqual({ next_block_n: 5 });
   });
+});
+
+describe('editar configuração', () => {
+  const versions = () =>
+    db
+      .select({ version: siteConfigs.version, config: siteConfigs.config })
+      .from(siteConfigs)
+      .where(eq(siteConfigs.siteId, 'exemplo-b'))
+      .orderBy(siteConfigs.version);
+
+  it('grava a versão N+1, mantém a N e registra a mudança pendente', async () => {
+    const before = await unresolvedPendingChangeIds(db, 'exemplo-b');
+    const result = await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-b', { ...config, name: 'Receitas B' }),
+    );
+
+    expect(result).toEqual({ ok: true, value: { version: 2 } });
+    const rows = await versions();
+    expect(rows.map((row) => row.version)).toEqual([1, 2]);
+    expect(rows[0]?.config).toEqual(config);
+    expect(rows[1]?.config.name).toBe('Receitas B');
+    expect((await unresolvedPendingChangeIds(db, 'exemplo-b')).length).toBe(before.length + 1);
+    const [site] = await db.select({ name: sites.name }).from(sites);
+    expect(site?.name).toBe('Receitas B');
+  });
+
+  it('mantém os textos institucionais da versão corrente', async () => {
+    const withoutTexts = { ...config };
+    delete withoutTexts.institutionalTexts;
+    await db.transaction((tx) => updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-b', withoutTexts));
+    await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-b', {
+        ...config,
+        institutionalTexts: { about: [] },
+      }),
+    );
+
+    const rows = await versions();
+    expect(rows.map((row) => row.config.institutionalTexts)).toEqual([
+      config.institutionalTexts,
+      config.institutionalTexts,
+      config.institutionalTexts,
+    ]);
+  });
+
+  it.each([
+    ['preset fora dos recursos', () => ({ presets: { ...config.presets, home: 'inexistente' } })],
+    ['variante fora dos recursos', () => ({ variants: { articleCard: 'inexistente' } })],
+  ])('recusa %s sem gravar nada', async (_, change) => {
+    const before = await unresolvedPendingChangeIds(db, 'exemplo-b');
+    const result = await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-b', { ...config, ...change() }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      issues: [{ code: 'semantic.supported-resources' }],
+    });
+    expect((await versions()).length).toBe(1);
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-b')).toEqual(before);
+  });
+
+  it('recusa trocar o SITE_ID e site inexistente', async () => {
+    expect(
+      await db.transaction((tx) =>
+        updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-b', { ...config, siteId: 'outro' }),
+      ),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.id_mismatch' }] });
+    expect(
+      await db.transaction((tx) =>
+        updateSiteConfig(tx, SYSTEM_ACTOR, 'outro', { ...config, siteId: 'outro' }),
+      ),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+    expect((await versions()).length).toBe(1);
+  });
+});
+
+describe('ciclo de vida', () => {
+  const lifecycle = async () =>
+    (await db.select({ lifecycle: sites.lifecycle }).from(sites))[0]?.lifecycle;
+
+  it('marca infra_aplicada e zona_ativa em ordem, sem mudança pendente', async () => {
+    const before = await unresolvedPendingChangeIds(db, 'exemplo-b');
+    for (const step of ['infra_aplicada', 'zona_ativa'] as const) {
+      expect(
+        await db.transaction((tx) => advanceLifecycle(tx, SYSTEM_ACTOR, 'exemplo-b', step)),
+      ).toEqual({ ok: true, value: undefined });
+      expect(await lifecycle()).toBe(step);
+    }
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-b')).toEqual(before);
+  });
+
+  it('recusa fora da ordem, com o motivo', async () => {
+    const result = await db.transaction((tx) =>
+      advanceLifecycle(tx, SYSTEM_ACTOR, 'exemplo-b', 'zona_ativa'),
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      issues: [
+        {
+          code: 'site.lifecycle_order',
+          message:
+            'zona_ativa só pode ser marcada a partir de infra_aplicada; o site está em cadastrado',
+        },
+      ],
+    });
+
+    await db.transaction((tx) => advanceLifecycle(tx, SYSTEM_ACTOR, 'exemplo-b', 'infra_aplicada'));
+    expect(
+      await db.transaction((tx) =>
+        advanceLifecycle(tx, SYSTEM_ACTOR, 'exemplo-b', 'infra_aplicada'),
+      ),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.lifecycle_order' }] });
+    expect(await lifecycle()).toBe('infra_aplicada');
+  });
+
+  it('recusa site inexistente', async () => {
+    expect(
+      await db.transaction((tx) => advanceLifecycle(tx, SYSTEM_ACTOR, 'outro', 'infra_aplicada')),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+  });
+});
+
+describe('permissões da configuração', () => {
+  it.each(['editor', 'revisor'] as const)(
+    '%s não edita a configuração nem marca etapas',
+    async (role) => {
+      const actor = { email: `${role}@orakel.local`, roles: [role] };
+      expect(
+        await db.transaction((tx) => updateSiteConfig(tx, actor, 'exemplo-b', config)),
+      ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+      expect(
+        await db.transaction((tx) => advanceLifecycle(tx, actor, 'exemplo-b', 'infra_aplicada')),
+      ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+      const [site] = await db.select({ lifecycle: sites.lifecycle }).from(sites);
+      expect(site?.lifecycle).toBe('cadastrado');
+    },
+  );
 });
