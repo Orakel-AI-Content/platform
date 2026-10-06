@@ -5,6 +5,8 @@
 import type { Media, SiteConfig } from '@orakel/content-model/v1';
 import { mediaUrl } from '@orakel/core/v1';
 
+import { fallbackVariant, pictureFormats } from '../render/image.ts';
+
 interface Props {
   media: Media;
   config: Pick<SiteConfig, 'domains'>;
@@ -16,22 +18,14 @@ interface Props {
 }
 const { media, config, alt, sizes, priority = false, class: className } = Astro.props;
 
-const FORMAT_ORDER = ['avif', 'webp'];
-const formats = [...new Set(media.variants.map((variant) => variant.format))].sort(
-  (a, b) => (FORMAT_ORDER.indexOf(a) + 1 || 99) - (FORMAT_ORDER.indexOf(b) + 1 || 99),
-);
+const formats = pictureFormats(media);
 const srcset = (format: string) =>
   media.variants
     .filter((variant) => variant.format === format)
     .sort((a, b) => a.width - b.width)
     .map((variant) => `${mediaUrl(config, variant.path)} ${variant.width}w`)
     .join(', ');
-const fallbackFormat = formats.at(-1) ?? 'webp';
-const fallback =
-  media.variants
-    .filter((variant) => variant.format === fallbackFormat)
-    .sort((a, b) => a.width - b.width)
-    .find((variant) => variant.width >= 960) ?? media.variants[0];
+const fallback = fallbackVariant(media);
 ---
 
 <picture class={className}>
