@@ -10,10 +10,10 @@ apps/backoffice/
 │   │   ├── (admin)/             área autenticada (layout confere o Access)
 │   │   └── api/                 export/v1 (rede interna), health
 │   ├── components/              ui/ (shadcn/ui) e componentes de tela
-│   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, export, import, builds)
+│   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, media, export, import, builds)
 │   ├── db/                      client.ts, schema/, site-ids.ts
 │   ├── auth/                    access-jwt.ts, internal-tokens.ts, request-actor.ts
-│   ├── jobs/                    task-lists.ts, tasks/ (build, heartbeat)
+│   ├── jobs/                    task-lists.ts, tasks/ (build, heartbeat, ingest-media)
 │   ├── bin/                     worker, build-runner, migrate, seed
 │   ├── lib/                     logger, problem, heartbeat, s3, sentry, utils, docker, tar
 │   ├── env.ts  proxy.ts  instrumentation.ts
@@ -40,5 +40,5 @@ interação em componente cliente em `src/components/`; componente do shadcn em
 **Uma rota da API:** `src/app/api/<…>/route.ts`, fina; token interno com `hasBearer`;
 erros com `problem()`. Rota interna nova: bloqueie o prefixo no `Caddyfile` e no Tunnel.
 
-**Um job:** `src/jobs/tasks/<nome>.ts`, registrado em `WORKER_TASKS` (e no `WORKER_CRONTAB`
+**Um job:** `src/jobs/tasks/<nome>.ts`, registrado em `workerTasks` (e no `WORKER_CRONTAB`
 se for periódico); enfileiramento na transação da gravação, como `scheduleBuild`.

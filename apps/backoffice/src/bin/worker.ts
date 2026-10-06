@@ -1,15 +1,17 @@
 import { run } from 'graphile-worker';
 
 import { getDb } from '../db/client.ts';
-import { WORKER_CRONTAB, WORKER_TASKS } from '../jobs/task-lists.ts';
+import { getEnv } from '../env.ts';
+import { WORKER_CRONTAB, workerTasks } from '../jobs/task-lists.ts';
+import { createS3Client, s3ObjectStore } from '../lib/s3.ts';
 import { runProcess } from './run-process.ts';
 
-// backoffice-worker: jobs gerais e agregador (cron). Encerra com SIGTERM/SIGINT.
+// backoffice-worker: jobs gerais (ingestão de mídia) e agregador (cron). Encerra com SIGTERM/SIGINT.
 await runProcess('backoffice-worker', async (logger) => {
   const { pool } = getDb();
   const runner = await run({
     pgPool: pool,
-    taskList: WORKER_TASKS,
+    taskList: workerTasks({ store: s3ObjectStore(createS3Client(getEnv())) }),
     crontab: WORKER_CRONTAB,
     concurrency: 4,
   });
