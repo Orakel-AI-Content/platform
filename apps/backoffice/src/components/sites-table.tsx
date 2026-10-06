@@ -128,8 +128,7 @@ export function SitesTable({
   canConfigure?: boolean;
 }) {
   const table = useTable({ features, columns, data: rows });
-  const actions = publishNow !== undefined || canConfigure;
-  const colSpan = columns.length + (actions ? 1 : 0);
+  const colSpan = columns.length + 1;
   return (
     <Table>
       <TableCaption>{rows.length === 1 ? '1 site' : `${rows.length} sites`}</TableCaption>
@@ -141,11 +140,9 @@ export function SitesTable({
                 <table.FlexRender header={header} />
               </TableHead>
             ))}
-            {actions && (
-              <TableHead scope="col">
-                <span className="sr-only">Ações</span>
-              </TableHead>
-            )}
+            <TableHead scope="col">
+              <span className="sr-only">Ações</span>
+            </TableHead>
           </TableRow>
         ))}
       </TableHeader>
@@ -157,24 +154,29 @@ export function SitesTable({
                 <table.FlexRender cell={cell} />
               </TableCell>
             ))}
-            {actions && (
-              <TableCell>
-                <span className="flex flex-col items-start gap-2">
-                  {canConfigure && (
-                    <Link
-                      href={`/sites/${row.original.id}/configuracao`}
-                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                    >
-                      Editar configuração
-                      <span className="sr-only"> {row.original.id}</span>
-                    </Link>
-                  )}
-                  {publishNow && row.original.state !== 'pausado' && (
-                    <PublishNowButton siteId={row.original.id} action={publishNow} />
-                  )}
-                </span>
-              </TableCell>
-            )}
+            <TableCell>
+              <span className="flex flex-col items-start gap-2">
+                <Link
+                  href={`/sites/${row.original.id}/conteudos`}
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                >
+                  Conteúdos
+                  <span className="sr-only"> {row.original.id}</span>
+                </Link>
+                {canConfigure && (
+                  <Link
+                    href={`/sites/${row.original.id}/configuracao`}
+                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                  >
+                    Editar configuração
+                    <span className="sr-only"> {row.original.id}</span>
+                  </Link>
+                )}
+                {publishNow && row.original.state !== 'pausado' && (
+                  <PublishNowButton siteId={row.original.id} action={publishNow} />
+                )}
+              </span>
+            </TableCell>
           </TableRow>
         ))}
         {rows.length === 0 && (
