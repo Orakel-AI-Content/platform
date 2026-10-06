@@ -13,7 +13,9 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
 - **Contrato** (`test/contract/`): cada arquivo migra e limpa o banco (`helpers.ts`);
   rodam um arquivo por vez. O snapshot de cada fixture do `content-model` tem de passar no
   `validateSnapshot` e reproduzir a fixture, menos as mudanças pendentes do header.
-- **E2E** (`test/e2e/`): login pelo access-mock, tela de sites e axe (WCAG 2.2 AA). Use
+- **E2E** (`test/e2e/`): login pelo access-mock, telas de sites e o editor de conteúdo, e axe
+  (WCAG 2.2 AA). Rodam contra a imagem `backoffice:local`: depois de mudar o código,
+  `docker/bake.sh backoffice` e `infra/local/compose.sh up -d --wait backoffice-web`. Use
   `E2E_BASE_URL` para outro endereço.
 
 ## Postgres para o contrato, na máquina
