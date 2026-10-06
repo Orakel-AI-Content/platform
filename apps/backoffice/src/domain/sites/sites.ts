@@ -12,6 +12,7 @@ import type { Executor } from '../../db/client.ts';
 import { pendingChanges, siteConfigs, sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { lastBuilds, type LastBuild } from '../builds/builds.ts';
+import { effectiveBuildWindowMs } from '../builds/schedule.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 
 export type SiteSummary = {
@@ -25,6 +26,10 @@ export type SiteSummary = {
   indexavel: boolean;
   pendingChanges: number;
   lastBuild: LastBuild | null;
+  /** Janela de agrupamento própria do site, em segundos; nula usa a padrão. */
+  buildWindowSeconds: number | null;
+  /** Janela que o agendamento usa para o site, em segundos. */
+  effectiveBuildWindowSeconds: number;
 };
 
 /** Schema e validação semântica da configuração v1, contra os recursos da release. */
@@ -173,6 +178,8 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
         indexavel: config?.indexavel ?? false,
         pendingChanges: pendingBySite.get(site.id) ?? 0,
         lastBuild: buildsBySite.get(site.id) ?? null,
+        buildWindowSeconds: site.buildWindowSeconds,
+        effectiveBuildWindowSeconds: effectiveBuildWindowMs(site.buildWindowSeconds) / 1000,
       };
     }),
   );
