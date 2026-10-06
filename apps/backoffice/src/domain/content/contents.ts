@@ -26,36 +26,6 @@ import { checkWrite, type WriteOptions } from './write.ts';
 
 type Status = (typeof CONTENT_STATUSES)[number];
 
-/**
- * Cria um conteúdo com a versão 1. `publicado` exige também permissão de publicar. O
- * próximo número de bloco fica acima do maior `n` usado (nunca reutilizado). O fluxo de
- * revisão, aprovação, agendamento e o limite diário entram com o módulo Publicação.
- */
-export async function createContent(
-  tx: Executor,
-  actor: Actor,
-  siteId: string,
-  input: Omit<Content, 'id'>,
-  options: WriteOptions & { status?: Status } = {},
-): Promise<Result<{ id: number }>> {
-  const status = options.status ?? 'rascunho';
-  const allowed = checkWrite(actor);
-  if (!allowed.ok) return allowed;
-  if (status === 'publicado') {
-    const publish = checkWrite(actor, 'content.publish');
-    if (!publish.ok) return publish;
-  }
-
-  const id = await allocateId(tx, siteId, 'content', options.id);
-  const nextBlockN = Math.max(0, ...input.blocks.map((block) => block.n)) + 1;
-  await tx.insert(contents).values({ siteId, id, kind: input.kind, nextBlockN });
-  await tx
-    .insert(contentVersions)
-    .values({ siteId, contentId: id, version: 1, status, data: input });
-  await recordPendingChange(tx, siteId, 'content', String(id));
-  return { ok: true, value: { id } };
-}
-
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 /** Bloco novo na edição: o `n` vem do servidor (`nextBlockN`); o enviado é ignorado. */
@@ -85,6 +55,79 @@ async function referenceContext(db: Executor, siteId: string) {
     taxonomyIds: await ids(taxonomies),
     mediaIds: await ids(media),
   };
+}
+
+const isNew = (block: EditBlock): block is NewBlock => 'new' in block && block.new === true;
+
+/** Bloco novo com o `n` do servidor (o enviado é descartado). */
+function withN(block: NewBlock, n: number): Block {
+  const fresh: Record<string, unknown> = { ...block };
+  delete fresh.new;
+  return { ...fresh, n } as Block;
+}
+
+/** Schema e validação semântica (referências do site, recursos); devolve os dados sem ID. */
+async function validate(
+  tx: Executor,
+  siteId: string,
+  contentId: number,
+  input: Omit<Content, 'id'>,
+  resources: Resources = RESOURCES,
+): Promise<Result<ContentData>> {
+  const parsed = ContentSchema.safeParse({ ...input, id: contentId });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      issues: parsed.error.issues.map((i) => ({
+        code: `schema.${i.code}`,
+        message: i.message,
+        path: i.path,
+      })),
+    };
+  }
+  const semantic = validateContent(parsed.data, await referenceContext(tx, siteId), resources);
+  if (!semantic.ok) return semantic;
+  const data: Partial<Content> = { ...semantic.value };
+  delete data.id;
+  return { ok: true, value: data as ContentData };
+}
+
+/**
+ * Cria um conteúdo com a versão 1, validado como na edição. Bloco novo (`new: true`) recebe
+ * o `n` do servidor, acima do maior `n` enviado (a importação traz os `n` do acervo); o
+ * próximo número fica acima de todos (nunca reutilizado). `publicado` exige também
+ * permissão de publicar. O fluxo de revisão, aprovação, agendamento e o limite diário
+ * entram com o módulo Publicação.
+ */
+export async function createContent(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  input: ContentEdit,
+  options: WriteOptions & { status?: Status; resources?: Resources } = {},
+): Promise<Result<{ id: number }>> {
+  const status = options.status ?? 'rascunho';
+  const allowed = checkWrite(actor);
+  if (!allowed.ok) return allowed;
+  if (status === 'publicado') {
+    const publish = checkWrite(actor, 'content.publish');
+    if (!publish.ok) return publish;
+  }
+
+  let nextBlockN =
+    Math.max(0, ...input.blocks.flatMap((block) => (isNew(block) ? [] : [block.n]))) + 1;
+  const blocks = input.blocks.map((block) => (isNew(block) ? withN(block, nextBlockN++) : block));
+  // ID provisório na validação: o definitivo só é alocado depois, para não gastar a sequência.
+  const data = await validate(tx, siteId, options.id ?? 1, { ...input, blocks }, options.resources);
+  if (!data.ok) return data;
+
+  const id = await allocateId(tx, siteId, 'content', options.id);
+  await tx.insert(contents).values({ siteId, id, kind: input.kind, nextBlockN });
+  await tx
+    .insert(contentVersions)
+    .values({ siteId, contentId: id, version: 1, status, data: data.value });
+  await recordPendingChange(tx, siteId, 'content', String(id));
+  return { ok: true, value: { id } };
 }
 
 /**
@@ -136,43 +179,25 @@ export async function updateContent(
   const issues: Issue[] = [];
   let nextBlockN = content.nextBlockN;
   const blocks = input.blocks.map((block, index): Block => {
-    if ('new' in block && block.new === true) {
-      const fresh: Record<string, unknown> = { ...block };
-      delete fresh.new;
-      return { ...fresh, n: nextBlockN++ } as Block;
-    }
-    const existing = block as Block;
-    if (!current.has(existing.n)) {
+    if (isNew(block)) return withN(block, nextBlockN++);
+    if (!current.has(block.n)) {
       issues.push({
         code: 'content.block_unknown',
-        message: `O bloco ${String(existing.n)} não está na versão ${latest.version}; bloco novo recebe o número do servidor`,
+        message: `O bloco ${String(block.n)} não está na versão ${latest.version}; bloco novo recebe o número do servidor`,
         path: ['blocks', index, 'n'],
       });
     }
-    return existing;
+    return block;
   });
   if (issues.length > 0) return { ok: false, issues };
 
-  const parsed = ContentSchema.safeParse({ ...input, id: contentId, blocks });
-  if (!parsed.success) {
-    return {
-      ok: false,
-      issues: parsed.error.issues.map((i) => ({
-        code: `schema.${i.code}`,
-        message: i.message,
-        path: i.path,
-      })),
-    };
-  }
-  const semantic = validateContent(parsed.data, await referenceContext(tx, siteId), resources);
-  if (!semantic.ok) return semantic;
-  const data: Partial<Content> = { ...semantic.value };
-  delete data.id;
+  const data = await validate(tx, siteId, contentId, { ...input, blocks }, resources);
+  if (!data.ok) return data;
 
   const version = latest.version + 1;
   await tx
     .insert(contentVersions)
-    .values({ siteId, contentId, version, status: 'rascunho', data: data as ContentData });
+    .values({ siteId, contentId, version, status: 'rascunho', data: data.value });
   await tx
     .update(contents)
     .set({ nextBlockN })

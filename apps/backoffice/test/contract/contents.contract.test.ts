@@ -175,6 +175,83 @@ describe('editar conteúdo', () => {
   });
 });
 
+describe('criar conteúdo', () => {
+  const article = (blocks: EditBlock[], extra: Partial<ContentEdit> = {}): ContentEdit => ({
+    kind: 'article',
+    slug: 'novo-artigo',
+    title: 'Novo artigo',
+    authorIds: [1],
+    taxonomyIds: [],
+    publishedAt: '2026-10-06T12:00:00-03:00',
+    blocks,
+    ...extra,
+  });
+  const create = (input: ContentEdit, actor = SYSTEM_ACTOR) =>
+    db.transaction((tx) => createContent(tx, actor, SITE, input));
+
+  it('blocos novos recebem n = 1..k do servidor e nextBlockN fica k+1', async () => {
+    const result = await create(
+      article([
+        newText('um', 50),
+        { new: true, type: 'image', mediaId: 1, alt: 'Capa' },
+        {
+          new: true,
+          type: 'faq',
+          items: [{ question: 'P?', answer: [{ type: 'text', text: 'R' }] }],
+        },
+      ]),
+    );
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    const data = await latest(result.value.id);
+    expect(data.blocks.map((block) => [block.n, block.type])).toEqual([
+      [1, 'text'],
+      [2, 'image'],
+      [3, 'faq'],
+    ]);
+    const [row] = await db
+      .select({ nextBlockN: contents.nextBlockN })
+      .from(contents)
+      .where(and(eq(contents.siteId, SITE), eq(contents.id, result.value.id)));
+    expect(row?.nextBlockN).toBe(4);
+    expect((await versions(result.value.id)).map((v) => v.status)).toEqual(['rascunho']);
+  });
+
+  it('imagem sem alt e sem decorativa é recusada com o caminho do campo', async () => {
+    const result = await create(article([{ new: true, type: 'image', mediaId: 1 }]));
+
+    expect(result).toMatchObject({ ok: false, issues: [{ path: ['blocks', 0, 'alt'] }] });
+  });
+
+  it('mídia ou autor que não existem no site são recusados e nada é gravado', async () => {
+    const before = await listContents(db, SYSTEM_ACTOR, SITE);
+    const result = await create(
+      article([{ new: true, type: 'image', mediaId: 99, alt: 'x' }], { authorIds: [99] }),
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      issues: [
+        { code: 'semantic.references', path: ['authorIds', 0] },
+        { code: 'semantic.references', path: ['blocks', 0, 'mediaId'] },
+      ],
+    });
+    expect(await listContents(db, SYSTEM_ACTOR, SITE)).toEqual(before);
+    // A recusa não gasta ID: o próximo conteúdo criado é o 4.
+    const next = await create(article([newText('ok')]));
+    expect(next).toMatchObject({ ok: true, value: { id: 4 } });
+  });
+
+  it.each(['revisor', 'operacao'] as const)('%s recebe forbidden ao criar', async (role) => {
+    const actor = { email: `${role}@orakel.local`, roles: [role] };
+    expect(await create(article([newText('x')]), actor)).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
+    expect(await listContents(db, SYSTEM_ACTOR, SITE)).toMatchObject({ value: { length: 3 } });
+  });
+});
+
 describe('leituras de conteúdo', () => {
   it('a lista traz tipo, título e status da versão mais recente', async () => {
     await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
