@@ -4,9 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useId, useState, type ReactNode } from 'react';
 import {
   Controller,
+  FormProvider,
   get,
   useFieldArray,
   useForm,
+  useFormContext,
   type Control,
   type FieldErrors,
   type FieldValues,
@@ -316,31 +318,36 @@ function ArrayField({
   );
 }
 
-/** Formulário gerado do schema; `onSubmit` recebe o valor já validado pelo schema. */
-export function SchemaForm<T>({
+export type SchemaFieldsProps = {
+  schema: z.ZodType;
+  /** Caminho do objeto no formulário externo (`blocks.2`); vazio é a raiz. */
+  prefix?: string;
+  labels?: Record<string, string>;
+  hints?: Record<string, string>;
+  hidden?: string[];
+  fields?: Record<string, FieldRenderer>;
+};
+
+/**
+ * Campos de um schema de objeto dentro de um formulário externo (`FormProvider` do
+ * react-hook-form), sob `prefix`. Rótulos, dicas, `hidden` e `fields` usam o caminho
+ * completo, com `*` no lugar dos índices (`blocks.*.content`). A validação é do formulário
+ * externo.
+ */
+export function SchemaFields({
   schema,
-  defaultValues,
+  prefix = '',
   labels = {},
   hints = {},
   hidden = [],
   fields = {},
-  submitLabel,
-  onSubmit,
-}: SchemaFormProps<T>) {
+}: SchemaFieldsProps) {
   const id = useId();
-  const [summary, setSummary] = useState('');
-  const resolver = zodResolver(
-    z
-      .unknown()
-      .transform((value) => clean(schema, value))
-      .pipe(schema) as unknown as z.ZodType<FieldValues, FieldValues>,
-  );
   const {
     register,
     control,
-    handleSubmit,
     formState: { errors },
-  } = useForm<FieldValues>({ resolver, defaultValues });
+  } = useFormContext<FieldValues>();
   const root = describe(schema).node;
   const ctx: Ctx = {
     id,
@@ -352,30 +359,60 @@ export function SchemaForm<T>({
     hidden: new Set(hidden),
     fields,
   };
+  return root.kind === 'object' ? (
+    <Children ctx={ctx} shape={root.shape} prefix={prefix} />
+  ) : (
+    <p className="text-sm text-warning">O gerador espera um schema de objeto.</p>
+  );
+}
+
+/** Formulário gerado do schema; `onSubmit` recebe o valor já validado pelo schema. */
+export function SchemaForm<T>({
+  schema,
+  defaultValues,
+  labels,
+  hints,
+  hidden,
+  fields,
+  submitLabel,
+  onSubmit,
+}: SchemaFormProps<T>) {
+  const [summary, setSummary] = useState('');
+  const resolver = zodResolver(
+    z
+      .unknown()
+      .transform((value) => clean(schema, value))
+      .pipe(schema) as unknown as z.ZodType<FieldValues, FieldValues>,
+  );
+  const form = useForm<FieldValues>({ resolver, defaultValues });
 
   return (
-    <form
-      noValidate
-      className="space-y-4"
-      onSubmit={(event) =>
-        void handleSubmit(
-          async (value) => {
-            setSummary('');
-            await onSubmit(value as T);
-          },
-          () => setSummary('Corrija os campos destacados.'),
-        )(event)
-      }
-    >
-      <div role="alert" className={cn(summary && 'text-sm text-destructive')}>
-        {summary}
-      </div>
-      {root.kind === 'object' ? (
-        <Children ctx={ctx} shape={root.shape} prefix="" />
-      ) : (
-        <p className="text-sm text-warning">O gerador espera um schema de objeto.</p>
-      )}
-      <Button type="submit">{submitLabel}</Button>
-    </form>
+    <FormProvider {...form}>
+      <form
+        noValidate
+        className="space-y-4"
+        onSubmit={(event) =>
+          void form.handleSubmit(
+            async (value) => {
+              setSummary('');
+              await onSubmit(value as T);
+            },
+            () => setSummary('Corrija os campos destacados.'),
+          )(event)
+        }
+      >
+        <div role="alert" className={cn(summary && 'text-sm text-destructive')}>
+          {summary}
+        </div>
+        <SchemaFields
+          schema={schema}
+          labels={labels}
+          hints={hints}
+          hidden={hidden}
+          fields={fields}
+        />
+        <Button type="submit">{submitLabel}</Button>
+      </form>
+    </FormProvider>
   );
 }
