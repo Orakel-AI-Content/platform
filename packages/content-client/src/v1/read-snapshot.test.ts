@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { failureKind } from '../index.ts';
+import { failureKind, type SnapshotKind } from '../index.ts';
 import { readSnapshot } from './read-snapshot.ts';
 import { readFixture, startServer, TOKEN, type Reply } from './test-server.ts';
 
@@ -11,7 +11,7 @@ afterEach(async () => {
   close = undefined;
 });
 
-async function serve(reply: (site: string) => Reply) {
+async function serve(reply: (site: string, kind: SnapshotKind) => Reply) {
   const server = await startServer(reply);
   close = server.close;
   return server.baseUrl;
@@ -26,6 +26,22 @@ describe('readSnapshot', () => {
     if (!result.ok) return;
     expect(result.value.header).toMatchObject({ site, schemaVersion: 1 });
     expect(result.value.end.counts.content).toBe(result.value.contents.length);
+  });
+
+  it('lê o snapshot da visualização pela rota dele', async () => {
+    const body = await readFixture('exemplo-a');
+    const baseUrl = await serve((_, kind) => (kind === 'preview' ? { body } : { status: 404 }));
+    const result = await readSnapshot({
+      baseUrl,
+      site: 'exemplo-a',
+      kind: 'preview',
+      token: TOKEN,
+    });
+    expect(result.ok).toBe(true);
+    expect(await readSnapshot({ baseUrl, site: 'exemplo-a', token: TOKEN })).toMatchObject({
+      ok: false,
+      issues: [{ code: 'http.404' }],
+    });
   });
 
   it('descarta campos desconhecidos (release antiga lendo snapshot novo)', async () => {

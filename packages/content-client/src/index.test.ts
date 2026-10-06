@@ -10,6 +10,12 @@ describe('snapshotUrl', () => {
       'http://backoffice-web:3000/api/export/v1/sites/exemplo%20a/snapshot',
     );
   });
+
+  it('aponta para o snapshot da visualização com o tipo preview', () => {
+    expect(snapshotUrl('http://backoffice-web:3000', 'exemplo-a', 1, 'preview')).toBe(
+      'http://backoffice-web:3000/api/export/v1/sites/exemplo-a/preview-snapshot',
+    );
+  });
 });
 
 describe('failureKind', () => {
