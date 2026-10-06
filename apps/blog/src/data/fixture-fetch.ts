@@ -1,5 +1,5 @@
-// Modo `fixture`: um `fetch` que responde à rota do snapshot com a fixture do content-model,
-// em streaming. O content-client lê e valida exatamente como leria a API.
+// Modo `fixture`: um `fetch` que responde às rotas do snapshot (build e visualização) com a
+// fixture do content-model, em streaming. O content-client lê e valida exatamente como leria a API.
 import { createReadStream } from 'node:fs';
 import { createRequire } from 'node:module';
 import { Readable } from 'node:stream';
@@ -9,7 +9,7 @@ export const FIXTURE_BASE_URL = 'http://fixtures.invalid';
 export const FIXTURE_TOKEN = 'fixture';
 
 const require = createRequire(import.meta.url);
-const SNAPSHOT_ROUTE = /\/api\/export\/v1\/sites\/([a-z0-9-]+)\/snapshot$/;
+const SNAPSHOT_ROUTE = /\/api\/export\/v1\/sites\/([a-z0-9-]+)\/(?:preview-)?snapshot$/;
 
 /** Caminho da fixture do site, ou undefined se o content-model não tem fixture para ele. */
 export function fixturePath(site: string): string | undefined {

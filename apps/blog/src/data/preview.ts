@@ -1,10 +1,10 @@
-// Fonte do SSR da visualização: lê o snapshot do site pedido (API ou fixture) e guarda por
-// alguns segundos, para a navegação entre páginas não reler tudo. Hoje mostra o conteúdo
-// publicado; rascunhos entram com a leitura ao vivo (rotas de visualização do backoffice).
+// Fonte do SSR da visualização: lê o snapshot de visualização do site pedido (API ou
+// fixture), com a versão mais recente de cada conteúdo, rascunhos inclusive, e guarda por
+// alguns segundos, para a navegação entre páginas não reler tudo.
 import { failureKind } from '@orakel/content-client';
 import { readSnapshot } from '@orakel/content-client/v1';
 
-import type { SourceEnv } from '../env.ts';
+import type { PreviewEnv } from '../env.ts';
 import { BuildError } from './errors.ts';
 import { FIXTURE_BASE_URL, FIXTURE_TOKEN, fixtureFetch } from './fixture-fetch.ts';
 import type { SiteData } from './site-source.ts';
@@ -14,11 +14,17 @@ export const PREVIEW_CACHE_MS = 10_000;
 type Entry = { at: number; data: Promise<SiteData | undefined> };
 const cache = new Map<string, Entry>();
 
-async function read(site: string, env: SourceEnv): Promise<SiteData | undefined> {
+async function read(site: string, env: PreviewEnv): Promise<SiteData | undefined> {
   const result = await readSnapshot(
     env.CONTENT_SOURCE === 'api'
-      ? { baseUrl: env.EXPORT_API_URL, site, token: env.EXPORT_BUILD_TOKEN }
-      : { baseUrl: FIXTURE_BASE_URL, site, token: FIXTURE_TOKEN, fetch: fixtureFetch },
+      ? { baseUrl: env.EXPORT_API_URL, site, kind: 'preview', token: env.EXPORT_PREVIEW_TOKEN }
+      : {
+          baseUrl: FIXTURE_BASE_URL,
+          site,
+          kind: 'preview',
+          token: FIXTURE_TOKEN,
+          fetch: fixtureFetch,
+        },
   );
   // O `end` a mais não atrapalha: as páginas só leem o snapshot.
   if (result.ok) return result.value;
@@ -32,7 +38,7 @@ async function read(site: string, env: SourceEnv): Promise<SiteData | undefined>
 /** Snapshot do site, ou undefined se o site não existe. */
 export function loadPreviewSite(
   site: string,
-  env: SourceEnv,
+  env: PreviewEnv,
   now: number = Date.now(),
 ): Promise<SiteData | undefined> {
   const hit = cache.get(site);
