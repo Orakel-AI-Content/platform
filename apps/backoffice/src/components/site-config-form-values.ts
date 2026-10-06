@@ -35,6 +35,11 @@ const lines = (text: string): string[] =>
     .map((line) => line.trim())
     .filter((line) => line !== '');
 
+/** Retorno das Server Actions do formulário (serializável; `path` aponta o campo). */
+export type SiteFormIssue = { path: (string | number)[]; message: string };
+export type SiteFormResult =
+  { ok: true; message: string } | { ok: false; message: string; issues: SiteFormIssue[] };
+
 /** Formulário → SiteConfig (sem validar; a validação é a do SiteConfigSchema). */
 export function toSiteConfig(values: SiteConfigFormValues): SiteConfig {
   const allow = lines(values.crawlers.allow);

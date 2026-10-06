@@ -11,6 +11,7 @@ import {
   SiteConfigFormSchema,
   type FormField,
   type SiteConfigFormValues,
+  type SiteFormResult,
 } from '@/components/site-config-form-values.ts';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,10 +19,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-
-export type SiteFormIssue = { path: (string | number)[]; message: string };
-export type SiteFormResult =
-  { ok: true; message: string } | { ok: false; message: string; issues: SiteFormIssue[] };
 
 type Options = { presets: Record<string, string[]>; variants: Record<string, string[]> };
 
