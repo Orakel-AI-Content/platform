@@ -215,6 +215,24 @@ export async function updateInstitutionalTexts(
   });
 }
 
+/** Textos institucionais da configuração corrente (vazio quando o site não os tem). */
+export async function getInstitutionalTexts(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<InstitutionalTexts>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+  const config = await currentConfig(db, siteId);
+  if (config === undefined) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  return { ok: true, value: config.institutionalTexts ?? {} };
+}
+
 export async function siteExists(db: Executor, siteId: string): Promise<boolean> {
   const rows = await db.select({ id: sites.id }).from(sites).where(eq(sites.id, siteId));
   return rows.length > 0;

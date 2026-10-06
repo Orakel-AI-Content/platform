@@ -1,0 +1,70 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
+
+import { currentActor } from '@/auth/request-actor.ts';
+import { getDb, type Executor } from '@/db/client.ts';
+import { can, type Actor } from '@/domain/access/rbac.ts';
+import { listSites, type SiteSummary } from '@/domain/sites/sites.ts';
+
+// Base das telas de autores, taxonomias, menus e textos institucionais (#46): sessão, site
+// existente (404) e permissão de gravar decidida no servidor; o domínio confere de novo.
+
+export type SitePageContext = {
+  actor: Actor;
+  db: Executor;
+  site: SiteSummary;
+  canWrite: boolean;
+};
+
+/** Contexto da página, ou o que mostrar no lugar dela (sem sessão, sem permissão). */
+export async function sitePageContext(
+  siteId: string,
+): Promise<{ ok: true; value: SitePageContext } | { ok: false; render: ReactNode }> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, render: null };
+  const db = getDb().db;
+  const sites = await listSites(db, actor.value);
+  if (!sites.ok) {
+    return { ok: false, render: <p role="alert">Sem permissão para ver os sites.</p> };
+  }
+  const site = sites.value.find((summary) => summary.id === siteId);
+  if (site === undefined) notFound();
+  return {
+    ok: true,
+    value: { actor: actor.value, db, site, canWrite: can(actor.value, 'content.write') },
+  };
+}
+
+export const noWrite = <p role="alert">Sem permissão para editar o conteúdo deste site.</p>;
+
+/** Título da tela com o link de volta. */
+export function PageHeader({
+  id,
+  back,
+  title,
+}: {
+  id: string;
+  back: { href: string; label: string };
+  title: ReactNode;
+}) {
+  return (
+    <>
+      <p className="text-sm">
+        <Link href={back.href} className="underline underline-offset-4">
+          {back.label}
+        </Link>
+      </p>
+      <h1 id={id} className="text-2xl font-semibold">
+        {title}
+      </h1>
+    </>
+  );
+}
+
+/** Valores do formulário de edição: a entidade sem o ID (que é da URL). */
+export function withoutId<T extends { id: number }>(item: T): Omit<T, 'id'> {
+  const copy: Partial<T> = { ...item };
+  delete copy.id;
+  return copy as Omit<T, 'id'>;
+}

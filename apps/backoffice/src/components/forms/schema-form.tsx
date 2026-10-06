@@ -53,8 +53,17 @@ export type SchemaFormProps<T> = {
   /** Campos especiais por caminho; têm prioridade sobre o desenho padrão. */
   fields?: Record<string, FieldRenderer>;
   submitLabel: string;
-  onSubmit: (value: T) => void | Promise<void>;
+  /**
+   * Recebe o valor validado pelo schema. Pode devolver a recusa do servidor: cada issue com
+   * `path` vira erro do campo; sem `path`, vai para o resumo.
+   */
+  onSubmit: (value: T) => SubmitOutcome | Promise<SubmitOutcome>;
 };
+
+/** Recusa do servidor (serializável; `path` aponta o campo). */
+export type SchemaFormIssue = { path: (string | number)[]; message: string };
+
+type SubmitOutcome = void | readonly SchemaFormIssue[];
 
 type Ctx = {
   id: string;
@@ -377,7 +386,7 @@ export function SchemaForm<T>({
   submitLabel,
   onSubmit,
 }: SchemaFormProps<T>) {
-  const [summary, setSummary] = useState('');
+  const [summary, setSummary] = useState<string[]>([]);
   const resolver = zodResolver(
     z
       .unknown()
@@ -394,15 +403,34 @@ export function SchemaForm<T>({
         onSubmit={(event) =>
           void form.handleSubmit(
             async (value) => {
-              setSummary('');
-              await onSubmit(value as T);
+              setSummary([]);
+              const issues = (await onSubmit(value as T)) ?? [];
+              const top: string[] = [];
+              let focused = false;
+              for (const issue of issues) {
+                if (issue.path.length === 0) {
+                  top.push(issue.message);
+                  continue;
+                }
+                form.setError(
+                  issue.path.join('.'),
+                  { type: 'server', message: issue.message },
+                  { shouldFocus: !focused },
+                );
+                focused = true;
+              }
+              if (issues.length > 0) {
+                setSummary(top.length > 0 ? top : ['Corrija os campos destacados.']);
+              }
             },
-            () => setSummary('Corrija os campos destacados.'),
+            () => setSummary(['Corrija os campos destacados.']),
           )(event)
         }
       >
-        <div role="alert" className={cn(summary && 'text-sm text-destructive')}>
-          {summary}
+        <div role="alert" className={cn(summary.length > 0 && 'text-sm text-destructive')}>
+          {summary.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
         </div>
         <SchemaFields
           schema={schema}

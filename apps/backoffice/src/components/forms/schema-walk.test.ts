@@ -1,4 +1,9 @@
-import { AuthorSchema, FaqBlockSchema, ImageBlockSchema } from '@orakel/content-model/v1';
+import {
+  AuthorSchema,
+  FaqBlockSchema,
+  ImageBlockSchema,
+  InstitutionalTextsSchema,
+} from '@orakel/content-model/v1';
 import { describe as group, expect, it } from 'vitest';
 import * as z from 'zod';
 
@@ -50,5 +55,16 @@ group('leitura do schema', () => {
       }),
     ).toEqual({ n: 1, type: 'image', mediaId: undefined, alt: undefined, decorative: false });
     expect(clean(AuthorSchema, { slug: '', name: '' })).toEqual({ slug: '', name: '' });
+  });
+
+  it('clean: lista vazia em campo opcional vira undefined; em obrigatório, fica', () => {
+    expect(
+      clean(InstitutionalTextsSchema, { about: [], terms: [{ type: 'paragraph', children: [] }] }),
+    ).toEqual({ about: undefined, terms: [{ type: 'paragraph', children: [] }] });
+    expect(clean(FaqBlockSchema, { n: 1, type: 'faq', items: [] })).toEqual({
+      n: 1,
+      type: 'faq',
+      items: [],
+    });
   });
 });

@@ -3,6 +3,7 @@ import {
   AuthorSchema,
   FaqBlockSchema,
   ImageBlockSchema,
+  InstitutionalTextsSchema,
   QuoteBlockSchema,
 } from '@orakel/content-model/v1';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
@@ -256,5 +257,57 @@ describe('SchemaFields', () => {
       [1, 'Ana'],
       [2, 'Bia'],
     ]);
+  });
+});
+
+describe('SchemaForm com o servidor', () => {
+  it('a recusa do servidor aparece no campo do path e a sem path no resumo', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn(() =>
+      Promise.resolve([
+        { path: ['slug'], message: 'Já existe um autor com o slug ana neste site' },
+        { path: [], message: 'Tente de novo.' },
+      ]),
+    );
+    render(
+      <SchemaForm
+        schema={AuthorSchema.omit({ id: true })}
+        defaultValues={{ slug: 'ana', name: 'Ana' }}
+        labels={{ slug: 'Slug' }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    const slug = screen.getByLabelText('Slug');
+    await waitFor(() => expect(slug.getAttribute('aria-invalid')).toBe('true'));
+    expect(document.getElementById(slug.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      'Já existe um autor com o slug ana neste site',
+    );
+    expect(screen.getByRole('alert').textContent).toBe('Tente de novo.');
+  });
+
+  it('rich text opcional apagado é enviado como ausente, sem erro', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <SchemaForm
+        schema={InstitutionalTextsSchema}
+        defaultValues={{ about: inline('Sobre') }}
+        labels={{ about: 'Sobre' }}
+        hidden={['contact', 'terms', 'privacy', 'editorialPolicy']}
+        fields={{ about: PlainInlines }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText('Sobre'));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({ about: undefined });
   });
 });
