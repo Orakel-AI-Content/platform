@@ -13,7 +13,8 @@ const MediaInputSchema = MediaSchema.omit({ id: true });
 
 /**
  * Registra uma mídia já processada e as variantes dela (geradas pelo job `media-variants`
- * ou vindas da importação). Recusa variantes que não cobrem o perfil de imagem exigido para
+ * ou vindas da importação), com o original de onde saíram (`originalKey`, para o
+ * reprocessamento). Recusa variantes que não cobrem o perfil de imagem exigido para
  * a largura do original (`validateMedia`).
  */
 export async function createMedia(
@@ -21,7 +22,7 @@ export async function createMedia(
   actor: Actor,
   siteId: string,
   input: Omit<Media, 'id'>,
-  options: WriteOptions = {},
+  options: WriteOptions & { originalKey?: string } = {},
 ): Promise<Result<{ id: number }>> {
   const allowed = checkWrite(actor);
   if (!allowed.ok) return allowed;
@@ -31,7 +32,7 @@ export async function createMedia(
   if (!valid.ok) return valid;
   const { width, height, variants } = parsed.value;
   const id = await allocateId(tx, siteId, 'media', options.id);
-  await tx.insert(media).values({ siteId, id, width, height });
+  await tx.insert(media).values({ siteId, id, width, height, originalKey: options.originalKey });
   await tx
     .insert(mediaVariants)
     .values(variants.map((variant) => ({ siteId, mediaId: id, ...variant })));

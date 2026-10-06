@@ -80,7 +80,9 @@ export async function registerMediaVariants(
   const generated = await generateVariants(deps.store, payload);
   if (generated.status === 'missing') return generated;
   const created = await deps.db.transaction((tx) =>
-    createMedia(tx, SYSTEM_ACTOR, payload.siteId, generated.media),
+    createMedia(tx, SYSTEM_ACTOR, payload.siteId, generated.media, {
+      originalKey: payload.originalKey,
+    }),
   );
   if (!created.ok) {
     // Variantes geradas pela própria regra do perfil: recusa aqui é bug, não conteúdo.

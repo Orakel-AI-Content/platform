@@ -29,6 +29,13 @@
       "when": 1791298950175,
       "tag": "0003_gatilhos_de_politica",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791318720864,
+      "tag": "0004_original_da_midia",
+      "breakpoints": true
     }
   ]
 }
