@@ -1,7 +1,7 @@
 import type { Block, Inline, RichText } from '@orakel/content-model/v1';
 import { Fragment, type ReactNode } from 'react';
 
-import { CONTENT_KIND_LABEL } from '@/components/site-labels.ts';
+import { BLOCK_TYPE_LABEL, CONTENT_KIND_LABEL } from '@/components/site-labels.ts';
 import type { ContentData } from '@/db/schema/index.ts';
 
 // Leitura de uma versão de conteúdo (#44): HTML semântico desenhado no servidor, sem
@@ -59,14 +59,6 @@ function RichTextView({ nodes }: { nodes: RichText }) {
     );
   });
 }
-
-const BLOCK_LABEL: Record<Block['type'], string> = {
-  text: 'Texto',
-  toc: 'Sumário',
-  quote: 'Citação',
-  image: 'Imagem',
-  faq: 'FAQ',
-};
 
 function BlockBody({ block }: { block: Block }) {
   switch (block.type) {
@@ -160,7 +152,7 @@ export function ContentVersionView({ data }: { data: ContentData }) {
           {data.blocks.map((block) => (
             <li key={block.n} className="space-y-2 rounded-md border border-border p-4">
               <h3 className="text-sm font-semibold text-muted-foreground">
-                {BLOCK_LABEL[block.type]} · bloco {block.n}
+                {BLOCK_TYPE_LABEL[block.type]} · bloco {block.n}
               </h3>
               <BlockBody block={block} />
             </li>
