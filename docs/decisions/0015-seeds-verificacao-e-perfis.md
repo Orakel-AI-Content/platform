@@ -21,6 +21,13 @@ Healthchecks, GlitchTip e Lighthouse CI como substitutos opcionais.
     `orakel-publish` (`DEPLOY_TARGET=local`), como o `build-runner` fará.
   - `pnpm local:load [<site>]` — k6 2.3.0 no `edge-local` com `X-Test-Country` variado; confere
     os pontos no ClickHouse e sessões só fora da UE.
+- `pnpm local:trust` — instala a raiz da CA do Caddy em uso no Keychain do sistema (macOS) e
+  remove as antigas pela impressão digital (todas têm o mesmo nome; a CA muda a cada
+  `local:reset`). O `local:check` confere certificado com nome exato por host e, no macOS, a
+  raiz instalada.
+- **Sites no Caddy:** bloco HTTPS genérico com certificado por host sob demanda
+  (`on_demand_tls` com `ask` só para `.localhost`): o Chrome recusa o curinga `*.localhost`
+  que o bloco `*.localhost` geraria.
 - **Perfis** (fora do `local:up`): `observability` — GlitchTip 6.2.6 (web e worker no mesmo
   container, banco `glitchtip` no Postgres, Valkey 9.0.6) e Healthchecks v4.4 (SQLite);
   `lighthouse` — LHCI server 0.15.1. Todos atrás do access-mock (`glitchtip.`, `hc.` e
