@@ -16,6 +16,7 @@ import {
 } from '../../src/domain/content/taxonomies.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import {
+  getInstitutionalTexts,
   unresolvedPendingChangeIds,
   updateInstitutionalTexts,
   updateSiteConfig,
@@ -207,6 +208,22 @@ describe('textos institucionais', () => {
       ),
     ).toMatchObject({ ok: false, issues: [{ path: ['institutionalTexts', 'about'] }] });
     expect(await configs()).toHaveLength(1);
+  });
+
+  it('a leitura devolve os textos da versão mais recente; sem papel, forbidden', async () => {
+    await tx((t) => updateInstitutionalTexts(t, editor, 'exemplo-a', { about }));
+
+    expect(await getInstitutionalTexts(db, revisor, 'exemplo-a')).toEqual({
+      ok: true,
+      value: { about },
+    });
+    expect(await getInstitutionalTexts(db, editor, 'nao-existe')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
+    expect(
+      await getInstitutionalTexts(db, { email: 'x@orakel.local', roles: [] }, 'exemplo-a'),
+    ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
   });
 });
 
