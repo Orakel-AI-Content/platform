@@ -65,6 +65,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         <ul className="flex flex-wrap gap-2">
           {[
             ['conteudos', 'Conteúdos'],
+            ['midia', 'Mídia'],
             ['autores', 'Autores'],
             ['taxonomias', 'Taxonomias'],
             ['menus', 'Menus'],
