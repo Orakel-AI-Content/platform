@@ -32,4 +32,11 @@ describe('tabela de sites', () => {
     const link = screen.getByRole('link', { name: 'Conteúdos exemplo-a' });
     expect(link.getAttribute('href')).toBe('/sites/exemplo-a/conteudos');
   });
+
+  it('tem o link para a biblioteca de mídia de cada site (#52)', () => {
+    render(<SitesTable rows={[site]} />);
+
+    const link = screen.getByRole('link', { name: 'Mídia exemplo-a' });
+    expect(link.getAttribute('href')).toBe('/sites/exemplo-a/midia');
+  });
 });

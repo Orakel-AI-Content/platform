@@ -163,6 +163,13 @@ export function SitesTable({
                   Conteúdos
                   <span className="sr-only"> {row.original.id}</span>
                 </Link>
+                <Link
+                  href={`/sites/${row.original.id}/midia`}
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                >
+                  Mídia
+                  <span className="sr-only"> {row.original.id}</span>
+                </Link>
                 {canConfigure && (
                   <Link
                     href={`/sites/${row.original.id}/configuracao`}
