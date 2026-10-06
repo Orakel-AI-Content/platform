@@ -20,6 +20,9 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   entidade) entra por `fields`, um campo registrado por caminho, com `*` no lugar dos
   índices, que recebe `id`, `label`, `value`, `onChange`, `invalid` e `describedBy` (ligue
   esses dois ao controle). Nó sem desenho e sem campo registrado aparece como aviso.
+  O `onSubmit` pode devolver a recusa do servidor (`{ path, message }[]`): com `path`, vira
+  erro do campo; sem, vai para o resumo. Lista vazia em campo opcional (rich text apagado) é
+  enviada como ausente.
   Dentro de um formulário maior (`FormProvider`), `SchemaFields` desenha um schema sob um
   prefixo (`blocks.2`), com os caminhos completos no registro (`blocks.*.content`): é como o
   editor de conteúdo monta cada bloco. Referências do site: `mediaField(opções)` (`<select>`,
