@@ -50,6 +50,9 @@
     "@orakel/vitest-config": "workspace:*",
     "@playwright/test": "catalog:",
     "@tailwindcss/postcss": "catalog:",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/react": "catalog:",
@@ -57,6 +60,7 @@
     "drizzle-kit": "catalog:",
     "eslint": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",
+    "happy-dom": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
