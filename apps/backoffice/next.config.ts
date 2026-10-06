@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   // Rastreia os arquivos a partir da raiz do monorepo (pacotes do workspace).
   outputFileTracingRoot: root,
   // Pacotes do workspace são consumidos como fonte TypeScript (ADR 0003 da raiz).
-  transpilePackages: ['@orakel/content-model'],
+  transpilePackages: ['@orakel/content-model', '@orakel/core'],
   // Dependências só do servidor: não entram no bundle.
   serverExternalPackages: ['pg', 'pino', 'graphile-worker'],
   // O repositório não usa AGENTS.md; a orientação está em .claude/rules/next.md.

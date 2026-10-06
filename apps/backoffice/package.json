@@ -26,6 +26,7 @@
     "@next/env": "catalog:",
     "@orakel/build-contract": "workspace:*",
     "@orakel/content-model": "workspace:*",
+    "@orakel/core": "workspace:*",
     "@sentry/nextjs": "catalog:",
     "@sentry/node": "catalog:",
     "@tanstack/react-table": "catalog:",
