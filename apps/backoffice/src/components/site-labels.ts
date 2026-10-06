@@ -1,3 +1,5 @@
+import type { Block } from '@orakel/content-model/v1';
+
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
@@ -13,6 +15,15 @@ export const LIFECYCLE_LABEL: Record<SiteSummary['lifecycle'], string> = {
 export const CONTENT_KIND_LABEL: Record<ContentListItem['kind'], string> = {
   article: 'Artigo',
   page: 'Página',
+};
+
+/** Tipo de bloco (editor e leitura de uma versão). */
+export const BLOCK_TYPE_LABEL: Record<Block['type'], string> = {
+  text: 'Texto',
+  toc: 'Sumário',
+  quote: 'Citação',
+  image: 'Imagem',
+  faq: 'FAQ',
 };
 
 /** Status de uma versão de conteúdo. */

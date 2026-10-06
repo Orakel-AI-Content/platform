@@ -7,9 +7,10 @@ import {
 } from '@orakel/content-model/v1';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { FormProvider, useForm, type FieldValues } from 'react-hook-form';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { SchemaForm, type FieldProps } from './schema-form.tsx';
+import { SchemaFields, SchemaForm, type FieldProps } from './schema-form.tsx';
 
 // Gerador de formulários (#42): campos por tipo, listas, registro, erros e teclado.
 
@@ -204,5 +205,56 @@ describe('SchemaForm', () => {
 
     const warning = screen.getByText(/sem editor para este campo/);
     expect(within(warning).getByText(/content/)).toBeTruthy();
+  });
+});
+
+describe('SchemaFields', () => {
+  /** Formulário externo com dois blocos sob prefixos (o editor de conteúdo faz assim). */
+  function Outer({ onSubmit }: { onSubmit: (value: FieldValues) => void }) {
+    const form = useForm<FieldValues>({
+      defaultValues: {
+        blocks: [
+          { n: 1, type: 'quote', content: inline('Um'), attribution: 'Ana' },
+          { n: 2, type: 'quote', content: inline('Dois') },
+        ],
+      },
+    });
+    return (
+      <FormProvider {...form}>
+        <form onSubmit={(event) => void form.handleSubmit(onSubmit)(event)}>
+          {[0, 1].map((index) => (
+            <SchemaFields
+              key={index}
+              schema={QuoteBlockSchema}
+              prefix={`blocks.${index}`}
+              labels={{
+                'blocks.*.attribution': `Autoria ${index + 1}`,
+                'blocks.*.content': `Citação ${index + 1}`,
+              }}
+              hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.sourceUrl']}
+              fields={{ 'blocks.*.content': PlainInlines }}
+            />
+          ))}
+          <button type="submit">Salvar</button>
+        </form>
+      </FormProvider>
+    );
+  }
+
+  it('desenha os campos sob o prefixo e grava no formulário externo', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<Outer onSubmit={onSubmit} />);
+
+    expect(screen.getByLabelText<HTMLInputElement>('Autoria 1').value).toBe('Ana');
+    await user.type(screen.getByLabelText('Autoria 2'), 'Bia');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const value = onSubmit.mock.calls[0]?.[0] as { blocks: { attribution?: string; n: number }[] };
+    expect(value.blocks.map((block) => [block.n, block.attribution])).toEqual([
+      [1, 'Ana'],
+      [2, 'Bia'],
+    ]);
   });
 });

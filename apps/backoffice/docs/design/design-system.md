@@ -20,6 +20,11 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   entidade) entra por `fields`, um campo registrado por caminho, com `*` no lugar dos
   índices, que recebe `id`, `label`, `value`, `onChange`, `invalid` e `describedBy` (ligue
   esses dois ao controle). Nó sem desenho e sem campo registrado aparece como aviso.
+  Dentro de um formulário maior (`FormProvider`), `SchemaFields` desenha um schema sob um
+  prefixo (`blocks.2`), com os caminhos completos no registro (`blocks.*.content`): é como o
+  editor de conteúdo monta cada bloco. Referências do site: `mediaField(opções)` (`<select>`,
+  `{ optional: true }` para capa) e `entityField(opções, aviso)` (caixas de seleção para
+  `authorIds` e `taxonomyIds`), em `src/components/forms/picker-fields.tsx`.
   Formulário escrito à mão (como o da configuração do site, #29) só até migrar (#47).
 - **Rich text:** TipTap só com o que o `RichTextSchema` aceita (`src/components/forms/`).
   Registre `richTextField('richText')` para texto e textos institucionais, e
