@@ -15,6 +15,14 @@ export function configureBuildWindow(ms: number): void {
 }
 
 /**
+ * Janela que vale para um site: a própria (segundos, `sites.buildWindowSeconds`), senão a
+ * padrão. Única regra de precedência, usada pelo agendamento e pelo registro de instâncias.
+ */
+export function effectiveBuildWindowMs(siteSeconds: number | null): number {
+  return siteSeconds === null ? windowMs : siteSeconds * 1000;
+}
+
+/**
  * Agenda o build do site na mesma transação da gravação. `job_key` + fila nomeada: um build
  * por vez por site, e publicações dentro da janela caem no mesmo job (`preserve_run_at`
  * mantém o horário do primeiro agendamento). Janela: `options.windowMs`, senão a do site,
@@ -26,7 +34,7 @@ export async function scheduleBuild(
   siteId: string,
   options: { windowMs?: number; now?: Date } = {},
 ): Promise<void> {
-  const delayMs = options.windowMs ?? (await siteWindowMs(tx, siteId)) ?? windowMs;
+  const delayMs = options.windowMs ?? effectiveBuildWindowMs(await siteWindowSeconds(tx, siteId));
   const runAt = new Date((options.now ?? new Date()).getTime() + delayMs);
   await tx.execute(sql`
     select graphile_worker.add_job(
@@ -40,13 +48,12 @@ export async function scheduleBuild(
     )`);
 }
 
-async function siteWindowMs(tx: Executor, siteId: string): Promise<number | undefined> {
+async function siteWindowSeconds(tx: Executor, siteId: string): Promise<number | null> {
   const [site] = await tx
     .select({ seconds: sites.buildWindowSeconds })
     .from(sites)
     .where(eq(sites.id, siteId));
-  const seconds = site?.seconds ?? undefined;
-  return seconds === undefined ? undefined : seconds * 1000;
+  return site?.seconds ?? null;
 }
 
 /** "Publicar agora": regrava o job do site para rodar imediatamente. */
