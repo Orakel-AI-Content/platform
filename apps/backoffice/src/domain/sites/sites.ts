@@ -27,16 +27,8 @@ export type SiteSummary = {
   lastBuild: LastBuild | null;
 };
 
-/** Cadastra um site com a configuração v1, validada contra os recursos da release. */
-export async function createSite(
-  tx: Executor,
-  actor: Actor,
-  input: SiteConfig,
-  resources: Resources = RESOURCES,
-): Promise<Result<{ siteId: string }>> {
-  const allowed = requireRole(actor, 'site.configure');
-  if (!allowed.ok) return allowed;
-
+/** Schema e validação semântica da configuração v1, contra os recursos da release. */
+function parseSiteConfig(input: SiteConfig, resources: Resources): Result<SiteConfig> {
   const parsed = SiteConfigSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -48,9 +40,22 @@ export async function createSite(
       })),
     };
   }
-  const semantic = validateSiteConfig(parsed.data, resources);
-  if (!semantic.ok) return semantic;
-  const config = semantic.value;
+  return validateSiteConfig(parsed.data, resources);
+}
+
+/** Cadastra um site com a configuração v1, validada contra os recursos da release. */
+export async function createSite(
+  tx: Executor,
+  actor: Actor,
+  input: SiteConfig,
+  resources: Resources = RESOURCES,
+): Promise<Result<{ siteId: string }>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  const validated = parseSiteConfig(input, resources);
+  if (!validated.ok) return validated;
+  const config = validated.value;
 
   const existing = await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, config.siteId));
   if (existing.length > 0) {
@@ -66,6 +71,62 @@ export async function createSite(
   await tx.insert(siteConfigs).values({ siteId: config.siteId, version: 1, config });
   await recordPendingChange(tx, config.siteId, 'config', 'v1');
   return { ok: true, value: { siteId: config.siteId } };
+}
+
+/**
+ * Edita a configuração: grava a versão N+1 (a N fica intacta) e registra a mudança pendente.
+ * O SITE_ID não muda (entra nos IDs de reconciliação de afiliados), e os textos
+ * institucionais vêm da versão corrente: a edição deles é de outro fluxo, e um formulário
+ * sem o campo não pode apagá-los.
+ */
+export async function updateSiteConfig(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  input: SiteConfig,
+  resources: Resources = RESOURCES,
+): Promise<Result<{ version: number }>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  const [current] = await tx
+    .select({ version: siteConfigs.version, config: siteConfigs.config })
+    .from(siteConfigs)
+    .where(eq(siteConfigs.siteId, siteId))
+    .orderBy(desc(siteConfigs.version))
+    .limit(1);
+  if (current === undefined) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  if (input.siteId !== siteId) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'site.id_mismatch',
+          message: `O SITE_ID não muda: a configuração é de ${input.siteId}, o site é ${siteId}`,
+          path: ['siteId'],
+        },
+      ],
+    };
+  }
+
+  const candidate: SiteConfig = { ...input };
+  delete candidate.institutionalTexts;
+  const { institutionalTexts } = current.config;
+  if (institutionalTexts !== undefined) candidate.institutionalTexts = institutionalTexts;
+  const validated = parseSiteConfig(candidate, resources);
+  if (!validated.ok) return validated;
+  const config = validated.value;
+
+  const version = current.version + 1;
+  await tx.insert(siteConfigs).values({ siteId, version, config });
+  await tx.update(sites).set({ name: config.name }).where(eq(sites.id, siteId));
+  await recordPendingChange(tx, siteId, 'config', `v${version}`);
+  return { ok: true, value: { version } };
 }
 
 export async function siteExists(db: Executor, siteId: string): Promise<boolean> {
