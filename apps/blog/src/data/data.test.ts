@@ -7,10 +7,12 @@ import { PREVIEW_CACHE_MS, loadPreviewSite } from './preview.ts';
 const fixtureEnv = { CONTENT_SOURCE: 'fixture' as const };
 
 describe('fixtureFetch', () => {
-  it('serve a fixture do site na rota do snapshot e 404 no resto', async () => {
-    const ok = await fixtureFetch(`${FIXTURE_BASE_URL}/api/export/v1/sites/exemplo-b/snapshot`);
-    expect(ok.status).toBe(200);
-    expect((await ok.text()).split('\n')[0]).toContain('"site":"exemplo-b"');
+  it('serve a fixture do site nas rotas do snapshot e 404 no resto', async () => {
+    for (const route of ['snapshot', 'preview-snapshot']) {
+      const ok = await fixtureFetch(`${FIXTURE_BASE_URL}/api/export/v1/sites/exemplo-b/${route}`);
+      expect(ok.status).toBe(200);
+      expect((await ok.text()).split('\n')[0]).toContain('"site":"exemplo-b"');
+    }
     expect(
       (await fixtureFetch(`${FIXTURE_BASE_URL}/api/export/v1/sites/nao-existe/snapshot`)).status,
     ).toBe(404);
@@ -38,7 +40,7 @@ describe('loadPreviewSite', () => {
     const env = {
       CONTENT_SOURCE: 'api' as const,
       EXPORT_API_URL: 'http://api.invalid',
-      EXPORT_BUILD_TOKEN: 'x'.repeat(32),
+      EXPORT_PREVIEW_TOKEN: 'x'.repeat(32),
     };
     await expect(loadPreviewSite('site-api', env, 5)).rejects.toMatchObject({
       name: 'BuildError',
@@ -46,6 +48,23 @@ describe('loadPreviewSite', () => {
     });
     await expect(loadPreviewSite('site-api', env, 6)).rejects.toBeInstanceOf(BuildError);
     expect(fetch).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it('com a API, lê o snapshot de visualização com o token da visualização', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response('', { status: 503 }));
+    vi.stubGlobal('fetch', fetch);
+    const token = 'p'.repeat(32);
+    await loadPreviewSite(
+      'site-token',
+      { CONTENT_SOURCE: 'api', EXPORT_API_URL: 'http://api.invalid', EXPORT_PREVIEW_TOKEN: token },
+      5,
+    ).catch(() => undefined);
+    const [url, init] = fetch.mock.calls[0] ?? [];
+    expect(url).toBe('http://api.invalid/api/export/v1/sites/site-token/preview-snapshot');
+    expect(init?.headers).toMatchObject({ authorization: `Bearer ${token}` });
     vi.unstubAllGlobals();
   });
 });

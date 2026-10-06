@@ -18,5 +18,6 @@ src/
 `./v2` e `./v2/astro`, e `2` em `CLIENT_SCHEMA_VERSIONS`. A release que usa a v2 importa
 só a v2.
 
-**Leitura ao vivo:** `src/v1/live.ts` (cliente das rotas de visualização) e um live loader em
-`src/v1/astro/`, no mesmo PR das rotas do backoffice.
+**Snapshot de visualização:** o mesmo `readSnapshot` com `kind: 'preview'` (rota
+`preview-snapshot`, token da visualização); não há cliente ao vivo nem live loader (ADR 0009
+do backoffice). Rota nova da API → caminho em `SNAPSHOT_ROUTES` de `src/index.ts`.

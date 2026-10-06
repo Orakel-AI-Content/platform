@@ -24,7 +24,7 @@ IMPORTANT: antes de começar uma tarefa, identifique quais documentos abaixo sã
 relevantes e leia-os primeiro.
 
 - `docs/architecture/overview.md` – leitura, falhas, loaders
-- `docs/architecture/folder-structure.md` – coleção nova, versão nova, leitura ao vivo
+- `docs/architecture/folder-structure.md` – coleção nova, versão nova, snapshot de visualização
 - `docs/conventions/testing.md` – servidor de teste e casos
 - `docs/decisions/` – por que as escolhas foram feitas
 - `docs/project-spec.yaml` – decisões desta unidade (herda as da raiz)

@@ -22,6 +22,16 @@ export const RenderEnvSchema = z.object({
 });
 export type RenderEnv = z.infer<typeof RenderEnvSchema>;
 
+/** ssr (blog-preview): lê o snapshot de visualização com o token dela, nunca o do build. */
+export const SsrEnvSchema = z.discriminatedUnion('CONTENT_SOURCE', [
+  z.object({
+    CONTENT_SOURCE: z.literal('api'),
+    EXPORT_API_URL: z.url(),
+    EXPORT_PREVIEW_TOKEN: Token,
+  }),
+  z.object({ CONTENT_SOURCE: z.literal('fixture') }),
+]);
+
 const S3 = {
   S3_ENDPOINT: z.url(),
   S3_ACCESS_KEY_ID: z.string().min(1),

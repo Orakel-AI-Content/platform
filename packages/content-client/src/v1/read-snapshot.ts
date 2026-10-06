@@ -7,14 +7,16 @@ import {
   type SnapshotLine,
 } from '@orakel/content-model/v1';
 
-import { snapshotUrl } from '../index.ts';
+import { snapshotUrl, type SnapshotKind } from '../index.ts';
 import { ndjsonLines } from './ndjson.ts';
 
 export type SnapshotRequest = {
   /** Base da API de exportação na rede interna (ex.: http://backoffice-web:3000). */
   baseUrl: string;
   site: string;
-  /** Token interno do build (Bearer). Nunca é logado. */
+  /** Snapshot do build (padrão) ou da visualização. */
+  kind?: SnapshotKind;
+  /** Token interno do consumidor (Bearer): o do build ou o da visualização. Nunca é logado. */
   token: string;
   fetch?: typeof fetch;
   signal?: AbortSignal;
@@ -37,7 +39,7 @@ export async function readSnapshot(request: SnapshotRequest): Promise<Result<Rea
   const doFetch = request.fetch ?? fetch;
   let response: Response;
   try {
-    response = await doFetch(snapshotUrl(request.baseUrl, request.site, 1), {
+    response = await doFetch(snapshotUrl(request.baseUrl, request.site, 1, request.kind), {
       headers: { authorization: `Bearer ${request.token}`, accept: 'application/x-ndjson' },
       signal: request.signal,
     });

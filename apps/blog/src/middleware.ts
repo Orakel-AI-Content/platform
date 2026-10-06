@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { defineMiddleware } from 'astro:middleware';
 
 import { loadPreviewSite } from './data/preview.ts';
-import { sourceEnv } from './env.ts';
+import { previewEnv } from './env.ts';
 import { splitPreviewPath } from './render/links.ts';
 
 const require = createRequire(import.meta.url);
@@ -42,7 +42,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       headers: { 'x-robots-tag': 'noindex' },
     });
   }
-  const site = await loadPreviewSite(target.site, sourceEnv());
+  const site = await loadPreviewSite(target.site, previewEnv());
   if (!site) {
     return new Response(`Site "${target.site}" não encontrado`, {
       status: 404,

@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import type { SnapshotKind } from '../index.ts';
+
 export const TOKEN = 'token-de-teste-com-32-caracteres-ok';
 
 export type Reply = { status?: number; body?: string; chunkSize?: number; abortAfter?: number };
@@ -15,16 +17,18 @@ export async function readFixture(site: string): Promise<string> {
   );
 }
 
-/** Sobe um servidor que responde conforme `reply(site)`; exige o token do build. */
+/** Sobe um servidor que responde conforme `reply(site, kind)`; exige o token de teste. */
 export async function startServer(
-  reply: (site: string) => Reply,
+  reply: (site: string, kind: SnapshotKind) => Reply,
 ): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server: Server = createServer((req, res) => {
     if (req.headers.authorization !== `Bearer ${TOKEN}`) {
       res.writeHead(401).end();
       return;
     }
-    const match = /^\/api\/export\/v1\/sites\/([^/]+)\/snapshot$/.exec(req.url ?? '');
+    const match = /^\/api\/export\/v1\/sites\/([^/]+)\/(snapshot|preview-snapshot)$/.exec(
+      req.url ?? '',
+    );
     if (!match?.[1]) {
       res.writeHead(404).end();
       return;
@@ -34,7 +38,7 @@ export async function startServer(
       body = '',
       chunkSize = 64,
       abortAfter,
-    } = reply(decodeURIComponent(match[1]));
+    } = reply(decodeURIComponent(match[1]), match[2] === 'snapshot' ? 'build' : 'preview');
     res.writeHead(status, { 'content-type': 'application/x-ndjson' });
     const bytes = Buffer.from(body);
     let offset = 0;
