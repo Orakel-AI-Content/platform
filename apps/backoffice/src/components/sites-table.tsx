@@ -4,6 +4,7 @@ import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-tab
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 
+import { LIFECYCLE_LABEL } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -20,13 +21,6 @@ import type { SiteSummary } from '@/domain/sites/sites.ts';
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, SiteSummary>();
-
-const LIFECYCLE_LABEL: Record<SiteSummary['lifecycle'], string> = {
-  cadastrado: 'Cadastrado',
-  infra_aplicada: 'Infra aplicada',
-  zona_ativa: 'Zona ativa',
-  publicado: 'Publicado',
-};
 
 type PublishNow = (siteId: string) => Promise<{ ok: boolean; message: string }>;
 
@@ -81,7 +75,14 @@ function PublishNowButton({ siteId, action }: { siteId: string; action: PublishN
 }
 
 const columns = column.columns([
-  column.accessor('id', { header: 'SITE_ID' }),
+  column.accessor('id', {
+    header: 'SITE_ID',
+    cell: (info) => (
+      <Link href={`/sites/${info.getValue()}`} className="font-medium underline underline-offset-4">
+        {info.getValue()}
+      </Link>
+    ),
+  }),
   column.accessor('name', { header: 'Nome' }),
   column.accessor('domain', { header: 'Domínio' }),
   column.accessor('lifecycle', {

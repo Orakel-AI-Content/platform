@@ -149,3 +149,80 @@ test('editor não cadastra nem edita a configuração', async ({ page }) => {
     await expect(page.locator('form')).toHaveCount(0);
   }
 });
+
+// Página do site (#30): ciclo de vida, G1 e janela de agrupamento.
+
+async function newSite(page: Page, siteId: string): Promise<void> {
+  await page.goto('/sites/novo');
+  await page.getByLabel('SITE_ID').fill(siteId);
+  await page.getByLabel('Nome', { exact: true }).fill(`Site ${siteId}`);
+  await page.getByLabel('Domínios').fill(`${siteId}.example.com`);
+  await page.getByLabel('Tema').fill('padrao');
+  await page.getByRole('button', { name: 'Cadastrar site' }).click();
+  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+}
+
+const status = (page: Page, text: string) => page.getByRole('status').filter({ hasText: text });
+
+test('operação marca as etapas, registra o G1 e define a janela do site', async ({ page }) => {
+  const siteId = `e2e-pagina-${Date.now()}`;
+  await loginAs(page, 'operacao@orakel.local');
+  await newSite(page, siteId);
+  await page.getByRole('link', { name: siteId, exact: true }).click();
+  await expect(page.getByRole('heading', { name: new RegExp(siteId) })).toBeVisible();
+  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+
+  // Ciclo de vida: só o próximo passo manual.
+  await page.getByRole('button', { name: 'Marcar infra aplicada' }).click();
+  await expect(status(page, 'Infra aplicada marcada.')).toBeVisible();
+  await expect(page.getByText('Etapa atual: Infra aplicada')).toBeVisible();
+  await page.getByRole('button', { name: 'Marcar zona ativa' }).click();
+  await expect(page.getByText('Etapa atual: Zona ativa')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Marcar/ })).toHaveCount(0);
+
+  // Indexação sem G1 é recusada; depois do G1 pela página, a mesma edição é aceita.
+  const indexar = async () => {
+    await page.goto(`/sites/${siteId}/configuracao`);
+    await page.getByLabel('Indexável').check();
+    await page.getByRole('button', { name: 'Salvar configuração' }).click();
+  };
+  await indexar();
+  await expect(page.getByText('só pode ficar indexável depois do G1 registrado')).toBeVisible();
+  await page.goto(`/sites/${siteId}`);
+  await page.getByLabel('Observação do G1').fill('Políticas publicadas');
+  await page.getByRole('button', { name: 'Registrar G1' }).click();
+  await expect(
+    page.getByText(/Registrado por operacao@orakel\.local em .* — Políticas publicadas/),
+  ).toBeVisible();
+  await indexar();
+  await expect(status(page, 'versão 2')).toBeVisible();
+
+  // Janela própria e volta à padrão.
+  await page.goto(`/sites/${siteId}`);
+  await page.getByLabel('Janela própria (segundos)').fill('30');
+  await page.getByRole('button', { name: 'Salvar janela' }).click();
+  await expect(page.getByText('Janela efetiva: 30 s (própria)')).toBeVisible();
+  await page.getByRole('button', { name: 'Usar padrão' }).click();
+  await expect(page.getByText(/Janela efetiva: \d+ s \(padrão\)/)).toBeVisible();
+  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+
+  await page.goto('/sites');
+  await expect(
+    page.getByRole('row').filter({ hasText: siteId }).getByRole('cell', { name: 'Zona ativa' }),
+  ).toBeVisible();
+});
+
+test('editor vê a página do site sem as ações', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.getByRole('link', { name: 'exemplo-a', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Ciclo de vida' })).toBeVisible();
+  for (const name of [/^Marcar/, 'Registrar G1', 'Salvar janela', 'Usar padrão']) {
+    await expect(page.getByRole('button', { name })).toHaveCount(0);
+  }
+  await expect(page.getByRole('link', { name: 'Editar configuração' })).toHaveCount(0);
+});
+
+test('site inexistente responde 404', async ({ page }) => {
+  await loginAs(page, 'operacao@orakel.local');
+  expect((await page.goto('/sites/nao-existe'))?.status()).toBe(404);
+});
