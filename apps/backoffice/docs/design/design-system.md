@@ -21,5 +21,10 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   índices, que recebe `id`, `label`, `value`, `onChange`, `invalid` e `describedBy` (ligue
   esses dois ao controle). Nó sem desenho e sem campo registrado aparece como aviso.
   Formulário escrito à mão (como o da configuração do site, #29) só até migrar (#47).
+- **Rich text:** TipTap só com o que o `RichTextSchema` aceita (`src/components/forms/`).
+  Registre `richTextField('richText')` para texto e textos institucionais, e
+  `richTextField('inlines')` (um parágrafo, sem intertítulo nem lista) para citação, resposta
+  de FAQ e legenda. O valor é sempre a árvore do content-model; colar HTML descarta o que o
+  schema não aceita, e link com endereço inválido vira texto.
 - **Testes de componente:** `*.test.tsx` com `// @vitest-environment happy-dom` e Testing
   Library (rótulos por `getByLabelText`, teclado por `user-event`).
