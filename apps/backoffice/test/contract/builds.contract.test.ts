@@ -7,6 +7,8 @@ import { builds, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { requestBuildNow } from '../../src/domain/builds/builds.ts';
+import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
+import { setBuildWindow } from '../../src/domain/builds/site-state.ts';
 import {
   failedFile,
   fakeRuntime,
@@ -78,6 +80,108 @@ describe('agendamento', () => {
     expect(
       await db.transaction((tx) => requestBuildNow(tx, SYSTEM_ACTOR, 'exemplo-a')),
     ).toMatchObject({ ok: false, issues: [{ code: 'site.paused' }] });
+  });
+});
+
+describe('janela por site', () => {
+  async function runAt(siteId: string): Promise<number[]> {
+    const result = await db.execute<{ run_at: Date }>(
+      sql`select run_at from graphile_worker.jobs where key = ${`build:${siteId}`}`,
+    );
+    return result.rows.map((row) => new Date(row.run_at).getTime());
+  }
+
+  /** Publica (grava um autor) e devolve o intervalo de tempo em volta da gravação. */
+  async function publish(siteId: string, slug: string): Promise<[number, number]> {
+    const before = Date.now();
+    await db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, siteId, { slug, name: slug }));
+    return [before, Date.now()];
+  }
+
+  function expectRunAt([runAtMs]: number[], [before, after]: [number, number], windowMs: number) {
+    expect(runAtMs).toBeGreaterThanOrEqual(before + windowMs);
+    expect(runAtMs).toBeLessThanOrEqual(after + windowMs);
+  }
+
+  beforeEach(async () => {
+    const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
+    if (line?.type !== 'config') throw new Error('fixture sem config');
+    await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, line.data));
+    await db.execute(sql`delete from graphile_worker._private_jobs`);
+  });
+
+  it('cada site agenda com a própria janela', async () => {
+    await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'exemplo-a', 30));
+    await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'exemplo-b', 120));
+    const a = await publish('exemplo-a', 'ana');
+    const b = await publish('exemplo-b', 'bia');
+
+    expectRunAt(await runAt('exemplo-a'), a, 30_000);
+    expectRunAt(await runAt('exemplo-b'), b, 120_000);
+  });
+
+  it('sem janela própria, ou com ela limpa, vale a padrão', async () => {
+    configureBuildWindow(45_000);
+    try {
+      const ana = await publish('exemplo-a', 'ana');
+      expectRunAt(await runAt('exemplo-a'), ana, 45_000);
+
+      await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'exemplo-b', 120));
+      await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'exemplo-b', null));
+      const bia = await publish('exemplo-b', 'bia');
+      expectRunAt(await runAt('exemplo-b'), bia, 45_000);
+    } finally {
+      configureBuildWindow(15 * 60_000);
+    }
+  });
+
+  it('janela 0 agenda para já', async () => {
+    await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'exemplo-a', 0));
+    const ana = await publish('exemplo-a', 'ana');
+    expectRunAt(await runAt('exemplo-a'), ana, 0);
+  });
+
+  it('publicações dentro da janela caem no mesmo job', async () => {
+    await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'exemplo-a', 30));
+    await publish('exemplo-a', 'ana');
+    const first = await runAt('exemplo-a');
+    await publish('exemplo-a', 'bia');
+
+    expect(await runAt('exemplo-a')).toEqual(first);
+  });
+
+  it('definir a janela não cria mudança pendente', async () => {
+    const before = await unresolvedPendingChangeIds(db, 'exemplo-a');
+    await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'exemplo-a', 30));
+
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(before);
+    expect(await runAt('exemplo-a')).toEqual([]);
+  });
+
+  it('recusa janela negativa, no domínio e no banco', async () => {
+    expect(
+      await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'exemplo-a', -1)),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.build_window_invalid' }] });
+    expect(await site()).toMatchObject({ buildWindowSeconds: null });
+
+    await expect(
+      db.update(sites).set({ buildWindowSeconds: -1 }).where(eq(sites.id, 'exemplo-a')),
+    ).rejects.toThrow();
+  });
+
+  it('recusa site inexistente', async () => {
+    expect(
+      await db.transaction((tx) => setBuildWindow(tx, SYSTEM_ACTOR, 'outro', 30)),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+  });
+
+  it.each(['editor', 'revisor'] as const)('%s não define a janela', async (role) => {
+    const actor = { email: `${role}@orakel.local`, roles: [role] };
+    expect(await db.transaction((tx) => setBuildWindow(tx, actor, 'exemplo-a', 30))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
+    expect(await site()).toMatchObject({ buildWindowSeconds: null });
   });
 });
 
