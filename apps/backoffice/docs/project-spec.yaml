@@ -157,7 +157,12 @@ decisions:
   extra.publication-states:
     { value: 'rascunho, em_revisao, aprovado, agendado, publicado, despublicado', source: input }
   extra.build-window:
-    { value: '15 min em produção, 30 s no local (proposta)', source: input, provisional: true }
+    {
+      value: '15 min em produção, 30 s no local (proposta); por site em sites.build_window_seconds, nula usa BUILD_WINDOW_SECONDS',
+      rationale: 'ADR 0010',
+      source: input,
+      provisional: true,
+    }
 
 commands:
   dev: pnpm dev
@@ -200,4 +205,3 @@ open_questions:
   - 'Streaming do snapshot lê entidade por entidade; para acervos grandes, cursor no Postgres (critério da L1: 1.000 artigos)'
   - 'Imagem com ~1,1 GB (dependências de produção + standalone); otimizar (ex.: bundle dos processos Node)'
   - 'Retomar site pausado, rollback e reconstruir em outra release: ações do Registro de instâncias (L4)'
-  - 'Janela de agrupamento por site (hoje global, BUILD_WINDOW_SECONDS)'

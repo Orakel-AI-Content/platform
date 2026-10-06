@@ -14,7 +14,7 @@ atende quatro serviços: `backoffice-migrate`, `backoffice-web`, `backoffice-wor
 modo dev atrás do Caddy: `README.md` e `docs/guides/local-setup.md` da raiz.
 
 **Builds (ADR 0008):** toda gravação que vai para um site agenda o build dele; depois da janela
-(`BUILD_WINDOW_SECONDS`, 30 s no local) o `build-runner` roda o `render` e o `publish` e o site
+(`BUILD_WINDOW_SECONDS`, 30 s no local; um site pode ter a própria, ADR 0010) o `build-runner` roda o `render` e o `publish` e o site
 é atualizado em `https://<site>.localhost`. Em `/sites`, "Publicar agora" antecipa o build e a
 coluna "Último build" mostra o resultado; falha permanente pausa o site com o motivo.
 
