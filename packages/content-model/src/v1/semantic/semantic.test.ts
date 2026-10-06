@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { Issue, Result } from '../../result.ts';
 import type { Content } from '../entities/index.ts';
-import { RESOURCES, type Resources } from '../resources.ts';
+import { requiredImageWidths, RESOURCES, type Resources } from '../resources.ts';
 import type { SnapshotLine } from '../snapshot.ts';
 import { buildConfig, buildContent, buildMedia, buildSnapshotLines } from '../test-builders.ts';
-import { validateContent, validateSiteConfig, validateSnapshot } from './index.ts';
+import { validateContent, validateMedia, validateSiteConfig, validateSnapshot } from './index.ts';
 
 const issuesOf = (result: Result<unknown>): Issue[] => (result.ok ? [] : result.issues);
 const codesOf = (result: Result<unknown>) => issuesOf(result).map((issue) => issue.code);
@@ -160,6 +160,55 @@ describe('validateSnapshot', () => {
         line.type === 'media' ? { ...line, data: extra } : line,
       );
       expect(validateSnapshot(lines).ok).toBe(true);
+    });
+
+    describe('mídia menor que a maior largura do perfil', () => {
+      const variantsOf = (id: number, widths: number[]) =>
+        widths.flatMap((width) =>
+          RESOURCES.imageProfile.formats.map((format) => ({
+            width,
+            format,
+            path: `teste/m${id}-${width}.${format}`,
+          })),
+        );
+      const withMedia = (media: ReturnType<typeof buildMedia>): SnapshotLine[] =>
+        buildSnapshotLines().map((line) =>
+          line.type === 'media' ? { ...line, data: media } : line,
+        );
+
+      it('original de 800 px: bastam 320 e 640 nos dois formatos', () => {
+        const media = buildMedia(1, {
+          width: 800,
+          height: 600,
+          variants: variantsOf(1, [320, 640]),
+        });
+        expect(validateSnapshot(withMedia(media)).ok).toBe(true);
+        expect(validateMedia(media).ok).toBe(true);
+      });
+
+      it('original de 800 px sem a 640: recusa', () => {
+        const media = buildMedia(1, { width: 800, height: 600, variants: variantsOf(1, [320]) });
+        expect(issuesOf(validateSnapshot(withMedia(media)))).toContainEqual(
+          expect.objectContaining({
+            code: 'semantic.supported-resources',
+            message: 'Mídia 1 sem a variante 640w avif do perfil de imagem',
+          }),
+        );
+        expect(validateMedia(media).ok).toBe(false);
+      });
+
+      it('original de 200 px: uma variante de 200 por formato', () => {
+        expect(requiredImageWidths(200, RESOURCES)).toEqual([200]);
+        const media = buildMedia(1, { width: 200, height: 100, variants: variantsOf(1, [200]) });
+        expect(validateSnapshot(withMedia(media)).ok).toBe(true);
+        const missing = { ...media, variants: variantsOf(1, [320]) };
+        expect(codesOf(validateMedia(missing))).toContain('semantic.supported-resources');
+      });
+
+      it('original maior que o perfil exige todas as larguras', () => {
+        expect(requiredImageWidths(2560, RESOURCES)).toEqual(RESOURCES.imageProfile.widths);
+        expect(requiredImageWidths(1920, RESOURCES)).toEqual(RESOURCES.imageProfile.widths);
+      });
     });
 
     it('usa os recursos da release do site, não os do código atual', () => {
