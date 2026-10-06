@@ -75,7 +75,14 @@ function PublishNowButton({ siteId, action }: { siteId: string; action: PublishN
 }
 
 const columns = column.columns([
-  column.accessor('id', { header: 'SITE_ID' }),
+  column.accessor('id', {
+    header: 'SITE_ID',
+    cell: (info) => (
+      <Link href={`/sites/${info.getValue()}`} className="font-medium underline underline-offset-4">
+        {info.getValue()}
+      </Link>
+    ),
+  }),
   column.accessor('name', { header: 'Nome' }),
   column.accessor('domain', { header: 'Domínio' }),
   column.accessor('lifecycle', {
