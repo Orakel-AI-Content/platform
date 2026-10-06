@@ -3,8 +3,7 @@
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
 
-import { dateTime } from '@/components/contents-table.tsx';
-import { CONTENT_STATUS_LABEL } from '@/components/site-labels.ts';
+import { CONTENT_STATUS_LABEL, dateTime } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,

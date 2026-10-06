@@ -24,3 +24,10 @@ export const CONTENT_STATUS_LABEL: Record<ContentListItem['status'], string> = {
   publicado: 'Publicado',
   despublicado: 'Despublicado',
 };
+
+/** Data e hora no fuso da operação (tabelas e páginas de conteúdo). */
+export const dateTime = new Intl.DateTimeFormat('pt-BR', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+  timeZone: 'America/Sao_Paulo',
+});

@@ -3,7 +3,7 @@
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
 
-import { CONTENT_KIND_LABEL, CONTENT_STATUS_LABEL } from '@/components/site-labels.ts';
+import { CONTENT_KIND_LABEL, CONTENT_STATUS_LABEL, dateTime } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -20,12 +20,6 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, ContentListItem>();
-
-export const dateTime = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-  timeZone: 'America/Sao_Paulo',
-});
 
 function columnsFor(siteId: string) {
   return column.columns([
