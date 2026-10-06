@@ -19,6 +19,8 @@ export interface ObjectStore {
   /** Lê o objeto inteiro; `undefined` se não existir. */
   get(bucket: string, key: string): Promise<Uint8Array | undefined>;
   delete(bucket: string, key: string): Promise<void>;
+  /** O objeto existe? Sem ler o corpo (variantes já publicadas não são regravadas). */
+  exists(bucket: string, key: string): Promise<boolean>;
 }
 
 /** Armazenamento em memória, para os testes. */
@@ -39,6 +41,9 @@ export function memoryStore(): ObjectStore & { objects: Map<string, Uint8Array> 
     delete(bucket, key) {
       objects.delete(`${bucket}/${key}`);
       return Promise.resolve();
+    },
+    exists(bucket, key) {
+      return Promise.resolve(objects.has(`${bucket}/${key}`));
     },
   };
 }
