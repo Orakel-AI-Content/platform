@@ -24,7 +24,7 @@ flowchart LR
 | Processo             | Comando                                           | Faz                                                        |
 | -------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
 | `backoffice-web`     | `node .next/standalone/apps/backoffice/server.js` | UI e route handlers (API de exportação, saúde)             |
-| `backoffice-worker`  | `node src/bin/worker.ts`                          | Jobs gerais e agregador pelo cron do Graphile Worker       |
+| `backoffice-worker`  | `node src/bin/worker.ts`                          | Jobs gerais (ingestão de imagens) e agregador pelo cron    |
 | `build-runner`       | `node src/bin/build-runner.ts`                    | Só a task `build`, concorrência 2 (ADR 0008)               |
 | `backoffice-migrate` | `node src/bin/migrate.ts`                         | Migrações do Drizzle e do Graphile Worker; sai ao terminar |
 
