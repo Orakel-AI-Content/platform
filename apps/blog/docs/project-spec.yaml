@@ -40,7 +40,7 @@ decisions:
     }
   architecture.site_source:
     {
-      value: 'SiteSource: coleções do snapshotLoaders no build; readSnapshot por site com cache de 10 s no SSR; rascunhos ao vivo depois',
+      value: 'SiteSource: coleções do snapshotLoaders no build; snapshot de visualização (rascunhos inclusive) por site com cache de 10 s no SSR',
       source: user,
     }
   architecture.routing:
@@ -92,7 +92,7 @@ decisions:
     }
   integration.env:
     {
-      value: 'SITE_ID, CONTENT_SOURCE (api|fixture, sem padrão), EXPORT_API_URL, EXPORT_BUILD_TOKEN, SNAPSHOT_META_FILE, PORT',
+      value: 'SITE_ID, CONTENT_SOURCE (api|fixture, sem padrão), EXPORT_API_URL, EXPORT_BUILD_TOKEN (build), EXPORT_PREVIEW_TOKEN (SSR), SNAPSHOT_META_FILE, PORT',
       source: user,
     }
   integration.dependencies:
@@ -134,7 +134,6 @@ structure:
     presets: src/presets/
 
 open_questions:
-  - 'Rascunhos na visualização: fonte ao vivo no SSR com as rotas de visualização do backoffice e o live loader do content-client'
   - 'Carrossel em navegador real: uma fixture com 4+ artigos num site revista'
   - 'Página de teste da ilha React: packages/ui'
   - 'Workspace: revisar a ADR-012 e o 12.0 com o limite de 130 kB da busca'
