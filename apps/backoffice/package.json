@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
+    "@hookform/resolvers": "catalog:",
     "@next/env": "catalog:",
     "@orakel/build-contract": "workspace:*",
     "@orakel/content-model": "workspace:*",
@@ -37,6 +38,7 @@
     "pino": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-hook-form": "catalog:",
     "tailwind-merge": "catalog:",
     "zod": "catalog:"
   },

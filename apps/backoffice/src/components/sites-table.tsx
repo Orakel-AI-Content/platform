@@ -1,9 +1,11 @@
 'use client';
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
+import Link from 'next/link';
 import { useState, useTransition } from 'react';
 
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -115,9 +117,18 @@ const columns = column.columns([
 ]);
 
 /** Registro de instâncias em tabela (TanStack Table + tabela do shadcn/ui). */
-export function SitesTable({ rows, publishNow }: { rows: SiteSummary[]; publishNow?: PublishNow }) {
+export function SitesTable({
+  rows,
+  publishNow,
+  canConfigure = false,
+}: {
+  rows: SiteSummary[];
+  publishNow?: PublishNow;
+  canConfigure?: boolean;
+}) {
   const table = useTable({ features, columns, data: rows });
-  const colSpan = columns.length + (publishNow ? 1 : 0);
+  const actions = publishNow !== undefined || canConfigure;
+  const colSpan = columns.length + (actions ? 1 : 0);
   return (
     <Table>
       <TableCaption>{rows.length === 1 ? '1 site' : `${rows.length} sites`}</TableCaption>
@@ -129,7 +140,7 @@ export function SitesTable({ rows, publishNow }: { rows: SiteSummary[]; publishN
                 <table.FlexRender header={header} />
               </TableHead>
             ))}
-            {publishNow && (
+            {actions && (
               <TableHead scope="col">
                 <span className="sr-only">Ações</span>
               </TableHead>
@@ -145,11 +156,22 @@ export function SitesTable({ rows, publishNow }: { rows: SiteSummary[]; publishN
                 <table.FlexRender cell={cell} />
               </TableCell>
             ))}
-            {publishNow && (
+            {actions && (
               <TableCell>
-                {row.original.state !== 'pausado' && (
-                  <PublishNowButton siteId={row.original.id} action={publishNow} />
-                )}
+                <span className="flex flex-col items-start gap-2">
+                  {canConfigure && (
+                    <Link
+                      href={`/sites/${row.original.id}/configuracao`}
+                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                    >
+                      Editar configuração
+                      <span className="sr-only"> {row.original.id}</span>
+                    </Link>
+                  )}
+                  {publishNow && row.original.state !== 'pausado' && (
+                    <PublishNowButton siteId={row.original.id} action={publishNow} />
+                  )}
+                </span>
               </TableCell>
             )}
           </TableRow>
