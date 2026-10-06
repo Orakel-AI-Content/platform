@@ -1,0 +1,60 @@
+'use server';
+
+import type { Issue } from '@orakel/content-model';
+import { revalidatePath } from 'next/cache';
+
+import { currentActor } from '@/auth/request-actor.ts';
+import type { ContentFormResult } from '@/components/content-editor-values.ts';
+import { getDb } from '@/db/client.ts';
+import { createContent, updateContent, type ContentEdit } from '@/domain/content/contents.ts';
+
+// Ações do editor de conteúdo: permissão, validação e o `n` dos blocos ficam no domínio.
+
+/** Issues do domínio no formato serializável do editor (o `path` aponta o campo). */
+function refused(issues: readonly Issue[]): ContentFormResult {
+  return {
+    ok: false,
+    message: 'Não foi possível salvar o conteúdo.',
+    issues: issues.map((issue) => ({
+      path: issue.path.map((key) => (typeof key === 'number' ? key : String(key))),
+      message: issue.message,
+    })),
+  };
+}
+
+const noSession: ContentFormResult = {
+  ok: false,
+  message: 'Sessão inválida; entre de novo.',
+  issues: [],
+};
+
+/** Cria o conteúdo com a versão 1 em rascunho. */
+export async function createContentAction(
+  siteId: string,
+  input: ContentEdit,
+): Promise<ContentFormResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return noSession;
+  const result = await getDb().db.transaction((tx) =>
+    createContent(tx, actor.value, siteId, input),
+  );
+  if (!result.ok) return refused(result.issues);
+  revalidatePath(`/sites/${siteId}/conteudos`);
+  return { ok: true, message: 'Conteúdo criado.', id: result.value.id };
+}
+
+/** Grava a versão N+1 do conteúdo em rascunho. */
+export async function updateContentAction(
+  siteId: string,
+  contentId: number,
+  input: ContentEdit,
+): Promise<ContentFormResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return noSession;
+  const result = await getDb().db.transaction((tx) =>
+    updateContent(tx, actor.value, siteId, contentId, input),
+  );
+  if (!result.ok) return refused(result.issues);
+  revalidatePath(`/sites/${siteId}/conteudos`);
+  return { ok: true, message: `Versão ${result.value.version} salva.`, id: contentId };
+}
