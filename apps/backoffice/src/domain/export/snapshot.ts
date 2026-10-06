@@ -16,12 +16,23 @@ import { currentConfig, siteExists, unresolvedPendingChangeIds } from '../sites/
 import { toAuthor, toContent, toMedia, toRedirect, toTaxonomy } from './mappers.ts';
 
 /**
+ * Que versão de cada conteúdo entra no snapshot: `published`, a última publicada (build);
+ * `latest`, a mais recente em qualquer estado, menos o conteúdo cuja última versão é
+ * `despublicado` (visualização, ADR 0009).
+ */
+export type VersionSelection = 'published' | 'latest';
+
+/**
  * Linhas do snapshot de um site, na ordem do contrato: header (mudanças pendentes visíveis),
- * config, autores, taxonomias, menus, mídias, redirects, conteúdos publicados, end. Precisa
+ * config, autores, taxonomias, menus, mídias, redirects, conteúdos da seleção, end. Precisa
  * rodar dentro de uma transação REPEATABLE READ: a primeira leitura fixa o snapshot, e toda
  * mudança confirmada depois fica de fora (e continua pendente).
  */
-export async function* snapshotLines(tx: Executor, siteId: string): AsyncGenerator<SnapshotLine> {
+export async function* snapshotLines(
+  tx: Executor,
+  siteId: string,
+  selection: VersionSelection = 'published',
+): AsyncGenerator<SnapshotLine> {
   const pendingChangeIds = await unresolvedPendingChangeIds(tx, siteId);
   yield { type: 'header', schemaVersion: SCHEMA_VERSION, site: siteId, pendingChangeIds };
 
@@ -97,16 +108,24 @@ export async function* snapshotLines(tx: Executor, siteId: string): AsyncGenerat
     yield { type: 'redirect', data: toRedirect(row) };
   }
 
-  // Última versão publicada de cada conteúdo.
-  const published = await tx
+  // Última versão de cada conteúdo na seleção. O despublicado sai depois do DISTINCT ON:
+  // filtrá-lo antes traria de volta a versão anterior à despublicação.
+  const versions = await tx
     .selectDistinctOn([contentVersions.contentId], {
       contentId: contentVersions.contentId,
+      status: contentVersions.status,
       data: contentVersions.data,
     })
     .from(contentVersions)
-    .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.status, 'publicado')))
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        selection === 'published' ? eq(contentVersions.status, 'publicado') : undefined,
+      ),
+    )
     .orderBy(asc(contentVersions.contentId), desc(contentVersions.version));
-  for (const row of published) {
+  for (const row of versions) {
+    if (row.status === 'despublicado') continue;
     counts.content += 1;
     yield { type: 'content', data: toContent(row) };
   }
@@ -121,6 +140,7 @@ export async function* snapshotLines(tx: Executor, siteId: string): AsyncGenerat
 export async function openSnapshot(
   db: Db,
   siteId: string,
+  selection: VersionSelection = 'published',
 ): Promise<Result<ReadableStream<Uint8Array>>> {
   if (!(await siteExists(db, siteId))) {
     return {
@@ -134,7 +154,7 @@ export async function openSnapshot(
       try {
         await db.transaction(
           async (tx) => {
-            for await (const line of snapshotLines(tx, siteId)) {
+            for await (const line of snapshotLines(tx, siteId, selection)) {
               controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`));
             }
           },
