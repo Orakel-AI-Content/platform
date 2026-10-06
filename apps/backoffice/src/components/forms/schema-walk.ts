@@ -98,7 +98,8 @@ export function emptyValue(schema: z.ZodType): unknown {
 
 /**
  * Prepara os valores do formulário para o schema: string opcional vazia vira `undefined`
- * (vale a regra do schema, não o `min(1)`), e número vazio (`NaN`) também.
+ * (vale a regra do schema, não o `min(1)`), número vazio (`NaN`) também, e lista vazia em
+ * campo opcional (rich text apagado, legenda sem texto) também.
  */
 export function clean(schema: z.ZodType, value: unknown): unknown {
   const { optional, node } = describe(schema);
@@ -118,6 +119,7 @@ export function clean(schema: z.ZodType, value: unknown): unknown {
     );
   }
   if (node.kind === 'array' && Array.isArray(value)) {
+    if (optional && value.length === 0) return undefined;
     return value.map((item) => clean(node.element, item));
   }
   return value;

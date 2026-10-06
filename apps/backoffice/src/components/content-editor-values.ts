@@ -11,7 +11,7 @@ import * as z from 'zod';
 
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
-import { clean, describe, emptyValue } from './forms/schema-walk.ts';
+import { clean, emptyValue } from './forms/schema-walk.ts';
 
 // Valores do editor de conteúdo (#45): metadados pelo schema do conteúdo e cada bloco pelo
 // schema do seu tipo. Bloco novo vai com `new: true` e sem `n` (o servidor numera).
@@ -31,23 +31,6 @@ export const isBlockType = (type: unknown): type is Block['type'] =>
   typeof type === 'string' && Object.hasOwn(BLOCK_SCHEMAS, type);
 
 type Raw = Record<string, unknown>;
-
-/**
- * Prepara um objeto para o schema: o `clean` do gerador e, além dele, lista vazia em campo
- * opcional (legenda sem texto) vira `undefined`.
- */
-function prepare(schema: z.ZodType, value: unknown): unknown {
-  const cleaned = clean(schema, value);
-  const { node } = describe(schema);
-  if (node.kind !== 'object' || cleaned === null || typeof cleaned !== 'object') return cleaned;
-  return Object.fromEntries(
-    Object.entries(cleaned as Raw).map(([key, child]) => {
-      const childSchema = node.shape[key];
-      const optional = childSchema !== undefined && describe(childSchema).optional;
-      return [key, optional && Array.isArray(child) && child.length === 0 ? undefined : child];
-    }),
-  );
-}
 
 /** Bloco do editor: validado pelo schema do tipo; o `n` provisório só serve para validar. */
 const EditorBlockSchema = z.looseObject({ type: z.string() }).superRefine((block, ctx) => {
@@ -71,9 +54,9 @@ export const ContentEditorSchema = z
     const record = (value ?? {}) as Raw;
     const blocks = Array.isArray(record.blocks) ? (record.blocks as Raw[]) : [];
     return {
-      ...(prepare(ContentMetaSchema, record) as Raw),
+      ...(clean(ContentMetaSchema, record) as Raw),
       blocks: blocks.map((block) =>
-        isBlockType(block.type) ? prepare(BLOCK_SCHEMAS[block.type], block) : block,
+        isBlockType(block.type) ? clean(BLOCK_SCHEMAS[block.type], block) : block,
       ),
     };
   })
