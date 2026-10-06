@@ -57,3 +57,25 @@ export const siteSequences = pgTable(
   },
   (t) => [primaryKey({ columns: [t.siteId, t.entity] })],
 );
+
+/** Gatilhos de política (G1: indexação; G2/G3: afiliados e anúncios, fase 3). */
+export const POLICY_TRIGGERS = ['G1', 'G2', 'G3'] as const;
+
+/**
+ * Gatilhos de política cumpridos por site, registrados à mão pela operação (quem, quando,
+ * observação). Operacional: fora do snapshot, sem mudança pendente.
+ */
+export const sitePolicyTriggers = pgTable(
+  'site_policy_triggers',
+  {
+    siteId: text()
+      .notNull()
+      .references(() => sites.id),
+    trigger: text({ enum: POLICY_TRIGGERS }).notNull(),
+    /** E-mail de quem registrou. */
+    registeredBy: text().notNull(),
+    registeredAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    note: text(),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.trigger] })],
+);
