@@ -157,7 +157,10 @@ test('editor não cadastra nem edita a configuração', async ({ page }) => {
 
   for (const path of ['/sites/novo', '/sites/exemplo-a/configuracao']) {
     await page.goto(path);
-    await expect(page.getByRole('alert').filter({ hasText: 'Sem permissão' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Sem permissão' })).toBeVisible();
+    await expect(
+      page.getByText('Configurar os sites exige o papel admin ou operacao.'),
+    ).toBeVisible();
     await expect(page.locator('form')).toHaveCount(0);
   }
 });
