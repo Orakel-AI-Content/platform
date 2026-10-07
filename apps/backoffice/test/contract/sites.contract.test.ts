@@ -82,6 +82,23 @@ describe('fuso do site (#90)', () => {
   });
 });
 
+describe('configuração de outro site (#97)', () => {
+  it('recusa trocar o ID com a mensagem na linguagem de quem usa, sem SITE_ID', async () => {
+    const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
+    if (line?.type !== 'config') throw new Error('fixture sem config');
+
+    const result = await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-a', line.data),
+    );
+
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'site.id_mismatch' }] });
+    if (result.ok) return;
+    expect(result.issues[0]?.message).toBe(
+      'O ID do site não muda: a configuração é de exemplo-b, o site é exemplo-a',
+    );
+  });
+});
+
 describe('sites.auto.tfvars.json', () => {
   it('lista todos os sites por SITE_ID, com os domínios (o principal primeiro)', async () => {
     const result = await exportSitesTfvars(db, SYSTEM_ACTOR);
