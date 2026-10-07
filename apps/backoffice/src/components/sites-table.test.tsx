@@ -23,6 +23,7 @@ const site: SiteSummary = {
   lastBuild: null,
   buildWindowSeconds: null,
   effectiveBuildWindowSeconds: 300,
+  timeZone: 'America/Sao_Paulo',
 };
 
 describe('tabela de sites', () => {
