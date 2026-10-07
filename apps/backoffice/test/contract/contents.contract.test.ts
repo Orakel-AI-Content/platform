@@ -3,7 +3,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { contents, contentVersions } from '../../src/db/schema/index.ts';
+import { contents, contentVersions, reviews } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
@@ -17,6 +17,7 @@ import {
   type EditBlock,
 } from '../../src/domain/content/contents.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
+import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
@@ -395,6 +396,32 @@ describe('leituras de conteúdo', () => {
       ok: false,
       issues: [{ code: 'content.not_found' }],
     });
+  });
+
+  it('cada versão traz a aprovação (revisor e data) ou nula, sem duplicar linhas (#76)', async () => {
+    await edit(3, { ...(await latest(3)), title: 'Quem somos (2)' });
+    await submit(3);
+    const approved = await db.transaction((tx) =>
+      approveVersion(
+        tx,
+        { email: 'revisor@orakel.local', roles: ['revisor'] },
+        SITE,
+        3,
+        2,
+        REVIEW_CHECKLIST.map((item) => item.key),
+      ),
+    );
+    if (!approved.ok) throw new Error(JSON.stringify(approved.issues));
+    const [review] = await db.select().from(reviews);
+
+    const result = await listContentVersions(db, SYSTEM_ACTOR, SITE, 3);
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value).toHaveLength(2);
+    expect(result.value.map((v) => [v.version, v.approval])).toEqual([
+      [1, null],
+      [2, { reviewer: 'revisor@orakel.local', approvedAt: review?.createdAt }],
+    ]);
   });
 
   it.each(['editor', 'revisor', 'operacao'] as const)(
