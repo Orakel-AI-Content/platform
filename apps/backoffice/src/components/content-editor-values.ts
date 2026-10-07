@@ -74,6 +74,47 @@ export function newBlock(type: Block['type']): Raw {
   return { ...value, type, new: true };
 }
 
+const isRecord = (value: unknown): value is Raw =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * Vazio da tela: `undefined` (a capa sem mídia), `''`, número vazio, lista vazia ou objeto só
+ * com vazios (o SEO em branco). A chave fica: a comparação de "alterado" conta as chaves.
+ */
+const isEmpty = (value: unknown): boolean =>
+  value === undefined ||
+  value === '' ||
+  (typeof value === 'number' && Number.isNaN(value)) ||
+  (Array.isArray(value) && value.length === 0) ||
+  (isRecord(value) && Object.values(value).every(isEmpty));
+
+/**
+ * Valores para reiniciar o editor com a versão salva (#109, #110): a versão vem sem os
+ * campos que `clean` esvaziou (descrição, SEO, legenda…), e os campos da tela voltariam a se
+ * registrar com `''` — o formulário pareceria alterado logo depois de salvar. Onde a versão
+ * salva não traz o campo e o envio tinha um valor vazio, o vazio fica; o resto é da versão
+ * salva (inclusive o `n` dos blocos novos, sem o `new`).
+ */
+export function savedFormValues(saved: unknown, sent: unknown): unknown {
+  if (Array.isArray(saved)) {
+    return Array.isArray(sent) && sent.length === saved.length
+      ? saved.map((item, index) => savedFormValues(item, sent[index]))
+      : saved;
+  }
+  if (!isRecord(saved)) return saved;
+  const result: Raw = { ...saved };
+  if (isRecord(sent)) {
+    for (const [key, value] of Object.entries(sent)) {
+      if (saved[key] === undefined) {
+        if (isEmpty(value)) result[key] = value;
+      } else {
+        result[key] = savedFormValues(saved[key], value);
+      }
+    }
+  }
+  return result;
+}
+
 /** Retorno das Server Actions do editor (serializável; `path` aponta o campo). */
 export type ContentFormIssue = { path: (string | number)[]; message: string };
 export type ContentFormResult =

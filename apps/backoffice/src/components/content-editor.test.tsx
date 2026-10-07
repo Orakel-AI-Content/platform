@@ -49,6 +49,7 @@ type RenderProps = {
   result?: ContentFormResult;
   mode?: 'create' | 'edit';
   created?: boolean;
+  previewUrl?: string;
   respond?: (input: ContentEdit) => Promise<ContentFormResult>;
 };
 
@@ -58,6 +59,7 @@ function renderEditor({
   result = { ok: true, message: 'Versão 2 salva.', id: 7 },
   mode = 'edit',
   created,
+  previewUrl,
   respond = () => Promise.resolve(result),
 }: RenderProps = {}) {
   const action = vi.fn<(input: ContentEdit) => Promise<ContentFormResult>>(respond);
@@ -69,6 +71,7 @@ function renderEditor({
       options={{ ...options, blockTypes }}
       action={action}
       created={created}
+      previewUrl={previewUrl}
     />,
   );
   return action;
@@ -246,5 +249,57 @@ describe('barra de ações e continuar no editor (#109)', () => {
     expect(router.replace).toHaveBeenCalledWith('/sites/exemplo-a/conteudos/7/editar', {
       scroll: false,
     });
+  });
+});
+
+describe('ver prévia (#110)', () => {
+  const PREVIEW = 'https://preview.orakel.localhost/exemplo-a/guia/';
+  const note = (id: string | null) => document.getElementById(id ?? '');
+
+  it('salvo: abre a prévia da última versão em nova aba, sem aviso', () => {
+    renderEditor({ previewUrl: PREVIEW });
+
+    const link = screen.getByRole('link', { name: 'Ver prévia (abre em nova aba)' });
+    expect(link.getAttribute('href')).toBe(PREVIEW);
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(note(link.getAttribute('aria-describedby'))?.textContent).toBe('');
+  });
+
+  it('alterado: o aviso aparece numa região anunciada e some depois de salvar', async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      previewUrl: PREVIEW,
+      defaultValues: { ...meta, blocks: [toc(1, 'A')] },
+      result: {
+        ok: true,
+        message: 'Versão 2 salva.',
+        id: 7,
+        saved: { ...meta, title: 'Guia revisado', blocks: [toc(1, 'A')] } as never,
+      },
+    });
+    const link = screen.getByRole('link', { name: 'Ver prévia (abre em nova aba)' });
+    const region = note(link.getAttribute('aria-describedby'));
+    expect(region?.getAttribute('aria-live')).toBe('polite');
+
+    await user.type(screen.getByLabelText('Título', { exact: true }), ' revisado');
+    await waitFor(() =>
+      expect(region?.textContent).toBe('As alterações não salvas não aparecem na prévia.'),
+    );
+
+    await save(user);
+    await screen.findByText('Versão 2 salva.');
+    await waitFor(() => expect(region?.textContent).toBe(''));
+  });
+
+  it('novo: antes do primeiro salvamento, "Ver prévia" não é um link ativo', () => {
+    renderEditor({ mode: 'create', defaultValues: { ...meta, blocks: [] } });
+
+    expect(screen.queryByRole('link', { name: /Ver prévia/ })).toBeNull();
+    const button = screen.getByRole('button', { name: 'Ver prévia' });
+    expect(button).toHaveProperty('disabled', true);
+    expect(note(button.getAttribute('aria-describedby'))?.textContent).toBe(
+      'Salve para ver a prévia.',
+    );
   });
 });
