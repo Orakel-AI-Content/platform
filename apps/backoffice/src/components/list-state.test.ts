@@ -174,3 +174,20 @@ describe('useListState', () => {
     });
   });
 });
+
+describe('lista sem ordem padrão (#108)', () => {
+  const unsorted: ListConfig = { filters: [], sortable: [] };
+
+  it('fica na ordem dos dados: sem sort, sem sorting e sem ordem na URL', () => {
+    navigation.search = 'ordem=-name&q=ana';
+    const { result } = renderHook(() => useListState(unsorted));
+
+    expect(parseListState(params('ordem=-name'), unsorted).sort).toBeUndefined();
+    expect(result.current.table.state.sorting).toEqual([]);
+    act(() => result.current.setPage(2));
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      '/sites/exemplo-a/conteudos?ordem=-name&q=ana&pagina=2',
+      { scroll: false },
+    );
+  });
+});

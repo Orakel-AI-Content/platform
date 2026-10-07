@@ -11,7 +11,10 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Autores' };
 
-/** Autores do site; criar e editar só com content.write. */
+/**
+ * Autores do site, com busca por nome e paginação (#108); criar e editar só com
+ * content.write.
+ */
 export default async function AuthorsPage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
   const context = await sitePageContext(siteId);
@@ -43,6 +46,7 @@ export default async function AuthorsPage({ params }: { params: Promise<{ site: 
           cells: [author.slug, author.expertise ?? '—'],
         }))}
         noun={{ one: 'autor', many: 'autores', none: 'Nenhum autor cadastrado.' }}
+        search={{ label: 'Buscar por nome', notFound: 'Nenhum autor encontrado.' }}
         canWrite={canWrite}
         emptyAction={create}
       />
