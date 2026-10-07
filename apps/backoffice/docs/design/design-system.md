@@ -11,6 +11,12 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
 - **Temas:** claro e escuro pela preferência do sistema (`prefers-color-scheme`).
 - **Tabelas:** TanStack Table 9 (`useTable` com `tableFeatures`); a biblioteca traz skills
   em `node_modules/@tanstack/react-table/skills/`.
+- **Larguras:** duas utilities de `globals.css`, na `section` (ou `article`) de topo da página,
+  nunca um `max-w-*` solto. `form-width` (`max-w-3xl`) para criar e editar, configuração,
+  textos institucionais e telas que leem um item (página do site, versão de um conteúdo):
+  uma coluna legível. `list-width` (largura cheia do `main`) para as listas e tabelas: sites,
+  conteúdos, versões, autores, taxonomias, menus e mídia. O componente de formulário não
+  define largura; quem define é a página.
 - **Estado pausado:** badge `warning` com o motivo, sempre visível na lista de sites.
 - **Telas de estado:** `StatusScreen` (`src/components/status-screen.tsx`), com título (`h1`),
   uma frase do que aconteceu e o que fazer, e a ação de saída (link de volta ou "Tentar de
