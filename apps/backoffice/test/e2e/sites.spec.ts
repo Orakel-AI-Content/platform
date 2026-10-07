@@ -1,9 +1,17 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import { removeSites } from './cleanup.ts';
+
 // E2E contra o ambiente local (pnpm local:up && pnpm local:seed): Caddy + access-mock +
 // backoffice-web. O fluxo completo (site → autor → imagem → artigo → revisão → build)
 // entra com os módulos Conteúdo, Mídia, Revisão e Publicação.
+
+/** Sites cadastrados por estes testes; removidos do banco no fim, mesmo se um falhar. */
+const created: string[] = [];
+test.afterAll(async () => {
+  await removeSites(created);
+});
 
 test('login pelo Access e registro de instâncias', async ({ page }) => {
   await page.goto('/sites');
@@ -78,6 +86,7 @@ async function typeInto(page: Page, target: Locator, text: string): Promise<void
 
 test('operação cadastra e edita um site só com o teclado', async ({ page }) => {
   const siteId = `e2e-${Date.now()}`;
+  created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
   await page.getByRole('link', { name: 'Cadastrar site' }).click();
   await expect(page.getByRole('heading', { name: 'Cadastrar site' })).toBeVisible();
@@ -115,6 +124,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
 
 test('preset fora dos recursos é recusado com a mensagem do domínio', async ({ page }) => {
   const siteId = `e2e-preset-${Date.now()}`;
+  created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
   await page.goto('/sites/novo');
   await page.getByLabel('SITE_ID').fill(siteId);
@@ -166,6 +176,7 @@ const status = (page: Page, text: string) => page.getByRole('status').filter({ h
 
 test('operação marca as etapas, registra o G1 e define a janela do site', async ({ page }) => {
   const siteId = `e2e-pagina-${Date.now()}`;
+  created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
   await newSite(page, siteId);
   await page.getByRole('link', { name: siteId, exact: true }).click();
