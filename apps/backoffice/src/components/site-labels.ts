@@ -3,6 +3,7 @@ import type { Block } from '@orakel/content-model/v1';
 import type { BadgeVariant } from '@/components/ui/badge';
 import type { LastBuild } from '@/domain/builds/builds.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
+import type { PendingOrigin } from '@/domain/pending-changes/record.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 /** Etapas do ciclo de vida como a operação as lê (lista de sites e página do site). */
@@ -104,3 +105,40 @@ export const TAXONOMY_KIND_LABEL: Record<'category' | 'tag' | 'series', string> 
   tag: 'Tag',
   series: 'Série',
 };
+
+/** Origem de uma mudança pendente (tela de pendências, #99). */
+export const PENDING_ORIGIN_LABEL: Record<PendingOrigin, string> = {
+  config: 'Configuração',
+  content: 'Conteúdo',
+  author: 'Autor',
+  taxonomy: 'Taxonomia',
+  menu: 'Menu',
+  media: 'Mídia',
+  redirect: 'Redirecionamento',
+  release: 'Release',
+  platform: 'Plataforma',
+};
+
+/** Tela de cada origem, quando existe; mídia vai à biblioteca (não há tela por imagem). */
+const PENDING_ORIGIN_PATH: Partial<Record<PendingOrigin, (reference: string) => string>> = {
+  config: () => 'configuracao',
+  content: (id) => `conteudos/${id}`,
+  author: (id) => `autores/${id}`,
+  taxonomy: (id) => `taxonomias/${id}`,
+  menu: (id) => `menus/${id}`,
+  media: () => 'midia',
+};
+
+/**
+ * Item de uma mudança pendente: o texto ("Conteúdo 42", "Configuração v3") e o link para a
+ * tela dele, se houver. Mostra o identificador gravado, não o título do item.
+ */
+export function pendingItem(
+  siteId: string,
+  origin: PendingOrigin,
+  reference: string,
+): { text: string; href?: string } {
+  const text = `${PENDING_ORIGIN_LABEL[origin]} ${reference}`;
+  const path = PENDING_ORIGIN_PATH[origin];
+  return path ? { text, href: `/sites/${siteId}/${path(reference)}` } : { text };
+}
