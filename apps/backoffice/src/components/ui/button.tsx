@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 // Button do shadcn/ui (new-york), sem Slot (Radix): para link com cara de botão, use
 // buttonVariants() no <a>/<Link>.
 export const buttonVariants = cva(
-  'inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium whitespace-nowrap disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {

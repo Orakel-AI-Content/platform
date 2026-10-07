@@ -84,7 +84,7 @@ type Ctx = {
 };
 
 const selectClass =
-  'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 aria-invalid:border-destructive';
+  'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm aria-invalid:border-destructive';
 
 /** Primeira mensagem de erro sob um caminho (o erro pode estar num item interno). */
 function messageAt(errors: FieldErrors<FieldValues>, path: string): string | undefined {

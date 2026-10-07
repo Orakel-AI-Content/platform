@@ -72,6 +72,16 @@
   @apply w-full max-w-none;
 }
 
+/* Foco visível (#85): um contorno --ring de 2px, a 3:1 do fundo nos dois temas, em todo
+   elemento focável (links, botões, campos e o editor de rich text). Em @layer base, para uma
+   utility da tela ainda poder sobrescrevê-lo; os componentes não repetem classes de foco. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

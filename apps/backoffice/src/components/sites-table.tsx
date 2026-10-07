@@ -57,7 +57,7 @@ function PublishNowButton({ siteId, action }: { siteId: string; action: PublishN
         type="button"
         disabled={pending}
         onClick={() => startTransition(async () => setStatus(await action(siteId)))}
-        className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+        className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
       >
         {pending ? 'Enfileirando…' : 'Publicar agora'}
         <span className="sr-only"> {siteId}</span>
