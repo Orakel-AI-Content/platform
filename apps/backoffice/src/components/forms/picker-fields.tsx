@@ -10,7 +10,7 @@ import type { FieldProps, FieldRenderer } from './schema-form.tsx';
 export type PickerOption = { id: number; label: string };
 
 const selectClass =
-  'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 aria-invalid:border-destructive';
+  'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm aria-invalid:border-destructive';
 
 /**
  * Uma mídia do site (`mediaId`, `coverMediaId`). Opcional: a opção vazia vira `undefined`;

@@ -9,7 +9,7 @@ export function Checkbox({ className, ...props }: Omit<ComponentProps<'input'>, 
     <input
       type="checkbox"
       className={cn(
-        'size-4 shrink-0 rounded border border-border accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        'size-4 shrink-0 rounded border border-border accent-primary disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       {...props}

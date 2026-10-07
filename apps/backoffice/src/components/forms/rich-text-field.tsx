@@ -134,7 +134,7 @@ export function RichTextEditor({
         'aria-invalid': invalid ? 'true' : 'false',
         ...(describedBy ? { 'aria-describedby': describedBy } : {}),
         class:
-          'min-h-20 rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 aria-invalid:border-destructive',
+          'min-h-20 rounded-md border border-border bg-background px-3 py-2 text-sm aria-invalid:border-destructive',
       },
     },
     onUpdate: ({ editor: current }) => onChange(fromDoc(mode, current.getJSON() as TipTapNode)),

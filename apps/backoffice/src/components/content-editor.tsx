@@ -235,7 +235,7 @@ export function ContentEditor({
               </label>
               <select
                 id={`${id}-new-type`}
-                className="flex min-h-9 rounded-md border border-border bg-background px-3 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="flex min-h-9 rounded-md border border-border bg-background px-3 py-1 text-sm"
                 value={nextType ?? ''}
                 onChange={(event) =>
                   setNextType(isBlockType(event.target.value) ? event.target.value : undefined)

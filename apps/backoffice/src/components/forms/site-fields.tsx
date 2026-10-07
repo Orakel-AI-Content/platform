@@ -14,7 +14,7 @@ import type { FieldProps, FieldRenderer } from './schema-form.tsx';
 // que vêm dos recursos da release, não do schema. O valor é sempre o da SiteConfig.
 
 const selectClass =
-  'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 aria-invalid:border-destructive';
+  'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm aria-invalid:border-destructive';
 
 const toLines = (text: string): string[] =>
   text
