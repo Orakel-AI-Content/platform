@@ -1,33 +1,25 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 
-import { currentActor } from '@/auth/request-actor.ts';
 import { ContentEditor } from '@/components/content-editor';
-import { getDb } from '@/db/client.ts';
-import { can } from '@/domain/access/rbac.ts';
-import { listSites } from '@/domain/sites/sites.ts';
 
+import { sitePageContext } from '../../editorial-page.tsx';
 import { createContentAction } from '../actions.ts';
 import { editorOptions } from '../editor-options.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Criar conteúdo · Orakel Backoffice' };
+export const metadata = { title: 'Criar conteúdo' };
 
 /** Criação de artigo ou página. Sem content.write não há editor (e o domínio recusa). */
 export default async function NewContentPage({ params }: { params: Promise<{ site: string }> }) {
-  const actor = await currentActor();
-  if (!actor.ok) return null;
   const { site: siteId } = await params;
-  const db = getDb().db;
-  const sites = await listSites(db, actor.value);
-  if (!sites.ok) return <p role="alert">Sem permissão para ver os sites.</p>;
-  const site = sites.value.find((summary) => summary.id === siteId);
-  if (site === undefined) notFound();
-  if (!can(actor.value, 'content.write')) {
+  const context = await sitePageContext(siteId);
+  if (!context.ok) return context.render;
+  const { actor, db, site, canWrite } = context.value;
+  if (!canWrite) {
     return <p role="alert">Sem permissão para criar conteúdos.</p>;
   }
-  const options = await editorOptions(db, actor.value, siteId);
+  const options = await editorOptions(db, actor, siteId);
   if (options === undefined) return <p role="alert">Sem permissão para ver os conteúdos.</p>;
 
   return (

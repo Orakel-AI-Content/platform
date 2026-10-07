@@ -5,7 +5,7 @@ import { noWrite, PageHeader, sitePageContext } from '../../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Criar taxonomia · Orakel Backoffice' };
+export const metadata = { title: 'Criar taxonomia' };
 
 export default async function NewTaxonomyPage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;

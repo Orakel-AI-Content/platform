@@ -6,7 +6,7 @@ import { noWrite, PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Textos institucionais · Orakel Backoffice' };
+export const metadata = { title: 'Textos institucionais' };
 
 /**
  * Textos institucionais do site (sobre, contato, termos, privacidade, política editorial).

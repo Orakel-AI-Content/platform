@@ -12,7 +12,7 @@ import { updateSiteConfigAction } from '../../actions.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Configuração do site · Orakel Backoffice' };
+export const metadata = { title: 'Configuração do site' };
 
 /**
  * Edição da configuração corrente: grava uma versão nova pelo domínio (updateSiteConfig).

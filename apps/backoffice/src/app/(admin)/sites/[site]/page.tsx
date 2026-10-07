@@ -1,20 +1,15 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 
-import { currentActor } from '@/auth/request-actor.ts';
 import { BuildWindowForm, LifecycleAction, RegisterG1Form } from '@/components/site-actions';
 import { LIFECYCLE_LABEL } from '@/components/site-labels.ts';
 import { buttonVariants } from '@/components/ui/button';
-import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
-import { listSites } from '@/domain/sites/sites.ts';
 
 import { advanceLifecycleAction, registerG1Action, setBuildWindowAction } from '../actions.ts';
+import { sitePageContext } from './editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
-
-export const metadata = { title: 'Site · Orakel Backoffice' };
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
@@ -23,23 +18,19 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 });
 
 /**
- * Página do site: ciclo de vida, registro do G1 e janela de agrupamento. Lê pelo listSites
- * (5 a 20 sites) e pelos gatilhos; as ações só aparecem com site.configure e o domínio
+ * Página do site: ciclo de vida, registro do G1 e janela de agrupamento. Lê o site pelo
+ * sitePageContext (a mesma busca do layout) e os gatilhos; as ações só aparecem com site.configure e o domínio
  * confere de novo.
  */
 export default async function SitePage({ params }: { params: Promise<{ site: string }> }) {
-  const actor = await currentActor();
-  if (!actor.ok) return null;
   const { site: siteId } = await params;
-  const db = getDb().db;
-  const sites = await listSites(db, actor.value);
-  if (!sites.ok) return <p role="alert">Sem permissão para ver os sites.</p>;
-  const site = sites.value.find((summary) => summary.id === siteId);
-  if (site === undefined) notFound();
-  const triggers = await listPolicyTriggers(db, actor.value, siteId);
+  const context = await sitePageContext(siteId);
+  if (!context.ok) return context.render;
+  const { actor, db, site } = context.value;
+  const triggers = await listPolicyTriggers(db, actor, siteId);
   const g1 = triggers.ok ? triggers.value.find((record) => record.trigger === 'G1') : undefined;
-  const canConfigure = can(actor.value, 'site.configure');
-  const canWriteContent = can(actor.value, 'content.write');
+  const canConfigure = can(actor, 'site.configure');
+  const canWriteContent = can(actor, 'content.write');
 
   const sectionClass = 'space-y-3 rounded-md border border-border p-4';
   return (

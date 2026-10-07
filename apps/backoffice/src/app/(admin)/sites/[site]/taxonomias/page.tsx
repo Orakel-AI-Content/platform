@@ -6,7 +6,7 @@ import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Taxonomias · Orakel Backoffice' };
+export const metadata = { title: 'Taxonomias' };
 
 /** Categorias, tags e séries do site; criar e editar só com content.write. */
 export default async function TaxonomiesPage({ params }: { params: Promise<{ site: string }> }) {

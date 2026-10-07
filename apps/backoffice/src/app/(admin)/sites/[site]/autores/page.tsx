@@ -5,7 +5,7 @@ import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Autores · Orakel Backoffice' };
+export const metadata = { title: 'Autores' };
 
 /** Autores do site; criar e editar só com content.write. */
 export default async function AuthorsPage({ params }: { params: Promise<{ site: string }> }) {

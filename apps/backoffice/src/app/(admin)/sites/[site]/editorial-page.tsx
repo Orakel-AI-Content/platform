@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { cache, type ReactNode } from 'react';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import { can, type Actor } from '@/domain/access/rbac.ts';
 import { listSites, type SiteSummary } from '@/domain/sites/sites.ts';
 
-// Base das telas de autores, taxonomias, menus e textos institucionais (#46): sessão, site
-// existente (404) e permissão de gravar decidida no servidor; o domínio confere de novo.
+// Base das telas do site (#46, #78): sessão, site existente (404) e permissão de gravar
+// decidida no servidor; o domínio confere de novo.
 
 export type SitePageContext = {
   actor: Actor;
@@ -17,22 +17,42 @@ export type SitePageContext = {
   canWrite: boolean;
 };
 
+/** O site da URL e quem pede, ou por que não há site (sem sessão, sem `site.read`, inexistente). */
+export type SiteLookup =
+  | { kind: 'found'; actor: Actor; site: SiteSummary }
+  | { kind: 'missing'; actor: Actor }
+  | { kind: 'forbidden'; actor: Actor }
+  | { kind: 'no-session' };
+
+/**
+ * Busca do site, uma vez por requisição: o layout do site, o `generateMetadata` e a página
+ * compartilham o resultado (`cache` do React, como o `currentActor`).
+ */
+export const lookupSite = cache(async (siteId: string): Promise<SiteLookup> => {
+  const actor = await currentActor();
+  if (!actor.ok) return { kind: 'no-session' };
+  const sites = await listSites(getDb().db, actor.value);
+  if (!sites.ok) return { kind: 'forbidden', actor: actor.value };
+  const site = sites.value.find((summary) => summary.id === siteId);
+  return site === undefined
+    ? { kind: 'missing', actor: actor.value }
+    : { kind: 'found', actor: actor.value, site };
+});
+
 /** Contexto da página, ou o que mostrar no lugar dela (sem sessão, sem permissão). */
 export async function sitePageContext(
   siteId: string,
 ): Promise<{ ok: true; value: SitePageContext } | { ok: false; render: ReactNode }> {
-  const actor = await currentActor();
-  if (!actor.ok) return { ok: false, render: null };
-  const db = getDb().db;
-  const sites = await listSites(db, actor.value);
-  if (!sites.ok) {
+  const lookup = await lookupSite(siteId);
+  if (lookup.kind === 'no-session') return { ok: false, render: null };
+  if (lookup.kind === 'forbidden') {
     return { ok: false, render: <p role="alert">Sem permissão para ver os sites.</p> };
   }
-  const site = sites.value.find((summary) => summary.id === siteId);
-  if (site === undefined) notFound();
+  if (lookup.kind === 'missing') notFound();
+  const { actor, site } = lookup;
   return {
     ok: true,
-    value: { actor: actor.value, db, site, canWrite: can(actor.value, 'content.write') },
+    value: { actor, db: getDb().db, site, canWrite: can(actor, 'content.write') },
   };
 }
 
