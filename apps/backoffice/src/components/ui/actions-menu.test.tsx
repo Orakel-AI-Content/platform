@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import Link from 'next/link';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ActionsMenu } from './actions-menu.tsx';
 
-// Menu "Mais ações" (#98): nome acessível e ligação botão → lista. Abrir, fechar e Esc são do
-// navegador (Popover API), que o happy-dom não implementa; o E2E da tabela de sites (#100)
-// os verifica.
+// Menu "Mais ações" (#98): nome acessível, ligação botão → lista e fechamento ao acionar um
+// item (#115). Abrir, fechar e Esc são do navegador (Popover API), que o happy-dom não
+// implementa: aqui `hidePopover` é espionado, e o E2E da tabela de sites (#100) confere o
+// comportamento real.
 
 afterEach(cleanup);
 
@@ -71,5 +72,28 @@ describe('menu Mais ações', () => {
     expect(a.id).not.toBe(b.id);
     expect(a.textContent).toBe('A');
     expect(b.textContent).toBe('B');
+  });
+
+  it('acionar um item, botão ou link, fecha a lista; a área fora dos itens não', () => {
+    render(
+      <ActionsMenu label="exemplo-a">
+        <a href="#conteudos">Conteúdos</a>
+        <button type="button">
+          <span>Remover</span>
+        </button>
+      </ActionsMenu>,
+    );
+    const list = menuOf(screen.getByRole('button', { name: 'Mais ações: exemplo-a' }));
+    const hidePopover = vi.fn();
+    list.hidePopover = hidePopover;
+
+    fireEvent.click(list);
+    expect(hidePopover).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Remover'));
+    expect(hidePopover).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Conteúdos' }));
+    expect(hidePopover).toHaveBeenCalledTimes(2);
   });
 });
