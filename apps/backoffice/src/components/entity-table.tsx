@@ -2,11 +2,13 @@
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
+import { ListPagination, ListToolbar } from '@/components/list-controls.tsx';
+import { listFeatures, useListState, type ListConfig } from '@/components/list-state.ts';
 
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -20,33 +22,50 @@ import {
 /** Linha de uma lista de entidades: o servidor já formata as células como texto. */
 export type EntityRow = { id: number; name: string; cells: string[] };
 
-// TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
-const features = tableFeatures({});
-const column = createColumnHelper<typeof features, EntityRow>();
+type Noun = { one: string; many: string; none: string };
 
-/**
- * Lista de autores, taxonomias ou menus. Editar só aparece com `canWrite` (content.write,
- * decidido no servidor); criar é a ação do cabeçalho da página, repetida no estado vazio.
- * O domínio confere de novo ao gravar.
- */
-export function EntityTable({
-  basePath,
-  headers,
-  rows,
-  noun,
-  canWrite = false,
-  emptyAction,
-}: {
+/** Busca por nome e paginação (#108): o rótulo da busca e a mensagem sem resultado. */
+export type EntitySearch = { label: string; notFound: string };
+
+type EntityTableProps = {
   /** `/sites/<site>/autores`: a edição é `<basePath>/<id>`. */
   basePath: string;
   /** Rótulo do nome e das demais células, na ordem. */
   headers: [string, ...string[]];
   rows: EntityRow[];
-  noun: { one: string; many: string; none: string };
+  noun: Noun;
   canWrite?: boolean;
   /** Ação principal da tela (criar), repetida no estado vazio; só com permissão. */
   emptyAction?: ReactNode;
-}) {
+  /** Liga a busca por nome e a paginação, com o estado na URL; sem ela, a lista inteira. */
+  search?: EntitySearch;
+};
+
+// TanStack Table 9: na lista simples, só o modelo de linhas básico.
+const features = tableFeatures({});
+const column = createColumnHelper<typeof features, EntityRow>();
+const listColumn = createColumnHelper<typeof listFeatures, EntityRow>();
+
+/** Só busca (`q`) e página: sem filtros, sem ordenação, na ordem do servidor. */
+const LIST: ListConfig = { filters: [], sortable: [] };
+
+/**
+ * Lista de autores, taxonomias ou menus. Editar só aparece com `canWrite` (content.write,
+ * decidido no servidor); criar é a ação do cabeçalho da página, repetida no estado vazio.
+ * O domínio confere de novo ao gravar. Com `search`, busca por nome e paginação (#108).
+ */
+export function EntityTable({ search, ...props }: EntityTableProps) {
+  if (props.rows.length === 0) {
+    return <EmptyState action={props.emptyAction}>{props.noun.none}</EmptyState>;
+  }
+  return search ? (
+    <SearchableEntityTable search={search} {...props} />
+  ) : (
+    <PlainEntityTable {...props} />
+  );
+}
+
+function PlainEntityTable({ headers, rows, noun, ...markup }: Omit<EntityTableProps, 'search'>) {
   const [nameHeader, ...rest] = headers;
   const columns = column.columns([
     column.accessor('name', { header: nameHeader }),
@@ -55,44 +74,113 @@ export function EntityTable({
     ),
   ]);
   const table = useTable({ features, columns, data: rows });
-  if (rows.length === 0) return <EmptyState action={emptyAction}>{noun.none}</EmptyState>;
+  return (
+    <EntityRowsTable
+      headers={headers}
+      rows={table.getRowModel().rows.map((row) => row.original)}
+      caption={rows.length === 1 ? `1 ${noun.one}` : `${rows.length} ${noun.many}`}
+      {...markup}
+    />
+  );
+}
+
+function SearchableEntityTable({
+  headers,
+  rows,
+  search,
+  ...markup
+}: Omit<EntityTableProps, 'search' | 'noun'> & { search: EntitySearch }) {
+  const list = useListState(LIST);
+  const columns = useMemo(() => {
+    const [nameHeader, ...rest] = headers;
+    return listColumn.columns([
+      listColumn.accessor('name', { header: nameHeader }),
+      ...rest.map((header, index) =>
+        listColumn.accessor((row) => row.cells[index] ?? '', {
+          id: `cell-${index}`,
+          header,
+          enableGlobalFilter: false,
+        }),
+      ),
+    ]);
+  }, [headers]);
+  const table = useTable({ features: listFeatures, columns, data: rows, ...list.table });
+  const found = table.getPrePaginatedRowModel().rows.length;
+  return (
+    <div className="space-y-4">
+      <ListToolbar
+        search={list.state.search}
+        searchLabel={search.label}
+        onSearchChange={list.setSearch}
+        onClear={list.clearFilters}
+      />
+      {found === 0 ? (
+        <EmptyState
+          action={
+            <Button variant="outline" onClick={list.clearFilters}>
+              Limpar busca
+            </Button>
+          }
+        >
+          {search.notFound}
+        </EmptyState>
+      ) : (
+        <EntityRowsTable
+          headers={headers}
+          rows={table.getRowModel().rows.map((row) => row.original)}
+          {...markup}
+        />
+      )}
+      <ListPagination
+        total={found}
+        page={list.state.page}
+        pageCount={table.getPageCount()}
+        onPageChange={list.setPage}
+      />
+    </div>
+  );
+}
+
+/** A tabela em si: cabeçalhos, células já formatadas e o link de editar com permissão. */
+function EntityRowsTable({
+  basePath,
+  headers,
+  rows,
+  canWrite = false,
+  caption,
+}: Pick<EntityTableProps, 'basePath' | 'headers' | 'rows' | 'canWrite'> & { caption?: string }) {
   return (
     <Table>
-      <TableCaption>
-        {rows.length === 1 ? `1 ${noun.one}` : `${rows.length} ${noun.many}`}
-      </TableCaption>
+      {caption && <TableCaption>{caption}</TableCaption>}
       <TableHeader>
-        {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id}>
-            {group.headers.map((header) => (
-              <TableHead key={header.id} scope="col">
-                <table.FlexRender header={header} />
-              </TableHead>
-            ))}
-            {canWrite && (
-              <TableHead scope="col">
-                <span className="sr-only">Ações</span>
-              </TableHead>
-            )}
-          </TableRow>
-        ))}
+        <TableRow>
+          {headers.map((header) => (
+            <TableHead key={header} scope="col">
+              {header}
+            </TableHead>
+          ))}
+          {canWrite && (
+            <TableHead scope="col">
+              <span className="sr-only">Ações</span>
+            </TableHead>
+          )}
+        </TableRow>
       </TableHeader>
       <TableBody>
-        {table.getRowModel().rows.map((row) => (
+        {rows.map((row) => (
           <TableRow key={row.id}>
-            {row.getAllCells().map((cell) => (
-              <TableCell key={cell.id}>
-                <table.FlexRender cell={cell} />
-              </TableCell>
+            <TableCell>{row.name}</TableCell>
+            {headers.slice(1).map((header, index) => (
+              <TableCell key={header}>{row.cells[index] ?? ''}</TableCell>
             ))}
             {canWrite && (
               <TableCell>
                 <Link
-                  href={`${basePath}/${row.original.id}`}
+                  href={`${basePath}/${row.id}`}
                   className={buttonVariants({ variant: 'outline', size: 'sm' })}
                 >
                   Editar
-                  <span className="sr-only"> {row.original.name}</span>
+                  <span className="sr-only"> {row.name}</span>
                 </Link>
               </TableCell>
             )}
