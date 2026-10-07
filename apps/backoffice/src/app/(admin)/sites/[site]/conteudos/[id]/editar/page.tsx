@@ -17,6 +17,7 @@ import { positiveInt } from '../../params.ts';
 export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ site: string; id: string }> };
+type SearchParams = { searchParams: Promise<{ criado?: string | string[] }> };
 
 /** "<título> · Editar conteúdo", só quando a página mostraria o editor (#79). */
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -30,10 +31,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 /**
  * Edição: parte da versão mais recente e grava a N+1 em rascunho. Sem content.write não há
- * editor (e o domínio recusa).
+ * editor (e o domínio recusa). Sem `key` pela versão: depois de salvar, o editor recomeça da
+ * versão salva (`reset`) e o `router.refresh` só atualiza o cabeçalho, sem remontar e perder a
+ * confirmação (#109). `?criado=1` vem da criação: o editor anuncia "Conteúdo criado.".
  */
-export default async function EditContentPage({ params }: Params) {
+export default async function EditContentPage({ params, searchParams }: Params & SearchParams) {
   const { site: siteId, id } = await params;
+  const { criado } = await searchParams;
   const contentId = positiveInt(id);
   if (contentId === undefined) notFound();
   const read = await readContentVersions(siteId, contentId);
@@ -69,12 +73,12 @@ export default async function EditContentPage({ params }: Params) {
         Partindo da versão {latest.version}; salvar grava a versão {latest.version + 1} em rascunho.
       </p>
       <ContentEditor
-        key={latest.version}
         mode="edit"
         siteId={siteId}
         defaultValues={latest.data}
         options={options}
         action={updateContentAction.bind(null, siteId, contentId)}
+        created={criado === '1'}
       />
     </section>
   );

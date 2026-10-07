@@ -2,8 +2,8 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Block } from '@orakel/content-model/v1';
-import { useRouter } from 'next/navigation';
-import { useId, useState, useTransition } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useId, useState, useTransition } from 'react';
 import { FormProvider, get, useFieldArray, useForm, type FieldValues } from 'react-hook-form';
 
 import {
@@ -24,7 +24,9 @@ import { cn } from '@/lib/utils';
 
 // Editor de artigos e páginas (#45): um formulário só; os metadados e cada bloco são
 // desenhados pelo gerador, e a lista de blocos (tipo, ordem, remoção) é daqui. O `n` de
-// bloco novo é do servidor; a permissão e as referências são conferidas no domínio.
+// bloco novo é do servidor; a permissão e as referências são conferidas no domínio. Salvar
+// fica numa barra fixa no rodapé e mantém a pessoa no editor (#109): a edição recomeça da
+// versão salva relida do servidor; a criação vai para a edição do conteúdo criado.
 
 const META_LABELS: Record<string, string> = {
   kind: 'Tipo',
@@ -83,17 +85,22 @@ export function ContentEditor({
   defaultValues,
   options,
   action,
+  created = false,
 }: {
   mode: 'create' | 'edit';
   siteId: string;
   defaultValues: FieldValues;
   options: ContentEditorOptions;
   action: (input: ContentEdit) => Promise<ContentFormResult>;
+  /** Acabou de ser criado (`?criado=1`): anuncia a confirmação e tira a marca da URL. */
+  created?: boolean;
 }) {
   const id = useId();
   const router = useRouter();
+  const pathname = usePathname();
   const [pending, startTransition] = useTransition();
   const [summary, setSummary] = useState<string[]>([]);
+  const [saved, setSaved] = useState('');
   const form = useForm<FieldValues>({
     resolver: zodResolver(
       ContentEditorSchema as unknown as Parameters<typeof zodResolver>[0],
@@ -120,16 +127,27 @@ export function ContentEditor({
     coverMediaId: mediaField(options.media, { optional: true }),
   };
 
+  // No quadro seguinte à montagem: texto já presente quando a região `role="status"` aparece
+  // não é anunciado; a mudança depois de montar é.
+  useEffect(() => {
+    if (!created) return;
+    const frame = requestAnimationFrame(() => setSaved('Conteúdo criado.'));
+    router.replace(pathname, { scroll: false });
+    return () => cancelAnimationFrame(frame);
+  }, [created, pathname, router]);
+
   const onValid = (value: FieldValues) =>
     startTransition(async () => {
       setSummary([]);
+      setSaved('');
       const result = await action(value as ContentEdit);
       if (result.ok) {
-        router.push(
-          mode === 'create'
-            ? `/sites/${siteId}/conteudos`
-            : `/sites/${siteId}/conteudos/${result.id}`,
-        );
+        if (mode === 'create') {
+          router.replace(`/sites/${siteId}/conteudos/${result.id}/editar?criado=1`);
+          return;
+        }
+        if (result.saved) form.reset(result.saved);
+        setSaved(result.message);
         router.refresh();
         return;
       }
@@ -162,12 +180,6 @@ export function ContentEditor({
           )
         }
       >
-        <div role="alert" className={cn(summary.length > 0 && 'text-sm text-destructive')}>
-          {summary.map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-        </div>
-
         <fieldset className="space-y-4 rounded-md border border-border p-4">
           <legend className="px-1 text-sm font-semibold">Dados do conteúdo</legend>
           <SchemaFields
@@ -259,9 +271,19 @@ export function ContentEditor({
           </div>
         </section>
 
-        <Button type="submit" disabled={pending}>
-          {pending ? 'Salvando…' : mode === 'create' ? 'Criar conteúdo' : 'Salvar nova versão'}
-        </Button>
+        <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border bg-background py-3">
+          <Button type="submit" disabled={pending || form.formState.isSubmitting}>
+            {pending ? 'Salvando…' : mode === 'create' ? 'Criar conteúdo' : 'Salvar nova versão'}
+          </Button>
+          <p role="status" className="text-sm text-muted-foreground">
+            {saved}
+          </p>
+          <div role="alert" className={cn(summary.length > 0 && 'text-sm text-destructive')}>
+            {summary.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+        </div>
       </form>
     </FormProvider>
   );
