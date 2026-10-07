@@ -1,3 +1,4 @@
+import type { Result } from '@orakel/content-model';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cache, type ReactNode } from 'react';
@@ -5,6 +6,9 @@ import { cache, type ReactNode } from 'react';
 import { currentActor } from '@/auth/request-actor.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import { can, type Actor } from '@/domain/access/rbac.ts';
+import { listAuthors } from '@/domain/content/authors.ts';
+import { listMenus } from '@/domain/content/menus.ts';
+import { listTaxonomies } from '@/domain/content/taxonomies.ts';
 import { listSites, type SiteSummary } from '@/domain/sites/sites.ts';
 
 // Base das telas do site (#46, #78): sessão, site existente (404) e permissão de gravar
@@ -38,6 +42,22 @@ export const lookupSite = cache(async (siteId: string): Promise<SiteLookup> => {
     ? { kind: 'missing', actor: actor.value }
     : { kind: 'found', actor: actor.value, site };
 });
+
+/**
+ * Uma lista do site lida uma vez por requisição: o título da aba (`generateMetadata`) e a
+ * página de edição compartilham o resultado (#79). `undefined` quando não há site para ler.
+ */
+function siteList<T>(list: (db: Executor, actor: Actor, siteId: string) => Promise<Result<T[]>>) {
+  return cache(async (siteId: string): Promise<Result<T[]> | undefined> => {
+    const lookup = await lookupSite(siteId);
+    if (lookup.kind !== 'found') return undefined;
+    return list(getDb().db, lookup.actor, siteId);
+  });
+}
+
+export const readAuthors = siteList(listAuthors);
+export const readTaxonomies = siteList(listTaxonomies);
+export const readMenus = siteList(listMenus);
 
 /** Contexto da página, ou o que mostrar no lugar dela (sem sessão, sem permissão). */
 export async function sitePageContext(
