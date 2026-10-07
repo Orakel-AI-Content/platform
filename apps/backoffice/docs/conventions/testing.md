@@ -11,7 +11,9 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
 - **Unitários** ao lado do código; o domínio é testado sem banco quando a regra é pura
   (RBAC, mapeamentos) e pela suíte de contrato quando depende de transação.
 - **Contrato** (`test/contract/`): cada arquivo migra e limpa o banco (`helpers.ts`);
-  rodam um arquivo por vez. O snapshot de cada fixture do `content-model` tem de passar no
+  rodam um arquivo por vez. Antes de migrar, a suíte recusa um banco com sites que ela não
+  marcou (tabela `contract_suite`, fora das migrations): apontada para o banco do
+  `local:up`, ela apagaria o seed. Use o Postgres descartável abaixo. O snapshot de cada fixture do `content-model` tem de passar no
   `validateSnapshot` e reproduzir a fixture, menos as mudanças pendentes do header.
 - **E2E** (`test/e2e/`): login pelo access-mock, telas de sites e o editor de conteúdo, e axe
   (WCAG 2.2 AA). Rodam contra a imagem `backoffice:local`: depois de mudar o código,
