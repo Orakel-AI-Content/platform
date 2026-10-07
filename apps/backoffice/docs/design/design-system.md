@@ -6,6 +6,14 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
 - **Componentes:** shadcn/ui (estilo new-york), copiados em `src/components/ui/` (tabela, badge,
   button, input, label, textarea e checkbox, sem Radix: `<select>` e checkbox nativos). Componente novo do catálogo: copie a fonte do shadcn para ali e
   ajuste aos tokens; o CLI não instala dependências fora do `catalog` da raiz.
+- **Menu "Mais ações":** `ActionsMenu` (`src/components/ui/actions-menu.tsx`), próprio (o
+  shadcn usaria Radix), para as ações secundárias de uma linha de tabela quando não cabem sem
+  aumentar a altura dela; a ação principal da linha fica visível, fora do menu. `label` põe o
+  item no nome acessível ("Mais ações: exemplo-a"). Os itens são links e botões comuns, em
+  `buttonVariants({ variant: 'ghost', size: 'sm' })`, sem `role="menu"`. A Popover API nativa
+  abre, fecha (clique fora e Esc) e devolve o foco ao botão; a posição é por CSS anchor
+  positioning. O happy-dom não implementa popover: o teste de componente confere o nome e a
+  ligação botão → lista, e o E2E confere abrir, fechar e Esc.
 - **Estilização:** Tailwind 4, só com os tokens de `src/app/globals.css` (`background`,
   `foreground`, `muted`, `border`, `primary`, `destructive`, `warning`, `success`, `info`,
   `ring`); nada de cor solta.
