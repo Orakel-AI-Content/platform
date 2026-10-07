@@ -2,7 +2,9 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 // Autores, taxonomias, menus e textos institucionais (#46) contra o ambiente local semeado:
-// o editor cria e edita pelas telas e vê o resultado; o revisor não grava.
+// o editor cria e edita pelas telas e vê o resultado; o revisor não grava. Autores e
+// taxonomias têm busca por nome e paginação (#108): o item novo, no fim da ordem por ID, é
+// achado pela busca (o banco local acumula itens entre rodadas).
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
@@ -28,16 +30,32 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await nav.getByRole('link', { name: 'Autores' }).click();
   // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
   await page.getByRole('link', { name: 'Criar autor' }).first().click();
-  await page.getByLabel('Nome').fill(author);
+  // "Nome" exato: a lista também tem "Buscar por nome" (#108).
+  await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+  await page.getByLabel('Nome', { exact: true }).fill(author);
   await page.getByLabel('Slug').fill(`autora-${stamp}`);
   await expectNoViolations(page);
   await page.getByRole('button', { name: 'Criar' }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/autores$/);
+  await page.getByLabel('Buscar por nome').fill(author.toUpperCase());
   await expect(page.getByRole('row', { name: new RegExp(author) })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Paginação' }).getByRole('status')).toHaveText(
+    '1 resultado',
+  );
+  await expectNoViolations(page);
+
+  // A URL leva a busca para outra aba.
+  await expect(page).toHaveURL(/q=/);
+  const other = await page.context().newPage();
+  await other.goto(page.url());
+  await expect(other.getByLabel('Buscar por nome')).toHaveValue(author.toUpperCase());
+  await expect(other.getByRole('row', { name: new RegExp(author) })).toBeVisible();
+  await other.close();
 
   // Slug repetido: a recusa do domínio aparece junto do campo.
   await page.getByRole('link', { name: 'Criar autor' }).first().click();
-  await page.getByLabel('Nome').fill('Outra');
+  await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+  await page.getByLabel('Nome', { exact: true }).fill('Outra');
   await page.getByLabel('Slug').fill(`autora-${stamp}`);
   await page.getByRole('button', { name: 'Criar' }).click();
   await expect(page.getByLabel('Slug')).toHaveAttribute('aria-invalid', 'true');
@@ -45,11 +63,21 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
 
   await page.goto('/sites/exemplo-a/taxonomias');
   await page.getByRole('link', { name: 'Criar taxonomia' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Criar taxonomia' })).toBeVisible();
   await page.getByLabel('Tipo').selectOption({ label: 'Categoria' });
-  await page.getByLabel('Nome').fill(category);
+  await page.getByLabel('Nome', { exact: true }).fill(category);
   await page.getByLabel('Slug').fill(`categoria-${stamp}`);
   await page.getByRole('button', { name: 'Criar' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-a\/taxonomias$/);
+  await page.getByLabel('Buscar por nome').fill(category);
   await expect(page.getByRole('row', { name: new RegExp(category) })).toContainText('Categoria');
+
+  // Busca sem resultado: a mensagem e "Limpar busca" volta a lista.
+  await page.getByLabel('Buscar por nome').fill(`nada-${stamp}`);
+  await expect(page.getByText('Nenhuma taxonomia encontrada.')).toBeVisible();
+  await page.getByRole('button', { name: 'Limpar busca' }).click();
+  await expect(page.getByLabel('Buscar por nome')).toHaveValue('');
+  await expect(page.getByRole('table')).toBeVisible();
 
   await page.goto('/sites/exemplo-a/conteudos/novo');
   await page
@@ -66,6 +94,9 @@ test('editor edita um item do menu e o vê na lista', async ({ page }) => {
   const label = `Guias ${Date.now()}`;
   await loginAs(page, 'editor@orakel.local');
   await page.goto('/sites/exemplo-a/menus');
+  // Menus segue sem busca nem paginação (#108).
+  await expect(page.getByRole('search')).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Paginação' })).toHaveCount(0);
   await page.getByRole('link', { name: 'Editar principal' }).click();
 
   const first = page.getByLabel('Rótulo').first();
