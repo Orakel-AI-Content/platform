@@ -206,6 +206,61 @@ export async function updateContent(
   return { ok: true, value: { version } };
 }
 
+/**
+ * Envia para revisão: a versão mais recente, em `rascunho`, passa a `em_revisao`. Muda só o
+ * `status` (os dados da versão continuam imutáveis, ADR 0015) e não registra mudança
+ * pendente: o status não entra no snapshot. A linha de `contents` fica travada, como na
+ * edição: o envio não marca uma versão que outra gravação acabou de substituir.
+ */
+export async function submitForReview(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+): Promise<Result<{ version: number }>> {
+  const allowed = checkWrite(actor);
+  if (!allowed.ok) return allowed;
+
+  const [content] = await tx
+    .select({ id: contents.id })
+    .from(contents)
+    .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)))
+    .for('update');
+  const [latest] = await tx
+    .select({ version: contentVersions.version, status: contentVersions.status })
+    .from(contentVersions)
+    .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))
+    .orderBy(desc(contentVersions.version))
+    .limit(1);
+  if (content === undefined || latest === undefined) {
+    return { ok: false, issues: [notFound(siteId, contentId)] };
+  }
+  if (latest.status !== 'rascunho') {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'content.not_draft',
+          message: `Só um rascunho vai para revisão: a versão ${latest.version} está ${latest.status}`,
+          path: [],
+        },
+      ],
+    };
+  }
+
+  await tx
+    .update(contentVersions)
+    .set({ status: 'em_revisao' })
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        eq(contentVersions.contentId, contentId),
+        eq(contentVersions.version, latest.version),
+      ),
+    );
+  return { ok: true, value: { version: latest.version } };
+}
+
 export type ContentListItem = {
   id: number;
   kind: Content['kind'];
@@ -248,6 +303,29 @@ export async function listContents(
       version: row.version,
       updatedAt: row.updatedAt,
     })),
+  };
+}
+
+export type ReviewQueueItem = Omit<ContentListItem, 'slug' | 'status'>;
+
+/**
+ * Fila de revisão do site: conteúdos cuja versão mais recente está `em_revisao`, da versão
+ * mais antiga para a mais recente. O filtro vem depois do DISTINCT ON: antes, traria a
+ * versão N em revisão mesmo com uma N+1 em rascunho (salvar de novo tira da fila).
+ */
+export async function listReviewQueue(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<ReviewQueueItem[]>> {
+  const listed = await listContents(db, actor, siteId);
+  if (!listed.ok) return listed;
+  return {
+    ok: true,
+    value: listed.value
+      .filter((item) => item.status === 'em_revisao')
+      .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime() || a.id - b.id)
+      .map(({ id, kind, title, version, updatedAt }) => ({ id, kind, title, version, updatedAt })),
   };
 }
 

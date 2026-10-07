@@ -113,7 +113,10 @@ export const CONTENT_STATUSES = [
 /** Dados de uma versão: o conteúdo do content-model, sem o ID (que é do conteúdo). */
 export type ContentData = Omit<Content, 'id'>;
 
-/** Versões imutáveis; a publicada mais recente é a que vai para o site. */
+/**
+ * Versões com dados imutáveis; só o `status` muda (ADR 0015). A publicada mais recente é a
+ * que vai para o site.
+ */
 export const contentVersions = pgTable(
   'content_versions',
   {
