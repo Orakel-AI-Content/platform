@@ -95,7 +95,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Cadastrar site' })).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
-  await typeInto(page, page.getByLabel('SITE_ID'), siteId);
+  await typeInto(page, page.getByLabel('ID', { exact: true }), siteId);
   await typeInto(page, page.getByLabel('Nome', { exact: true }), 'Site do E2E');
   await typeInto(page, page.getByLabel('Domínios'), `${siteId}.example.com`);
   await typeInto(page, page.getByLabel('Tema'), 'padrao');
@@ -108,7 +108,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
 
   // Edição: versão nova, e a lista mostra o domínio principal novo.
   await row.getByRole('link', { name: `Editar configuração ${siteId}` }).click();
-  await expect(page.getByLabel('SITE_ID')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('ID', { exact: true })).toHaveAttribute('readonly', '');
   await typeInto(page, page.getByLabel('Domínios'), `novo.${siteId}.example.com`);
   await tabTo(page, page.getByRole('button', { name: 'Salvar configuração' }));
   await page.keyboard.press('Enter');
@@ -130,7 +130,7 @@ test('preset fora dos recursos é recusado com a mensagem do domínio', async ({
   created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
   await page.goto('/sites/novo');
-  await page.getByLabel('SITE_ID').fill(siteId);
+  await page.getByLabel('ID', { exact: true }).fill(siteId);
   await page.getByLabel('Nome', { exact: true }).fill('Preset forçado');
   await page.getByLabel('Domínios').fill(`${siteId}.example.com`);
   await page.getByLabel('Tema').fill('padrao');
@@ -170,7 +170,7 @@ test('editor não cadastra nem edita a configuração', async ({ page }) => {
 
 async function newSite(page: Page, siteId: string): Promise<void> {
   await page.goto('/sites/novo');
-  await page.getByLabel('SITE_ID').fill(siteId);
+  await page.getByLabel('ID', { exact: true }).fill(siteId);
   await page.getByLabel('Nome', { exact: true }).fill(`Site ${siteId}`);
   await page.getByLabel('Domínios').fill(`${siteId}.example.com`);
   await page.getByLabel('Tema').fill('padrao');
