@@ -1,16 +1,45 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Link from 'next/link';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 import { ContentsTable } from './contents-table.tsx';
 
 // Lista de conteúdos (#44): status da versão mais recente, links por permissão e teclado.
+// Busca, filtros, ordem e paginação com o estado na URL (#107): router.replace simulado.
 
-afterEach(cleanup);
+const navigation = vi.hoisted(() => {
+  let search = '';
+  const listeners = new Set<() => void>();
+  return {
+    get: () => search,
+    set: (next: string) => {
+      search = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+});
+vi.mock('next/navigation', async () => {
+  const { useSyncExternalStore } = await import('react');
+  return {
+    usePathname: () => '/sites/exemplo-a/conteudos',
+    useSearchParams: () =>
+      new URLSearchParams(useSyncExternalStore(navigation.subscribe, navigation.get)),
+    useRouter: () => ({ replace: (url: string) => navigation.set(url.split('?')[1] ?? '') }),
+  };
+});
+
+afterEach(() => {
+  cleanup();
+  navigation.set('');
+});
 
 const rows: ContentListItem[] = [
   {
@@ -43,14 +72,15 @@ describe('tabela de conteúdos', () => {
     expect(first?.textContent).toContain('Em revisão');
     expect(second?.textContent).toContain('Página');
     expect(second?.textContent).toContain('Publicado');
-    expect(screen.getByText('2 conteúdos')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('2 resultados');
   });
 
   it('dá a cada status o badge da sua variante, com o texto do status (#86)', () => {
     render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
 
-    expect(screen.getByText('Em revisão').className).toContain('text-warning');
-    expect(screen.getByText('Publicado').className).toContain('bg-success');
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText('Em revisão').className).toContain('text-warning');
+    expect(table.getByText('Publicado').className).toContain('bg-success');
   });
 
   it('sem content.write não tem links de criar nem de editar', () => {
@@ -73,9 +103,9 @@ describe('tabela de conteúdos', () => {
     const user = userEvent.setup();
     render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
 
-    await user.tab();
     const first = screen.getByRole('link', { name: 'Guia de uso (versões)' });
-    expect(document.activeElement).toBe(first);
+    // Busca, filtros e cabeçalhos ordenáveis vêm antes: o Tab chega ao primeiro link.
+    while (document.activeElement !== first) await user.tab();
     expect(first.getAttribute('href')).toBe('/sites/exemplo-a/conteudos/1');
     await user.tab();
     expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Sobre (versões)' }));
@@ -93,6 +123,7 @@ describe('tabela de conteúdos', () => {
     );
 
     expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('search')).toBeNull();
     expect(screen.getByText('Nenhum conteúdo cadastrado.')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Criar conteúdo' }).getAttribute('href')).toBe(
       '/sites/exemplo-a/conteudos/novo',
@@ -107,5 +138,140 @@ describe('tabela de conteúdos', () => {
 
     rerender(<ContentsTable siteId="exemplo-a" timeZone="Europe/Lisbon" rows={rows} />);
     expect(screen.getAllByRole('row')[1]?.textContent).toContain('01/10/2026, 13:00 GMT+1');
+  });
+});
+
+const titles = () =>
+  screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => within(row).getAllByRole('link')[0]?.textContent?.replace(' (versões)', ''));
+
+const many: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
+  id: index + 10,
+  kind: index % 3 === 0 ? 'page' : 'article',
+  title: index === 0 ? 'Ação de graças' : `Receita ${String(index).padStart(2, '0')}`,
+  slug: `c-${index}`,
+  status: index % 2 === 0 ? 'publicado' : 'rascunho',
+  version: 1,
+  // Mais recente quanto maior o índice.
+  updatedAt: new Date(Date.UTC(2026, 8, 1 + index)),
+}));
+
+function renderMany() {
+  return render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={many} />);
+}
+
+describe('busca, filtros, ordem e paginação (#107)', () => {
+  it('sem parâmetros, ordena pela última alteração, da mais recente para a mais antiga', () => {
+    renderMany();
+
+    expect(titles().slice(0, 3)).toEqual(['Receita 29', 'Receita 28', 'Receita 27']);
+    expect(
+      screen.getByRole('columnheader', { name: /Última alteração/ }).getAttribute('aria-sort'),
+    ).toBe('descending');
+    expect(screen.getByRole('columnheader', { name: 'Versão' }).getAttribute('aria-sort')).toBe(
+      null,
+    );
+  });
+
+  it('busca por palavra do título sem diferenciar maiúsculas e acentos', async () => {
+    const user = userEvent.setup();
+    renderMany();
+
+    await user.type(screen.getByLabelText('Buscar por título'), 'ACAO');
+
+    expect(titles()).toEqual(['Ação de graças']);
+    expect(screen.getByRole('status').textContent).toBe('1 resultado');
+    expect(navigation.get()).toBe('q=ACAO');
+  });
+
+  it('filtros por tipo e status combinam com a busca; "Limpar filtros" zera tudo', async () => {
+    const user = userEvent.setup();
+    renderMany();
+
+    await user.selectOptions(screen.getByLabelText('Tipo'), 'page');
+    await user.selectOptions(screen.getByLabelText('Status'), 'rascunho');
+    expect(titles()).toEqual([
+      'Receita 27',
+      'Receita 21',
+      'Receita 15',
+      'Receita 09',
+      'Receita 03',
+    ]);
+    await user.type(screen.getByLabelText('Buscar por título'), '2');
+    expect(titles()).toEqual(['Receita 27', 'Receita 21']);
+
+    await user.click(screen.getByRole('button', { name: 'Limpar filtros' }));
+
+    expect(navigation.get()).toBe('');
+    expect(screen.getByRole('status').textContent).toBe('30 resultados');
+  });
+
+  it('clicar num cabeçalho ordenável inverte a ordem, com aria-sort no sentido', async () => {
+    const user = userEvent.setup();
+    renderMany();
+    const header = () => screen.getByRole('columnheader', { name: /Título/ });
+
+    await user.click(within(header()).getByRole('button'));
+    expect(header().getAttribute('aria-sort')).toBe('ascending');
+    expect(titles()[0]).toBe('Ação de graças');
+    await user.click(within(header()).getByRole('button'));
+    expect(header().getAttribute('aria-sort')).toBe('descending');
+    expect(titles()[0]).toBe('Receita 29');
+    expect(navigation.get()).toBe('ordem=-title');
+  });
+
+  it('tipo e status ordenam pelo rótulo exibido', async () => {
+    const user = userEvent.setup();
+    renderMany();
+
+    await user.click(
+      within(screen.getByRole('columnheader', { name: /Status/ })).getByRole('button'),
+    );
+
+    const statuses = screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getAllByRole('cell')[2]?.textContent);
+    expect(statuses[0]).toBe('Publicado');
+    expect(statuses.at(-1)).toBe('Rascunho');
+  });
+
+  it('25 por página, com contagem e Anterior/Próxima', async () => {
+    const user = userEvent.setup();
+    renderMany();
+
+    expect(screen.getAllByRole('row')).toHaveLength(26);
+    expect(screen.getByRole('status').textContent).toBe('30 resultados');
+    await user.click(screen.getByRole('button', { name: 'Próxima' }));
+
+    expect(screen.getAllByRole('row')).toHaveLength(6);
+    expect(navigation.get()).toBe('pagina=2');
+  });
+
+  it('a URL de uma lista filtrada, ordenada e paginada restaura o mesmo estado', () => {
+    act(() => navigation.set('status=publicado&ordem=title&pagina=1&q=receita'));
+    renderMany();
+
+    expect(screen.getByLabelText<HTMLInputElement>('Buscar por título').value).toBe('receita');
+    expect(screen.getByLabelText<HTMLSelectElement>('Status').value).toBe('publicado');
+    expect(titles()[0]).toBe('Receita 02');
+    expect(screen.getByRole('status').textContent).toBe('14 resultados');
+  });
+
+  it('busca sem resultado mostra a mensagem e "Limpar busca" volta a lista inteira', async () => {
+    const user = userEvent.setup();
+    renderMany();
+
+    await user.type(screen.getByLabelText('Buscar por título'), 'inexistente');
+
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByText('Nenhum conteúdo encontrado.')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Limpar busca' }));
+
+    expect(navigation.get()).toBe('');
+    expect(screen.getByLabelText<HTMLInputElement>('Buscar por título').value).toBe('');
+    expect(screen.getAllByRole('row')).toHaveLength(26);
   });
 });
