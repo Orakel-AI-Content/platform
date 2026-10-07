@@ -7,7 +7,7 @@ import {
   type Content,
   type Resources,
 } from '@orakel/content-model/v1';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import {
@@ -282,7 +282,10 @@ export type ContentListItem = {
   updatedAt: Date;
 };
 
-/** Conteúdos do site com a versão mais recente de cada um, em ordem de ID. */
+/**
+ * Conteúdos do site com a versão mais recente de cada um, em ordem de ID. Lê só o título e o
+ * slug do JSONB (nunca os blocos) e o tipo de `contents`: a lista abre com milhares de itens.
+ */
 export async function listContents(
   db: Executor,
   actor: Actor,
@@ -294,26 +297,21 @@ export async function listContents(
   const rows = await db
     .selectDistinctOn([contentVersions.contentId], {
       id: contentVersions.contentId,
+      kind: contents.kind,
+      title: sql<string>`${contentVersions.data}->>'title'`,
+      slug: sql<string>`${contentVersions.data}->>'slug'`,
       status: contentVersions.status,
       version: contentVersions.version,
-      data: contentVersions.data,
       updatedAt: contentVersions.createdAt,
     })
     .from(contentVersions)
+    .innerJoin(
+      contents,
+      and(eq(contents.siteId, contentVersions.siteId), eq(contents.id, contentVersions.contentId)),
+    )
     .where(eq(contentVersions.siteId, siteId))
     .orderBy(asc(contentVersions.contentId), desc(contentVersions.version));
-  return {
-    ok: true,
-    value: rows.map((row) => ({
-      id: row.id,
-      kind: row.data.kind,
-      title: row.data.title,
-      slug: row.data.slug,
-      status: row.status,
-      version: row.version,
-      updatedAt: row.updatedAt,
-    })),
-  };
+  return { ok: true, value: rows };
 }
 
 export type ReviewQueueItem = Omit<ContentListItem, 'slug' | 'status'>;
