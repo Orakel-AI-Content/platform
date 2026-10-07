@@ -36,7 +36,13 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   imagem). Texto de campo nunca fica menor que o corpo. Células de tabela usam números
   tabulares (`tabular-nums`, no `TableCell`), para datas e contagens alinharem na coluna.
 - **Tabelas:** TanStack Table 9 (`useTable` com `tableFeatures`); a biblioteca traz skills
-  em `node_modules/@tanstack/react-table/skills/`.
+  em `node_modules/@tanstack/react-table/skills/`. Linha de tabela densa (lista de sites):
+  no máximo duas linhas por célula, a principal e a secundária em `text-xs
+text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é cortado
+  (`truncate` com `max-w-*`) com o inteiro em `title`, em vez de quebrar. O `whitespace-nowrap`
+  do `TableCell` não muda. A ação principal da linha fica visível e as demais vão para o menu
+  "Mais ações"; o retorno de uma ação vai para uma região `role="status"` da tabela, nunca para
+  a linha.
 - **Datas:** `formatDateTime(data, fuso)` de `src/components/site-labels.ts`, sempre com o fuso
   do site (`SiteSummary.timeZone`, da configuração corrente), nunca o do navegador nem um fixo:
   "01/10/2026, 09:00 BRT" (dia, mês, ano, hora e minuto, com a sigla ou o deslocamento, como
