@@ -229,6 +229,9 @@ describe('barra de ações e continuar no editor (#109)', () => {
     await save(user);
     expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
     expect(action.mock.calls[0]?.[0].blocks.at(-1)).toMatchObject({ new: true, title: 'Novo' });
+    // A confirmação chega antes do fim da transição: espera o botão sair de "Salvando…".
+    const button = await screen.findByRole('button', { name: 'Salvar nova versão' });
+    expect(button).toHaveProperty('disabled', false);
 
     await save(user);
 
