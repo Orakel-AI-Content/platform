@@ -82,26 +82,44 @@ export function noWrite(siteId: string): ReactNode {
   return <ForbiddenScreen action="content.write" back={backToSite(siteId)} />;
 }
 
-/** Título da tela com o link de volta. */
+/**
+ * Cabeçalho da tela (#87): link de volta (se houver), título à esquerda e a ação principal à
+ * direita. A página só passa `action` quando quem pede tem permissão para ela.
+ */
 export function PageHeader({
   id,
   back,
   title,
+  action,
 }: {
   id: string;
-  back: { href: string; label: string };
+  back?: { href: string; label: string };
   title: ReactNode;
+  /** Ação principal (e as secundárias, agrupadas): link de criar, de cadastrar. */
+  action?: ReactNode;
 }) {
+  const heading = (
+    <h1 id={id} className="text-2xl font-semibold">
+      {title}
+    </h1>
+  );
   return (
     <>
-      <p className="text-sm">
-        <Link href={back.href} className="underline underline-offset-4">
-          {back.label}
-        </Link>
-      </p>
-      <h1 id={id} className="text-2xl font-semibold">
-        {title}
-      </h1>
+      {back && (
+        <p className="text-sm">
+          <Link href={back.href} className="underline underline-offset-4">
+            {back.label}
+          </Link>
+        </p>
+      )}
+      {action ? (
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {heading}
+          <div className="flex flex-wrap items-center gap-2">{action}</div>
+        </div>
+      ) : (
+        heading
+      )}
     </>
   );
 }
