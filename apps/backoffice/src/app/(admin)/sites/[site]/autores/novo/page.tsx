@@ -17,7 +17,7 @@ export default async function NewAuthorPage({ params }: { params: Promise<{ site
   const options = await editorOptions(db, actor, site.id);
 
   return (
-    <section aria-labelledby="new-author-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="new-author-title" className="form-width space-y-4">
       <PageHeader
         id="new-author-title"
         back={{ href: `/sites/${site.id}/autores`, label: `Autores de ${site.id}` }}

@@ -34,7 +34,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
 
   const sectionClass = 'space-y-3 rounded-md border border-border p-4';
   return (
-    <section aria-labelledby="site-title" className="max-w-3xl space-y-6">
+    <section aria-labelledby="site-title" className="form-width space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 id="site-title" className="text-2xl font-semibold">
           {site.name} <span className="text-muted-foreground">({site.id})</span>

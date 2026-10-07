@@ -24,7 +24,7 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
   if (options === undefined) return noRead;
 
   return (
-    <section aria-labelledby="new-content-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="new-content-title" className="form-width space-y-4">
       <p className="text-sm">
         <Link href={`/sites/${site.id}/conteudos`} className="underline underline-offset-4">
           Conteúdos de {site.id}

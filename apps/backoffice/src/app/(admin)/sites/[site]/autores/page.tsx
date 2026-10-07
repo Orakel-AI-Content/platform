@@ -18,7 +18,7 @@ export default async function AuthorsPage({ params }: { params: Promise<{ site: 
   if (!authors.ok) return noRead;
 
   return (
-    <section aria-labelledby="authors-title" className="space-y-4">
+    <section aria-labelledby="authors-title" className="list-width space-y-4">
       <PageHeader
         id="authors-title"
         back={{ href: `/sites/${site.id}`, label: site.name }}

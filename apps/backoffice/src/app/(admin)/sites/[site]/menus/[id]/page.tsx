@@ -47,7 +47,7 @@ export default async function EditMenuPage({ params }: Params) {
   if (menu === undefined) notFound();
 
   return (
-    <section aria-labelledby="edit-menu-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="edit-menu-title" className="form-width space-y-4">
       <PageHeader
         id="edit-menu-title"
         back={{ href: `/sites/${site.id}/menus`, label: `Menus de ${site.id}` }}

@@ -46,6 +46,16 @@
   --font-sans: ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Larguras canônicas das telas (#88): formulário e leitura de um item numa coluna legível;
+   lista na largura cheia do main. Toda tela usa uma das duas, nunca um max-w-* solto. */
+@utility form-width {
+  @apply max-w-3xl;
+}
+
+@utility list-width {
+  @apply w-full max-w-none;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

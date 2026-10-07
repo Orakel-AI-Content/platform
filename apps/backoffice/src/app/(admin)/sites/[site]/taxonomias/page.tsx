@@ -19,7 +19,7 @@ export default async function TaxonomiesPage({ params }: { params: Promise<{ sit
   if (!taxonomies.ok) return noRead;
 
   return (
-    <section aria-labelledby="taxonomies-title" className="space-y-4">
+    <section aria-labelledby="taxonomies-title" className="list-width space-y-4">
       <PageHeader
         id="taxonomies-title"
         back={{ href: `/sites/${site.id}`, label: site.name }}

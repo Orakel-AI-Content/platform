@@ -27,7 +27,7 @@ export default async function InstitutionalTextsPage({
   if (!texts.ok) return noRead;
 
   return (
-    <section aria-labelledby="institutional-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="institutional-title" className="form-width space-y-4">
       <PageHeader
         id="institutional-title"
         back={{ href: `/sites/${site.id}`, label: site.name }}

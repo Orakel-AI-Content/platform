@@ -18,7 +18,7 @@ export default async function MenusPage({ params }: { params: Promise<{ site: st
   if (!menus.ok) return noRead;
 
   return (
-    <section aria-labelledby="menus-title" className="space-y-4">
+    <section aria-labelledby="menus-title" className="list-width space-y-4">
       <PageHeader
         id="menus-title"
         back={{ href: `/sites/${site.id}`, label: site.name }}

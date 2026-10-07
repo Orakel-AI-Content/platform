@@ -49,7 +49,7 @@ export default async function EditTaxonomyPage({ params }: Params) {
   if (taxonomy === undefined) notFound();
 
   return (
-    <section aria-labelledby="edit-taxonomy-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="edit-taxonomy-title" className="form-width space-y-4">
       <PageHeader
         id="edit-taxonomy-title"
         back={{ href: `/sites/${site.id}/taxonomias`, label: `Taxonomias de ${site.id}` }}

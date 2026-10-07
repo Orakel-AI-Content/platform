@@ -47,7 +47,7 @@ export default async function ContentVersionPage({ params }: Params) {
   const latest = versions.value.at(-1)!.version;
 
   return (
-    <article aria-labelledby="version-title" className="max-w-3xl space-y-4">
+    <article aria-labelledby="version-title" className="form-width space-y-4">
       <p className="text-sm">
         <Link
           href={`/sites/${siteId}/conteudos/${contentId}`}

@@ -38,7 +38,7 @@ export default async function ContentVersionsPage({ params }: Params) {
   const latest = versions.value.at(-1)!;
 
   return (
-    <section aria-labelledby="versions-title" className="space-y-4">
+    <section aria-labelledby="versions-title" className="list-width space-y-4">
       <p className="text-sm">
         <Link href={`/sites/${siteId}/conteudos`} className="underline underline-offset-4">
           Conteúdos de {siteId}
