@@ -26,6 +26,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
+import { cn } from '@/lib/utils';
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
 const features = tableFeatures({});
@@ -184,7 +185,7 @@ export function SitesTable({
   if (rows.length === 0) {
     return <EmptyState action={emptyAction}>Nenhum site cadastrado.</EmptyState>;
   }
-  const item = buttonVariants({ variant: 'ghost', size: 'sm' });
+  const item = cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'justify-start');
   return (
     <div className="space-y-2">
       {/* Uma região para a tabela inteira: o retorno de "Publicar agora" não cresce a linha. */}

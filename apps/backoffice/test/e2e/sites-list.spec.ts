@@ -81,7 +81,8 @@ test('com 20 sites em 1280 px, sem rolagem horizontal e linhas de até duas linh
   for (const height of heights) expect(height).toBeLessThanOrEqual(MAX_ROW_HEIGHT);
 
   // Todas as informações continuam na linha; o nome longo fica cortado, inteiro no `title`.
-  const row = rows.filter({ hasText: created[0] });
+  // `-1` também casaria com `-10`…`-18`: a linha é a do ID seguido do separador.
+  const row = rows.filter({ hasText: `${created[0]} · ` });
   await expect(row.getByRole('link', { name: LONG_NAME })).toHaveAttribute('title', LONG_NAME);
   for (const text of ['Cadastrado', 'Sem release', 'Ativo', 'Não']) {
     await expect(row.getByText(text, { exact: true })).toBeVisible();
