@@ -2,11 +2,12 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { siteConfigs, sites } from '../../src/db/schema/index.ts';
+import { pendingChanges, siteConfigs, sites } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { advanceLifecycle } from '../../src/domain/builds/site-state.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
+import { listPendingChanges } from '../../src/domain/pending-changes/list.ts';
 import {
   createSite,
   unresolvedPendingChangeIds,
@@ -66,6 +67,44 @@ describe('recordPendingChange', () => {
     );
     const seenAfter = await unresolvedPendingChangeIds(db, 'exemplo-b');
     expect(seenAfter.length).toBe(seenInside.length + 1);
+  });
+});
+
+describe('listPendingChanges (#99)', () => {
+  it('lista só as não resolvidas do site pedido, da mais recente para a mais antiga', async () => {
+    const other = (await readFixture('exemplo-a')).find((l) => l.type === 'config');
+    if (other?.type !== 'config') throw new Error('fixture sem config');
+    await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, other.data));
+    await db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, 'exemplo-b', author));
+    await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-b', { ...config, name: 'Receitas B' }),
+    );
+    // O build baixou a criação do site (config v1): fica fora da lista.
+    await db
+      .update(pendingChanges)
+      .set({ resolvedAt: new Date() })
+      .where(eq(pendingChanges.reference, 'v1'));
+
+    const result = await listPendingChanges(db, SYSTEM_ACTOR, 'exemplo-b');
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.map(({ origin, reference }) => ({ origin, reference }))).toEqual([
+      { origin: 'config', reference: 'v2' },
+      { origin: 'author', reference: '1' },
+    ]);
+    expect(result.value.map((change) => change.id)).toEqual(
+      (await unresolvedPendingChangeIds(db, 'exemplo-b')).toReversed(),
+    );
+    expect(result.value[0]?.createdAt).toBeInstanceOf(Date);
+  });
+
+  it('sem site.read, recusa', async () => {
+    const result = await listPendingChanges(
+      db,
+      { email: 'x@orakel.local', roles: [] },
+      'exemplo-b',
+    );
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
   });
 });
 
