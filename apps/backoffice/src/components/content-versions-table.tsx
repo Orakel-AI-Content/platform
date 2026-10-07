@@ -3,7 +3,11 @@
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
 
-import { CONTENT_STATUS_LABEL, dateTime } from '@/components/site-labels.ts';
+import {
+  CONTENT_STATUS_LABEL,
+  CONTENT_STATUS_VARIANT,
+  dateTime,
+} from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -43,7 +47,11 @@ function columnsFor(siteId: string, contentId: number) {
     }),
     column.accessor('status', {
       header: 'Status',
-      cell: (info) => <Badge variant="outline">{CONTENT_STATUS_LABEL[info.getValue()]}</Badge>,
+      cell: (info) => (
+        <Badge variant={CONTENT_STATUS_VARIANT[info.getValue()]}>
+          {CONTENT_STATUS_LABEL[info.getValue()]}
+        </Badge>
+      ),
     }),
     column.accessor('title', { header: 'Título' }),
     column.accessor('createdAt', {

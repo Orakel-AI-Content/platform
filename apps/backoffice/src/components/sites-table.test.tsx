@@ -39,4 +39,42 @@ describe('tabela de sites', () => {
     const link = screen.getByRole('link', { name: 'Mídia exemplo-a' });
     expect(link.getAttribute('href')).toBe('/sites/exemplo-a/midia');
   });
+
+  it('dá a cada estado de site o badge da sua variante, com o texto do estado (#86)', () => {
+    render(
+      <SitesTable
+        rows={[
+          site,
+          { ...site, id: 'exemplo-b', state: 'promovendo' },
+          { ...site, id: 'exemplo-c', state: 'pausado', pausedReason: 'cota' },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Ativo').className).toContain('text-success');
+    expect(screen.getByText('Promovendo').className).toContain('text-info');
+    const paused = screen.getByText('Pausado: cota');
+    expect(paused.className).toContain('text-warning');
+    expect(paused.getAttribute('title')).toBe('cota');
+  });
+
+  it('dá a cada resultado de build o badge da sua variante (#86)', () => {
+    const finishedAt = new Date('2026-10-01T12:00:00Z');
+    render(
+      <SitesTable
+        rows={[
+          { ...site, lastBuild: { status: 'ok', versionId: 'v1', finishedAt } },
+          {
+            ...site,
+            id: 'exemplo-b',
+            lastBuild: { status: 'failed', versionId: null, finishedAt },
+          },
+        ]}
+      />,
+    );
+
+    // A etapa do ciclo de vida também se chama "Publicado", mas é texto solto na célula.
+    expect(screen.getByText('Publicado', { selector: 'span' }).className).toContain('text-success');
+    expect(screen.getByText('Falhou').className).toContain('bg-destructive');
+  });
 });
