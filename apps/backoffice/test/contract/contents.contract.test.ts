@@ -379,6 +379,47 @@ describe('leituras de conteúdo', () => {
     ]);
   });
 
+  it('com 2.000 conteúdos de duas versões, a lista traz só a mais recente em menos de 500 ms (#105)', async () => {
+    const template = await latest(1);
+    const ids = Array.from({ length: 2000 }, (_, index) => 1001 + index);
+    await db
+      .insert(contents)
+      .values(ids.map((id) => ({ siteId: SITE, id, kind: 'article' as const })));
+    await db.insert(contentVersions).values(
+      ids.flatMap((id) =>
+        [1, 2].map((version) => ({
+          siteId: SITE,
+          contentId: id,
+          version,
+          status: version === 2 ? ('rascunho' as const) : ('publicado' as const),
+          data: { ...template, title: `Conteúdo ${id} v${version}`, slug: `conteudo-${id}` },
+        })),
+      ),
+    );
+
+    const started = performance.now();
+    const result = await listContents(db, SYSTEM_ACTOR, SITE);
+    const elapsed = performance.now() - started;
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    const bulk = result.value.filter((item) => item.id > 1000);
+    expect(bulk).toHaveLength(2000);
+    expect(Object.keys(bulk[0] ?? {}).sort()).toEqual(
+      ['id', 'kind', 'slug', 'status', 'title', 'updatedAt', 'version'].sort(),
+    );
+    expect(bulk[0]).toMatchObject({
+      id: 1001,
+      kind: 'article',
+      title: 'Conteúdo 1001 v2',
+      slug: 'conteudo-1001',
+      status: 'rascunho',
+      version: 2,
+    });
+    expect(bulk[0]?.updatedAt).toBeInstanceOf(Date);
+    expect(bulk.every((item) => item.version === 2 && item.title.endsWith(' v2'))).toBe(true);
+    expect(elapsed).toBeLessThan(500);
+  });
+
   it('as versões de um conteúdo vêm em ordem; inexistente é recusado', async () => {
     const current = await latest(3);
     await edit(3, { ...current, title: 'Quem somos (2)' });
