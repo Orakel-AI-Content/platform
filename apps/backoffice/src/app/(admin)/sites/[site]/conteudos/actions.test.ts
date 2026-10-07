@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   currentActor: vi.fn(),
   createContent: vi.fn(),
   updateContent: vi.fn(),
+  listContentVersions: vi.fn(),
   submitForReview: vi.fn(),
   resourcesFor: vi.fn(),
   revalidatePath: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('@/db/client.ts', () => ({
 vi.mock('@/domain/content/contents.ts', () => ({
   createContent: mocks.createContent,
   updateContent: mocks.updateContent,
+  listContentVersions: mocks.listContentVersions,
   submitForReview: mocks.submitForReview,
 }));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
@@ -74,6 +76,14 @@ describe('ações do editor de conteúdo', () => {
   it('sucesso delega com o ator da sessão e revalida a lista do site', async () => {
     mocks.createContent.mockResolvedValue({ ok: true, value: { id: 4 } });
     mocks.updateContent.mockResolvedValue({ ok: true, value: { version: 3 } });
+    const saved = { ...input, blocks: [{ n: 1, type: 'toc', title: 'Neste guia' }] };
+    mocks.listContentVersions.mockResolvedValue({
+      ok: true,
+      value: [
+        { version: 2, data: input },
+        { version: 3, data: saved },
+      ],
+    });
 
     expect(await createContentAction('exemplo-a', input)).toEqual({
       ok: true,
@@ -84,7 +94,15 @@ describe('ações do editor de conteúdo', () => {
       ok: true,
       message: 'Versão 3 salva.',
       id: 2,
+      // A versão salva relida do servidor: o editor continua nela (#109).
+      saved,
     });
+    expect(mocks.listContentVersions).toHaveBeenCalledWith(
+      expect.anything(),
+      editor,
+      'exemplo-a',
+      2,
+    );
     expect(mocks.createContent).toHaveBeenCalledWith({}, editor, 'exemplo-a', input, {
       resources: RESOURCES,
     });
