@@ -8,6 +8,7 @@ import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { listSites, TFVARS_FILENAME } from '@/domain/sites/sites.ts';
 
+import { PageHeader } from './[site]/editorial-page.tsx';
 import { publishNow } from './actions.ts';
 
 export const dynamic = 'force-dynamic';
@@ -23,32 +24,37 @@ export default async function SitesPage() {
     return noRead;
   }
   const canConfigure = can(actor.value, 'site.configure');
+  const register = canConfigure ? (
+    <Link href="/sites/novo" className={buttonVariants({ size: 'sm' })}>
+      Cadastrar site
+    </Link>
+  ) : undefined;
   return (
     <section aria-labelledby="sites-title" className="list-width space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 id="sites-title" className="text-2xl font-semibold">
-          Sites
-        </h1>
-        {canConfigure ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/sites/novo" className={buttonVariants({ size: 'sm' })}>
-              Cadastrar site
-            </Link>
-            {/* Rota de download (ADR 0011), não navegação: <a> com download, não <Link>. */}
-            <a
-              href="/sites/tfvars"
-              download={TFVARS_FILENAME}
-              className={buttonVariants({ variant: 'outline', size: 'sm' })}
-            >
-              Baixar {TFVARS_FILENAME}
-            </a>
-          </div>
-        ) : null}
-      </div>
+      <PageHeader
+        id="sites-title"
+        title="Sites"
+        action={
+          canConfigure ? (
+            <>
+              {register}
+              {/* Rota de download (ADR 0011), não navegação: <a> com download, não <Link>. */}
+              <a
+                href="/sites/tfvars"
+                download={TFVARS_FILENAME}
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              >
+                Baixar {TFVARS_FILENAME}
+              </a>
+            </>
+          ) : undefined
+        }
+      />
       <SitesTable
         rows={sites.value}
         publishNow={can(actor.value, 'operations.run') ? publishNow : undefined}
         canConfigure={canConfigure}
+        emptyAction={register}
       />
     </section>
   );

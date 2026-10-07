@@ -79,24 +79,11 @@ describe('tabela de sites', () => {
     expect(screen.getByText('Falhou').className).toContain('bg-destructive');
   });
 
-  it('mostra o último build de cada site no fuso do próprio site (#90)', () => {
-    const finishedAt = new Date('2026-10-01T12:00:00Z');
-    render(
-      <SitesTable
-        rows={[
-          { ...site, lastBuild: { status: 'ok', versionId: null, finishedAt } },
-          {
-            ...site,
-            id: 'exemplo-b',
-            timeZone: 'Europe/Lisbon',
-            lastBuild: { status: 'ok', versionId: null, finishedAt },
-          },
-        ]}
-      />,
-    );
+  it('sem sites mostra o estado vazio no lugar da tabela (#87)', () => {
+    render(<SitesTable rows={[]} />);
 
-    const [, first, second] = screen.getAllByRole('row');
-    expect(first?.textContent).toContain('01/10/2026, 09:00 BRT');
-    expect(second?.textContent).toContain('01/10/2026, 13:00 GMT+1');
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByText('Nenhum site cadastrado.')).toBeTruthy();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });

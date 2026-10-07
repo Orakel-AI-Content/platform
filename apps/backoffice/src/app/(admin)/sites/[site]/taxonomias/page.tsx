@@ -1,7 +1,10 @@
+import Link from 'next/link';
+
 import { EntityTable } from '@/components/entity-table';
 import { TAXONOMY_KIND_LABEL } from '@/components/site-labels.ts';
 import { listTaxonomies } from '@/domain/content/taxonomies.ts';
 import { noRead } from '@/components/forbidden-screen';
+import { buttonVariants } from '@/components/ui/button';
 
 import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
@@ -18,12 +21,19 @@ export default async function TaxonomiesPage({ params }: { params: Promise<{ sit
   const taxonomies = await listTaxonomies(db, actor, site.id);
   if (!taxonomies.ok) return noRead;
 
+  const create = canWrite ? (
+    <Link href={`/sites/${site.id}/taxonomias/novo`} className={buttonVariants({ size: 'sm' })}>
+      Criar taxonomia
+    </Link>
+  ) : undefined;
+
   return (
     <section aria-labelledby="taxonomies-title" className="list-width space-y-4">
       <PageHeader
         id="taxonomies-title"
         back={{ href: `/sites/${site.id}`, label: site.name }}
         title={`Taxonomias (${site.id})`}
+        action={create}
       />
       <EntityTable
         basePath={`/sites/${site.id}/taxonomias`}
@@ -34,8 +44,8 @@ export default async function TaxonomiesPage({ params }: { params: Promise<{ sit
           cells: [TAXONOMY_KIND_LABEL[taxonomy.kind], taxonomy.slug],
         }))}
         noun={{ one: 'taxonomia', many: 'taxonomias', none: 'Nenhuma taxonomia cadastrada.' }}
-        createLabel="Criar taxonomia"
         canWrite={canWrite}
+        emptyAction={create}
       />
     </section>
   );

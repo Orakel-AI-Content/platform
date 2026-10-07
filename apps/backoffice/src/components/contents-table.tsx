@@ -2,6 +2,9 @@
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
+
+import { EmptyState } from '@/components/empty-state';
 
 import {
   CONTENT_KIND_LABEL,
@@ -61,79 +64,71 @@ function columnsFor(siteId: string, timeZone: string) {
 }
 
 /**
- * Conteúdos de um site com a versão mais recente de cada um. Criar e editar só aparecem com
- * `canWrite` (content.write, decidido no servidor); as rotas são do editor (#45).
+ * Conteúdos de um site com a versão mais recente de cada um. Editar só aparece com
+ * `canWrite` (content.write, decidido no servidor); criar é a ação do cabeçalho da página,
+ * repetida no estado vazio. As rotas são do editor (#45).
  */
 export function ContentsTable({
   siteId,
   timeZone,
   rows,
   canWrite = false,
+  emptyAction,
 }: {
   siteId: string;
   /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
   timeZone: string;
   rows: ContentListItem[];
   canWrite?: boolean;
+  /** Ação principal da tela (criar conteúdo), repetida no estado vazio; só com permissão. */
+  emptyAction?: ReactNode;
 }) {
   const columns = columnsFor(siteId, timeZone);
   const table = useTable({ features, columns, data: rows });
-  const colSpan = columns.length + (canWrite ? 1 : 0);
+  if (rows.length === 0) {
+    return <EmptyState action={emptyAction}>Nenhum conteúdo cadastrado.</EmptyState>;
+  }
   return (
-    <div className="space-y-4">
-      {canWrite && (
-        <Link href={`/sites/${siteId}/conteudos/novo`} className={buttonVariants({ size: 'sm' })}>
-          Criar conteúdo
-        </Link>
-      )}
-      <Table>
-        <TableCaption>{rows.length === 1 ? '1 conteúdo' : `${rows.length} conteúdos`}</TableCaption>
-        <TableHeader>
-          {table.getHeaderGroups().map((group) => (
-            <TableRow key={group.id}>
-              {group.headers.map((header) => (
-                <TableHead key={header.id} scope="col">
-                  <table.FlexRender header={header} />
-                </TableHead>
-              ))}
-              {canWrite && (
-                <TableHead scope="col">
-                  <span className="sr-only">Ações</span>
-                </TableHead>
-              )}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
-              {row.getAllCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  <table.FlexRender cell={cell} />
-                </TableCell>
-              ))}
-              {canWrite && (
-                <TableCell>
-                  <Link
-                    href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
-                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                  >
-                    Editar
-                    <span className="sr-only"> {row.original.title}</span>
-                  </Link>
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-          {rows.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={colSpan} className="text-center text-muted-foreground">
-                Nenhum conteúdo cadastrado.
+    <Table>
+      <TableCaption>{rows.length === 1 ? '1 conteúdo' : `${rows.length} conteúdos`}</TableCaption>
+      <TableHeader>
+        {table.getHeaderGroups().map((group) => (
+          <TableRow key={group.id}>
+            {group.headers.map((header) => (
+              <TableHead key={header.id} scope="col">
+                <table.FlexRender header={header} />
+              </TableHead>
+            ))}
+            {canWrite && (
+              <TableHead scope="col">
+                <span className="sr-only">Ações</span>
+              </TableHead>
+            )}
+          </TableRow>
+        ))}
+      </TableHeader>
+      <TableBody>
+        {table.getRowModel().rows.map((row) => (
+          <TableRow key={row.id}>
+            {row.getAllCells().map((cell) => (
+              <TableCell key={cell.id}>
+                <table.FlexRender cell={cell} />
               </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+            ))}
+            {canWrite && (
+              <TableCell>
+                <Link
+                  href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                >
+                  Editar
+                  <span className="sr-only"> {row.original.title}</span>
+                </Link>
+              </TableCell>
+            )}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

@@ -26,7 +26,8 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   const nav = page.getByRole('navigation', { name: 'Conteúdo editorial do site' });
 
   await nav.getByRole('link', { name: 'Autores' }).click();
-  await page.getByRole('link', { name: 'Criar autor' }).click();
+  // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
+  await page.getByRole('link', { name: 'Criar autor' }).first().click();
   await page.getByLabel('Nome').fill(author);
   await page.getByLabel('Slug').fill(`autora-${stamp}`);
   await expectNoViolations(page);
@@ -35,7 +36,7 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await expect(page.getByRole('row', { name: new RegExp(author) })).toBeVisible();
 
   // Slug repetido: a recusa do domínio aparece junto do campo.
-  await page.getByRole('link', { name: 'Criar autor' }).click();
+  await page.getByRole('link', { name: 'Criar autor' }).first().click();
   await page.getByLabel('Nome').fill('Outra');
   await page.getByLabel('Slug').fill(`autora-${stamp}`);
   await page.getByRole('button', { name: 'Criar' }).click();
@@ -43,7 +44,7 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await expect(page).toHaveURL(/\/autores\/novo$/);
 
   await page.goto('/sites/exemplo-a/taxonomias');
-  await page.getByRole('link', { name: 'Criar taxonomia' }).click();
+  await page.getByRole('link', { name: 'Criar taxonomia' }).first().click();
   await page.getByLabel('Tipo').selectOption({ label: 'Categoria' });
   await page.getByLabel('Nome').fill(category);
   await page.getByLabel('Slug').fill(`categoria-${stamp}`);
