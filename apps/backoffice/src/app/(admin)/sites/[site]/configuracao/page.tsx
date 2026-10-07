@@ -2,6 +2,7 @@ import { RESOURCES } from '@orakel/content-model/v1';
 import { notFound } from 'next/navigation';
 
 import { currentActor } from '@/auth/request-actor.ts';
+import { backToSite, ForbiddenScreen } from '@/components/forbidden-screen';
 import { editValues } from '@/components/site-config-form-values.ts';
 import { SiteConfigForm } from '@/components/site-config-form';
 import { getDb } from '@/db/client.ts';
@@ -20,11 +21,11 @@ export const metadata = { title: 'Configuração do site' };
  */
 export default async function SiteConfigPage({ params }: { params: Promise<{ site: string }> }) {
   const actor = await currentActor();
+  const { site } = await params;
   if (!actor.ok) return null;
   if (!can(actor.value, 'site.configure')) {
-    return <p role="alert">Sem permissão para editar a configuração dos sites.</p>;
+    return <ForbiddenScreen action="site.configure" back={backToSite(site)} />;
   }
-  const { site } = await params;
   const config = await currentConfig(getDb().db, site);
   if (config === undefined) notFound();
   return (

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ContentsTable } from '@/components/contents-table';
 import { can } from '@/domain/access/rbac.ts';
 import { listContents } from '@/domain/content/contents.ts';
+import { noRead } from '@/components/forbidden-screen';
 
 import { sitePageContext } from '../editorial-page.tsx';
 
@@ -20,7 +21,7 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
   if (!context.ok) return context.render;
   const { actor, db, site } = context.value;
   const contents = await listContents(db, actor, siteId);
-  if (!contents.ok) return <p role="alert">Sem permissão para ver os conteúdos.</p>;
+  if (!contents.ok) return noRead;
 
   return (
     <section aria-labelledby="contents-title" className="space-y-4">

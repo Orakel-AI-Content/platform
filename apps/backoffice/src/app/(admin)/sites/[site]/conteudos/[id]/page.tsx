@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { ContentVersionsTable } from '@/components/content-versions-table';
 import { CONTENT_KIND_LABEL } from '@/components/site-labels.ts';
+import { noRead } from '@/components/forbidden-screen';
 
 import { itemTitle } from '../../item-title.ts';
 import { readContentVersions } from '../content-versions.ts';
@@ -32,7 +33,7 @@ export default async function ContentVersionsPage({ params }: Params) {
   const { versions } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
-    return <p role="alert">Sem permissão para ver os conteúdos.</p>;
+    return noRead;
   }
   const latest = versions.value.at(-1)!;
 

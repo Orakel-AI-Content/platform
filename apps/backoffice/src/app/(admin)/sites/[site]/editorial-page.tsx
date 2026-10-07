@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { cache, type ReactNode } from 'react';
 
 import { currentActor } from '@/auth/request-actor.ts';
+import { backToSite, ForbiddenScreen, noRead } from '@/components/forbidden-screen';
 import { getDb, type Executor } from '@/db/client.ts';
 import { can, type Actor } from '@/domain/access/rbac.ts';
 import { listAuthors } from '@/domain/content/authors.ts';
@@ -66,7 +67,7 @@ export async function sitePageContext(
   const lookup = await lookupSite(siteId);
   if (lookup.kind === 'no-session') return { ok: false, render: null };
   if (lookup.kind === 'forbidden') {
-    return { ok: false, render: <p role="alert">Sem permissão para ver os sites.</p> };
+    return { ok: false, render: noRead };
   }
   if (lookup.kind === 'missing') notFound();
   const { actor, site } = lookup;
@@ -76,7 +77,10 @@ export async function sitePageContext(
   };
 }
 
-export const noWrite = <p role="alert">Sem permissão para editar o conteúdo deste site.</p>;
+/** Tela de permissão sem `content.write`, com a volta para o site. */
+export function noWrite(siteId: string): ReactNode {
+  return <ForbiddenScreen action="content.write" back={backToSite(siteId)} />;
+}
 
 /** Título da tela com o link de volta. */
 export function PageHeader({

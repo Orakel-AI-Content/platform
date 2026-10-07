@@ -1,6 +1,7 @@
 import { EntityTable } from '@/components/entity-table';
 import { TAXONOMY_KIND_LABEL } from '@/components/site-labels.ts';
 import { listTaxonomies } from '@/domain/content/taxonomies.ts';
+import { noRead } from '@/components/forbidden-screen';
 
 import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
@@ -15,7 +16,7 @@ export default async function TaxonomiesPage({ params }: { params: Promise<{ sit
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
   const taxonomies = await listTaxonomies(db, actor, site.id);
-  if (!taxonomies.ok) return <p role="alert">Sem permissão para ver as taxonomias.</p>;
+  if (!taxonomies.ok) return noRead;
 
   return (
     <section aria-labelledby="taxonomies-title" className="space-y-4">

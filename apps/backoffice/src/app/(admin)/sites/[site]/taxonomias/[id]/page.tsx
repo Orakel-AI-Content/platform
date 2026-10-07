@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { EntityForm } from '@/components/entity-forms';
 import { can } from '@/domain/access/rbac.ts';
+import { noRead } from '@/components/forbidden-screen';
 
 import { positiveInt } from '../../conteudos/params.ts';
 import { updateTaxonomyAction } from '../../editorial-actions.ts';
@@ -41,9 +42,9 @@ export default async function EditTaxonomyPage({ params }: Params) {
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { site, canWrite } = context.value;
-  if (!canWrite) return noWrite;
+  if (!canWrite) return noWrite(site.id);
   const taxonomies = await readTaxonomies(site.id);
-  if (!taxonomies?.ok) return <p role="alert">Sem permissão para ver as taxonomias.</p>;
+  if (!taxonomies?.ok) return noRead;
   const taxonomy = taxonomies.value.find((item) => item.id === taxonomyId);
   if (taxonomy === undefined) notFound();
 

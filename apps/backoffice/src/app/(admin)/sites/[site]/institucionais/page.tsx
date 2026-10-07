@@ -1,5 +1,6 @@
 import { InstitutionalTextsForm } from '@/components/entity-forms';
 import { getInstitutionalTexts } from '@/domain/sites/sites.ts';
+import { noRead } from '@/components/forbidden-screen';
 
 import { updateInstitutionalTextsAction } from '../editorial-actions.ts';
 import { noWrite, PageHeader, sitePageContext } from '../editorial-page.tsx';
@@ -21,9 +22,9 @@ export default async function InstitutionalTextsPage({
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
-  if (!canWrite) return noWrite;
+  if (!canWrite) return noWrite(site.id);
   const texts = await getInstitutionalTexts(db, actor, site.id);
-  if (!texts.ok) return <p role="alert">Sem permissão para ver os textos institucionais.</p>;
+  if (!texts.ok) return noRead;
 
   return (
     <section aria-labelledby="institutional-title" className="max-w-3xl space-y-4">

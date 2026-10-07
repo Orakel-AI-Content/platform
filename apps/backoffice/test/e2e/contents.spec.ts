@@ -83,16 +83,13 @@ test('revisor não tem editor nem link para criar ou editar', async ({ page }) =
   await expect(page.getByRole('link', { name: 'Criar conteúdo' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /^Editar/ })).toHaveCount(0);
 
-  await page.goto('/sites/exemplo-a/conteudos/1/editar');
-  await expect(page.getByText('Sem permissão para editar conteúdos.')).toHaveAttribute(
-    'role',
-    'alert',
-  );
-  await expect(page.getByRole('button', { name: /Salvar/ })).toHaveCount(0);
-
-  await page.goto('/sites/exemplo-a/conteudos/novo');
-  await expect(page.getByText('Sem permissão para criar conteúdos.')).toHaveAttribute(
-    'role',
-    'alert',
-  );
+  // Tela de permissão (#80): título, a ação com os papéis que a permitem e a volta ao site.
+  for (const path of ['conteudos/1/editar', 'conteudos/novo']) {
+    await page.goto(`/sites/exemplo-a/${path}`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Sem permissão' })).toBeVisible();
+    await expect(page.getByText('Editar conteúdo exige o papel admin ou editor.')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Salvar/ })).toHaveCount(0);
+  }
+  await page.getByRole('link', { name: 'Ir para o site exemplo-a' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-a$/);
 });

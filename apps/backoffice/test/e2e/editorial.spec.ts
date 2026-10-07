@@ -113,7 +113,8 @@ test('revisor não vê formulário nem links de criar e editar', async ({ page }
   }
   for (const path of ['autores/novo', 'taxonomias/1', 'menus/1', 'institucionais']) {
     await page.goto(`/sites/exemplo-a/${path}`);
-    await expect(page.getByText('Sem permissão para editar o conteúdo deste site.')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Sem permissão' })).toBeVisible();
+    await expect(page.getByText('Editar conteúdo exige o papel admin ou editor.')).toBeVisible();
     await expect(page.getByRole('button', { name: /Criar|Salvar/ })).toHaveCount(0);
   }
 });

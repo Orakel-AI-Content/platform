@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { backToSites } from '@/components/forbidden-screen';
 import { StatusScreen } from '@/components/status-screen';
 import { buttonVariants } from '@/components/ui/button';
 
@@ -10,8 +11,8 @@ export default function NotFound() {
     <StatusScreen
       title="Página não encontrada"
       action={
-        <Link href="/sites" className={buttonVariants({ variant: 'outline' })}>
-          Ir para a lista de sites
+        <Link href={backToSites.href} className={buttonVariants({ variant: 'outline' })}>
+          {backToSites.label}
         </Link>
       }
     >
