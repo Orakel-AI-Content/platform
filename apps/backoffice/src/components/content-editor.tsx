@@ -12,6 +12,7 @@ import {
   ContentMetaSchema,
   isBlockType,
   newBlock,
+  savedFormValues,
   type ContentFormResult,
 } from '@/components/content-editor-values.ts';
 import { entityField, mediaField, type PickerOption } from '@/components/forms/picker-fields';
@@ -143,13 +144,15 @@ export function ContentEditor({
     startTransition(async () => {
       setSummary([]);
       setSaved('');
+      // Valores crus da tela (o `value` do resolver já vem sem os vazios): base do reset.
+      const sent = form.getValues();
       const result = await action(value as ContentEdit);
       if (result.ok) {
         if (mode === 'create') {
           router.replace(`/sites/${siteId}/conteudos/${result.id}/editar?criado=1`);
           return;
         }
-        if (result.saved) form.reset(result.saved);
+        if (result.saved) form.reset(savedFormValues(result.saved, sent) as FieldValues);
         setSaved(result.message);
         router.refresh();
         return;
