@@ -29,7 +29,7 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
   const config = await currentConfig(getDb().db, site);
   if (config === undefined) notFound();
   return (
-    <section aria-labelledby="site-config-title" className="space-y-6">
+    <section aria-labelledby="site-config-title" className="form-width space-y-6">
       <h1 id="site-config-title" className="text-2xl font-semibold">
         Configuração de {config.name} <span className="text-muted-foreground">({site})</span>
       </h1>

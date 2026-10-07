@@ -53,7 +53,7 @@ export default async function EditContentPage({ params }: Params) {
   if (latest === undefined) notFound();
 
   return (
-    <section aria-labelledby="edit-content-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="edit-content-title" className="form-width space-y-4">
       <p className="text-sm">
         <Link
           href={`/sites/${siteId}/conteudos/${contentId}`}

@@ -15,7 +15,7 @@ export default async function NewTaxonomyPage({ params }: { params: Promise<{ si
   if (!canWrite) return noWrite(site.id);
 
   return (
-    <section aria-labelledby="new-taxonomy-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="new-taxonomy-title" className="form-width space-y-4">
       <PageHeader
         id="new-taxonomy-title"
         back={{ href: `/sites/${site.id}/taxonomias`, label: `Taxonomias de ${site.id}` }}

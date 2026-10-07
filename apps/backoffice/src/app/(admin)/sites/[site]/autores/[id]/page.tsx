@@ -49,7 +49,7 @@ export default async function EditAuthorPage({ params }: Params) {
   const options = await editorOptions(db, actor, site.id);
 
   return (
-    <section aria-labelledby="edit-author-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="edit-author-title" className="form-width space-y-4">
       <PageHeader
         id="edit-author-title"
         back={{ href: `/sites/${site.id}/autores`, label: `Autores de ${site.id}` }}

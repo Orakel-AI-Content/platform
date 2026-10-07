@@ -97,7 +97,7 @@ export function SiteConfigForm({
   };
 
   return (
-    <div className="max-w-2xl space-y-2">
+    <div className="space-y-2">
       <SchemaForm
         schema={SiteConfigSchema}
         defaultValues={defaultValues}

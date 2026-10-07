@@ -15,7 +15,7 @@ export default async function NewMenuPage({ params }: { params: Promise<{ site: 
   if (!canWrite) return noWrite(site.id);
 
   return (
-    <section aria-labelledby="new-menu-title" className="max-w-3xl space-y-4">
+    <section aria-labelledby="new-menu-title" className="form-width space-y-4">
       <PageHeader
         id="new-menu-title"
         back={{ href: `/sites/${site.id}/menus`, label: `Menus de ${site.id}` }}

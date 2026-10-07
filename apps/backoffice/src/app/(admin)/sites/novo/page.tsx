@@ -20,7 +20,7 @@ export default async function NewSitePage() {
     return <ForbiddenScreen action="site.configure" back={backToSites} />;
   }
   return (
-    <section aria-labelledby="new-site-title" className="space-y-6">
+    <section aria-labelledby="new-site-title" className="form-width space-y-6">
       <h1 id="new-site-title" className="text-2xl font-semibold">
         Cadastrar site
       </h1>
