@@ -18,8 +18,8 @@ const created = Array.from({ length: 18 }, (_, index) => `e2e-lista-${stamp}-${i
 /** Nome e domínio longos: o corte com `title` tem de segurar a largura e a altura. */
 const LONG_NAME = 'Guia completo de receitas regionais brasileiras para o dia a dia';
 
-/** 2 × 20 px de `text-sm` + 16 px de padding da célula + 1 px de borda. */
-const MAX_ROW_HEIGHT = 57;
+/** Nome e `SITE_ID · domínio` na célula do site; as outras células têm uma linha só. */
+const MAX_LINES_PER_CELL = 2;
 
 test.beforeAll(async () => {
   const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
@@ -75,10 +75,38 @@ test('com 20 sites em 1280 px, sem rolagem horizontal e linhas de até duas linh
   });
   expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth);
 
-  const heights = await rows.evaluateAll((trs) =>
-    trs.map((tr) => tr.getBoundingClientRect().height),
+  // Linhas de texto por célula, não altura em px (#117): um badge ou botão 1 px maior não
+  // muda a contagem. Só nós de texto visíveis (a Range da célula inteira traria as caixas dos
+  // badges, alguns px acima do texto); o texto sr-only mede 1 px e fica de fora. Retângulos
+  // que se sobrepõem na vertical são a mesma linha: badge e texto ao lado não têm o mesmo top.
+  const cells = await rows.evaluateAll((trs) =>
+    trs.flatMap((tr) =>
+      Array.from(tr.querySelectorAll('td'), (cell, column) => {
+        const lines: { top: number; bottom: number }[] = [];
+        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          if (!node.textContent?.trim()) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) {
+            if (rect.width <= 1 || rect.height <= 1) continue;
+            const middle = (rect.top + rect.bottom) / 2;
+            const line = lines.find((l) => l.top <= middle && middle <= l.bottom);
+            if (line === undefined) lines.push({ top: rect.top, bottom: rect.bottom });
+            else
+              Object.assign(line, {
+                top: Math.min(line.top, rect.top),
+                bottom: Math.max(line.bottom, rect.bottom),
+              });
+          }
+        }
+        const site = tr.querySelector('td')?.textContent?.trim().slice(0, 60) ?? '';
+        return { site, column, lines: lines.length };
+      }),
+    ),
   );
-  for (const height of heights) expect(height).toBeLessThanOrEqual(MAX_ROW_HEIGHT);
+  expect(cells.length).toBeGreaterThan(0);
+  expect(cells.filter((cell) => cell.lines > MAX_LINES_PER_CELL)).toEqual([]);
 
   // Todas as informações continuam na linha; o nome longo fica cortado, inteiro no `title`.
   // `-1` também casaria com `-10`…`-18`: a linha é a do ID seguido do separador.
