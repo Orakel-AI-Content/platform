@@ -26,6 +26,8 @@ export type ContentVersionRow = {
   status: ContentListItem['status'];
   title: string;
   createdAt: Date;
+  /** Quem aprovou a versão e quando (`reviews`); nula sem aprovação. */
+  approval: { reviewer: string; approvedAt: Date } | null;
 };
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
@@ -57,6 +59,22 @@ function columnsFor(siteId: string, contentId: number, timeZone: string) {
     column.accessor('createdAt', {
       header: 'Gravada em',
       cell: (info) => formatDateTime(info.getValue(), timeZone),
+    }),
+    // Duas linhas, como na tabela densa: o revisor e, embaixo, a data; vazia sem aprovação.
+    column.accessor('approval', {
+      header: 'Aprovação',
+      cell: (info) => {
+        const approval = info.getValue();
+        if (approval === null) return null;
+        return (
+          <span className="flex flex-col items-start gap-0.5">
+            <span>{approval.reviewer}</span>
+            <span className="text-xs text-muted-foreground">
+              {formatDateTime(approval.approvedAt, timeZone)}
+            </span>
+          </span>
+        );
+      },
     }),
   ]);
 }

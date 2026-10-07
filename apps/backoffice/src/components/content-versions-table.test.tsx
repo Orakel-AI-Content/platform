@@ -13,6 +13,7 @@ const rows: ContentVersionRow[] = [1, 2, 3].map((version) => ({
   status: version === 1 ? 'publicado' : 'rascunho',
   title: `Guia v${version}`,
   createdAt: new Date(`2026-10-0${version}T12:00:00Z`),
+  approval: null,
 }));
 
 describe('tabela de versões', () => {
@@ -73,5 +74,34 @@ describe('tabela de versões', () => {
       />,
     );
     expect(screen.getAllByRole('row')[1]?.textContent).toContain('01/10/2026, 13:00 GMT+1');
+  });
+
+  it('mostra quem aprovou e quando, no fuso do site; sem aprovação, a célula fica vazia (#76)', () => {
+    const approved: ContentVersionRow[] = [
+      { ...rows[0]!, approval: null },
+      {
+        ...rows[1]!,
+        status: 'aprovado',
+        approval: {
+          reviewer: 'revisor@orakel.local',
+          approvedAt: new Date('2026-10-01T12:00:00Z'),
+        },
+      },
+    ];
+    render(
+      <ContentVersionsTable
+        siteId="exemplo-a"
+        contentId={7}
+        timeZone="America/Sao_Paulo"
+        rows={approved}
+      />,
+    );
+
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toContain('Aprovação');
+    const [, first, second] = screen.getAllByRole('row');
+    const approvalCell = (row: HTMLElement | undefined) => row?.querySelectorAll('td')[4];
+    expect(approvalCell(first)?.textContent).toBe('');
+    expect(approvalCell(second)?.textContent).toContain('revisor@orakel.local');
+    expect(approvalCell(second)?.textContent).toContain('01/10/2026, 09:00 BRT');
   });
 });
