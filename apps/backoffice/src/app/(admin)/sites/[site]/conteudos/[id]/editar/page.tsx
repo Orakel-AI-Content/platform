@@ -1,44 +1,51 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { currentActor } from '@/auth/request-actor.ts';
 import { ContentEditor } from '@/components/content-editor';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
-import { listContentVersions } from '@/domain/content/contents.ts';
 
+import { itemTitle } from '../../../item-title.ts';
 import { updateContentAction } from '../../actions.ts';
+import { readContentVersions } from '../../content-versions.ts';
 import { editorOptions } from '../../editor-options.ts';
 import { positiveInt } from '../../params.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Editar conteúdo' };
+type Params = { params: Promise<{ site: string; id: string }> };
+
+/** "<título> · Editar conteúdo", só quando a página mostraria o editor (#79). */
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { site: siteId, id } = await params;
+  const contentId = positiveInt(id);
+  const read = contentId === undefined ? undefined : await readContentVersions(siteId, contentId);
+  const latest =
+    read?.versions.ok && can(read.actor, 'content.write') ? read.versions.value.at(-1) : undefined;
+  return { title: itemTitle(latest?.data.title, 'Editar conteúdo') };
+}
 
 /**
  * Edição: parte da versão mais recente e grava a N+1 em rascunho. Sem content.write não há
  * editor (e o domínio recusa).
  */
-export default async function EditContentPage({
-  params,
-}: {
-  params: Promise<{ site: string; id: string }>;
-}) {
-  const actor = await currentActor();
-  if (!actor.ok) return null;
+export default async function EditContentPage({ params }: Params) {
   const { site: siteId, id } = await params;
   const contentId = positiveInt(id);
   if (contentId === undefined) notFound();
+  const read = await readContentVersions(siteId, contentId);
+  if (read === undefined) return null;
+  const { actor, versions } = read;
   const db = getDb().db;
-  const versions = await listContentVersions(db, actor.value, siteId, contentId);
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return <p role="alert">Sem permissão para ver os conteúdos.</p>;
   }
-  if (!can(actor.value, 'content.write')) {
+  if (!can(actor, 'content.write')) {
     return <p role="alert">Sem permissão para editar conteúdos.</p>;
   }
-  const options = await editorOptions(db, actor.value, siteId);
+  const options = await editorOptions(db, actor, siteId);
   if (options === undefined) return <p role="alert">Sem permissão para ver os conteúdos.</p>;
   const latest = versions.value.at(-1);
   if (latest === undefined) notFound();
