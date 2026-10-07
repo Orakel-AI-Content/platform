@@ -7,6 +7,7 @@ import {
   CONTENT_STATUS_VARIANT,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
+  formatDateTime,
 } from './site-labels.ts';
 
 // Cada estado tem aparência própria dentro do seu grupo (#86): a variante não se repete e
@@ -27,5 +28,19 @@ describe.each(groups)('%s', (_, labels, variants) => {
   it('tem rótulo e variante para os mesmos estados', () => {
     expect(Object.keys(variants).sort()).toEqual(Object.keys(labels).sort());
     for (const label of Object.values(labels)) expect(label).not.toBe('');
+  });
+});
+
+describe('data e hora no fuso do site (#90)', () => {
+  const instant = new Date('2026-10-01T12:00:00Z');
+
+  it('mostra o mesmo instante no horário de cada fuso, com a indicação do fuso', () => {
+    expect(formatDateTime(instant, 'America/Sao_Paulo')).toBe('01/10/2026, 09:00 BRT');
+    expect(formatDateTime(instant, 'Europe/Lisbon')).toBe('01/10/2026, 13:00 GMT+1');
+  });
+
+  it('reaproveita o formatador do fuso sem misturar fusos', () => {
+    expect(formatDateTime(instant, 'Europe/Lisbon')).toBe(formatDateTime(instant, 'Europe/Lisbon'));
+    expect(formatDateTime(instant, 'UTC')).toBe('01/10/2026, 12:00 UTC');
   });
 });
