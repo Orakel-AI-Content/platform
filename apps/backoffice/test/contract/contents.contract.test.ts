@@ -10,6 +10,7 @@ import {
   createContent,
   listContents,
   listContentVersions,
+  submitForReview,
   updateContent,
   type ContentEdit,
   type EditBlock,
@@ -249,6 +250,56 @@ describe('criar conteúdo', () => {
       issues: [{ code: 'forbidden' }],
     });
     expect(await listContents(db, SYSTEM_ACTOR, SITE)).toMatchObject({ value: { length: 3 } });
+  });
+});
+
+const submit = (contentId: number, actor = SYSTEM_ACTOR) =>
+  db.transaction((tx) => submitForReview(tx, actor, SITE, contentId));
+
+describe('enviar para revisão (#72)', () => {
+  it('a versão mais recente em rascunho passa a em_revisao, sem nova versão nem mudança pendente', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    const [, before] = await versions(1);
+    const pending = await unresolvedPendingChangeIds(db, SITE);
+
+    expect(await submit(1)).toEqual({ ok: true, value: { version: 2 } });
+
+    const after = await versions(1);
+    expect(after.map((v) => [v.version, v.status])).toEqual([
+      [1, 'publicado'],
+      [2, 'em_revisao'],
+    ]);
+    expect(after[1]?.data).toEqual(before?.data);
+    expect(after[1]?.createdAt).toEqual(before?.createdAt);
+    expect(await unresolvedPendingChangeIds(db, SITE)).toEqual(pending);
+  });
+
+  it('recusa versão mais recente fora de rascunho e conteúdo inexistente', async () => {
+    expect(await submit(2)).toMatchObject({ ok: false, issues: [{ code: 'content.not_draft' }] });
+    await edit(1, await latest(1));
+    await submit(1);
+    expect(await submit(1)).toMatchObject({ ok: false, issues: [{ code: 'content.not_draft' }] });
+    expect(await submit(999)).toMatchObject({
+      ok: false,
+      issues: [{ code: 'content.not_found' }],
+    });
+    expect((await versions(2)).map((v) => v.status)).toEqual(['publicado']);
+  });
+
+  it.each(['revisor', 'operacao'] as const)('%s não envia', async (role) => {
+    await edit(1, await latest(1));
+
+    const result = await submit(1, { email: `${role}@orakel.local`, roles: [role] });
+
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect((await versions(1)).at(-1)?.status).toBe('rascunho');
+  });
+
+  it('editor envia', async () => {
+    await edit(1, await latest(1));
+    expect(await submit(1, { email: 'editor@orakel.local', roles: ['editor'] })).toMatchObject({
+      ok: true,
+    });
   });
 });
 
