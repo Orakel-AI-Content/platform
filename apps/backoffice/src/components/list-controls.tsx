@@ -22,8 +22,9 @@ export type ListFilterControl = {
 
 /**
  * Busca e filtros da lista. A busca guarda o texto digitado localmente (a URL chega depois
- * de cada `router.replace`) e é recriada ao limpar. "Limpar filtros" só aparece com busca ou
- * filtro ativo e devolve o foco à busca.
+ * de cada `router.replace`) e esvazia quando a busca da URL volta a vazia, venha a limpeza
+ * daqui ou de fora (o "Limpar busca" do estado sem resultado). "Limpar filtros" só aparece
+ * com busca ou filtro ativo e devolve o foco à busca.
  */
 export function ListToolbar({
   search,
@@ -43,7 +44,12 @@ export function ListToolbar({
 }) {
   const id = useId();
   const searchRef = useRef<HTMLInputElement>(null);
-  const [resets, setResets] = useState(0);
+  const [text, setText] = useState(search);
+  const [previous, setPrevious] = useState(search);
+  if (search !== previous) {
+    setPrevious(search);
+    if (search === '') setText('');
+  }
   const active = search !== '' || filters.some((filter) => filter.value !== undefined);
 
   return (
@@ -55,12 +61,14 @@ export function ListToolbar({
       <div className="min-w-56 flex-1 space-y-1.5">
         <Label htmlFor={`${id}-search`}>{searchLabel}</Label>
         <Input
-          key={resets}
           ref={searchRef}
           id={`${id}-search`}
           type="search"
-          defaultValue={search}
-          onChange={(event) => onSearchChange(event.target.value)}
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value);
+            onSearchChange(event.target.value);
+          }}
         />
       </div>
       {filters.map((filter) => (
@@ -86,7 +94,6 @@ export function ListToolbar({
           variant="outline"
           onClick={() => {
             onClear();
-            setResets((count) => count + 1);
             requestAnimationFrame(() => searchRef.current?.focus());
           }}
         >
