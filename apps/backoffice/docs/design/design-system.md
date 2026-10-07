@@ -7,7 +7,19 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   button, input, label, textarea e checkbox, sem Radix: `<select>` e checkbox nativos). Componente novo do catálogo: copie a fonte do shadcn para ali e
   ajuste aos tokens; o CLI não instala dependências fora do `catalog` da raiz.
 - **Estilização:** Tailwind 4, só com os tokens de `src/app/globals.css` (`background`,
-  `foreground`, `muted`, `border`, `primary`, `destructive`, `warning`); nada de cor solta.
+  `foreground`, `muted`, `border`, `primary`, `destructive`, `warning`, `success`, `info`,
+  `ring`); nada de cor solta.
+- **Tokens de estado:** `success` e `info` (como `destructive`) servem nos dois usos: texto ou
+  borda sobre o fundo (`text-success`, `border-info`) e preenchido com o próprio
+  `-foreground` (`bg-success text-success-foreground`). `warning` só tem o uso sobre o fundo.
+  Todo par de texto chega a 4,5:1 e o `ring` a 3:1 do fundo, nos dois temas; o
+  `globals-contrast.test.ts` lê os tokens do `globals.css` e reprova o par que não chegar.
+  Token novo de texto entra também na lista de pares do teste.
+- **Foco:** uma regra global `:focus-visible` (`@layer base` do `globals.css`) desenha o
+  contorno `ring` de 2px, afastado 2px, em todo elemento focável: links, botões, campos e o
+  editor de rich text. Componentes não repetem classes de foco (`focus-visible:outline-*`);
+  uma tela só sobrescreve o contorno por motivo explícito. O E2E `focus.spec.ts` confere o
+  contorno navegando com `Tab`.
 - **Temas:** claro e escuro pela preferência do sistema (`prefers-color-scheme`).
 - **Tipografia:** pilha `system-ui`, sem fonte própria, numa escala de quatro tamanhos: título
   da página (`h1`) em `text-2xl font-semibold`; seção (`h2`) em `text-lg font-semibold`;
