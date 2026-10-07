@@ -11,9 +11,11 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   aumentar a altura dela; a ação principal da linha fica visível, fora do menu. `label` põe o
   item no nome acessível ("Mais ações: exemplo-a"). Os itens são links e botões comuns, em
   `buttonVariants({ variant: 'ghost', size: 'sm' })`, sem `role="menu"`. A Popover API nativa
-  abre, fecha (clique fora e Esc) e devolve o foco ao botão; a posição é por CSS anchor
-  positioning. O happy-dom não implementa popover: o teste de componente confere o nome e a
-  ligação botão → lista, e o E2E confere abrir, fechar e Esc.
+  abre, fecha (clique fora e Esc) e devolve o foco ao botão; acionar um item (clique, Enter ou
+  Espaço) também fecha a lista, por um `onClick` no contêiner que chama `hidePopover()`, sem
+  estado React. A posição é por CSS anchor positioning. O happy-dom não implementa popover: o
+  teste de componente confere o nome, a ligação botão → lista e a chamada a `hidePopover`
+  (espionado), e o E2E confere abrir, fechar, Esc e o fechamento ao acionar um item.
 - **Estilização:** Tailwind 4, só com os tokens de `src/app/globals.css` (`background`,
   `foreground`, `muted`, `border`, `primary`, `destructive`, `warning`, `success`, `info`,
   `ring`); nada de cor solta.

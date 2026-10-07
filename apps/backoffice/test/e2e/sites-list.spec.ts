@@ -128,3 +128,42 @@ test('o menu Mais ações abre e fecha pelo mouse e pelo teclado; Esc devolve o 
   await expect(item).toBeHidden();
   await expect(button).toBeFocused();
 });
+
+test('acionar um item do menu Mais ações fecha a lista e devolve o foco; um link navega', async ({
+  page,
+}) => {
+  await loginAsAdmin(page);
+  const button = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
+  const list = page.locator(`[id="${await button.getAttribute('popovertarget')}"]`);
+
+  // Nenhuma tela tem item botão ainda (#115): o teste põe um na lista. O clique sobe até o
+  // contêiner, onde o React trata o evento, como num item vindo de `children`.
+  await list.evaluate((element) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.textContent = 'Ação de teste';
+    element.append(item);
+  });
+  const item = list.getByRole('button', { name: 'Ação de teste' });
+
+  // Mouse.
+  await button.click();
+  await item.click();
+  await expect(item).toBeHidden();
+  await expect(button).toBeFocused();
+
+  // Teclado: Enter e Espaço no item.
+  for (const key of ['Enter', 'Space']) {
+    await page.keyboard.press('Enter');
+    await expect(item).toBeVisible();
+    await item.focus();
+    await page.keyboard.press(key);
+    await expect(item).toBeHidden();
+    await expect(button).toBeFocused();
+  }
+
+  // Um item link continua navegando.
+  await button.click();
+  await page.getByRole('link', { name: 'Conteúdos exemplo-a' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos$/);
+});
