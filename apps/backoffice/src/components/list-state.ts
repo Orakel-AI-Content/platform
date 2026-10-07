@@ -21,7 +21,7 @@ import {
   type Updater,
 } from '@tanstack/react-table';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 /** Itens por página de toda lista filtrada (sem seletor: decisão da #35). */
 export const PAGE_SIZE = 25;
@@ -147,12 +147,20 @@ export function useListState(config: ListConfig) {
   const query = params.toString();
   const state = useMemo(() => parseListState(new URLSearchParams(query), config), [query, config]);
 
+  // Última query pedida: o `router.replace` chega à URL depois, e duas mudanças seguidas
+  // (filtro e logo a busca) partiriam da mesma query antiga, e a segunda apagaria a primeira.
+  const latest = useRef(query);
+  useEffect(() => {
+    latest.current = query;
+  }, [query]);
+
   const update = useCallback(
     (patch: ListPatch) => {
-      const next = listStateQuery(new URLSearchParams(query), config, patch);
+      const next = listStateQuery(new URLSearchParams(latest.current), config, patch);
+      latest.current = next;
       router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
     },
-    [query, config, router, pathname],
+    [config, router, pathname],
   );
 
   const columnFilters: ColumnFiltersState = Object.entries(state.filters).map(([id, value]) => ({

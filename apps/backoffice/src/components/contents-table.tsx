@@ -1,10 +1,12 @@
 'use client';
 
-import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
+import { createColumnHelper, useTable, type Row } from '@tanstack/react-table';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
+import { ListPagination, ListToolbar, SortableHead } from '@/components/list-controls.tsx';
+import { listFeatures, useListState, type ListConfig } from '@/components/list-state.ts';
 
 import {
   CONTENT_KIND_LABEL,
@@ -13,11 +15,10 @@ import {
   formatDateTime,
 } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -25,18 +26,41 @@ import {
 } from '@/components/ui/table';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
-// TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
-const features = tableFeatures({});
-const column = createColumnHelper<typeof features, ContentListItem>();
+const column = createColumnHelper<typeof listFeatures, ContentListItem>();
+
+const KINDS = Object.keys(CONTENT_KIND_LABEL) as ContentListItem['kind'][];
+const STATUSES = Object.keys(CONTENT_STATUS_LABEL) as ContentListItem['status'][];
+
+/** Busca por título, filtros por tipo e status, mais recente primeiro (#107). */
+const LIST: ListConfig = {
+  filters: [
+    { column: 'kind', param: 'tipo', values: KINDS },
+    { column: 'status', param: 'status', values: STATUSES },
+  ],
+  sortable: ['title', 'kind', 'status', 'updatedAt'],
+  defaultSort: { id: 'updatedAt', desc: true },
+};
+
+/** Ordena pelo texto exibido em pt-BR (rótulo de tipo e status, título), não pelo valor. */
+function byText(text: (item: ContentListItem) => string) {
+  return (
+    a: Row<typeof listFeatures, ContentListItem>,
+    b: Row<typeof listFeatures, ContentListItem>,
+  ) => text(a.original).localeCompare(text(b.original), 'pt-BR');
+}
 
 function columnsFor(siteId: string, timeZone: string) {
   return column.columns([
     column.accessor('kind', {
       header: 'Tipo',
+      enableGlobalFilter: false,
+      filterFn: 'equalsString',
+      sortFn: byText((item) => CONTENT_KIND_LABEL[item.kind]),
       cell: (info) => CONTENT_KIND_LABEL[info.getValue()],
     }),
     column.accessor('title', {
       header: 'Título',
+      sortFn: byText((item) => item.title),
       cell: (info) => (
         <Link
           href={`/sites/${siteId}/conteudos/${info.row.original.id}`}
@@ -49,24 +73,34 @@ function columnsFor(siteId: string, timeZone: string) {
     }),
     column.accessor('status', {
       header: 'Status',
+      enableGlobalFilter: false,
+      filterFn: 'equalsString',
+      sortFn: byText((item) => CONTENT_STATUS_LABEL[item.status]),
       cell: (info) => (
         <Badge variant={CONTENT_STATUS_VARIANT[info.getValue()]}>
           {CONTENT_STATUS_LABEL[info.getValue()]}
         </Badge>
       ),
     }),
-    column.accessor('version', { header: 'Versão' }),
+    column.accessor('version', {
+      header: 'Versão',
+      enableGlobalFilter: false,
+      enableSorting: false,
+    }),
     column.accessor('updatedAt', {
       header: 'Última alteração',
+      enableGlobalFilter: false,
+      sortFn: 'datetime',
       cell: (info) => formatDateTime(info.getValue(), timeZone),
     }),
   ]);
 }
 
 /**
- * Conteúdos de um site com a versão mais recente de cada um. Editar só aparece com
- * `canWrite` (content.write, decidido no servidor); criar é a ação do cabeçalho da página,
- * repetida no estado vazio. As rotas são do editor (#45).
+ * Conteúdos de um site com a versão mais recente de cada um, com busca por título, filtros
+ * por tipo e status, ordenação e paginação no cliente e o estado na URL (#107). Editar só
+ * aparece com `canWrite` (content.write, decidido no servidor); criar é a ação do cabeçalho
+ * da página, repetida no estado vazio. As rotas são do editor (#45).
  */
 export function ContentsTable({
   siteId,
@@ -83,52 +117,107 @@ export function ContentsTable({
   /** Ação principal da tela (criar conteúdo), repetida no estado vazio; só com permissão. */
   emptyAction?: ReactNode;
 }) {
-  const columns = columnsFor(siteId, timeZone);
-  const table = useTable({ features, columns, data: rows });
+  const list = useListState(LIST);
+  const columns = useMemo(() => columnsFor(siteId, timeZone), [siteId, timeZone]);
+  const table = useTable({ features: listFeatures, columns, data: rows, ...list.table });
   if (rows.length === 0) {
     return <EmptyState action={emptyAction}>Nenhum conteúdo cadastrado.</EmptyState>;
   }
+  const found = table.getPrePaginatedRowModel().rows.length;
   return (
-    <Table>
-      <TableCaption>{rows.length === 1 ? '1 conteúdo' : `${rows.length} conteúdos`}</TableCaption>
-      <TableHeader>
-        {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id}>
-            {group.headers.map((header) => (
-              <TableHead key={header.id} scope="col">
-                <table.FlexRender header={header} />
-              </TableHead>
+    <div className="space-y-4">
+      <ListToolbar
+        search={list.state.search}
+        searchLabel="Buscar por título"
+        onSearchChange={list.setSearch}
+        filters={[
+          {
+            column: 'kind',
+            label: 'Tipo',
+            value: list.state.filters.kind,
+            options: KINDS.map((kind) => ({ value: kind, label: CONTENT_KIND_LABEL[kind] })),
+          },
+          {
+            column: 'status',
+            label: 'Status',
+            value: list.state.filters.status,
+            options: STATUSES.map((status) => ({
+              value: status,
+              label: CONTENT_STATUS_LABEL[status],
+            })),
+          },
+        ]}
+        onFilterChange={list.setFilter}
+        onClear={list.clearFilters}
+      />
+      {found === 0 ? (
+        <EmptyState
+          action={
+            <Button variant="outline" onClick={list.clearFilters}>
+              Limpar busca
+            </Button>
+          }
+        >
+          Nenhum conteúdo encontrado.
+        </EmptyState>
+      ) : (
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((group) => (
+              <TableRow key={group.id}>
+                {group.headers.map((header) =>
+                  header.column.getCanSort() ? (
+                    <SortableHead
+                      key={header.id}
+                      scope="col"
+                      label={String(header.column.columnDef.header)}
+                      direction={header.column.getIsSorted()}
+                      onToggle={() => header.column.toggleSorting()}
+                    />
+                  ) : (
+                    <TableHead key={header.id} scope="col">
+                      <table.FlexRender header={header} />
+                    </TableHead>
+                  ),
+                )}
+                {canWrite && (
+                  <TableHead scope="col">
+                    <span className="sr-only">Ações</span>
+                  </TableHead>
+                )}
+              </TableRow>
             ))}
-            {canWrite && (
-              <TableHead scope="col">
-                <span className="sr-only">Ações</span>
-              </TableHead>
-            )}
-          </TableRow>
-        ))}
-      </TableHeader>
-      <TableBody>
-        {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
-            {row.getAllCells().map((cell) => (
-              <TableCell key={cell.id}>
-                <table.FlexRender cell={cell} />
-              </TableCell>
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getAllCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    <table.FlexRender cell={cell} />
+                  </TableCell>
+                ))}
+                {canWrite && (
+                  <TableCell>
+                    <Link
+                      href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
+                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                    >
+                      Editar
+                      <span className="sr-only"> {row.original.title}</span>
+                    </Link>
+                  </TableCell>
+                )}
+              </TableRow>
             ))}
-            {canWrite && (
-              <TableCell>
-                <Link
-                  href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
-                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                >
-                  Editar
-                  <span className="sr-only"> {row.original.title}</span>
-                </Link>
-              </TableCell>
-            )}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+          </TableBody>
+        </Table>
+      )}
+      <ListPagination
+        total={found}
+        page={list.state.page}
+        pageCount={table.getPageCount()}
+        onPageChange={list.setPage}
+      />
+    </div>
   );
 }
