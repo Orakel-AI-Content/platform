@@ -28,7 +28,9 @@ export function forbiddenReason(
   const roles = (Object.keys(permissions) as Role[]).filter((role) =>
     permissions[role].includes(action),
   );
-  return `${ACTION_LABEL[action]} exige o papel ${OR.format(roles)}.`;
+  return roles.length === 0
+    ? `${ACTION_LABEL[action]} não é permitido a nenhum papel.`
+    : `${ACTION_LABEL[action]} exige o papel ${OR.format(roles)}.`;
 }
 
 export function ForbiddenScreen({
@@ -48,7 +50,8 @@ export function ForbiddenScreen({
         </Link>
       }
     >
-      {forbiddenReason(action)}
+      {/* Anunciado como o alerta que esta tela substitui: a aba mantém o título da página. */}
+      <p role="alert">{forbiddenReason(action)}</p>
     </StatusScreen>
   );
 }

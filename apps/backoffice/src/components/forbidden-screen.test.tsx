@@ -14,7 +14,9 @@ describe('tela de permissão', () => {
   it('um revisor em "criar conteúdo" vê o título, o motivo e o link para o site', () => {
     render(<ForbiddenScreen action="content.write" back={backToSite('exemplo-a')} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Sem permissão' })).toBeTruthy();
-    expect(screen.getByText('Editar conteúdo exige o papel admin ou editor.')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Editar conteúdo exige o papel admin ou editor.',
+    );
     expect(
       screen.getByRole('link', { name: 'Ir para o site exemplo-a' }).getAttribute('href'),
     ).toBe('/sites/exemplo-a');
@@ -41,6 +43,13 @@ describe('tela de permissão', () => {
     );
     expect(forbiddenReason('content.write', { ...PERMISSIONS, editor: [] })).toBe(
       'Editar conteúdo exige o papel admin.',
+    );
+  });
+
+  it('ação que nenhum papel tem não deixa a frase quebrada', () => {
+    const matrix = { admin: [], editor: [], revisor: [], operacao: [] };
+    expect(forbiddenReason('operations.run', matrix)).toBe(
+      'Rodar operações não é permitido a nenhum papel.',
     );
   });
 });
