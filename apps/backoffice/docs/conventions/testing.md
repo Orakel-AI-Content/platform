@@ -17,6 +17,8 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
   (WCAG 2.2 AA). Rodam contra a imagem `backoffice:local`: depois de mudar o código,
   `docker/bake.sh backoffice` e `infra/local/compose.sh up -d --wait backoffice-web`. Use
   `E2E_BASE_URL` para outro endereço.
+- **Sites do E2E**: quem cadastra site (`e2e-<timestamp>`) registra o ID e o remove do banco
+  no `afterAll` com `removeSites` (`test/e2e/cleanup.ts`), junto com o build agendado.
 
 ## Postgres para o contrato, na máquina
 
