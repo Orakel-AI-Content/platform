@@ -11,8 +11,6 @@ import { sitePageContext } from './editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Site · Orakel Backoffice' };
-
 const dateTime = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'short',

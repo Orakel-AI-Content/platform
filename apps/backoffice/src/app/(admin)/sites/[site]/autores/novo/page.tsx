@@ -6,7 +6,7 @@ import { noWrite, PageHeader, sitePageContext } from '../../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Criar autor · Orakel Backoffice' };
+export const metadata = { title: 'Criar autor' };
 
 export default async function NewAuthorPage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;

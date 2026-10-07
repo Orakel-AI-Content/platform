@@ -13,7 +13,7 @@ import { positiveInt } from '../../params.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Editar conteúdo · Orakel Backoffice' };
+export const metadata = { title: 'Editar conteúdo' };
 
 /**
  * Edição: parte da versão mais recente e grava a N+1 em rascunho. Sem content.write não há

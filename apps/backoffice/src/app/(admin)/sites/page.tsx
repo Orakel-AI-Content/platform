@@ -11,7 +11,7 @@ import { publishNow } from './actions.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Sites · Orakel Backoffice' };
+export const metadata = { title: 'Sites' };
 
 /** Registro de instâncias: um site por linha, com estado, release e mudanças pendentes. */
 export default async function SitesPage() {

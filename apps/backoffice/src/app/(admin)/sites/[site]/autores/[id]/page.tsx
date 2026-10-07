@@ -10,7 +10,7 @@ import { noWrite, PageHeader, sitePageContext, withoutId } from '../../editorial
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Editar autor · Orakel Backoffice' };
+export const metadata = { title: 'Editar autor' };
 
 export default async function EditAuthorPage({
   params,

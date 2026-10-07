@@ -5,7 +5,7 @@ import { noWrite, PageHeader, sitePageContext } from '../../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Criar menu · Orakel Backoffice' };
+export const metadata = { title: 'Criar menu' };
 
 export default async function NewMenuPage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;

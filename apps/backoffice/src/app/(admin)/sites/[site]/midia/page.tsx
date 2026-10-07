@@ -7,7 +7,7 @@ import { mediaItems } from './items.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Mídia · Orakel Backoffice' };
+export const metadata = { title: 'Mídia' };
 
 /** Biblioteca de mídia do site; enviar imagem só com content.write (a rota confere de novo). */
 export default async function MediaPage({ params }: { params: Promise<{ site: string }> }) {

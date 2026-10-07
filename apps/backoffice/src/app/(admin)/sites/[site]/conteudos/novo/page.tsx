@@ -8,7 +8,7 @@ import { editorOptions } from '../editor-options.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Criar conteúdo · Orakel Backoffice' };
+export const metadata = { title: 'Criar conteúdo' };
 
 /** Criação de artigo ou página. Sem content.write não há editor (e o domínio recusa). */
 export default async function NewContentPage({ params }: { params: Promise<{ site: string }> }) {

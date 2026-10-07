@@ -12,7 +12,7 @@ import { positiveInt } from '../../../params.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Versão do conteúdo · Orakel Backoffice' };
+export const metadata = { title: 'Versão do conteúdo' };
 
 /** Uma versão de um conteúdo, só para leitura: nenhum controle de edição. */
 export default async function ContentVersionPage({

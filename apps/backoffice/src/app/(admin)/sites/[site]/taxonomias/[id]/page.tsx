@@ -9,7 +9,7 @@ import { noWrite, PageHeader, sitePageContext, withoutId } from '../../editorial
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Editar taxonomia · Orakel Backoffice' };
+export const metadata = { title: 'Editar taxonomia' };
 
 export default async function EditTaxonomyPage({
   params,

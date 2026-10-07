@@ -8,7 +8,7 @@ import { sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Conteúdos · Orakel Backoffice' };
+export const metadata = { title: 'Conteúdos' };
 
 /**
  * Conteúdos do site com a versão mais recente de cada um. Ler exige site.read (o domínio

@@ -9,7 +9,7 @@ import { createSiteAction } from '../actions.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Cadastrar site · Orakel Backoffice' };
+export const metadata = { title: 'Cadastrar site' };
 
 /** Cadastro de site: a tela só mostra; permissão e regras são do domínio (createSite). */
 export default async function NewSitePage() {

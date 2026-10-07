@@ -5,7 +5,7 @@ import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Menus · Orakel Backoffice' };
+export const metadata = { title: 'Menus' };
 
 /** Menus do site com os itens (rótulo e link); criar e editar só com content.write. */
 export default async function MenusPage({ params }: { params: Promise<{ site: string }> }) {

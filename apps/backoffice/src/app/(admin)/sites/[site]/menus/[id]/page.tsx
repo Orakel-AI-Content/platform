@@ -9,7 +9,7 @@ import { noWrite, PageHeader, sitePageContext, withoutId } from '../../editorial
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Editar menu · Orakel Backoffice' };
+export const metadata = { title: 'Editar menu' };
 
 export default async function EditMenuPage({
   params,
