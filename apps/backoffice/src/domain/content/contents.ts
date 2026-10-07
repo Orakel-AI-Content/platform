@@ -15,6 +15,7 @@ import {
   contents,
   contentVersions,
   media,
+  reviews,
   taxonomies,
   type CONTENT_STATUSES,
   type ContentData,
@@ -343,6 +344,8 @@ export type ContentVersion = {
   status: Status;
   createdAt: Date;
   data: ContentData;
+  /** Aprovação da versão (`reviews`): quem aprovou e quando; nula sem aprovação. */
+  approval: { reviewer: string; approvedAt: Date } | null;
 };
 
 /** Versões de um conteúdo, da primeira à mais recente. */
@@ -355,16 +358,34 @@ export async function listContentVersions(
   const allowed = requireRole(actor, 'site.read');
   if (!allowed.ok) return allowed;
 
+  // Uma linha por versão: só a aprovação grava em `reviews`, e a versão aprovada não volta a
+  // ficar em revisão (ADR 0015). Com outras ações (reprovar), vira a aprovação mais recente.
   const rows = await db
     .select({
       version: contentVersions.version,
       status: contentVersions.status,
       createdAt: contentVersions.createdAt,
       data: contentVersions.data,
+      reviewer: reviews.reviewer,
+      approvedAt: reviews.createdAt,
     })
     .from(contentVersions)
+    .leftJoin(
+      reviews,
+      and(
+        eq(reviews.siteId, contentVersions.siteId),
+        eq(reviews.contentId, contentVersions.contentId),
+        eq(reviews.version, contentVersions.version),
+      ),
+    )
     .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))
     .orderBy(asc(contentVersions.version));
   if (rows.length === 0) return { ok: false, issues: [notFound(siteId, contentId)] };
-  return { ok: true, value: rows };
+  return {
+    ok: true,
+    value: rows.map(({ reviewer, approvedAt, ...version }) => ({
+      ...version,
+      approval: reviewer === null || approvedAt === null ? null : { reviewer, approvedAt },
+    })),
+  };
 }
