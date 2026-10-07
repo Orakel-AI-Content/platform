@@ -5,8 +5,11 @@ import { notFound } from 'next/navigation';
 import { ContentVersionsTable } from '@/components/content-versions-table';
 import { CONTENT_KIND_LABEL } from '@/components/site-labels.ts';
 import { noRead } from '@/components/forbidden-screen';
+import { SubmitForReview } from '@/components/submit-for-review';
+import { can } from '@/domain/access/rbac.ts';
 
 import { itemTitle } from '../../item-title.ts';
+import { submitForReviewAction } from '../actions.ts';
 import { readContentVersions } from '../content-versions.ts';
 import { positiveInt } from '../params.ts';
 
@@ -23,19 +26,24 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: itemTitle(latest?.data.title, 'Versões') };
 }
 
-/** Versões de um conteúdo, da primeira à mais recente; cada uma abre só para leitura. */
+/**
+ * Versões de um conteúdo, da primeira à mais recente; cada uma abre só para leitura. Enviar
+ * para revisão só aparece com content.write e a versão mais recente em rascunho (o domínio
+ * confere de novo).
+ */
 export default async function ContentVersionsPage({ params }: Params) {
   const { site: siteId, id } = await params;
   const contentId = positiveInt(id);
   if (contentId === undefined) notFound();
   const read = await readContentVersions(siteId, contentId);
   if (read === undefined) return null;
-  const { versions, timeZone } = read;
+  const { actor, versions, timeZone } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return noRead;
   }
   const latest = versions.value.at(-1)!;
+  const canWrite = can(actor, 'content.write');
 
   return (
     <section aria-labelledby="versions-title" className="list-width space-y-4">
@@ -50,6 +58,12 @@ export default async function ContentVersionsPage({ params }: Params) {
       <p className="text-sm text-muted-foreground">
         {CONTENT_KIND_LABEL[latest.data.kind]} · ID {contentId} · /{latest.data.slug}
       </p>
+      {canWrite && (
+        <SubmitForReview
+          available={latest.status === 'rascunho'}
+          action={submitForReviewAction.bind(null, siteId, contentId)}
+        />
+      )}
       <ContentVersionsTable
         siteId={siteId}
         contentId={contentId}

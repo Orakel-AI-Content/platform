@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
-import { createContentAction, updateContentAction } from './actions.ts';
+import { createContentAction, submitForReviewAction, updateContentAction } from './actions.ts';
 
 // As actions só traduzem: sessão → recusa, Result do domínio → issues com path, sucesso →
 // revalida a lista. Regras e permissão estão nos testes de contrato do domínio.
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   currentActor: vi.fn(),
   createContent: vi.fn(),
   updateContent: vi.fn(),
+  submitForReview: vi.fn(),
   resourcesFor: vi.fn(),
   revalidatePath: vi.fn(),
 }));
@@ -24,6 +25,7 @@ vi.mock('@/db/client.ts', () => ({
 vi.mock('@/domain/content/contents.ts', () => ({
   createContent: mocks.createContent,
   updateContent: mocks.updateContent,
+  submitForReview: mocks.submitForReview,
 }));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
 
@@ -117,5 +119,50 @@ describe('ações do editor de conteúdo', () => {
     });
     expect(mocks.updateContent).toHaveBeenCalledWith({}, editor, 'exemplo-b', 2, input, withoutFaq);
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe('enviar para revisão', () => {
+  it('sem sessão não chama o domínio nem revalida', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await submitForReviewAction('exemplo-a', 1)).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.submitForReview).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('recusa do domínio volta com a mensagem e não revalida', async () => {
+    mocks.submitForReview.mockResolvedValue({
+      ok: false,
+      issues: [
+        {
+          code: 'content.not_draft',
+          message: 'Só um rascunho vai para revisão: a versão 2 está em_revisao',
+          path: [],
+        },
+      ],
+    });
+
+    expect(await submitForReviewAction('exemplo-a', 1)).toEqual({
+      ok: false,
+      message: 'Só um rascunho vai para revisão: a versão 2 está em_revisao',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('sucesso delega com o ator da sessão e revalida o conteúdo, a lista e a fila', async () => {
+    mocks.submitForReview.mockResolvedValue({ ok: true, value: { version: 2 } });
+
+    expect(await submitForReviewAction('exemplo-a', 7)).toEqual({
+      ok: true,
+      message: 'Enviado para revisão.',
+    });
+    expect(mocks.submitForReview).toHaveBeenCalledWith({}, editor, 'exemplo-a', 7);
+    expect(mocks.revalidatePath).toHaveBeenNthCalledWith(1, '/sites/exemplo-a/conteudos');
+    expect(mocks.revalidatePath).toHaveBeenNthCalledWith(2, '/sites/exemplo-a/conteudos/7');
+    expect(mocks.revalidatePath).toHaveBeenNthCalledWith(3, '/sites/exemplo-a/revisao');
   });
 });
