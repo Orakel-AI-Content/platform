@@ -9,6 +9,12 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
 - **Estilização:** Tailwind 4, só com os tokens de `src/app/globals.css` (`background`,
   `foreground`, `muted`, `border`, `primary`, `destructive`, `warning`); nada de cor solta.
 - **Temas:** claro e escuro pela preferência do sistema (`prefers-color-scheme`).
+- **Tipografia:** pilha `system-ui`, sem fonte própria, numa escala de quatro tamanhos: título
+  da página (`h1`) em `text-2xl font-semibold`; seção (`h2`) em `text-lg font-semibold`;
+  corpo em `text-sm`, inclusive rótulos, dicas e erros de campo e mensagens de status de uma
+  ação; auxiliar em `text-xs`, só para badges e legendas (data sob um badge, legenda de
+  imagem). Texto de campo nunca fica menor que o corpo. Células de tabela usam números
+  tabulares (`tabular-nums`, no `TableCell`), para datas e contagens alinharem na coluna.
 - **Tabelas:** TanStack Table 9 (`useTable` com `tableFeatures`); a biblioteca traz skills
   em `node_modules/@tanstack/react-table/skills/`.
 - **Larguras:** duas utilities de `globals.css`, na `section` (ou `article`) de topo da página,

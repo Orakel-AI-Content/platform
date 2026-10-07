@@ -65,7 +65,7 @@ function PublishNowButton({ siteId, action }: { siteId: string; action: PublishN
       <span
         role="status"
         className={
-          status?.ok === false ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'
+          status?.ok === false ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
         }
       >
         {status?.message}

@@ -127,12 +127,12 @@ function Field({
       <Label htmlFor={fieldId}>{label}</Label>
       {children({ id: fieldId, invalid: message !== undefined, describedBy })}
       {hint && (
-        <p id={`${fieldId}-hint`} className="text-xs text-muted-foreground">
+        <p id={`${fieldId}-hint`} className="text-sm text-muted-foreground">
           {hint}
         </p>
       )}
       {message && (
-        <p id={`${fieldId}-error`} className="text-xs text-destructive">
+        <p id={`${fieldId}-error`} className="text-sm text-destructive">
           {message}
         </p>
       )}
@@ -256,12 +256,12 @@ function Node({
             {label}
           </label>
           {hint && (
-            <p id={`${fieldId}-hint`} className="text-xs text-muted-foreground">
+            <p id={`${fieldId}-hint`} className="text-sm text-muted-foreground">
               {hint}
             </p>
           )}
           {message && (
-            <p id={`${fieldId}-error`} className="text-xs text-destructive">
+            <p id={`${fieldId}-error`} className="text-sm text-destructive">
               {message}
             </p>
           )}
@@ -343,7 +343,7 @@ function ArrayField({
           </Button>
         </fieldset>
       ))}
-      {typeof message === 'string' && <p className="text-xs text-destructive">{message}</p>}
+      {typeof message === 'string' && <p className="text-sm text-destructive">{message}</p>}
       <Button variant="outline" size="sm" onClick={() => append(emptyValue(element))}>
         {`Adicionar ${itemLabel}`}
       </Button>

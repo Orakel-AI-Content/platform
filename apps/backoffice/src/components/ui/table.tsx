@@ -36,7 +36,12 @@ export function TableHead({ className, ...props }: ComponentProps<'th'>) {
 }
 
 export function TableCell({ className, ...props }: ComponentProps<'td'>) {
-  return <td className={cn('px-3 py-2 align-middle whitespace-nowrap', className)} {...props} />;
+  return (
+    <td
+      className={cn('px-3 py-2 align-middle whitespace-nowrap tabular-nums', className)}
+      {...props}
+    />
+  );
 }
 
 export function TableCaption({ className, ...props }: ComponentProps<'caption'>) {
