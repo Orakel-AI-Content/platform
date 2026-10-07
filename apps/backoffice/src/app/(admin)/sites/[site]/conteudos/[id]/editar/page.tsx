@@ -6,6 +6,7 @@ import { ContentEditor } from '@/components/content-editor';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 
+import { noRead, noWrite } from '../../../editorial-page.tsx';
 import { itemTitle } from '../../../item-title.ts';
 import { updateContentAction } from '../../actions.ts';
 import { readContentVersions } from '../../content-versions.ts';
@@ -40,13 +41,13 @@ export default async function EditContentPage({ params }: Params) {
   const db = getDb().db;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
-    return <p role="alert">Sem permissão para ver os conteúdos.</p>;
+    return noRead;
   }
   if (!can(actor, 'content.write')) {
-    return <p role="alert">Sem permissão para editar conteúdos.</p>;
+    return noWrite(siteId);
   }
   const options = await editorOptions(db, actor, siteId);
-  if (options === undefined) return <p role="alert">Sem permissão para ver os conteúdos.</p>;
+  if (options === undefined) return noRead;
   const latest = versions.value.at(-1);
   if (latest === undefined) notFound();
 

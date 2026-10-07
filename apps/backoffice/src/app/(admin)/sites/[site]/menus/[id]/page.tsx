@@ -8,6 +8,7 @@ import { positiveInt } from '../../conteudos/params.ts';
 import { updateMenuAction } from '../../editorial-actions.ts';
 import {
   lookupSite,
+  noRead,
   noWrite,
   PageHeader,
   readMenus,
@@ -39,9 +40,9 @@ export default async function EditMenuPage({ params }: Params) {
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { site, canWrite } = context.value;
-  if (!canWrite) return noWrite;
+  if (!canWrite) return noWrite(site.id);
   const menus = await readMenus(site.id);
-  if (!menus?.ok) return <p role="alert">Sem permissão para ver os menus.</p>;
+  if (!menus?.ok) return noRead;
   const menu = menus.value.find((item) => item.id === menuId);
   if (menu === undefined) notFound();
 

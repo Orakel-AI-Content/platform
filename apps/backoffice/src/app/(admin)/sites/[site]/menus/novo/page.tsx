@@ -12,7 +12,7 @@ export default async function NewMenuPage({ params }: { params: Promise<{ site: 
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { site, canWrite } = context.value;
-  if (!canWrite) return noWrite;
+  if (!canWrite) return noWrite(site.id);
 
   return (
     <section aria-labelledby="new-menu-title" className="max-w-3xl space-y-4">

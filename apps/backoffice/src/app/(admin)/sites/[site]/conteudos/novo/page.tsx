@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 import { ContentEditor } from '@/components/content-editor';
 
-import { sitePageContext } from '../../editorial-page.tsx';
+import { noRead, noWrite, sitePageContext } from '../../editorial-page.tsx';
 import { createContentAction } from '../actions.ts';
 import { editorOptions } from '../editor-options.ts';
 
@@ -17,10 +17,10 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
   if (!canWrite) {
-    return <p role="alert">Sem permissão para criar conteúdos.</p>;
+    return noWrite(site.id);
   }
   const options = await editorOptions(db, actor, siteId);
-  if (options === undefined) return <p role="alert">Sem permissão para ver os conteúdos.</p>;
+  if (options === undefined) return noRead;
 
   return (
     <section aria-labelledby="new-content-title" className="max-w-3xl space-y-4">

@@ -1,7 +1,7 @@
 import { EntityTable } from '@/components/entity-table';
 import { listMenus } from '@/domain/content/menus.ts';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { noRead, PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export default async function MenusPage({ params }: { params: Promise<{ site: st
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
   const menus = await listMenus(db, actor, site.id);
-  if (!menus.ok) return <p role="alert">Sem permissão para ver os menus.</p>;
+  if (!menus.ok) return noRead;
 
   return (
     <section aria-labelledby="menus-title" className="space-y-4">

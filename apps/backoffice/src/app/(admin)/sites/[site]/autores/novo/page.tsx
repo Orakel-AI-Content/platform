@@ -13,7 +13,7 @@ export default async function NewAuthorPage({ params }: { params: Promise<{ site
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
-  if (!canWrite) return noWrite;
+  if (!canWrite) return noWrite(site.id);
   const options = await editorOptions(db, actor, site.id);
 
   return (

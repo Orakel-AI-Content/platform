@@ -9,6 +9,7 @@ import { positiveInt } from '../../conteudos/params.ts';
 import { updateAuthorAction } from '../../editorial-actions.ts';
 import {
   lookupSite,
+  noRead,
   noWrite,
   PageHeader,
   readAuthors,
@@ -40,9 +41,9 @@ export default async function EditAuthorPage({ params }: Params) {
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
-  if (!canWrite) return noWrite;
+  if (!canWrite) return noWrite(site.id);
   const authors = await readAuthors(site.id);
-  if (!authors?.ok) return <p role="alert">Sem permissão para ver os autores.</p>;
+  if (!authors?.ok) return noRead;
   const author = authors.value.find((item) => item.id === authorId);
   if (author === undefined) notFound();
   const options = await editorOptions(db, actor, site.id);

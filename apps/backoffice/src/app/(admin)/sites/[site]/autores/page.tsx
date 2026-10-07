@@ -1,7 +1,7 @@
 import { EntityTable } from '@/components/entity-table';
 import { listAuthors } from '@/domain/content/authors.ts';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { noRead, PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export default async function AuthorsPage({ params }: { params: Promise<{ site: 
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
   const authors = await listAuthors(db, actor, site.id);
-  if (!authors.ok) return <p role="alert">Sem permissão para ver os autores.</p>;
+  if (!authors.ok) return noRead;
 
   return (
     <section aria-labelledby="authors-title" className="space-y-4">

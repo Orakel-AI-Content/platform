@@ -6,6 +6,7 @@ import { ContentVersionView } from '@/components/content-version-view';
 import { CONTENT_STATUS_LABEL, dateTime } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 
+import { noRead } from '../../../../editorial-page.tsx';
 import { itemTitle } from '../../../../item-title.ts';
 import { readContentVersions } from '../../../content-versions.ts';
 import { positiveInt } from '../../../params.ts';
@@ -39,7 +40,7 @@ export default async function ContentVersionPage({ params }: Params) {
   const { versions } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
-    return <p role="alert">Sem permissão para ver os conteúdos.</p>;
+    return noRead;
   }
   const version = versions.value.find((item) => item.version === number);
   if (version === undefined) notFound();
