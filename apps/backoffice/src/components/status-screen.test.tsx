@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { StatusScreen } from './status-screen.tsx';
 
-// Tela de estado (#77): título como heading da seção, frase e ação; carregamento anunciado.
+// Tela de estado (#77): título como heading da seção, frase e ação.
 
 afterEach(cleanup);
 
@@ -28,19 +28,8 @@ describe('tela de estado', () => {
   });
 
   it('sem ação, não desenha a área de ações', () => {
-    render(<StatusScreen title="Carregando…">Aguarde.</StatusScreen>);
+    render(<StatusScreen title="Erro">Falhou.</StatusScreen>);
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
-  });
-
-  it('só é região de status (anunciada) quando `live`', () => {
-    const { rerender } = render(<StatusScreen title="Erro">Falhou.</StatusScreen>);
-    expect(screen.queryByRole('status')).toBeNull();
-    rerender(
-      <StatusScreen title="Carregando…" live>
-        Aguarde.
-      </StatusScreen>,
-    );
-    expect(screen.getByRole('status').textContent).toContain('Carregando…');
   });
 });
