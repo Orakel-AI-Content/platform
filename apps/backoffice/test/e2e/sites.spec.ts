@@ -90,7 +90,8 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   const siteId = `e2e-${Date.now()}`;
   created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
-  await page.getByRole('link', { name: 'Cadastrar site' }).click();
+  // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
+  await page.getByRole('link', { name: 'Cadastrar site' }).first().click();
   await expect(page.getByRole('heading', { name: 'Cadastrar site' })).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 

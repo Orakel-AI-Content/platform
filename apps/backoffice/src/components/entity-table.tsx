@@ -2,6 +2,9 @@
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
+
+import { EmptyState } from '@/components/empty-state';
 
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -22,25 +25,27 @@ const features = tableFeatures({});
 const column = createColumnHelper<typeof features, EntityRow>();
 
 /**
- * Lista de autores, taxonomias ou menus. Criar e editar só aparecem com `canWrite`
- * (content.write, decidido no servidor); o domínio confere de novo ao gravar.
+ * Lista de autores, taxonomias ou menus. Editar só aparece com `canWrite` (content.write,
+ * decidido no servidor); criar é a ação do cabeçalho da página, repetida no estado vazio.
+ * O domínio confere de novo ao gravar.
  */
 export function EntityTable({
   basePath,
   headers,
   rows,
   noun,
-  createLabel,
   canWrite = false,
+  emptyAction,
 }: {
-  /** `/sites/<site>/autores`: a criação é `<basePath>/novo` e a edição `<basePath>/<id>`. */
+  /** `/sites/<site>/autores`: a edição é `<basePath>/<id>`. */
   basePath: string;
   /** Rótulo do nome e das demais células, na ordem. */
   headers: [string, ...string[]];
   rows: EntityRow[];
   noun: { one: string; many: string; none: string };
-  createLabel: string;
   canWrite?: boolean;
+  /** Ação principal da tela (criar), repetida no estado vazio; só com permissão. */
+  emptyAction?: ReactNode;
 }) {
   const [nameHeader, ...rest] = headers;
   const columns = column.columns([
@@ -50,64 +55,50 @@ export function EntityTable({
     ),
   ]);
   const table = useTable({ features, columns, data: rows });
-  const colSpan = columns.length + (canWrite ? 1 : 0);
+  if (rows.length === 0) return <EmptyState action={emptyAction}>{noun.none}</EmptyState>;
   return (
-    <div className="space-y-4">
-      {canWrite && (
-        <Link href={`${basePath}/novo`} className={buttonVariants({ size: 'sm' })}>
-          {createLabel}
-        </Link>
-      )}
-      <Table>
-        <TableCaption>
-          {rows.length === 1 ? `1 ${noun.one}` : `${rows.length} ${noun.many}`}
-        </TableCaption>
-        <TableHeader>
-          {table.getHeaderGroups().map((group) => (
-            <TableRow key={group.id}>
-              {group.headers.map((header) => (
-                <TableHead key={header.id} scope="col">
-                  <table.FlexRender header={header} />
-                </TableHead>
-              ))}
-              {canWrite && (
-                <TableHead scope="col">
-                  <span className="sr-only">Ações</span>
-                </TableHead>
-              )}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
-              {row.getAllCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  <table.FlexRender cell={cell} />
-                </TableCell>
-              ))}
-              {canWrite && (
-                <TableCell>
-                  <Link
-                    href={`${basePath}/${row.original.id}`}
-                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                  >
-                    Editar
-                    <span className="sr-only"> {row.original.name}</span>
-                  </Link>
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-          {rows.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={colSpan} className="text-center text-muted-foreground">
-                {noun.none}
+    <Table>
+      <TableCaption>
+        {rows.length === 1 ? `1 ${noun.one}` : `${rows.length} ${noun.many}`}
+      </TableCaption>
+      <TableHeader>
+        {table.getHeaderGroups().map((group) => (
+          <TableRow key={group.id}>
+            {group.headers.map((header) => (
+              <TableHead key={header.id} scope="col">
+                <table.FlexRender header={header} />
+              </TableHead>
+            ))}
+            {canWrite && (
+              <TableHead scope="col">
+                <span className="sr-only">Ações</span>
+              </TableHead>
+            )}
+          </TableRow>
+        ))}
+      </TableHeader>
+      <TableBody>
+        {table.getRowModel().rows.map((row) => (
+          <TableRow key={row.id}>
+            {row.getAllCells().map((cell) => (
+              <TableCell key={cell.id}>
+                <table.FlexRender cell={cell} />
               </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+            ))}
+            {canWrite && (
+              <TableCell>
+                <Link
+                  href={`${basePath}/${row.original.id}`}
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                >
+                  Editar
+                  <span className="sr-only"> {row.original.name}</span>
+                </Link>
+              </TableCell>
+            )}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

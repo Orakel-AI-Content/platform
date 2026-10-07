@@ -22,7 +22,8 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   const title = `Artigo ${slug}`;
   await loginAs(page, 'editor@orakel.local');
   await page.goto('/sites/exemplo-a/conteudos');
-  await page.getByRole('link', { name: 'Criar conteúdo' }).click();
+  // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
+  await page.getByRole('link', { name: 'Criar conteúdo' }).first().click();
   await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
 
   await page.getByLabel('Título', { exact: true }).fill(title);

@@ -1,6 +1,9 @@
+import Link from 'next/link';
+
 import { EntityTable } from '@/components/entity-table';
 import { listMenus } from '@/domain/content/menus.ts';
 import { noRead } from '@/components/forbidden-screen';
+import { buttonVariants } from '@/components/ui/button';
 
 import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
@@ -17,12 +20,19 @@ export default async function MenusPage({ params }: { params: Promise<{ site: st
   const menus = await listMenus(db, actor, site.id);
   if (!menus.ok) return noRead;
 
+  const create = canWrite ? (
+    <Link href={`/sites/${site.id}/menus/novo`} className={buttonVariants({ size: 'sm' })}>
+      Criar menu
+    </Link>
+  ) : undefined;
+
   return (
     <section aria-labelledby="menus-title" className="list-width space-y-4">
       <PageHeader
         id="menus-title"
         back={{ href: `/sites/${site.id}`, label: site.name }}
         title={`Menus (${site.id})`}
+        action={create}
       />
       <EntityTable
         basePath={`/sites/${site.id}/menus`}
@@ -33,8 +43,8 @@ export default async function MenusPage({ params }: { params: Promise<{ site: st
           cells: [menu.items.map((item) => `${item.label} (${item.href})`).join(' · ')],
         }))}
         noun={{ one: 'menu', many: 'menus', none: 'Nenhum menu cadastrado.' }}
-        createLabel="Criar menu"
         canWrite={canWrite}
+        emptyAction={create}
       />
     </section>
   );

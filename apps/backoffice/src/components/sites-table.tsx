@@ -2,7 +2,7 @@
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useState, useTransition, type ReactNode } from 'react';
 
 import {
   BUILD_STATUS_LABEL,
@@ -11,6 +11,7 @@ import {
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
 } from '@/components/site-labels.ts';
+import { EmptyState } from '@/components/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -121,13 +122,18 @@ export function SitesTable({
   rows,
   publishNow,
   canConfigure = false,
+  emptyAction,
 }: {
   rows: SiteSummary[];
   publishNow?: PublishNow;
   canConfigure?: boolean;
+  /** Ação principal da tela (cadastrar site), repetida no estado vazio; só com permissão. */
+  emptyAction?: ReactNode;
 }) {
   const table = useTable({ features, columns, data: rows });
-  const colSpan = columns.length + 1;
+  if (rows.length === 0) {
+    return <EmptyState action={emptyAction}>Nenhum site cadastrado.</EmptyState>;
+  }
   return (
     <Table>
       <TableCaption>{rows.length === 1 ? '1 site' : `${rows.length} sites`}</TableCaption>
@@ -185,13 +191,6 @@ export function SitesTable({
             </TableCell>
           </TableRow>
         ))}
-        {rows.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={colSpan} className="text-center text-muted-foreground">
-              Nenhum site cadastrado.
-            </TableCell>
-          </TableRow>
-        )}
       </TableBody>
     </Table>
   );

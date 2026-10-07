@@ -1,6 +1,9 @@
+import Link from 'next/link';
+
 import { EntityTable } from '@/components/entity-table';
 import { listAuthors } from '@/domain/content/authors.ts';
 import { noRead } from '@/components/forbidden-screen';
+import { buttonVariants } from '@/components/ui/button';
 
 import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
@@ -17,12 +20,19 @@ export default async function AuthorsPage({ params }: { params: Promise<{ site: 
   const authors = await listAuthors(db, actor, site.id);
   if (!authors.ok) return noRead;
 
+  const create = canWrite ? (
+    <Link href={`/sites/${site.id}/autores/novo`} className={buttonVariants({ size: 'sm' })}>
+      Criar autor
+    </Link>
+  ) : undefined;
+
   return (
     <section aria-labelledby="authors-title" className="list-width space-y-4">
       <PageHeader
         id="authors-title"
         back={{ href: `/sites/${site.id}`, label: site.name }}
         title={`Autores (${site.id})`}
+        action={create}
       />
       <EntityTable
         basePath={`/sites/${site.id}/autores`}
@@ -33,8 +43,8 @@ export default async function AuthorsPage({ params }: { params: Promise<{ site: 
           cells: [author.slug, author.expertise ?? '—'],
         }))}
         noun={{ one: 'autor', many: 'autores', none: 'Nenhum autor cadastrado.' }}
-        createLabel="Criar autor"
         canWrite={canWrite}
+        emptyAction={create}
       />
     </section>
   );
