@@ -38,7 +38,7 @@ type PublishNow = (siteId: string) => Promise<PublishStatus>;
 function TwoLines({ children, secondary }: { children: ReactNode; secondary?: ReactNode }) {
   return (
     <span className="flex flex-col items-start gap-0.5">
-      {children}
+      <span>{children}</span>
       {secondary !== undefined && (
         <span className="text-xs text-muted-foreground">{secondary}</span>
       )}
