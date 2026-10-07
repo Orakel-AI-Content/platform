@@ -5,8 +5,8 @@ import { notFound } from 'next/navigation';
 import { ContentVersionView } from '@/components/content-version-view';
 import { CONTENT_STATUS_LABEL, dateTime } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
+import { noRead } from '@/components/forbidden-screen';
 
-import { noRead } from '../../../../editorial-page.tsx';
 import { itemTitle } from '../../../../item-title.ts';
 import { readContentVersions } from '../../../content-versions.ts';
 import { positiveInt } from '../../../params.ts';

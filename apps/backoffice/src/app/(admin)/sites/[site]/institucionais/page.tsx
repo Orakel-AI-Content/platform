@@ -1,8 +1,9 @@
 import { InstitutionalTextsForm } from '@/components/entity-forms';
 import { getInstitutionalTexts } from '@/domain/sites/sites.ts';
+import { noRead } from '@/components/forbidden-screen';
 
 import { updateInstitutionalTextsAction } from '../editorial-actions.ts';
-import { noRead, noWrite, PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { noWrite, PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

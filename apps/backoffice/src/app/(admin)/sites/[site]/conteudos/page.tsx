@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { ContentsTable } from '@/components/contents-table';
 import { can } from '@/domain/access/rbac.ts';
 import { listContents } from '@/domain/content/contents.ts';
+import { noRead } from '@/components/forbidden-screen';
 
-import { noRead, sitePageContext } from '../editorial-page.tsx';
+import { sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

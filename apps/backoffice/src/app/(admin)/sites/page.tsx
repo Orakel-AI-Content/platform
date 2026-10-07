@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import { backToSites, ForbiddenScreen } from '@/components/forbidden-screen';
+import { noRead } from '@/components/forbidden-screen';
 import { SitesTable } from '@/components/sites-table';
 import { buttonVariants } from '@/components/ui/button';
 import { getDb } from '@/db/client.ts';
@@ -20,7 +20,7 @@ export default async function SitesPage() {
   if (!actor.ok) return null;
   const sites = await listSites(getDb().db, actor.value);
   if (!sites.ok) {
-    return <ForbiddenScreen action="site.read" back={backToSites} />;
+    return noRead;
   }
   const canConfigure = can(actor.value, 'site.configure');
   return (

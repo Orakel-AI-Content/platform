@@ -3,13 +3,13 @@ import { notFound } from 'next/navigation';
 
 import { EntityForm } from '@/components/entity-forms';
 import { can } from '@/domain/access/rbac.ts';
+import { noRead } from '@/components/forbidden-screen';
 
 import { editorOptions } from '../../conteudos/editor-options.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { updateAuthorAction } from '../../editorial-actions.ts';
 import {
   lookupSite,
-  noRead,
   noWrite,
   PageHeader,
   readAuthors,

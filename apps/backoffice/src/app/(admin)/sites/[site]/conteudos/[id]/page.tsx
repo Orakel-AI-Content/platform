@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 
 import { ContentVersionsTable } from '@/components/content-versions-table';
 import { CONTENT_KIND_LABEL } from '@/components/site-labels.ts';
+import { noRead } from '@/components/forbidden-screen';
 
-import { noRead } from '../../editorial-page.tsx';
 import { itemTitle } from '../../item-title.ts';
 import { readContentVersions } from '../content-versions.ts';
 import { positiveInt } from '../params.ts';

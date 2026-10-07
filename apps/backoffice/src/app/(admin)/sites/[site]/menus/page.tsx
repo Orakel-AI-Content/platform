@@ -1,7 +1,8 @@
 import { EntityTable } from '@/components/entity-table';
 import { listMenus } from '@/domain/content/menus.ts';
+import { noRead } from '@/components/forbidden-screen';
 
-import { noRead, PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

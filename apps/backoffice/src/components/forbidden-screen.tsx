@@ -63,3 +63,6 @@ export const backToSite = (siteId: string) => ({
 });
 
 export const backToSites = { href: '/sites', label: 'Ir para a lista de sites' };
+
+/** Tela de permissão sem `site.read`: não há site para onde voltar. */
+export const noRead = <ForbiddenScreen action="site.read" back={backToSites} />;

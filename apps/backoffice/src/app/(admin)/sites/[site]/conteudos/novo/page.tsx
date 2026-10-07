@@ -1,8 +1,9 @@
 import Link from 'next/link';
 
 import { ContentEditor } from '@/components/content-editor';
+import { noRead } from '@/components/forbidden-screen';
 
-import { noRead, noWrite, sitePageContext } from '../../editorial-page.tsx';
+import { noWrite, sitePageContext } from '../../editorial-page.tsx';
 import { createContentAction } from '../actions.ts';
 import { editorOptions } from '../editor-options.ts';
 

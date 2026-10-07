@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { cache, type ReactNode } from 'react';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import { backToSite, backToSites, ForbiddenScreen } from '@/components/forbidden-screen';
+import { backToSite, ForbiddenScreen, noRead } from '@/components/forbidden-screen';
 import { getDb, type Executor } from '@/db/client.ts';
 import { can, type Actor } from '@/domain/access/rbac.ts';
 import { listAuthors } from '@/domain/content/authors.ts';
@@ -76,9 +76,6 @@ export async function sitePageContext(
     value: { actor, db: getDb().db, site, canWrite: can(actor, 'content.write') },
   };
 }
-
-/** Tela de permissão sem `site.read`: não há site para onde voltar. */
-export const noRead = <ForbiddenScreen action="site.read" back={backToSites} />;
 
 /** Tela de permissão sem `content.write`, com a volta para o site. */
 export function noWrite(siteId: string): ReactNode {

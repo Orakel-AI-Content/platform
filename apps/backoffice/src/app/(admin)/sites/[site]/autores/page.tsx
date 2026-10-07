@@ -1,7 +1,8 @@
 import { EntityTable } from '@/components/entity-table';
 import { listAuthors } from '@/domain/content/authors.ts';
+import { noRead } from '@/components/forbidden-screen';
 
-import { noRead, PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

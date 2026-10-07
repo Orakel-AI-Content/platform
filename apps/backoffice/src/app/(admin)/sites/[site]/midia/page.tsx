@@ -1,7 +1,8 @@
 import { MediaLibrary } from '@/components/media-library';
 import { listMedia } from '@/domain/content/media.ts';
+import { noRead } from '@/components/forbidden-screen';
 
-import { noRead, PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, sitePageContext } from '../editorial-page.tsx';
 import { listMediaAction } from './actions.ts';
 import { mediaItems } from './items.ts';
 

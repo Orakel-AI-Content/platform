@@ -5,8 +5,9 @@ import { notFound } from 'next/navigation';
 import { ContentEditor } from '@/components/content-editor';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
+import { noRead } from '@/components/forbidden-screen';
 
-import { noRead, noWrite } from '../../../editorial-page.tsx';
+import { noWrite } from '../../../editorial-page.tsx';
 import { itemTitle } from '../../../item-title.ts';
 import { updateContentAction } from '../../actions.ts';
 import { readContentVersions } from '../../content-versions.ts';
