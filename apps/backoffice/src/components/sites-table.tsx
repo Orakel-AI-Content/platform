@@ -13,6 +13,7 @@ import {
   SITE_STATE_VARIANT,
 } from '@/components/site-labels.ts';
 import { EmptyState } from '@/components/empty-state';
+import { ActionsMenu } from '@/components/ui/actions-menu';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -30,63 +31,114 @@ import type { SiteSummary } from '@/domain/sites/sites.ts';
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, SiteSummary>();
 
-type PublishNow = (siteId: string) => Promise<{ ok: boolean; message: string }>;
+type PublishStatus = { ok: boolean; message: string };
+type PublishNow = (siteId: string) => Promise<PublishStatus>;
+
+/** Duas linhas numa célula: a principal e a secundária, menor; nenhuma quebra além delas. */
+function TwoLines({ children, secondary }: { children: ReactNode; secondary?: ReactNode }) {
+  return (
+    <span className="flex flex-col items-start gap-0.5">
+      {children}
+      {secondary !== undefined && (
+        <span className="text-xs text-muted-foreground">{secondary}</span>
+      )}
+    </span>
+  );
+}
+
+/** Texto cortado numa largura máxima, com o texto inteiro em `title`. */
+function Truncated({ text, className }: { text: string; className: string }) {
+  return (
+    <span title={text} className={`block truncate ${className}`}>
+      {text}
+    </span>
+  );
+}
 
 /** Último build no fuso do próprio site: a lista mistura fusos, cada linha com a sigla (#90). */
 function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; timeZone: string }) {
   if (build === null) return <span className="text-muted-foreground">—</span>;
+  const when = `${formatDateTime(new Date(build.finishedAt), timeZone)}${build.versionId ? ` · ${build.versionId}` : ''}`;
   return (
-    <span className="flex flex-col gap-0.5">
+    <TwoLines secondary={<Truncated text={when} className="max-w-44" />}>
       <Badge variant={BUILD_STATUS_VARIANT[build.status]}>{BUILD_STATUS_LABEL[build.status]}</Badge>
-      <span className="text-xs text-muted-foreground">
-        {formatDateTime(new Date(build.finishedAt), timeZone)}
-        {build.versionId ? ` · ${build.versionId}` : ''}
-      </span>
-    </span>
+    </TwoLines>
   );
 }
 
-/** Enfileira o build já, com o retorno anunciado para leitores de tela. */
-function PublishNowButton({ siteId, action }: { siteId: string; action: PublishNow }) {
+/**
+ * Enfileira o build já. O retorno vai para a região `role="status"` da tabela, não para a
+ * linha: a mensagem não aumenta a altura dela.
+ */
+function PublishNowButton({
+  siteId,
+  action,
+  onResult,
+}: {
+  siteId: string;
+  action: PublishNow;
+  onResult: (status: PublishStatus) => void;
+}) {
   const [pending, startTransition] = useTransition();
-  const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
   return (
-    <span className="flex flex-col items-start gap-1">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => startTransition(async () => setStatus(await action(siteId)))}
-        className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
-      >
-        {pending ? 'Enfileirando…' : 'Publicar agora'}
-        <span className="sr-only"> {siteId}</span>
-      </button>
-      <span
-        role="status"
-        className={
-          status?.ok === false ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
-        }
-      >
-        {status?.message}
-      </span>
-    </span>
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => startTransition(async () => onResult(await action(siteId)))}
+      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+    >
+      {pending ? 'Enfileirando…' : 'Publicar agora'}
+      <span className="sr-only"> {siteId}</span>
+    </button>
+  );
+}
+
+/** Pendências maiores que 0 se destacam e levam à tela de pendências do site (#99). */
+function PendingCell({ siteId, count }: { siteId: string; count: number }) {
+  if (count === 0) return <span className="text-muted-foreground">0</span>;
+  return (
+    <Link href={`/sites/${siteId}/pendencias`} className="inline-flex rounded-md">
+      <Badge variant="warning" className="underline underline-offset-4">
+        {count}
+        <span className="sr-only">
+          {' '}
+          {count === 1 ? 'mudança pendente' : 'mudanças pendentes'} em {siteId}
+        </span>
+      </Badge>
+    </Link>
   );
 }
 
 const columns = column.columns([
-  column.accessor('id', {
-    header: 'SITE_ID',
-    cell: (info) => (
-      <Link href={`/sites/${info.getValue()}`} className="font-medium underline underline-offset-4">
-        {info.getValue()}
-      </Link>
-    ),
+  column.accessor('name', {
+    header: 'Site',
+    cell: (info) => {
+      const site = info.row.original;
+      return (
+        <TwoLines
+          secondary={<Truncated text={`${site.id} · ${site.domain}`} className="max-w-48" />}
+        >
+          <Link
+            href={`/sites/${site.id}`}
+            title={site.name}
+            className="block max-w-48 truncate font-medium underline underline-offset-4"
+          >
+            {site.name}
+          </Link>
+        </TwoLines>
+      );
+    },
   }),
-  column.accessor('name', { header: 'Nome' }),
-  column.accessor('domain', { header: 'Domínio' }),
   column.accessor('lifecycle', {
     header: 'Ciclo de vida',
-    cell: (info) => LIFECYCLE_LABEL[info.getValue()],
+    cell: (info) => {
+      const release = info.row.original.release;
+      return (
+        <TwoLines secondary={release ? `Release ${release}` : 'Sem release'}>
+          {LIFECYCLE_LABEL[info.getValue()]}
+        </TwoLines>
+      );
+    },
   }),
   column.accessor('state', {
     header: 'Estado',
@@ -94,19 +146,20 @@ const columns = column.columns([
       const site = info.row.original;
       const reason = site.state === 'pausado' ? site.pausedReason : null;
       return (
-        <Badge variant={SITE_STATE_VARIANT[site.state]} title={reason ?? undefined}>
-          {SITE_STATE_LABEL[site.state]}
-          {reason ? `: ${reason}` : ''}
-        </Badge>
+        <TwoLines secondary={reason ? <Truncated text={reason} className="max-w-36" /> : undefined}>
+          <Badge variant={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</Badge>
+        </TwoLines>
       );
     },
   }),
-  column.accessor('release', { header: 'Release', cell: (info) => info.getValue() ?? '—' }),
   column.accessor('indexavel', {
     header: 'Indexável',
     cell: (info) => (info.getValue() ? 'Sim' : 'Não'),
   }),
-  column.accessor('pendingChanges', { header: 'Mudanças pendentes' }),
+  column.accessor('pendingChanges', {
+    header: 'Pendências',
+    cell: (info) => <PendingCell siteId={info.row.original.id} count={info.getValue()} />,
+  }),
   column.accessor('lastBuild', {
     header: 'Último build',
     cell: (info) => <LastBuildCell build={info.getValue()} timeZone={info.row.original.timeZone} />,
@@ -127,67 +180,73 @@ export function SitesTable({
   emptyAction?: ReactNode;
 }) {
   const table = useTable({ features, columns, data: rows });
+  const [status, setStatus] = useState<PublishStatus | null>(null);
   if (rows.length === 0) {
     return <EmptyState action={emptyAction}>Nenhum site cadastrado.</EmptyState>;
   }
+  const item = buttonVariants({ variant: 'ghost', size: 'sm' });
   return (
-    <Table>
-      <TableCaption>{rows.length === 1 ? '1 site' : `${rows.length} sites`}</TableCaption>
-      <TableHeader>
-        {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id}>
-            {group.headers.map((header) => (
-              <TableHead key={header.id} scope="col">
-                <table.FlexRender header={header} />
+    <div className="space-y-2">
+      {/* Uma região para a tabela inteira: o retorno de "Publicar agora" não cresce a linha. */}
+      <p
+        role="status"
+        className={
+          status?.ok === false ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
+        }
+      >
+        {status?.message}
+      </p>
+      <Table>
+        <TableCaption>{rows.length === 1 ? '1 site' : `${rows.length} sites`}</TableCaption>
+        <TableHeader>
+          {table.getHeaderGroups().map((group) => (
+            <TableRow key={group.id}>
+              {group.headers.map((header) => (
+                <TableHead key={header.id} scope="col">
+                  <table.FlexRender header={header} />
+                </TableHead>
+              ))}
+              <TableHead scope="col">
+                <span className="sr-only">Ações</span>
               </TableHead>
-            ))}
-            <TableHead scope="col">
-              <span className="sr-only">Ações</span>
-            </TableHead>
-          </TableRow>
-        ))}
-      </TableHeader>
-      <TableBody>
-        {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
-            {row.getAllCells().map((cell) => (
-              <TableCell key={cell.id}>
-                <table.FlexRender cell={cell} />
-              </TableCell>
-            ))}
-            <TableCell>
-              <span className="flex flex-col items-start gap-2">
-                <Link
-                  href={`/sites/${row.original.id}/conteudos`}
-                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                >
-                  Conteúdos
-                  <span className="sr-only"> {row.original.id}</span>
-                </Link>
-                <Link
-                  href={`/sites/${row.original.id}/midia`}
-                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                >
-                  Mídia
-                  <span className="sr-only"> {row.original.id}</span>
-                </Link>
-                {canConfigure && (
-                  <Link
-                    href={`/sites/${row.original.id}/configuracao`}
-                    className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                  >
-                    Editar configuração
-                    <span className="sr-only"> {row.original.id}</span>
-                  </Link>
-                )}
-                {publishNow && row.original.state !== 'pausado' && (
-                  <PublishNowButton siteId={row.original.id} action={publishNow} />
-                )}
-              </span>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => {
+            const siteId = row.original.id;
+            return (
+              <TableRow key={row.id}>
+                {row.getAllCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    <table.FlexRender cell={cell} />
+                  </TableCell>
+                ))}
+                <TableCell>
+                  <span className="flex items-center gap-2">
+                    {publishNow && row.original.state !== 'pausado' && (
+                      <PublishNowButton siteId={siteId} action={publishNow} onResult={setStatus} />
+                    )}
+                    <ActionsMenu label={siteId}>
+                      <Link href={`/sites/${siteId}/conteudos`} className={item}>
+                        Conteúdos<span className="sr-only"> {siteId}</span>
+                      </Link>
+                      <Link href={`/sites/${siteId}/midia`} className={item}>
+                        Mídia<span className="sr-only"> {siteId}</span>
+                      </Link>
+                      {canConfigure && (
+                        <Link href={`/sites/${siteId}/configuracao`} className={item}>
+                          Editar configuração<span className="sr-only"> {siteId}</span>
+                        </Link>
+                      )}
+                    </ActionsMenu>
+                  </span>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
