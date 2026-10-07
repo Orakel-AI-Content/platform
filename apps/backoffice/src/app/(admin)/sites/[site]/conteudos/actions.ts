@@ -8,6 +8,7 @@ import type { ContentFormResult } from '@/components/content-editor-values.ts';
 import { getDb } from '@/db/client.ts';
 import {
   createContent,
+  listContentVersions,
   submitForReview,
   updateContent,
   type ContentEdit,
@@ -50,7 +51,10 @@ export async function createContentAction(
   return { ok: true, message: 'Conteúdo criado.', id: result.value.id };
 }
 
-/** Grava a versão N+1 do conteúdo em rascunho. */
+/**
+ * Grava a versão N+1 do conteúdo em rascunho e a devolve relida do servidor: o editor
+ * continua nela (#109), com os `n` que o servidor deu aos blocos novos.
+ */
 export async function updateContentAction(
   siteId: string,
   contentId: number,
@@ -58,12 +62,18 @@ export async function updateContentAction(
 ): Promise<ContentFormResult> {
   const actor = await currentActor();
   if (!actor.ok) return noSession;
-  const result = await getDb().db.transaction(async (tx) =>
+  const { db } = getDb();
+  const result = await db.transaction(async (tx) =>
     updateContent(tx, actor.value, siteId, contentId, input, await resourcesFor(tx, siteId)),
   );
   if (!result.ok) return refused(result.issues);
   revalidatePath(`/sites/${siteId}/conteudos`);
-  return { ok: true, message: `Versão ${result.value.version} salva.`, id: contentId };
+  revalidatePath(`/sites/${siteId}/conteudos/${contentId}`);
+  const versions = await listContentVersions(db, actor.value, siteId, contentId);
+  const saved = versions.ok
+    ? versions.value.find((version) => version.version === result.value.version)?.data
+    : undefined;
+  return { ok: true, message: `Versão ${result.value.version} salva.`, id: contentId, saved };
 }
 
 /** Retorno do botão Enviar para revisão, anunciado em `role="status"`. */

@@ -5,6 +5,7 @@ import { readFixture } from '../../src/bin/seed.ts';
 import { createDb, createPool } from '../../src/db/client.ts';
 import { contents, contentVersions } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
+import { createContent } from '../../src/domain/content/contents.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
@@ -80,7 +81,12 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await alt.fill('Mesa organizada');
   await page.getByRole('button', { name: 'Criar conteúdo' }).click();
 
-  await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos$/);
+  // Fica no editor do conteúdo criado, com a confirmação na barra (#109).
+  await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos\/\d+\/editar$/);
+  await expect(page.getByRole('heading', { name: `Editar “${title}”` })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('status')).toHaveText('Conteúdo criado.');
+
+  await page.goto('/sites/exemplo-a/conteudos');
   const row = page.getByRole('row', { name: new RegExp(title) });
   await expect(row).toContainText('Artigo');
   await expect(row).toContainText('Rascunho');
@@ -237,5 +243,66 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
 
     await expect(page.getByLabel('Buscar por título')).toHaveValue('');
     await expect(page.getByRole('row')).toHaveCount(26);
+  });
+});
+
+test.describe('barra de ações do editor (#109)', () => {
+  let contentId = 0;
+  const title = `Artigo longo ${Date.now()}`;
+
+  test.beforeAll(async () => {
+    const fixture = await readFixture('exemplo-a');
+    const content = fixture.find((line) => line.type === 'content');
+    if (content?.type !== 'content') throw new Error('fixture sem conteúdo');
+    const pool = createPool(getEnv().DATABASE_URL);
+    try {
+      const created = await createDb(pool).transaction((tx) =>
+        createContent(tx, SYSTEM_ACTOR, 'exemplo-a', {
+          // O ID da fixture é ignorado: o domínio aloca o próximo.
+          ...content.data,
+          kind: 'article',
+          title,
+          slug: `artigo-longo-${Date.now()}`,
+          // 20 blocos: o fim do formulário fica bem abaixo da dobra.
+          blocks: Array.from({ length: 20 }, (_, index) => ({
+            new: true as const,
+            type: 'toc' as const,
+            title: `Seção ${index + 1}`,
+          })),
+        }),
+      );
+      if (!created.ok) throw new Error(JSON.stringify(created.issues));
+      contentId = created.value.id;
+    } finally {
+      await pool.end();
+    }
+  });
+
+  test('salvar fica visível em qualquer ponto da rolagem e mantém a pessoa no editor', async ({
+    page,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
+    await page.goto(editPath);
+    const save = page.getByRole('button', { name: 'Salvar nova versão' });
+
+    for (const position of [0, 0.5, 1]) {
+      await page.evaluate((fraction) => {
+        window.scrollTo(0, (document.body.scrollHeight - window.innerHeight) * fraction);
+      }, position);
+      await expect(save).toBeInViewport();
+    }
+    const status = page.getByRole('main').getByRole('status');
+
+    await save.click();
+    await expect(status).toHaveText('Versão 2 salva.');
+    await expect(page).toHaveURL(new RegExp(`${editPath}$`));
+    await expect(page.getByText('Partindo da versão 2;')).toBeVisible();
+
+    // Salvar de novo sem mudar nada: nova versão, os mesmos 20 blocos.
+    await save.click();
+    await expect(status).toHaveText('Versão 3 salva.');
+    await expect(page.getByRole('group', { name: /^Bloco \d+:/ })).toHaveCount(20);
+    await expect(page.getByRole('main').getByRole('alert')).toHaveText('');
   });
 });

@@ -6,6 +6,7 @@ import {
   TextBlockSchema,
   TocBlockSchema,
   type Block,
+  type Content,
 } from '@orakel/content-model/v1';
 import * as z from 'zod';
 
@@ -76,5 +77,11 @@ export function newBlock(type: Block['type']): Raw {
 /** Retorno das Server Actions do editor (serializável; `path` aponta o campo). */
 export type ContentFormIssue = { path: (string | number)[]; message: string };
 export type ContentFormResult =
-  | { ok: true; message: string; id: number }
+  | {
+      ok: true;
+      message: string;
+      id: number;
+      /** Na edição, a versão recém-salva relida do servidor (blocos novos com o `n` dele). */
+      saved?: Omit<Content, 'id'>;
+    }
   | { ok: false; message: string; issues: ContentFormIssue[] };

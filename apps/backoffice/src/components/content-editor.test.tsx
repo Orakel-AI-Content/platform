@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FieldValues } from 'react-hook-form';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -11,8 +11,11 @@ import { ContentEditor, type ContentEditorOptions } from './content-editor.tsx';
 
 // Editor de conteúdo (#45): tipos da release, seletores do site, teclado e erros por campo.
 
-const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
-vi.mock('next/navigation', () => ({ useRouter: () => router }));
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => router,
+  usePathname: () => '/sites/exemplo-a/conteudos/7/editar',
+}));
 
 afterEach(() => {
   cleanup();
@@ -45,17 +48,19 @@ type RenderProps = {
   blockTypes?: readonly string[];
   result?: ContentFormResult;
   mode?: 'create' | 'edit';
+  created?: boolean;
+  respond?: (input: ContentEdit) => Promise<ContentFormResult>;
 };
 
 function renderEditor({
   defaultValues = { ...meta, blocks: [toc(1, 'A'), toc(2, 'B'), toc(3, 'C')] },
   blockTypes = options.blockTypes,
-  result = { ok: true, message: 'ok', id: 7 },
+  result = { ok: true, message: 'Versão 2 salva.', id: 7 },
   mode = 'edit',
+  created,
+  respond = () => Promise.resolve(result),
 }: RenderProps = {}) {
-  const action = vi.fn<(input: ContentEdit) => Promise<ContentFormResult>>(() =>
-    Promise.resolve(result),
-  );
+  const action = vi.fn<(input: ContentEdit) => Promise<ContentFormResult>>(respond);
   render(
     <ContentEditor
       mode={mode}
@@ -63,6 +68,7 @@ function renderEditor({
       defaultValues={defaultValues}
       options={{ ...options, blockTypes }}
       action={action}
+      created={created}
     />,
   );
   return action;
@@ -112,7 +118,11 @@ describe('editor de conteúdo', () => {
       [2, 'B'],
       [1, 'A'],
     ]);
-    expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/conteudos/7');
+    // Fica no editor (#109): confirmação na barra e o cabeçalho atualizado, sem navegar.
+    expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('Versão 2 salva.');
+    expect(router.refresh).toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('bloco adicionado vai como novo, sem n', async () => {
@@ -128,7 +138,9 @@ describe('editor de conteúdo', () => {
     expect(action.mock.calls[0]?.[0].blocks).toEqual([
       { new: true, type: 'toc', title: 'Neste guia' },
     ]);
-    expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/conteudos');
+    // Criou: vai para a edição do conteúdo criado, que anuncia a confirmação (#109).
+    expect(router.replace).toHaveBeenCalledWith('/sites/exemplo-a/conteudos/7/editar?criado=1');
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('imagem sem texto alternativo e sem decorativa é recusada junto do campo', async () => {
@@ -165,6 +177,74 @@ describe('editor de conteúdo', () => {
 
     expect(await screen.findByText('Título recusado')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain('Sem permissão para content.write');
+    expect(screen.getByRole('status').textContent).toBe('');
     expect(router.push).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe('barra de ações e continuar no editor (#109)', () => {
+  it('o botão e o resultado ficam numa barra fixa no rodapé', () => {
+    renderEditor();
+
+    const bar = screen.getByRole('button', { name: 'Salvar nova versão' }).parentElement;
+    expect(bar?.className).toContain('sticky');
+    expect(bar?.className).toContain('bottom-0');
+    expect(bar?.querySelector('[role="status"]')).toBeTruthy();
+    expect(bar?.querySelector('[role="alert"]')).toBeTruthy();
+  });
+
+  it('durante o salvamento, "Salvando…" e nenhum outro clique', async () => {
+    const user = userEvent.setup();
+    let finish: (result: ContentFormResult) => void = () => {};
+    const action = renderEditor({
+      respond: () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    });
+
+    await save(user);
+    const button = await screen.findByRole('button', { name: 'Salvando…' });
+    expect(button).toHaveProperty('disabled', true);
+    await user.click(button);
+    expect(action).toHaveBeenCalledTimes(1);
+
+    act(() => finish({ ok: true, message: 'Versão 2 salva.', id: 7 }));
+    expect(await screen.findByRole('button', { name: 'Salvar nova versão' })).toBeTruthy();
+  });
+
+  it('recomeça da versão salva: o bloco novo ganha o n do servidor e salvar de novo não duplica', async () => {
+    const user = userEvent.setup();
+    const saved = { ...meta, blocks: [toc(1, 'A'), toc(4, 'Novo')] };
+    const action = renderEditor({
+      defaultValues: { ...meta, blocks: [toc(1, 'A')] },
+      result: { ok: true, message: 'Versão 2 salva.', id: 7, saved: saved as never },
+    });
+
+    await user.selectOptions(screen.getByLabelText('Tipo do novo bloco'), 'Sumário');
+    await user.click(screen.getByRole('button', { name: 'Adicionar bloco' }));
+    const titles = screen.getAllByLabelText('Título do sumário');
+    await user.type(titles[titles.length - 1] as HTMLElement, 'Novo');
+    await save(user);
+    expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
+    expect(action.mock.calls[0]?.[0].blocks.at(-1)).toMatchObject({ new: true, title: 'Novo' });
+    // A confirmação chega antes do fim da transição: espera o botão sair de "Salvando…".
+    const button = await screen.findByRole('button', { name: 'Salvar nova versão' });
+    expect(button).toHaveProperty('disabled', false);
+
+    await save(user);
+
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+    expect(action.mock.calls[1]?.[0].blocks).toEqual([toc(1, 'A'), toc(4, 'Novo')]);
+  });
+
+  it('acabou de criar: anuncia "Conteúdo criado." e tira a marca da URL', async () => {
+    renderEditor({ created: true });
+
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Conteúdo criado.'));
+    expect(router.replace).toHaveBeenCalledWith('/sites/exemplo-a/conteudos/7/editar', {
+      scroll: false,
+    });
   });
 });
