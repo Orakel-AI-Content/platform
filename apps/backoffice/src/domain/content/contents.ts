@@ -306,6 +306,29 @@ export async function listContents(
   };
 }
 
+export type ReviewQueueItem = Omit<ContentListItem, 'slug' | 'status'>;
+
+/**
+ * Fila de revisão do site: conteúdos cuja versão mais recente está `em_revisao`, da versão
+ * mais antiga para a mais recente. O filtro vem depois do DISTINCT ON: antes, traria a
+ * versão N em revisão mesmo com uma N+1 em rascunho (salvar de novo tira da fila).
+ */
+export async function listReviewQueue(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<ReviewQueueItem[]>> {
+  const listed = await listContents(db, actor, siteId);
+  if (!listed.ok) return listed;
+  return {
+    ok: true,
+    value: listed.value
+      .filter((item) => item.status === 'em_revisao')
+      .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime() || a.id - b.id)
+      .map(({ id, kind, title, version, updatedAt }) => ({ id, kind, title, version, updatedAt })),
+  };
+}
+
 export type ContentVersion = {
   version: number;
   status: Status;

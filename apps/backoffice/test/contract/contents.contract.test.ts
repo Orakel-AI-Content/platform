@@ -10,6 +10,7 @@ import {
   createContent,
   listContents,
   listContentVersions,
+  listReviewQueue,
   submitForReview,
   updateContent,
   type ContentEdit,
@@ -299,6 +300,57 @@ describe('enviar para revisão (#72)', () => {
     await edit(1, await latest(1));
     expect(await submit(1, { email: 'editor@orakel.local', roles: ['editor'] })).toMatchObject({
       ok: true,
+    });
+  });
+});
+
+describe('fila de revisão (#72)', () => {
+  const queue = async (siteId = SITE, actor = SYSTEM_ACTOR) => {
+    const result = await listReviewQueue(db, actor, siteId);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value;
+  };
+
+  it('lista só os conteúdos com a versão mais recente em revisão, da mais antiga à mais recente', async () => {
+    await edit(3, { ...(await latest(3)), title: 'Quem somos (2)' });
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await edit(2, await latest(2));
+    await submit(3);
+    await submit(1);
+
+    expect(
+      (await queue()).map(({ id, kind, title, version }) => ({ id, kind, title, version })),
+    ).toEqual([
+      { id: 3, kind: 'page', title: 'Quem somos (2)', version: 2 },
+      { id: 1, kind: 'article', title: 'Guia revisado', version: 2 },
+    ]);
+  });
+
+  it('salvar uma versão nova tira o conteúdo da fila', async () => {
+    await edit(1, await latest(1));
+    await submit(1);
+    expect((await queue()).map((item) => item.id)).toEqual([1]);
+
+    await edit(1, { ...(await latest(1)), title: 'Guia (3)' });
+
+    expect(await queue()).toEqual([]);
+  });
+
+  it('não traz conteúdos de outro site', async () => {
+    const imported = await importSnapshot(db, SYSTEM_ACTOR, await readFixture('exemplo-b'));
+    if (!imported.ok) throw new Error(JSON.stringify(imported.issues));
+    await edit(1, await latest(1));
+    await submit(1);
+
+    expect(await queue('exemplo-b')).toEqual([]);
+  });
+
+  it('revisor lê a fila; sem papel, forbidden', async () => {
+    expect(
+      await listReviewQueue(db, { email: 'revisor@orakel.local', roles: ['revisor'] }, SITE),
+    ).toMatchObject({ ok: true });
+    expect(await listReviewQueue(db, { email: 'x@orakel.local', roles: [] }, SITE)).toMatchObject({
+      issues: [{ code: 'forbidden' }],
     });
   });
 });
