@@ -47,6 +47,16 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   - Site: ativo `success`, promovendo `info`, pausado `warning` (com o motivo no texto e no
     `title`, sempre visível na lista de sites).
   - Build: publicado `success`, falhou `destructive`.
+- **Cabeçalho de página:** `PageHeader` (`src/app/(admin)/sites/[site]/editorial-page.tsx`),
+  em toda tela de lista: link de volta (opcional; Sites é a raiz), título (`h1`) à esquerda e a
+  ação principal à direita (`action`), que quebra para baixo em tela estreita. A página monta a
+  ação no servidor e só a passa com permissão; sem ela, o cabeçalho é só o título. Ação
+  principal em `buttonVariants({ size: 'sm' })`; a secundária (baixar o tfvars em Sites) ao
+  lado, em `variant: 'outline'`. A tabela nunca desenha o link de criar.
+- **Estado vazio:** `EmptyState` (`src/components/empty-state.tsx`) no lugar da tabela sem
+  linhas, nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
+  permissão, a mesma ação principal do cabeçalho (`emptyAction` das tabelas). Com a lista
+  vazia, a ação aparece duas vezes; no E2E, clique na primeira (a do cabeçalho).
 - **Telas de estado:** `StatusScreen` (`src/components/status-screen.tsx`), com título (`h1`),
   uma frase do que aconteceu e o que fazer, e a ação de saída (link de volta ou "Tentar de
   novo"). "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo
