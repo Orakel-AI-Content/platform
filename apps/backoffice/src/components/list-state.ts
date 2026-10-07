@@ -63,14 +63,16 @@ export type ListConfig = {
   filters: readonly ListFilterConfig[];
   /** Colunas que aceitam ordenação; `ordem` fora delas cai na padrão. */
   sortable: readonly string[];
-  defaultSort: ColumnSort;
+  /** Sem ordem padrão (e sem `sortable`), a tabela fica na ordem dos dados. */
+  defaultSort?: ColumnSort;
 };
 
 export type ListState = {
   search: string;
   /** Valor de cada filtro ativo, pela coluna. */
   filters: Record<string, string>;
-  sort: ColumnSort;
+  /** `undefined`: a ordem dos dados. */
+  sort: ColumnSort | undefined;
   /** Página a partir de 1. */
   page: number;
 };
@@ -99,7 +101,7 @@ export function parseListState(params: URLSearchParams, config: ListConfig): Lis
   const sortColumn = desc ? sortParam.slice(1) : sortParam;
   const sort = config.sortable.includes(sortColumn)
     ? { id: sortColumn, desc }
-    : { ...config.defaultSort };
+    : config.defaultSort && { ...config.defaultSort };
   const page = Number(params.get(PAGE));
   return {
     search: params.get(SEARCH) ?? '',
@@ -127,7 +129,7 @@ export function listStateQuery(params: URLSearchParams, config: ListConfig, patc
   }
   if (patch.sort !== undefined) {
     const { id, desc } = patch.sort;
-    const isDefault = id === config.defaultSort.id && desc === config.defaultSort.desc;
+    const isDefault = id === config.defaultSort?.id && desc === config.defaultSort.desc;
     set(SORT, isDefault ? undefined : `${desc ? '-' : ''}${id}`);
   }
   if (patch.page !== undefined) set(PAGE, patch.page > 1 ? String(patch.page) : undefined);
@@ -167,7 +169,7 @@ export function useListState(config: ListConfig) {
     id,
     value,
   }));
-  const sorting: SortingState = [state.sort];
+  const sorting: SortingState = state.sort ? [state.sort] : [];
   const pagination: PaginationState = { pageIndex: state.page - 1, pageSize: PAGE_SIZE };
 
   return {
@@ -199,8 +201,10 @@ export function useListState(config: ListConfig) {
           ),
         });
       },
-      onSortingChange: (updater: Updater<SortingState>) =>
-        update({ sort: functionalUpdate(updater, sorting)[0] ?? config.defaultSort }),
+      onSortingChange: (updater: Updater<SortingState>) => {
+        const sort = functionalUpdate(updater, sorting)[0] ?? config.defaultSort;
+        if (sort) update({ sort });
+      },
       onPaginationChange: (updater: Updater<PaginationState>) =>
         update({ page: functionalUpdate(updater, pagination).pageIndex + 1 }),
       globalFilterFn: searchFilterFn,
