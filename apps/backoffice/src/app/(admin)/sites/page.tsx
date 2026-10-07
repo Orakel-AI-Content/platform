@@ -24,7 +24,7 @@ export default async function SitesPage() {
   }
   const canConfigure = can(actor.value, 'site.configure');
   return (
-    <section aria-labelledby="sites-title" className="space-y-4">
+    <section aria-labelledby="sites-title" className="list-width space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 id="sites-title" className="text-2xl font-semibold">
           Sites

@@ -20,7 +20,7 @@ export default async function MediaPage({ params }: { params: Promise<{ site: st
   if (!media.ok) return noRead;
 
   return (
-    <section aria-labelledby="media-title" className="space-y-4">
+    <section aria-labelledby="media-title" className="list-width space-y-4">
       <PageHeader
         id="media-title"
         back={{ href: `/sites/${site.id}`, label: site.name }}

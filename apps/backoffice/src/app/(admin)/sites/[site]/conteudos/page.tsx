@@ -24,7 +24,7 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
   if (!contents.ok) return noRead;
 
   return (
-    <section aria-labelledby="contents-title" className="space-y-4">
+    <section aria-labelledby="contents-title" className="list-width space-y-4">
       <p className="text-sm">
         <Link href={`/sites/${site.id}`} className="underline underline-offset-4">
           {site.name}
