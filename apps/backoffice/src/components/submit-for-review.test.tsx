@@ -12,7 +12,7 @@ afterEach(cleanup);
 describe('enviar para revisão', () => {
   it('pelo teclado, chama a action e anuncia o sucesso', async () => {
     const action = vi.fn().mockResolvedValue({ ok: true, message: 'Enviado para revisão.' });
-    render(<SubmitForReview action={action} />);
+    render(<SubmitForReview available action={action} />);
 
     await userEvent.tab();
     expect(document.activeElement).toBe(
@@ -29,12 +29,33 @@ describe('enviar para revisão', () => {
       ok: false,
       message: 'Só um rascunho vai para revisão: a versão 2 está em_revisao',
     });
-    render(<SubmitForReview action={action} />);
+    render(<SubmitForReview available action={action} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Enviar para revisão' }));
 
     const status = await screen.findByText(/Só um rascunho/);
     expect(status.getAttribute('role')).toBe('status');
     expect(status.className).toContain('text-destructive');
+  });
+});
+
+describe('disponibilidade', () => {
+  it('sem rascunho e sem envio anterior, não mostra nada', () => {
+    render(<SubmitForReview available={false} action={vi.fn()} />);
+
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('depois do envio, a página revalida sem o botão e a mensagem continua', async () => {
+    const action = vi.fn().mockResolvedValue({ ok: true, message: 'Enviado para revisão.' });
+    const { rerender } = render(<SubmitForReview available action={action} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Enviar para revisão' }));
+    await screen.findByText('Enviado para revisão.');
+
+    rerender(<SubmitForReview available={false} action={action} />);
+
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('Enviado para revisão.');
   });
 });

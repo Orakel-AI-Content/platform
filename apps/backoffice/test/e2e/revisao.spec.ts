@@ -50,7 +50,9 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
 
   // Editor envia: o retorno aparece em role=status e o botão some (versão em revisão).
   await page.getByRole('button', { name: 'Enviar para revisão' }).click();
-  await expect(page.getByRole('status')).toHaveText('Enviado para revisão.');
+  // O status global (indicador de navegação) também é role=status: só o do conteúdo.
+  await expect(page.getByRole('main').getByRole('status')).toHaveText('Enviado para revisão.');
+  await expect(page.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Em revisão');
   await expect(page.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);

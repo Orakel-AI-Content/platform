@@ -43,7 +43,7 @@ export default async function ContentVersionsPage({ params }: Params) {
     return noRead;
   }
   const latest = versions.value.at(-1)!;
-  const canSubmit = can(actor, 'content.write') && latest.status === 'rascunho';
+  const canWrite = can(actor, 'content.write');
 
   return (
     <section aria-labelledby="versions-title" className="list-width space-y-4">
@@ -58,8 +58,11 @@ export default async function ContentVersionsPage({ params }: Params) {
       <p className="text-sm text-muted-foreground">
         {CONTENT_KIND_LABEL[latest.data.kind]} · ID {contentId} · /{latest.data.slug}
       </p>
-      {canSubmit && (
-        <SubmitForReview action={submitForReviewAction.bind(null, siteId, contentId)} />
+      {canWrite && (
+        <SubmitForReview
+          available={latest.status === 'rascunho'}
+          action={submitForReviewAction.bind(null, siteId, contentId)}
+        />
       )}
       <ContentVersionsTable
         siteId={siteId}
