@@ -12,7 +12,10 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Taxonomias' };
 
-/** Categorias, tags e séries do site; criar e editar só com content.write. */
+/**
+ * Categorias, tags e séries do site, com busca por nome e paginação (#108); criar e editar
+ * só com content.write.
+ */
 export default async function TaxonomiesPage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
   const context = await sitePageContext(siteId);
@@ -44,6 +47,7 @@ export default async function TaxonomiesPage({ params }: { params: Promise<{ sit
           cells: [TAXONOMY_KIND_LABEL[taxonomy.kind], taxonomy.slug],
         }))}
         noun={{ one: 'taxonomia', many: 'taxonomias', none: 'Nenhuma taxonomia cadastrada.' }}
+        search={{ label: 'Buscar por nome', notFound: 'Nenhuma taxonomia encontrada.' }}
         canWrite={canWrite}
         emptyAction={create}
       />
