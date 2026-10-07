@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { currentActor } from '@/auth/request-actor.ts';
+import { NavigationIndicator } from '@/components/navigation-indicator';
 
 // Área autenticada: toda página daqui exige o JWT do Access e um usuário com papel. O
 // domínio confere de novo a permissão de cada ação (nunca só aqui nem no proxy).
@@ -19,6 +20,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   }
   return (
     <div className="min-h-screen">
+      <NavigationIndicator />
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
           <nav aria-label="Principal" className="flex items-center gap-6">

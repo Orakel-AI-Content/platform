@@ -26,6 +26,11 @@ describe('parseEnv', () => {
     );
   });
 
+  it('a página de erro do E2E fica desligada sem E2E_ERROR_ROUTE', () => {
+    expect(parseEnv(valid).E2E_ERROR_ROUTE).toBe(false);
+    expect(parseEnv({ ...valid, E2E_ERROR_ROUTE: '1' }).E2E_ERROR_ROUTE).toBe(true);
+  });
+
   it('SENTRY_DSN e HEARTBEAT_BASE_URL vazios desligam as integrações', () => {
     expect(parseEnv({ ...valid, SENTRY_DSN: '', HEARTBEAT_BASE_URL: '' })).toMatchObject({
       SENTRY_DSN: '',

@@ -12,6 +12,16 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
 - **Tabelas:** TanStack Table 9 (`useTable` com `tableFeatures`); a biblioteca traz skills
   em `node_modules/@tanstack/react-table/skills/`.
 - **Estado pausado:** badge `warning` com o motivo, sempre visível na lista de sites.
+- **Telas de estado:** `StatusScreen` (`src/components/status-screen.tsx`), com título (`h1`),
+  uma frase do que aconteceu e o que fazer, e a ação de saída (link de volta ou "Tentar de
+  novo"). "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo
+  catch-all `(admin)/[...rest]`) e erro (`(admin)/error.tsx` e `global-error.tsx`, pelo
+  `ErrorScreen`) a usam. Um caso novo, como a falta de permissão, muda só o conteúdo, sem
+  variante visual. A tela de erro nunca mostra a mensagem da exceção, só o `digest`.
+- **Carregamento:** `NavigationIndicator` no layout `(admin)`. Acende "Carregando…" numa região
+  `role="status"` persistente no clique de um link interno e apaga quando o endereço muda. Não
+  use `loading.tsx` nem `Suspense` acima das páginas: o fallback só aparece quando muda o
+  segmento logo abaixo dele, e a resposta enviada em streaming faria o `notFound()` responder 200. No E2E, leia o status da tela pelo `main` (`getByRole('main').getByRole('status')`).
 - **Formulários:** gerados do schema Zod com `SchemaForm` (`src/components/forms/`), sobre
   react-hook-form + zodResolver; a validação é só a do schema. O gerador desenha texto,
   número, booleano, enum, objeto (`fieldset`) e lista de objetos (adicionar e remover).

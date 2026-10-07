@@ -22,6 +22,8 @@ export const EnvSchema = z.object({
   BUILD_WINDOW_SECONDS: z.coerce.number().int().min(0).default(900),
   SENTRY_DSN: z.union([z.url(), z.literal('')]).optional(),
   HEARTBEAT_BASE_URL: z.union([z.url(), z.literal('')]).optional(),
+  /** Só no E2E local: liga a página /teste-de-erro, que lança erro de propósito (#77). */
+  E2E_ERROR_ROUTE: z.stringbool().default(false),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

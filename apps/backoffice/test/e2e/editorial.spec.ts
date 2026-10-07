@@ -94,7 +94,7 @@ test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   await expectNoViolations(page);
   await page.getByRole('button', { name: 'Salvar textos' }).click();
 
-  await expect(page.getByRole('status')).toHaveText('Textos salvos.');
+  await expect(page.getByRole('main').getByRole('status')).toHaveText('Textos salvos.');
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Sobre' })).toHaveText(text);
 });

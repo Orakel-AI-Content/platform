@@ -158,6 +158,8 @@ services:
       ACCESS_JWKS_URL: http://access-mock:8788/cdn-cgi/access/certs
       S3_ENDPOINT: http://s3:8333
       BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-30}
+      # Página /teste-de-erro para o E2E da tela de erro (#77); nunca no compose da VPS.
+      E2E_ERROR_ROUTE: ${E2E_ERROR_ROUTE:-1}
     depends_on:
       s3-init:
         condition: service_completed_successfully
