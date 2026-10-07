@@ -45,6 +45,13 @@ describe('tabela de conteúdos', () => {
     expect(screen.getByText('2 conteúdos')).toBeTruthy();
   });
 
+  it('dá a cada status o badge da sua variante, com o texto do status (#86)', () => {
+    render(<ContentsTable siteId="exemplo-a" rows={rows} />);
+
+    expect(screen.getByText('Em revisão').className).toContain('text-warning');
+    expect(screen.getByText('Publicado').className).toContain('bg-success');
+  });
+
   it('sem content.write não tem links de criar nem de editar', () => {
     render(<ContentsTable siteId="exemplo-a" rows={rows} />);
 

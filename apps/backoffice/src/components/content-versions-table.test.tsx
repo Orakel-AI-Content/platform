@@ -29,4 +29,13 @@ describe('tabela de versões', () => {
     expect(screen.getAllByRole('row')[1]?.textContent).toContain('Publicado');
     expect(screen.getByText('3 versões')).toBeTruthy();
   });
+
+  it('dá a cada status o badge da sua variante, com o texto do status (#86)', () => {
+    render(<ContentVersionsTable siteId="exemplo-a" contentId={7} rows={rows} />);
+
+    expect(screen.getByText('Publicado').className).toContain('bg-success');
+    for (const badge of screen.getAllByText('Rascunho')) {
+      expect(badge.className).toContain('bg-muted');
+    }
+  });
 });

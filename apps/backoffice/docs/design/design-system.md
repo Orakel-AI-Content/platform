@@ -35,7 +35,18 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   uma coluna legível. `list-width` (largura cheia do `main`) para as listas e tabelas: sites,
   conteúdos, versões, autores, taxonomias, menus e mídia. O componente de formulário não
   define largura; quem define é a página.
-- **Estado pausado:** badge `warning` com o motivo, sempre visível na lista de sites.
+- **Estados:** badge com o texto do estado e uma variante própria dentro do grupo, sem ícone
+  (o texto distingue os estados em tons de cinza). O mapa fica ao lado dos rótulos, em
+  `src/components/site-labels.ts` (`CONTENT_STATUS_VARIANT`, `SITE_STATE_VARIANT`,
+  `BUILD_STATUS_VARIANT`); nunca escreva a variante de um estado na tela. As variantes do
+  `Badge`: contorno (`outline`, `success`, `info`, `warning`) e preenchido (`muted`,
+  `success-solid`, `info-solid`, `destructive`). O `site-labels.test.ts` reprova dois estados
+  do mesmo grupo com a mesma variante.
+  - Conteúdo: rascunho `muted`, em revisão `warning`, aprovado `info`, agendado `info-solid`,
+    publicado `success-solid`, despublicado `outline`.
+  - Site: ativo `success`, promovendo `info`, pausado `warning` (com o motivo no texto e no
+    `title`, sempre visível na lista de sites).
+  - Build: publicado `success`, falhou `destructive`.
 - **Telas de estado:** `StatusScreen` (`src/components/status-screen.tsx`), com título (`h1`),
   uma frase do que aconteceu e o que fazer, e a ação de saída (link de volta ou "Tentar de
   novo"). "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo

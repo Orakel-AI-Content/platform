@@ -4,7 +4,13 @@ import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-tab
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 
-import { LIFECYCLE_LABEL } from '@/components/site-labels.ts';
+import {
+  BUILD_STATUS_LABEL,
+  BUILD_STATUS_VARIANT,
+  LIFECYCLE_LABEL,
+  SITE_STATE_LABEL,
+  SITE_STATE_VARIANT,
+} from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -34,11 +40,7 @@ function LastBuildCell({ build }: { build: SiteSummary['lastBuild'] }) {
   if (build === null) return <span className="text-muted-foreground">—</span>;
   return (
     <span className="flex flex-col gap-0.5">
-      {build.status === 'ok' ? (
-        <Badge variant="outline">Publicado</Badge>
-      ) : (
-        <Badge variant="destructive">Falhou</Badge>
-      )}
+      <Badge variant={BUILD_STATUS_VARIANT[build.status]}>{BUILD_STATUS_LABEL[build.status]}</Badge>
       <span className="text-xs text-muted-foreground">
         {dateTime.format(new Date(build.finishedAt))}
         {build.versionId ? ` · ${build.versionId}` : ''}
@@ -93,15 +95,12 @@ const columns = column.columns([
     header: 'Estado',
     cell: (info) => {
       const site = info.row.original;
-      if (site.state === 'pausado') {
-        return (
-          <Badge variant="warning" title={site.pausedReason ?? undefined}>
-            Pausado{site.pausedReason ? `: ${site.pausedReason}` : ''}
-          </Badge>
-        );
-      }
+      const reason = site.state === 'pausado' ? site.pausedReason : null;
       return (
-        <Badge variant="outline">{site.state === 'promovendo' ? 'Promovendo' : 'Ativo'}</Badge>
+        <Badge variant={SITE_STATE_VARIANT[site.state]} title={reason ?? undefined}>
+          {SITE_STATE_LABEL[site.state]}
+          {reason ? `: ${reason}` : ''}
+        </Badge>
       );
     },
   }),

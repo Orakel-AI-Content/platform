@@ -3,7 +3,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ContentVersionView } from '@/components/content-version-view';
-import { CONTENT_STATUS_LABEL, dateTime } from '@/components/site-labels.ts';
+import {
+  CONTENT_STATUS_LABEL,
+  CONTENT_STATUS_VARIANT,
+  dateTime,
+} from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import { noRead } from '@/components/forbidden-screen';
 
@@ -60,7 +64,9 @@ export default async function ContentVersionPage({ params }: Params) {
         Versão {version.version} de “{version.data.title}”
       </h1>
       <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        <Badge variant="outline">{CONTENT_STATUS_LABEL[version.status]}</Badge>
+        <Badge variant={CONTENT_STATUS_VARIANT[version.status]}>
+          {CONTENT_STATUS_LABEL[version.status]}
+        </Badge>
         Gravada em {dateTime.format(version.createdAt)}
         {version.version === latest ? ' · versão mais recente' : ` · mais recente: ${latest}`}
       </p>
