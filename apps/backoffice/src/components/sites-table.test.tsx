@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
@@ -54,9 +55,9 @@ describe('tabela de sites', () => {
 
     expect(screen.getByText('Ativo').className).toContain('text-success');
     expect(screen.getByText('Promovendo').className).toContain('text-info');
-    const paused = screen.getByText('Pausado: cota');
-    expect(paused.className).toContain('text-warning');
-    expect(paused.getAttribute('title')).toBe('cota');
+    expect(screen.getByText('Pausado').className).toContain('text-warning');
+    // O motivo fica sob o badge, cortado se for longo, com o texto inteiro em `title` (#100).
+    expect(screen.getByText('cota').getAttribute('title')).toBe('cota');
   });
 
   it('dá a cada resultado de build o badge da sua variante (#86)', () => {
@@ -74,9 +75,80 @@ describe('tabela de sites', () => {
       />,
     );
 
-    // A etapa do ciclo de vida também se chama "Publicado", mas é texto solto na célula.
-    expect(screen.getByText('Publicado', { selector: 'span' }).className).toContain('text-success');
+    // A etapa do ciclo de vida também se chama "Publicado"; o badge é o do último build.
+    const [build] = screen
+      .getAllByText('Publicado')
+      .filter((element) => element.className.includes('text-success'));
+    expect(build).toBeTruthy();
     expect(screen.getByText('Falhou').className).toContain('bg-destructive');
+  });
+
+  it('não mostra "SITE_ID" em nenhum cabeçalho; o ID fica sob o nome (#100)', () => {
+    render(<SitesTable rows={[site]} />);
+
+    const headers = screen.getAllByRole('columnheader').map((header) => header.textContent);
+    expect(headers).toEqual([
+      'Site',
+      'Ciclo de vida',
+      'Estado',
+      'Indexável',
+      'Pendências',
+      'Último build',
+      'Ações',
+    ]);
+    expect(screen.getByRole('link', { name: 'Exemplo A' }).getAttribute('href')).toBe(
+      '/sites/exemplo-a',
+    );
+    expect(screen.getByText('exemplo-a · exemplo-a.test')).toBeTruthy();
+  });
+
+  it('pendências > 0 se destacam e levam à tela de pendências; 0 não (#100)', () => {
+    render(
+      <SitesTable
+        rows={[
+          { ...site, pendingChanges: 3 },
+          { ...site, id: 'exemplo-b' },
+        ]}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: '3 mudanças pendentes em exemplo-a' });
+    expect(link.getAttribute('href')).toBe('/sites/exemplo-a/pendencias');
+    expect(link.firstElementChild?.className).toContain('text-warning');
+    expect(screen.queryByRole('link', { name: /pendentes em exemplo-b/ })).toBeNull();
+  });
+
+  it('põe Conteúdos, Mídia e, com site.configure, Editar configuração no menu Mais ações', () => {
+    const { rerender } = render(<SitesTable rows={[site]} />);
+    const menu = () => {
+      const button = screen.getByRole('button', { name: 'Mais ações: exemplo-a' });
+      const list = document.getElementById(button.getAttribute('popovertarget') ?? '');
+      return [...(list?.querySelectorAll('a') ?? [])].map((link) => link.textContent);
+    };
+    expect(menu()).toEqual(['Conteúdos exemplo-a', 'Mídia exemplo-a']);
+
+    rerender(<SitesTable rows={[site]} canConfigure />);
+    expect(menu()).toEqual([
+      'Conteúdos exemplo-a',
+      'Mídia exemplo-a',
+      'Editar configuração exemplo-a',
+    ]);
+  });
+
+  it('"Publicar agora" fica fora do menu e anuncia numa única região de status', async () => {
+    const user = userEvent.setup();
+    const publishNow = vi.fn((siteId: string) =>
+      Promise.resolve({ ok: true, message: `Build de ${siteId} enfileirado.` }),
+    );
+    render(<SitesTable rows={[site, { ...site, id: 'exemplo-b' }]} publishNow={publishNow} />);
+
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-b' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Build de exemplo-b enfileirado.'),
+    );
+    expect(publishNow).toHaveBeenCalledWith('exemplo-b');
   });
 
   it('sem sites mostra o estado vazio no lugar da tabela (#87)', () => {

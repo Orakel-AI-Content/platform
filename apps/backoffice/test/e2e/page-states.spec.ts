@@ -94,7 +94,7 @@ test('a navegação mostra o carregamento, anunciado, em até 100 ms', async ({ 
     }).observe(document.body, { childList: true, subtree: true });
   });
 
-  await page.getByRole('link', { name: 'exemplo-a', exact: true }).click();
+  await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Carregando' })).toBeVisible();
   const elapsed = await page.evaluate(() => {
     const marks = window as unknown as { clickAt?: number; loadingAt?: number };

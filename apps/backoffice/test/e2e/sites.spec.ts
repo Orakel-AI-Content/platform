@@ -23,8 +23,10 @@ test('login pelo Access e registro de instâncias', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
   await expect(page.getByText('operacao@orakel.local · operacao')).toBeVisible();
   const table = page.getByRole('table');
-  await expect(table.getByRole('cell', { name: 'exemplo-a', exact: true })).toBeVisible();
-  await expect(table.getByRole('cell', { name: 'exemplo-b', exact: true })).toBeVisible();
+  // O nome é o link principal; o ID e o domínio ficam sob ele (#100).
+  await expect(table.getByRole('link', { name: 'Exemplo A — Guias' })).toBeVisible();
+  await expect(table.getByText(/^exemplo-a · /)).toBeVisible();
+  await expect(table.getByRole('link', { name: 'Exemplo B — Receitas' })).toBeVisible();
 
   // Operação baixa a lista de sites do OpenTofu (ADR 0011).
   const download = page.waitForEvent('download');
@@ -104,10 +106,14 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
 
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
   const row = page.getByRole('row').filter({ hasText: siteId });
-  await expect(row.getByRole('cell', { name: 'Cadastrado', exact: true })).toBeVisible();
+  await expect(row.getByText('Cadastrado', { exact: true })).toBeVisible();
 
-  // Edição: versão nova, e a lista mostra o domínio principal novo.
-  await row.getByRole('link', { name: `Editar configuração ${siteId}` }).click();
+  // Edição pelo menu "Mais ações" (#100), só com o teclado: versão nova, e a lista mostra o
+  // domínio principal novo.
+  await tabTo(page, row.getByRole('button', { name: `Mais ações: ${siteId}` }));
+  await page.keyboard.press('Enter');
+  await tabTo(page, row.getByRole('link', { name: `Editar configuração ${siteId}` }));
+  await page.keyboard.press('Enter');
   await expect(page.getByLabel('ID', { exact: true })).toHaveAttribute('readonly', '');
   await typeInto(page, page.getByLabel('Domínios'), `novo.${siteId}.example.com`);
   await tabTo(page, page.getByRole('button', { name: 'Salvar configuração' }));
@@ -119,9 +125,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
     page
       .getByRole('row')
       .filter({ hasText: siteId })
-      .getByRole('cell', {
-        name: `novo.${siteId}.example.com`,
-      }),
+      .getByText(`${siteId} · novo.${siteId}.example.com`),
   ).toBeVisible();
 });
 
@@ -185,7 +189,7 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
   await newSite(page, siteId);
-  await page.getByRole('link', { name: siteId, exact: true }).click();
+  await page.getByRole('link', { name: `Site ${siteId}`, exact: true }).click();
   await expect(page.getByRole('heading', { name: new RegExp(siteId) })).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
@@ -225,13 +229,13 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
 
   await page.goto('/sites');
   await expect(
-    page.getByRole('row').filter({ hasText: siteId }).getByRole('cell', { name: 'Zona ativa' }),
+    page.getByRole('row').filter({ hasText: siteId }).getByText('Zona ativa', { exact: true }),
   ).toBeVisible();
 });
 
 test('editor vê a página do site sem as ações', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
-  await page.getByRole('link', { name: 'exemplo-a', exact: true }).click();
+  await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
   await expect(page.getByRole('heading', { name: 'Ciclo de vida' })).toBeVisible();
   for (const name of [/^Marcar/, 'Registrar G1', 'Salvar janela', 'Usar padrão']) {
     await expect(page.getByRole('button', { name })).toHaveCount(0);
