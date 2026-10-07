@@ -66,8 +66,11 @@ function withN(block: NewBlock, n: number): Block {
   return { ...fresh, n } as Block;
 }
 
-/** Schema e validação semântica (referências do site, recursos); devolve os dados sem ID. */
-async function validate(
+/**
+ * Schema e validação semântica (referências do site, recursos); devolve os dados sem ID. A
+ * revisão valida a versão com a mesma regra da edição.
+ */
+export async function validateContentData(
   tx: Executor,
   siteId: string,
   contentId: number,
@@ -118,7 +121,13 @@ export async function createContent(
     Math.max(0, ...input.blocks.flatMap((block) => (isNew(block) ? [] : [block.n]))) + 1;
   const blocks = input.blocks.map((block) => (isNew(block) ? withN(block, nextBlockN++) : block));
   // ID provisório na validação: o definitivo só é alocado depois, para não gastar a sequência.
-  const data = await validate(tx, siteId, options.id ?? 1, { ...input, blocks }, options.resources);
+  const data = await validateContentData(
+    tx,
+    siteId,
+    options.id ?? 1,
+    { ...input, blocks },
+    options.resources,
+  );
   if (!data.ok) return data;
 
   const id = await allocateId(tx, siteId, 'content', options.id);
@@ -191,7 +200,7 @@ export async function updateContent(
   });
   if (issues.length > 0) return { ok: false, issues };
 
-  const data = await validate(tx, siteId, contentId, { ...input, blocks }, resources);
+  const data = await validateContentData(tx, siteId, contentId, { ...input, blocks }, resources);
   if (!data.ok) return data;
 
   const version = latest.version + 1;
