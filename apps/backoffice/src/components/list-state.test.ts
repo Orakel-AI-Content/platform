@@ -148,7 +148,7 @@ describe('useListState', () => {
     });
   });
 
-  it('as mudanças do TanStack (ordem e página) viram parâmetros', () => {
+  it('mudanças seguidas antes da URL chegar se somam: a segunda não apaga a primeira', () => {
     const { result } = renderHook(() => useListState(config));
 
     act(() => result.current.table.onSortingChange([{ id: 'title', desc: true }]));
@@ -158,7 +158,19 @@ describe('useListState', () => {
 
     expect(navigation.replace.mock.calls.map(([url]) => String(url))).toEqual([
       '/sites/exemplo-a/conteudos?ordem=-title',
-      '/sites/exemplo-a/conteudos?pagina=2',
+      '/sites/exemplo-a/conteudos?ordem=-title&pagina=2',
     ]);
+  });
+
+  it('filtro e logo a busca vazia, com a URL ainda antiga, mantêm o filtro', () => {
+    navigation.search = 'q=promocao';
+    const { result } = renderHook(() => useListState(config));
+
+    act(() => result.current.setFilter('kind', 'page'));
+    act(() => result.current.setSearch(''));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith('/sites/exemplo-a/conteudos?tipo=page', {
+      scroll: false,
+    });
   });
 });
