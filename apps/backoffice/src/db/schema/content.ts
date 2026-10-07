@@ -1,5 +1,14 @@
 import type { Content, Menu } from '@orakel/content-model/v1';
-import { integer, jsonb, pgTable, primaryKey, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import {
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  serial,
+  text,
+  timestamp,
+  unique,
+} from 'drizzle-orm/pg-core';
 
 import { sites } from './sites.ts';
 
@@ -129,3 +138,19 @@ export const contentVersions = pgTable(
   },
   (t) => [primaryKey({ columns: [t.siteId, t.contentId, t.version] })],
 );
+
+/**
+ * Revisões das versões: quem aprovou, qual versão, o checklist marcado e quando. Uma linha
+ * por ação; a aprovação também leva a versão a `aprovado` (ADR 0015).
+ */
+export const reviews = pgTable('reviews', {
+  id: serial().primaryKey(),
+  siteId: siteId(),
+  contentId: integer().notNull(),
+  version: integer().notNull(),
+  /** E-mail de quem revisou. */
+  reviewer: text().notNull(),
+  /** Chaves de `REVIEW_CHECKLIST` marcadas. */
+  checklist: jsonb().$type<string[]>().notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
