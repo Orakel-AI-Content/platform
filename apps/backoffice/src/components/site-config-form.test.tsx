@@ -56,7 +56,7 @@ describe('formulário da configuração do site', () => {
     const user = userEvent.setup();
     const action = renderEdit({ ok: true, message: 'Configuração salva (versão 2).' });
 
-    expect(screen.getByLabelText('SITE_ID').hasAttribute('readonly')).toBe(true);
+    expect(screen.getByLabelText('ID').hasAttribute('readonly')).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
 
     await waitFor(() => expect(action).toHaveBeenCalled());

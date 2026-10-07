@@ -61,7 +61,7 @@ describe('tabela de conteúdos', () => {
   });
 
   it('com content.write tem o link de editar, e o de criar fica no cabeçalho da página', () => {
-    render(<ContentsTable siteId="exemplo-a" rows={rows} canWrite />);
+    render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} canWrite />);
 
     expect(screen.queryByRole('link', { name: 'Criar conteúdo' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Editar Guia de uso' }).getAttribute('href')).toBe(
@@ -85,6 +85,7 @@ describe('tabela de conteúdos', () => {
     render(
       <ContentsTable
         siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
         rows={[]}
         canWrite
         emptyAction={<Link href="/sites/exemplo-a/conteudos/novo">Criar conteúdo</Link>}

@@ -24,7 +24,7 @@ const PAGE_TYPE_LABEL: Record<string, string> = {
 const VARIANT_LABEL: Record<string, string> = { articleCard: 'Card de artigo' };
 
 const LABELS: Record<string, string> = {
-  siteId: 'SITE_ID',
+  siteId: 'ID',
   name: 'Nome',
   domains: 'Domínios',
   language: 'Idioma',
