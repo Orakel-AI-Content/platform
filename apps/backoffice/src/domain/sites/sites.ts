@@ -144,7 +144,7 @@ export async function updateSiteConfig(
       issues: [
         {
           code: 'site.id_mismatch',
-          message: `O SITE_ID não muda: a configuração é de ${input.siteId}, o site é ${siteId}`,
+          message: `O ID do site não muda: a configuração é de ${input.siteId}, o site é ${siteId}`,
           path: ['siteId'],
         },
       ],
