@@ -45,6 +45,19 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   do `TableCell` não muda. A ação principal da linha fica visível e as demais vão para o menu
   "Mais ações"; o retorno de uma ação vai para uma região `role="status"` da tabela, nunca para
   a linha.
+- **Lista filtrada:** busca, filtros, ordenação e paginação no cliente, com o estado na URL.
+  `useListState` (`src/components/list-state.ts`) lê e grava `q` (busca), um parâmetro por
+  filtro, `ordem` (id da coluna, com `-` na frente se decrescente) e `pagina` com `router.replace` (sem
+  entrada no histórico por tecla); valor padrão não aparece na URL e parâmetro inválido cai no
+  padrão. A tabela usa `listFeatures` e recebe `list.table` no `useTable`. A busca ignora
+  maiúsculas e acentos (`normalizeText`) e só olha as colunas com `enableGlobalFilter`; mudar
+  a busca ou um filtro volta à página 1. Controles de `src/components/list-controls.tsx`:
+  `ListToolbar` acima da tabela (busca com rótulo visível do que procura, `<select>` nativo
+  por filtro com "Todos", e "Limpar filtros" só com algo ativo); `SortableHead` no lugar do
+  `TableHead` de coluna ordenável (`aria-sort` no `th` e o sentido no nome do botão); e
+  `ListPagination` abaixo, com a contagem em `role="status"` ("N resultados") e
+  Anterior/Próxima desabilitados nas pontas. Página de 25 itens fixos (`PAGE_SIZE`), sem
+  seletor.
 - **Datas:** `formatDateTime(data, fuso)` de `src/components/site-labels.ts`, sempre com o fuso
   do site (`SiteSummary.timeZone`, da configuração corrente), nunca o do navegador nem um fixo:
   "01/10/2026, 09:00 BRT" (dia, mês, ano, hora e minuto, com a sigla ou o deslocamento, como
