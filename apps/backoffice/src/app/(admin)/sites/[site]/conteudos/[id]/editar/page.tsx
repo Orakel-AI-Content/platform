@@ -1,3 +1,4 @@
+import { contentPath } from '@orakel/core/v1';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -6,6 +7,7 @@ import { ContentEditor } from '@/components/content-editor';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { noRead } from '@/components/forbidden-screen';
+import { getEnv } from '@/env.ts';
 
 import { noWrite } from '../../../editorial-page.tsx';
 import { itemTitle } from '../../../item-title.ts';
@@ -33,7 +35,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * Edição: parte da versão mais recente e grava a N+1 em rascunho. Sem content.write não há
  * editor (e o domínio recusa). Sem `key` pela versão: depois de salvar, o editor recomeça da
  * versão salva (`reset`) e o `router.refresh` só atualiza o cabeçalho, sem remontar e perder a
- * confirmação (#109). `?criado=1` vem da criação: o editor anuncia "Conteúdo criado.".
+ * confirmação (#109). `?criado=1` vem da criação: o editor anuncia "Conteúdo criado.". A prévia
+ * (#110) é a da última versão salva, no host de visualização (`PREVIEW_BASE_URL`).
  */
 export default async function EditContentPage({ params, searchParams }: Params & SearchParams) {
   const { site: siteId, id } = await params;
@@ -79,6 +82,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
         options={options}
         action={updateContentAction.bind(null, siteId, contentId)}
         created={criado === '1'}
+        previewUrl={`${getEnv().PREVIEW_BASE_URL}/${siteId}${contentPath(latest.data)}`}
       />
     </section>
   );

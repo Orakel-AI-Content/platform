@@ -18,7 +18,7 @@ import { entityField, mediaField, type PickerOption } from '@/components/forms/p
 import { richTextField } from '@/components/forms/rich-text-field';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form';
 import { BLOCK_TYPE_LABEL } from '@/components/site-labels.ts';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 import { cn } from '@/lib/utils';
 
@@ -86,6 +86,7 @@ export function ContentEditor({
   options,
   action,
   created = false,
+  previewUrl,
 }: {
   mode: 'create' | 'edit';
   siteId: string;
@@ -94,6 +95,8 @@ export function ContentEditor({
   action: (input: ContentEdit) => Promise<ContentFormResult>;
   /** Acabou de ser criado (`?criado=1`): anuncia a confirmação e tira a marca da URL. */
   created?: boolean;
+  /** Prévia da última versão salva (#110); sem ela (criação), "Ver prévia" fica desabilitada. */
+  previewUrl?: string;
 }) {
   const id = useId();
   const router = useRouter();
@@ -169,6 +172,11 @@ export function ContentEditor({
     });
 
   const blocksError = errorAt(form.formState.errors, 'blocks');
+  const previewNote = !previewUrl
+    ? 'Salve para ver a prévia.'
+    : form.formState.isDirty
+      ? 'As alterações não salvas não aparecem na prévia.'
+      : '';
   return (
     <FormProvider {...form}>
       <form
@@ -275,6 +283,29 @@ export function ContentEditor({
           <Button type="submit" disabled={pending || form.formState.isSubmitting}>
             {pending ? 'Salvando…' : mode === 'create' ? 'Criar conteúdo' : 'Salvar nova versão'}
           </Button>
+          {previewUrl ? (
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-describedby={`${id}-preview-note`}
+              className={buttonVariants({ variant: 'outline' })}
+            >
+              Ver prévia<span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          ) : (
+            <Button variant="outline" disabled aria-describedby={`${id}-preview-note`}>
+              Ver prévia
+            </Button>
+          )}
+          {/* aria-live sem role: o `status` da barra é a confirmação do salvamento. */}
+          <p
+            id={`${id}-preview-note`}
+            aria-live="polite"
+            className="text-sm text-muted-foreground empty:hidden"
+          >
+            {previewNote}
+          </p>
           <p role="status" className="text-sm text-muted-foreground">
             {saved}
           </p>
