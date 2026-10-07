@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import Link from 'next/link';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { ContentListItem } from '@/domain/content/contents.ts';
@@ -59,12 +60,10 @@ describe('tabela de conteúdos', () => {
     expect(screen.queryByRole('link', { name: /^Editar/ })).toBeNull();
   });
 
-  it('com content.write tem os links de criar e de editar', () => {
+  it('com content.write tem o link de editar, e o de criar fica no cabeçalho da página', () => {
     render(<ContentsTable siteId="exemplo-a" rows={rows} canWrite />);
 
-    expect(screen.getByRole('link', { name: 'Criar conteúdo' }).getAttribute('href')).toBe(
-      '/sites/exemplo-a/conteudos/novo',
-    );
+    expect(screen.queryByRole('link', { name: 'Criar conteúdo' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Editar Guia de uso' }).getAttribute('href')).toBe(
       '/sites/exemplo-a/conteudos/1/editar',
     );
@@ -82,9 +81,20 @@ describe('tabela de conteúdos', () => {
     expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Sobre (versões)' }));
   });
 
-  it('avisa quando o site não tem conteúdo', () => {
-    render(<ContentsTable siteId="exemplo-a" rows={[]} />);
+  it('sem conteúdo mostra o estado vazio no lugar da tabela, com a ação recebida', () => {
+    render(
+      <ContentsTable
+        siteId="exemplo-a"
+        rows={[]}
+        canWrite
+        emptyAction={<Link href="/sites/exemplo-a/conteudos/novo">Criar conteúdo</Link>}
+      />,
+    );
 
+    expect(screen.queryByRole('table')).toBeNull();
     expect(screen.getByText('Nenhum conteúdo cadastrado.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Criar conteúdo' }).getAttribute('href')).toBe(
+      '/sites/exemplo-a/conteudos/novo',
+    );
   });
 });

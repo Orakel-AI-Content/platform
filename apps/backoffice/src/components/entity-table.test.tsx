@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import Link from 'next/link';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { EntityTable, type EntityRow } from './entity-table.tsx';
 
-// Listas de autores, taxonomias e menus (#46): células, links por permissão e teclado.
+// Listas de autores, taxonomias e menus (#46): células, links por permissão e teclado. Criar
+// é a ação do cabeçalho da página, repetida no estado vazio (#87).
 
 afterEach(cleanup);
 
@@ -21,8 +23,10 @@ const renderTable = (canWrite = false, data = rows) =>
       headers={['Chave', 'Itens']}
       rows={data}
       noun={{ one: 'menu', many: 'menus', none: 'Nenhum menu cadastrado.' }}
-      createLabel="Criar menu"
       canWrite={canWrite}
+      emptyAction={
+        canWrite ? <Link href="/sites/exemplo-a/menus/novo">Criar menu</Link> : undefined
+      }
     />,
   );
 
@@ -44,24 +48,31 @@ describe('tabela de entidades', () => {
     expect(screen.queryAllByRole('link')).toEqual([]);
   });
 
-  it('com content.write, criar e editar pelo teclado', async () => {
+  it('com content.write, editar pelo teclado e sem link de criar na tabela', async () => {
     const user = userEvent.setup();
     renderTable(true);
 
-    await user.tab();
-    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Criar menu' }));
-    expect(screen.getByRole('link', { name: 'Criar menu' }).getAttribute('href')).toBe(
-      '/sites/exemplo-a/menus/novo',
-    );
+    expect(screen.queryByRole('link', { name: 'Criar menu' })).toBeNull();
     await user.tab();
     const edit = screen.getByRole('link', { name: 'Editar principal' });
     expect(document.activeElement).toBe(edit);
     expect(edit.getAttribute('href')).toBe('/sites/exemplo-a/menus/1');
   });
 
-  it('avisa quando não há nada cadastrado', () => {
+  it('sem linhas mostra o estado vazio com a ação no lugar da tabela', () => {
     renderTable(true, []);
 
+    expect(screen.queryByRole('table')).toBeNull();
     expect(screen.getByText('Nenhum menu cadastrado.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Criar menu' }).getAttribute('href')).toBe(
+      '/sites/exemplo-a/menus/novo',
+    );
+  });
+
+  it('sem linhas e sem content.write, o estado vazio não tem ação', () => {
+    renderTable(false, []);
+
+    expect(screen.getByText('Nenhum menu cadastrado.')).toBeTruthy();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });

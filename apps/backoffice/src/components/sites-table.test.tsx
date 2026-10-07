@@ -77,4 +77,12 @@ describe('tabela de sites', () => {
     expect(screen.getByText('Publicado', { selector: 'span' }).className).toContain('text-success');
     expect(screen.getByText('Falhou').className).toContain('bg-destructive');
   });
+
+  it('sem sites mostra o estado vazio no lugar da tabela (#87)', () => {
+    render(<SitesTable rows={[]} />);
+
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByText('Nenhum site cadastrado.')).toBeTruthy();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
 });
