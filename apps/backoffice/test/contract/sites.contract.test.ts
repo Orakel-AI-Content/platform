@@ -61,6 +61,27 @@ describe('registro de instâncias', () => {
   });
 });
 
+describe('fuso do site (#90)', () => {
+  it('lista cada site com o timeZone da configuração corrente', async () => {
+    const line = (await readFixture('exemplo-a')).find((l) => l.type === 'config');
+    if (line?.type !== 'config') throw new Error('fixture sem config');
+    const updated = await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-a', { ...line.data, timeZone: 'Europe/Lisbon' }),
+    );
+    if (!updated.ok) throw new Error(JSON.stringify(updated.issues));
+
+    const result = await listSites(db, SYSTEM_ACTOR);
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    const fixtureB = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
+    if (fixtureB?.type !== 'config') throw new Error('fixture sem config');
+    expect(result.value.map(({ id, timeZone }) => ({ id, timeZone }))).toEqual([
+      { id: 'exemplo-a', timeZone: 'Europe/Lisbon' },
+      { id: 'exemplo-b', timeZone: fixtureB.data.timeZone },
+    ]);
+  });
+});
+
 describe('sites.auto.tfvars.json', () => {
   it('lista todos os sites por SITE_ID, com os domínios (o principal primeiro)', async () => {
     const result = await exportSitesTfvars(db, SYSTEM_ACTOR);

@@ -74,12 +74,29 @@ export const BUILD_STATUS_VARIANT: Record<LastBuild['status'], BadgeVariant> = {
   failed: 'destructive',
 };
 
-/** Data e hora no fuso da operação (tabelas e páginas de conteúdo). */
-export const dateTime = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-  timeZone: 'America/Sao_Paulo',
-});
+const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * Data e hora no fuso do site, com a sigla ("01/10/2026, 09:00 BRT"), igual no servidor e no
+ * navegador: o fuso é sempre o do site (`SiteSummary.timeZone`), nunca o de quem lê (#90).
+ * Campos explícitos porque `dateStyle`/`timeStyle` não aceitam `timeZoneName`.
+ */
+export function formatDateTime(date: Date, timeZone: string): string {
+  let format = dateTimeFormats.get(timeZone);
+  if (format === undefined) {
+    format = new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone,
+      timeZoneName: 'short',
+    });
+    dateTimeFormats.set(timeZone, format);
+  }
+  return format.format(date);
+}
 
 /** Tipo de taxonomia (lista de taxonomias e seletor do editor). */
 export const TAXONOMY_KIND_LABEL: Record<'category' | 'tag' | 'series', string> = {

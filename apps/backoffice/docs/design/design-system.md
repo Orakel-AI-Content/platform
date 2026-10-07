@@ -29,6 +29,12 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   tabulares (`tabular-nums`, no `TableCell`), para datas e contagens alinharem na coluna.
 - **Tabelas:** TanStack Table 9 (`useTable` com `tableFeatures`); a biblioteca traz skills
   em `node_modules/@tanstack/react-table/skills/`.
+- **Datas:** `formatDateTime(data, fuso)` de `src/components/site-labels.ts`, sempre com o fuso
+  do site (`SiteSummary.timeZone`, da configuração corrente), nunca o do navegador nem um fixo:
+  "01/10/2026, 09:00 BRT" (dia, mês, ano, hora e minuto, com a sigla ou o deslocamento, como
+  "GMT+1" em Lisboa). Telas de um site usam `site.timeZone`; a lista de sites mostra cada linha
+  no fuso do próprio site. Componente cliente recebe o fuso por prop, para o texto sair igual
+  no servidor e no navegador.
 - **Larguras:** duas utilities de `globals.css`, na `section` (ou `article`) de topo da página,
   nunca um `max-w-*` solto. `form-width` (`max-w-3xl`) para criar e editar, configuração,
   textos institucionais e telas que leem um item (página do site, versão de um conteúdo):

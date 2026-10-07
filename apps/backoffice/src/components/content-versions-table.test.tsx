@@ -17,7 +17,14 @@ const rows: ContentVersionRow[] = [1, 2, 3].map((version) => ({
 
 describe('tabela de versões', () => {
   it('lista as versões em ordem crescente com link para cada uma', () => {
-    render(<ContentVersionsTable siteId="exemplo-a" contentId={7} rows={rows} />);
+    render(
+      <ContentVersionsTable
+        siteId="exemplo-a"
+        contentId={7}
+        timeZone="America/Sao_Paulo"
+        rows={rows}
+      />,
+    );
 
     const links = screen.getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual(['Versão 1', 'Versão 2', 'Versão 3']);
@@ -31,11 +38,40 @@ describe('tabela de versões', () => {
   });
 
   it('dá a cada status o badge da sua variante, com o texto do status (#86)', () => {
-    render(<ContentVersionsTable siteId="exemplo-a" contentId={7} rows={rows} />);
+    render(
+      <ContentVersionsTable
+        siteId="exemplo-a"
+        contentId={7}
+        timeZone="America/Sao_Paulo"
+        rows={rows}
+      />,
+    );
 
     expect(screen.getByText('Publicado').className).toContain('bg-success');
     for (const badge of screen.getAllByText('Rascunho')) {
       expect(badge.className).toContain('bg-muted');
     }
+  });
+
+  it('mostra a data de cada versão no fuso do site, com a sigla (#90)', () => {
+    const { rerender } = render(
+      <ContentVersionsTable
+        siteId="exemplo-a"
+        contentId={7}
+        timeZone="America/Sao_Paulo"
+        rows={rows}
+      />,
+    );
+    expect(screen.getAllByRole('row')[1]?.textContent).toContain('01/10/2026, 09:00 BRT');
+
+    rerender(
+      <ContentVersionsTable
+        siteId="exemplo-a"
+        contentId={7}
+        timeZone="Europe/Lisbon"
+        rows={rows}
+      />,
+    );
+    expect(screen.getAllByRole('row')[1]?.textContent).toContain('01/10/2026, 13:00 GMT+1');
   });
 });

@@ -30,7 +30,7 @@ export default async function ContentVersionsPage({ params }: Params) {
   if (contentId === undefined) notFound();
   const read = await readContentVersions(siteId, contentId);
   if (read === undefined) return null;
-  const { versions } = read;
+  const { versions, timeZone } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return noRead;
@@ -53,6 +53,7 @@ export default async function ContentVersionsPage({ params }: Params) {
       <ContentVersionsTable
         siteId={siteId}
         contentId={contentId}
+        timeZone={timeZone}
         rows={versions.value.map((version) => ({
           version: version.version,
           status: version.status,

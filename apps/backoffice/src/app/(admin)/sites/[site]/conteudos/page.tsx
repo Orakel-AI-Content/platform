@@ -43,6 +43,7 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
       />
       <ContentsTable
         siteId={site.id}
+        timeZone={site.timeZone}
         rows={contents.value}
         canWrite={canWrite}
         emptyAction={create}

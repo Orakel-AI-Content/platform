@@ -20,6 +20,9 @@ import { hasPolicyTrigger } from './policy-triggers.ts';
 /** Textos das páginas institucionais (o content-model só exporta o schema). */
 export type InstitutionalTexts = NonNullable<SiteConfig['institutionalTexts']>;
 
+/** Fuso de um site sem configuração gravada: o padrão do formulário de cadastro. */
+export const DEFAULT_TIME_ZONE = 'America/Sao_Paulo';
+
 export type SiteSummary = {
   id: string;
   name: string;
@@ -35,6 +38,8 @@ export type SiteSummary = {
   buildWindowSeconds: number | null;
   /** Janela que o agendamento usa para o site, em segundos. */
   effectiveBuildWindowSeconds: number;
+  /** Fuso IANA da configuração corrente: as telas mostram as datas do site nele. */
+  timeZone: string;
 };
 
 /** Schema e validação semântica da configuração v1, contra os recursos da release. */
@@ -279,6 +284,7 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
         lastBuild: buildsBySite.get(site.id) ?? null,
         buildWindowSeconds: site.buildWindowSeconds,
         effectiveBuildWindowSeconds: effectiveBuildWindowMs(site.buildWindowSeconds) / 1000,
+        timeZone: config?.timeZone ?? DEFAULT_TIME_ZONE,
       };
     }),
   );

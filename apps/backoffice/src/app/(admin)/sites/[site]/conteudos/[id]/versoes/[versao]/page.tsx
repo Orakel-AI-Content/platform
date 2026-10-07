@@ -6,7 +6,7 @@ import { ContentVersionView } from '@/components/content-version-view';
 import {
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_VARIANT,
-  dateTime,
+  formatDateTime,
 } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import { noRead } from '@/components/forbidden-screen';
@@ -41,7 +41,7 @@ export default async function ContentVersionPage({ params }: Params) {
   if (contentId === undefined || number === undefined) notFound();
   const read = await readContentVersions(siteId, contentId);
   if (read === undefined) return null;
-  const { versions } = read;
+  const { versions, timeZone } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return noRead;
@@ -67,7 +67,7 @@ export default async function ContentVersionPage({ params }: Params) {
         <Badge variant={CONTENT_STATUS_VARIANT[version.status]}>
           {CONTENT_STATUS_LABEL[version.status]}
         </Badge>
-        Gravada em {dateTime.format(version.createdAt)}
+        Gravada em {formatDateTime(version.createdAt, timeZone)}
         {version.version === latest ? ' · versão mais recente' : ` · mais recente: ${latest}`}
       </p>
       <ContentVersionView data={version.data} />

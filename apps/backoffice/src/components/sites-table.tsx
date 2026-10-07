@@ -7,6 +7,7 @@ import { useState, useTransition, type ReactNode } from 'react';
 import {
   BUILD_STATUS_LABEL,
   BUILD_STATUS_VARIANT,
+  formatDateTime,
   LIFECYCLE_LABEL,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
@@ -31,19 +32,14 @@ const column = createColumnHelper<typeof features, SiteSummary>();
 
 type PublishNow = (siteId: string) => Promise<{ ok: boolean; message: string }>;
 
-const dateTime = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-  timeZone: 'America/Sao_Paulo',
-});
-
-function LastBuildCell({ build }: { build: SiteSummary['lastBuild'] }) {
+/** Último build no fuso do próprio site: a lista mistura fusos, cada linha com a sigla (#90). */
+function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; timeZone: string }) {
   if (build === null) return <span className="text-muted-foreground">—</span>;
   return (
     <span className="flex flex-col gap-0.5">
       <Badge variant={BUILD_STATUS_VARIANT[build.status]}>{BUILD_STATUS_LABEL[build.status]}</Badge>
       <span className="text-xs text-muted-foreground">
-        {dateTime.format(new Date(build.finishedAt))}
+        {formatDateTime(new Date(build.finishedAt), timeZone)}
         {build.versionId ? ` · ${build.versionId}` : ''}
       </span>
     </span>
@@ -113,7 +109,7 @@ const columns = column.columns([
   column.accessor('pendingChanges', { header: 'Mudanças pendentes' }),
   column.accessor('lastBuild', {
     header: 'Último build',
-    cell: (info) => <LastBuildCell build={info.getValue()} />,
+    cell: (info) => <LastBuildCell build={info.getValue()} timeZone={info.row.original.timeZone} />,
   }),
 ]);
 
