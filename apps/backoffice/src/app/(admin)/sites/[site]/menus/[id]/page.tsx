@@ -1,30 +1,47 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { EntityForm } from '@/components/entity-forms';
-import { listMenus } from '@/domain/content/menus.ts';
+import { can } from '@/domain/access/rbac.ts';
 
 import { positiveInt } from '../../conteudos/params.ts';
 import { updateMenuAction } from '../../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext, withoutId } from '../../editorial-page.tsx';
+import {
+  lookupSite,
+  noWrite,
+  PageHeader,
+  readMenus,
+  sitePageContext,
+  withoutId,
+} from '../../editorial-page.tsx';
+import { itemTitle } from '../../item-title.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Editar menu' };
+type Params = { params: Promise<{ site: string; id: string }> };
 
-export default async function EditMenuPage({
-  params,
-}: {
-  params: Promise<{ site: string; id: string }>;
-}) {
+/** "<chave> · Editar menu", só quando a página mostraria o formulário (#79). */
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { site: siteId, id } = await params;
+  const menuId = positiveInt(id);
+  const lookup = await lookupSite(siteId);
+  const editable =
+    menuId !== undefined && lookup.kind === 'found' && can(lookup.actor, 'content.write');
+  const menus = editable ? await readMenus(siteId) : undefined;
+  const menu = menus?.ok ? menus.value.find((item) => item.id === menuId) : undefined;
+  return { title: itemTitle(menu?.key, 'Editar menu') };
+}
+
+export default async function EditMenuPage({ params }: Params) {
   const { site: siteId, id } = await params;
   const menuId = positiveInt(id);
   if (menuId === undefined) notFound();
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
-  const { actor, db, site, canWrite } = context.value;
+  const { site, canWrite } = context.value;
   if (!canWrite) return noWrite;
-  const menus = await listMenus(db, actor, site.id);
-  if (!menus.ok) return <p role="alert">Sem permissão para ver os menus.</p>;
+  const menus = await readMenus(site.id);
+  if (!menus?.ok) return <p role="alert">Sem permissão para ver os menus.</p>;
   const menu = menus.value.find((item) => item.id === menuId);
   if (menu === undefined) notFound();
 

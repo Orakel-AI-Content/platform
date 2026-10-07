@@ -1,32 +1,42 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { currentActor } from '@/auth/request-actor.ts';
 import { ContentVersionView } from '@/components/content-version-view';
 import { CONTENT_STATUS_LABEL, dateTime } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
-import { getDb } from '@/db/client.ts';
-import { listContentVersions } from '@/domain/content/contents.ts';
 
+import { itemTitle } from '../../../../item-title.ts';
+import { readContentVersions } from '../../../content-versions.ts';
 import { positiveInt } from '../../../params.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Versão do conteúdo' };
+type Params = { params: Promise<{ site: string; id: string; versao: string }> };
+
+/** "<título> · Versão N" (#79); sem a versão, "Versão N" (ou "Versão", com número inválido). */
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { site: siteId, id, versao } = await params;
+  const contentId = positiveInt(id);
+  const number = positiveInt(versao);
+  const area = number === undefined ? 'Versão' : `Versão ${number}`;
+  if (contentId === undefined || number === undefined) return { title: area };
+  const read = await readContentVersions(siteId, contentId);
+  const version = read?.versions.ok
+    ? read.versions.value.find((item) => item.version === number)
+    : undefined;
+  return { title: itemTitle(version?.data.title, area) };
+}
 
 /** Uma versão de um conteúdo, só para leitura: nenhum controle de edição. */
-export default async function ContentVersionPage({
-  params,
-}: {
-  params: Promise<{ site: string; id: string; versao: string }>;
-}) {
-  const actor = await currentActor();
-  if (!actor.ok) return null;
+export default async function ContentVersionPage({ params }: Params) {
   const { site: siteId, id, versao } = await params;
   const contentId = positiveInt(id);
   const number = positiveInt(versao);
   if (contentId === undefined || number === undefined) notFound();
-  const versions = await listContentVersions(getDb().db, actor.value, siteId, contentId);
+  const read = await readContentVersions(siteId, contentId);
+  if (read === undefined) return null;
+  const { versions } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return <p role="alert">Sem permissão para ver os conteúdos.</p>;

@@ -1,30 +1,49 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { EntityForm } from '@/components/entity-forms';
-import { listTaxonomies } from '@/domain/content/taxonomies.ts';
+import { can } from '@/domain/access/rbac.ts';
 
 import { positiveInt } from '../../conteudos/params.ts';
 import { updateTaxonomyAction } from '../../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext, withoutId } from '../../editorial-page.tsx';
+import {
+  lookupSite,
+  noWrite,
+  PageHeader,
+  readTaxonomies,
+  sitePageContext,
+  withoutId,
+} from '../../editorial-page.tsx';
+import { itemTitle } from '../../item-title.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Editar taxonomia' };
+type Params = { params: Promise<{ site: string; id: string }> };
 
-export default async function EditTaxonomyPage({
-  params,
-}: {
-  params: Promise<{ site: string; id: string }>;
-}) {
+/** "<nome> · Editar taxonomia", só quando a página mostraria o formulário (#79). */
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { site: siteId, id } = await params;
+  const taxonomyId = positiveInt(id);
+  const lookup = await lookupSite(siteId);
+  const editable =
+    taxonomyId !== undefined && lookup.kind === 'found' && can(lookup.actor, 'content.write');
+  const taxonomies = editable ? await readTaxonomies(siteId) : undefined;
+  const taxonomy = taxonomies?.ok
+    ? taxonomies.value.find((item) => item.id === taxonomyId)
+    : undefined;
+  return { title: itemTitle(taxonomy?.name, 'Editar taxonomia') };
+}
+
+export default async function EditTaxonomyPage({ params }: Params) {
   const { site: siteId, id } = await params;
   const taxonomyId = positiveInt(id);
   if (taxonomyId === undefined) notFound();
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
-  const { actor, db, site, canWrite } = context.value;
+  const { site, canWrite } = context.value;
   if (!canWrite) return noWrite;
-  const taxonomies = await listTaxonomies(db, actor, site.id);
-  if (!taxonomies.ok) return <p role="alert">Sem permissão para ver as taxonomias.</p>;
+  const taxonomies = await readTaxonomies(site.id);
+  if (!taxonomies?.ok) return <p role="alert">Sem permissão para ver as taxonomias.</p>;
   const taxonomy = taxonomies.value.find((item) => item.id === taxonomyId);
   if (taxonomy === undefined) notFound();
 

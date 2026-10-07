@@ -1,22 +1,39 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { EntityForm } from '@/components/entity-forms';
-import { listAuthors } from '@/domain/content/authors.ts';
+import { can } from '@/domain/access/rbac.ts';
 
 import { editorOptions } from '../../conteudos/editor-options.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { updateAuthorAction } from '../../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext, withoutId } from '../../editorial-page.tsx';
+import {
+  lookupSite,
+  noWrite,
+  PageHeader,
+  readAuthors,
+  sitePageContext,
+  withoutId,
+} from '../../editorial-page.tsx';
+import { itemTitle } from '../../item-title.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Editar autor' };
+type Params = { params: Promise<{ site: string; id: string }> };
 
-export default async function EditAuthorPage({
-  params,
-}: {
-  params: Promise<{ site: string; id: string }>;
-}) {
+/** "<nome> · Editar autor", só quando a página mostraria o formulário (#79). */
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { site: siteId, id } = await params;
+  const authorId = positiveInt(id);
+  const lookup = await lookupSite(siteId);
+  const editable =
+    authorId !== undefined && lookup.kind === 'found' && can(lookup.actor, 'content.write');
+  const authors = editable ? await readAuthors(siteId) : undefined;
+  const author = authors?.ok ? authors.value.find((item) => item.id === authorId) : undefined;
+  return { title: itemTitle(author?.name, 'Editar autor') };
+}
+
+export default async function EditAuthorPage({ params }: Params) {
   const { site: siteId, id } = await params;
   const authorId = positiveInt(id);
   if (authorId === undefined) notFound();
@@ -24,8 +41,8 @@ export default async function EditAuthorPage({
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
   if (!canWrite) return noWrite;
-  const authors = await listAuthors(db, actor, site.id);
-  if (!authors.ok) return <p role="alert">Sem permissão para ver os autores.</p>;
+  const authors = await readAuthors(site.id);
+  if (!authors?.ok) return <p role="alert">Sem permissão para ver os autores.</p>;
   const author = authors.value.find((item) => item.id === authorId);
   if (author === undefined) notFound();
   const options = await editorOptions(db, actor, site.id);
