@@ -1,0 +1,156 @@
+// @vitest-environment happy-dom
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { ReviewPanel } from './review-panel.tsx';
+
+// Painel da revisão (#75): erros da release, checklist com os rótulos recebidos, bloqueio,
+// permissão e a mensagem de aprovação.
+
+afterEach(cleanup);
+
+// Os itens de REVIEW_CHECKLIST (domínio), como a página os passa.
+const checklist = [
+  {
+    key: 'valor_original',
+    label: 'Valor original: informação, análise ou experiência que não é só paráfrase das fontes',
+  },
+  {
+    key: 'politicas_anuncios_afiliados',
+    label: 'Conforme as políticas de conteúdo dos programas de anúncios e afiliados',
+  },
+  { key: 'descricao_imagens', label: 'Descrição em todas as imagens de conteúdo' },
+  {
+    key: 'visualizacao_conferida',
+    label: 'Visualização conferida: o conteúdo como vai ficar no site',
+  },
+  { key: 'imagens_decorativas_marcadas', label: 'Imagens decorativas marcadas como tal' },
+];
+
+type Props = ComponentProps<typeof ReviewPanel>;
+
+const renderPanel = (props: Partial<Props> = {}) =>
+  render(
+    <ReviewPanel
+      version={2}
+      status="em_revisao"
+      issues={[]}
+      checklist={checklist}
+      canApprove
+      previewUrl="https://preview.orakel.localhost/exemplo-a/guia/"
+      approve={vi.fn()}
+      {...props}
+    />,
+  );
+
+describe('painel de revisão', () => {
+  it('mostra os 5 itens do checklist com os rótulos recebidos, como caixas de seleção', () => {
+    renderPanel();
+
+    for (const item of checklist) {
+      expect(screen.getByRole('checkbox', { name: item.label })).toBeTruthy();
+    }
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
+    expect(screen.getByText('Nenhum problema de validação.')).toBeTruthy();
+  });
+
+  it('liga para a visualização em nova aba', () => {
+    renderPanel();
+
+    const link = screen.getByRole('link', { name: 'Abrir a visualização em nova aba' });
+    expect(link.getAttribute('href')).toBe('https://preview.orakel.localhost/exemplo-a/guia/');
+    expect(link.getAttribute('target')).toBe('_blank');
+  });
+
+  it('com bloco fora da release, mostra o erro e bloqueia aprovar, com o motivo', () => {
+    renderPanel({
+      issues: [{ message: 'O bloco faq não é suportado pela release do site' }],
+    });
+
+    expect(screen.getByText('O bloco faq não é suportado pela release do site')).toBeTruthy();
+    const button = screen.getByRole('button', { name: 'Aprovar' });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(button.getAttribute('aria-describedby')).toBeTruthy();
+    expect(
+      document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe('Corrija os problemas de validação antes de aprovar.');
+  });
+
+  it('sem content.publish, não há ação de aprovar; o checklist aparece só para leitura', () => {
+    renderPanel({ canApprove: false });
+
+    expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByText(checklist[0]!.label)).toBeTruthy();
+  });
+
+  it('checklist incompleto não chama a aprovação', async () => {
+    const approve = vi.fn();
+    renderPanel({ approve });
+
+    await userEvent.click(screen.getByRole('checkbox', { name: checklist[0]!.label }));
+    await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
+
+    expect(approve).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Marque este item para aprovar.')).toHaveLength(4);
+  });
+
+  it('pelo teclado, com o checklist completo, aprova com as chaves e anuncia o resultado', async () => {
+    const approve = vi.fn().mockResolvedValue({ ok: true, message: 'Versão 2 aprovada.' });
+    const { rerender } = renderPanel({ approve });
+    const user = userEvent.setup();
+
+    for (const item of checklist) {
+      screen.getByRole('checkbox', { name: item.label }).focus();
+      await user.keyboard(' ');
+    }
+    screen.getByRole('button', { name: 'Aprovar' }).focus();
+    await user.keyboard('{Enter}');
+
+    expect(approve).toHaveBeenCalledWith(checklist.map((item) => item.key));
+    expect((await screen.findByRole('status')).textContent).toBe('Versão 2 aprovada.');
+
+    // A página revalida com a versão aprovada: o painel continua e a mensagem também.
+    rerender(
+      <ReviewPanel
+        version={2}
+        status="aprovado"
+        issues={[]}
+        checklist={checklist}
+        canApprove
+        previewUrl="https://preview.orakel.localhost/exemplo-a/guia/"
+        approve={approve}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('Versão 2 aprovada.');
+  });
+
+  it('recusa do domínio aparece no resumo do formulário', async () => {
+    const approve = vi.fn().mockResolvedValue({
+      ok: false,
+      issues: [
+        { path: [], message: 'A versão 2 não é a mais recente: o conteúdo está na versão 3' },
+      ],
+    });
+    renderPanel({ approve });
+
+    for (const item of checklist) {
+      await userEvent.click(screen.getByRole('checkbox', { name: item.label }));
+    }
+    await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('não é a mais recente');
+  });
+
+  it('versão fora de em revisão mostra o status, sem formulário', () => {
+    renderPanel({ status: 'rascunho' });
+
+    expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    expect(
+      screen.getByText(/Esta versão está rascunho: só uma versão em revisão pode ser aprovada/),
+    ).toBeTruthy();
+  });
+});
