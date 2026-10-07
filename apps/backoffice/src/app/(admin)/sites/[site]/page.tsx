@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { BuildWindowForm, LifecycleAction, RegisterG1Form } from '@/components/site-actions';
-import { LIFECYCLE_LABEL } from '@/components/site-labels.ts';
+import { formatDateTime, LIFECYCLE_LABEL } from '@/components/site-labels.ts';
 import { buttonVariants } from '@/components/ui/button';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
@@ -10,12 +10,6 @@ import { advanceLifecycleAction, registerG1Action, setBuildWindowAction } from '
 import { sitePageContext } from './editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
-
-const dateTime = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-  timeZone: 'America/Sao_Paulo',
-});
 
 /**
  * Página do site: ciclo de vida, registro do G1 e janela de agrupamento. Lê o site pelo
@@ -96,7 +90,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         </h2>
         {g1 ? (
           <p>
-            Registrado por {g1.registeredBy} em {dateTime.format(g1.registeredAt)}
+            Registrado por {g1.registeredBy} em {formatDateTime(g1.registeredAt, site.timeZone)}
             {g1.note ? ` — ${g1.note}` : ''}.
           </p>
         ) : (

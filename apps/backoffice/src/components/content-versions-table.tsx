@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_VARIANT,
-  dateTime,
+  formatDateTime,
 } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -32,7 +32,7 @@ export type ContentVersionRow = {
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, ContentVersionRow>();
 
-function columnsFor(siteId: string, contentId: number) {
+function columnsFor(siteId: string, contentId: number, timeZone: string) {
   return column.columns([
     column.accessor('version', {
       header: 'Versão',
@@ -56,7 +56,7 @@ function columnsFor(siteId: string, contentId: number) {
     column.accessor('title', { header: 'Título' }),
     column.accessor('createdAt', {
       header: 'Gravada em',
-      cell: (info) => dateTime.format(info.getValue()),
+      cell: (info) => formatDateTime(info.getValue(), timeZone),
     }),
   ]);
 }
@@ -65,13 +65,20 @@ function columnsFor(siteId: string, contentId: number) {
 export function ContentVersionsTable({
   siteId,
   contentId,
+  timeZone,
   rows,
 }: {
   siteId: string;
   contentId: number;
+  /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
+  timeZone: string;
   rows: ContentVersionRow[];
 }) {
-  const table = useTable({ features, columns: columnsFor(siteId, contentId), data: rows });
+  const table = useTable({
+    features,
+    columns: columnsFor(siteId, contentId, timeZone),
+    data: rows,
+  });
   return (
     <Table>
       <TableCaption>{rows.length === 1 ? '1 versão' : `${rows.length} versões`}</TableCaption>

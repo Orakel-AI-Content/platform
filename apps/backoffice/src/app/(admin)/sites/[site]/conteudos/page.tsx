@@ -35,6 +35,7 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
       </h1>
       <ContentsTable
         siteId={site.id}
+        timeZone={site.timeZone}
         rows={contents.value}
         canWrite={can(actor, 'content.write')}
       />

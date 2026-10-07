@@ -7,7 +7,7 @@ import {
   CONTENT_KIND_LABEL,
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_VARIANT,
-  dateTime,
+  formatDateTime,
 } from '@/components/site-labels.ts';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
@@ -26,7 +26,7 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, ContentListItem>();
 
-function columnsFor(siteId: string) {
+function columnsFor(siteId: string, timeZone: string) {
   return column.columns([
     column.accessor('kind', {
       header: 'Tipo',
@@ -55,7 +55,7 @@ function columnsFor(siteId: string) {
     column.accessor('version', { header: 'Versão' }),
     column.accessor('updatedAt', {
       header: 'Última alteração',
-      cell: (info) => dateTime.format(info.getValue()),
+      cell: (info) => formatDateTime(info.getValue(), timeZone),
     }),
   ]);
 }
@@ -66,14 +66,17 @@ function columnsFor(siteId: string) {
  */
 export function ContentsTable({
   siteId,
+  timeZone,
   rows,
   canWrite = false,
 }: {
   siteId: string;
+  /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
+  timeZone: string;
   rows: ContentListItem[];
   canWrite?: boolean;
 }) {
-  const columns = columnsFor(siteId);
+  const columns = columnsFor(siteId, timeZone);
   const table = useTable({ features, columns, data: rows });
   const colSpan = columns.length + (canWrite ? 1 : 0);
   return (
