@@ -13,6 +13,7 @@ const valid = {
   S3_ENDPOINT: 'http://localhost:8333',
   S3_ACCESS_KEY_ID: 'k',
   S3_SECRET_ACCESS_KEY: 's',
+  PREVIEW_BASE_URL: 'https://preview.orakel.localhost',
 };
 
 describe('parseEnv', () => {
@@ -24,6 +25,11 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...valid, DATABASE_URL: undefined, GENERATOR_TOKEN: 'curto' })).toThrow(
       /DATABASE_URL[\s\S]*GENERATOR_TOKEN/,
     );
+  });
+
+  it('exige a URL da visualização da revisão', () => {
+    expect(() => parseEnv({ ...valid, PREVIEW_BASE_URL: undefined })).toThrow(/PREVIEW_BASE_URL/);
+    expect(() => parseEnv({ ...valid, PREVIEW_BASE_URL: 'preview' })).toThrow(/PREVIEW_BASE_URL/);
   });
 
   it('a página de erro do E2E fica desligada sem E2E_ERROR_ROUTE', () => {

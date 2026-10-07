@@ -59,6 +59,10 @@ export type SchemaFormProps<T> = {
   /** Campos especiais por caminho; têm prioridade sobre o desenho padrão. */
   fields?: Record<string, FieldRenderer>;
   submitLabel: string;
+  /** Envio bloqueado (ex.: aprovação com erro de validação); o motivo vai em `submitDescribedBy`. */
+  submitDisabled?: boolean;
+  /** `id` do texto que explica o bloqueio do envio (`aria-describedby` do botão). */
+  submitDescribedBy?: string;
   /**
    * Recebe o valor validado pelo schema. Pode devolver a recusa do servidor: cada issue com
    * `path` vira erro do campo; sem `path`, vai para o resumo.
@@ -412,6 +416,8 @@ export function SchemaForm<T>({
   readOnly,
   fields,
   submitLabel,
+  submitDisabled = false,
+  submitDescribedBy,
   onSubmit,
 }: SchemaFormProps<T>) {
   const [summary, setSummary] = useState<string[]>([]);
@@ -468,7 +474,9 @@ export function SchemaForm<T>({
           readOnly={readOnly}
           fields={fields}
         />
-        <Button type="submit">{submitLabel}</Button>
+        <Button type="submit" disabled={submitDisabled} aria-describedby={submitDescribedBy}>
+          {submitLabel}
+        </Button>
       </form>
     </FormProvider>
   );

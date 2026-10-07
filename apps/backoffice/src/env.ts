@@ -18,6 +18,8 @@ export const EnvSchema = z.object({
   S3_ENDPOINT: z.url(),
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
+  /** Visualização SSR dos sites (apps/blog): a tela de revisão a abre em iframe, /<site>/<caminho>. */
+  PREVIEW_BASE_URL: z.url(),
   /** Janela de agrupamento dos builds: 900 em produção, 30 no local. */
   BUILD_WINDOW_SECONDS: z.coerce.number().int().min(0).default(900),
   SENTRY_DSN: z.union([z.url(), z.literal('')]).optional(),
