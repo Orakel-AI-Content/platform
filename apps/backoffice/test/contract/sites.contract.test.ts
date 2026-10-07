@@ -1,3 +1,4 @@
+import { RESOURCES } from '@orakel/content-model/v1';
 import { count, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -16,6 +17,7 @@ import {
   createSite,
   exportSitesTfvars,
   listSites,
+  resourcesFor,
   unresolvedPendingChangeIds,
   updateSiteConfig,
 } from '../../src/domain/sites/sites.ts';
@@ -79,6 +81,15 @@ describe('fuso do site (#90)', () => {
       { id: 'exemplo-a', timeZone: 'Europe/Lisbon' },
       { id: 'exemplo-b', timeZone: fixtureB.data.timeZone },
     ]);
+  });
+});
+
+describe('recursos da release do site (#71)', () => {
+  it('sem registro por release, devolve os RESOURCES com release nula ou registrada', async () => {
+    await db.update(sites).set({ release: 'core-v1.2.0' }).where(eq(sites.id, 'exemplo-b'));
+
+    expect(await resourcesFor(db, 'exemplo-a')).toEqual(RESOURCES);
+    expect(await resourcesFor(db, 'exemplo-b')).toEqual(RESOURCES);
   });
 });
 

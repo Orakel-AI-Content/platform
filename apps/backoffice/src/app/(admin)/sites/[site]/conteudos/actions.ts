@@ -7,8 +7,10 @@ import { currentActor } from '@/auth/request-actor.ts';
 import type { ContentFormResult } from '@/components/content-editor-values.ts';
 import { getDb } from '@/db/client.ts';
 import { createContent, updateContent, type ContentEdit } from '@/domain/content/contents.ts';
+import { resourcesFor } from '@/domain/sites/sites.ts';
 
-// Ações do editor de conteúdo: permissão, validação e o `n` dos blocos ficam no domínio.
+// Ações do editor de conteúdo: permissão, validação e o `n` dos blocos ficam no domínio; a
+// validação usa os recursos da release do site (`resourcesFor`).
 
 /** Issues do domínio no formato serializável do editor (o `path` aponta o campo). */
 function refused(issues: readonly Issue[]): ContentFormResult {
@@ -35,8 +37,8 @@ export async function createContentAction(
 ): Promise<ContentFormResult> {
   const actor = await currentActor();
   if (!actor.ok) return noSession;
-  const result = await getDb().db.transaction((tx) =>
-    createContent(tx, actor.value, siteId, input),
+  const result = await getDb().db.transaction(async (tx) =>
+    createContent(tx, actor.value, siteId, input, { resources: await resourcesFor(tx, siteId) }),
   );
   if (!result.ok) return refused(result.issues);
   revalidatePath(`/sites/${siteId}/conteudos`);
@@ -51,8 +53,8 @@ export async function updateContentAction(
 ): Promise<ContentFormResult> {
   const actor = await currentActor();
   if (!actor.ok) return noSession;
-  const result = await getDb().db.transaction((tx) =>
-    updateContent(tx, actor.value, siteId, contentId, input),
+  const result = await getDb().db.transaction(async (tx) =>
+    updateContent(tx, actor.value, siteId, contentId, input, await resourcesFor(tx, siteId)),
   );
   if (!result.ok) return refused(result.issues);
   revalidatePath(`/sites/${siteId}/conteudos`);

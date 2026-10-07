@@ -1,3 +1,4 @@
+import { RESOURCES } from '@orakel/content-model/v1';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ContentEdit } from '@/domain/content/contents.ts';
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   currentActor: vi.fn(),
   createContent: vi.fn(),
   updateContent: vi.fn(),
+  resourcesFor: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -23,6 +25,7 @@ vi.mock('@/domain/content/contents.ts', () => ({
   createContent: mocks.createContent,
   updateContent: mocks.updateContent,
 }));
+vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
 
 const editor = { email: 'editor@orakel.local', roles: ['editor'] };
 const input = { kind: 'article', title: 'Guia', blocks: [] } as unknown as ContentEdit;
@@ -30,6 +33,7 @@ const input = { kind: 'article', title: 'Guia', blocks: [] } as unknown as Conte
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.currentActor.mockResolvedValue({ ok: true, value: editor });
+  mocks.resourcesFor.mockResolvedValue(RESOURCES);
 });
 
 describe('ações do editor de conteúdo', () => {
@@ -79,8 +83,39 @@ describe('ações do editor de conteúdo', () => {
       message: 'Versão 3 salva.',
       id: 2,
     });
-    expect(mocks.createContent).toHaveBeenCalledWith({}, editor, 'exemplo-a', input);
-    expect(mocks.updateContent).toHaveBeenCalledWith({}, editor, 'exemplo-a', 2, input);
+    expect(mocks.createContent).toHaveBeenCalledWith({}, editor, 'exemplo-a', input, {
+      resources: RESOURCES,
+    });
+    expect(mocks.updateContent).toHaveBeenCalledWith({}, editor, 'exemplo-a', 2, input, RESOURCES);
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/conteudos');
+  });
+
+  it('valida com os recursos da release do site: sem faq, a gravação com faq é recusada', async () => {
+    const withoutFaq = {
+      ...RESOURCES,
+      blockTypes: RESOURCES.blockTypes.filter((t) => t !== 'faq'),
+    };
+    mocks.resourcesFor.mockResolvedValue(withoutFaq);
+    const unsupported = {
+      ok: false,
+      issues: [
+        {
+          code: 'semantic.supported-resources',
+          message: 'Bloco faq fora da release',
+          path: ['blocks', 0, 'type'],
+        },
+      ],
+    };
+    mocks.createContent.mockResolvedValue(unsupported);
+    mocks.updateContent.mockResolvedValue(unsupported);
+
+    expect(await createContentAction('exemplo-b', input)).toMatchObject({ ok: false });
+    expect(await updateContentAction('exemplo-b', 2, input)).toMatchObject({ ok: false });
+    expect(mocks.resourcesFor).toHaveBeenCalledWith({}, 'exemplo-b');
+    expect(mocks.createContent).toHaveBeenCalledWith({}, editor, 'exemplo-b', input, {
+      resources: withoutFaq,
+    });
+    expect(mocks.updateContent).toHaveBeenCalledWith({}, editor, 'exemplo-b', 2, input, withoutFaq);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });

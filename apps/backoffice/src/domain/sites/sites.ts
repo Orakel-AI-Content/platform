@@ -243,6 +243,17 @@ export async function siteExists(db: Executor, siteId: string): Promise<boolean>
   return rows.length > 0;
 }
 
+/**
+ * Recursos da release registrada para o site: o editor e a validação de conteúdo os obtêm só
+ * por aqui. Enquanto não há registro de recursos por release (workspace#26), toda release,
+ * inclusive a nula de um site ainda não promovido, usa os `RESOURCES` do código.
+ */
+export async function resourcesFor(db: Executor, siteId: string): Promise<Resources> {
+  // A release já é lida aqui: a workspace#26 troca só o retorno, sem mudar quem chama.
+  await db.select({ release: sites.release }).from(sites).where(eq(sites.id, siteId));
+  return RESOURCES;
+}
+
 /** Configuração corrente (maior versão) de um site. */
 export async function currentConfig(db: Executor, siteId: string): Promise<SiteConfig | undefined> {
   const [row] = await db
