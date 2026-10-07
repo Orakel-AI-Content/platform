@@ -31,7 +31,9 @@ test('login pelo Access e registro de instâncias', async ({ page }) => {
   await page.getByRole('link', { name: 'Baixar sites.auto.tfvars.json' }).click();
   expect((await download).suggestedFilename()).toBe('sites.auto.tfvars.json');
 
-  // Operação enfileira o build do site sem esperar a janela (12.0, L3).
+  // Operação enfileira o build do site sem esperar a janela (12.0, L3). Espera a página
+  // hidratar: um clique antes disso não chega ao onClick (a ação nem é chamada).
+  await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
   await expect(page.getByText('Build de exemplo-a enfileirado.')).toBeVisible();
 
