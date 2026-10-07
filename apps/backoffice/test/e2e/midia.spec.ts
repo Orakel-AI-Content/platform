@@ -66,9 +66,12 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
   await page.goto(`/sites/${SITE}/midia`);
   await page.getByLabel(/^Imagem \(JPEG/).setInputFiles(FIXTURE.pathname);
   await page.getByRole('button', { name: 'Enviar imagem' }).click();
-  await expect(page.getByRole('status')).toHaveText('Imagem pronta na biblioteca.', {
-    timeout: 60_000,
-  });
+  await expect(page.getByRole('main').getByRole('status')).toHaveText(
+    'Imagem pronta na biblioteca.',
+    {
+      timeout: 60_000,
+    },
+  );
 
   const { db } = getDb();
   const listed = await listMedia(db, SYSTEM_ACTOR, SITE);
