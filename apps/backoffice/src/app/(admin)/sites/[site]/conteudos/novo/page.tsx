@@ -1,9 +1,7 @@
-import Link from 'next/link';
-
 import { ContentEditor } from '@/components/content-editor';
 import { noRead } from '@/components/forbidden-screen';
 
-import { noWrite, sitePageContext } from '../../editorial-page.tsx';
+import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
 import { createContentAction } from '../actions.ts';
 import { editorOptions } from '../editor-options.ts';
 
@@ -25,14 +23,13 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
 
   return (
     <section aria-labelledby="new-content-title" className="form-width space-y-4">
-      <p className="text-sm">
-        <Link href={`/sites/${site.id}/conteudos`} className="underline underline-offset-4">
-          Conteúdos de {site.id}
-        </Link>
-      </p>
-      <h1 id="new-content-title" className="text-2xl font-semibold">
-        Criar conteúdo
-      </h1>
+      <PageHeader
+        id="new-content-title"
+        trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
+          { label: 'Criar conteúdo' },
+        ])}
+        title="Criar conteúdo"
+      />
       <ContentEditor
         mode="create"
         siteId={site.id}

@@ -1,6 +1,5 @@
 import { contentPath } from '@orakel/core/v1';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ContentEditor } from '@/components/content-editor';
@@ -9,7 +8,7 @@ import { can } from '@/domain/access/rbac.ts';
 import { noRead } from '@/components/forbidden-screen';
 import { getEnv } from '@/env.ts';
 
-import { noWrite } from '../../../editorial-page.tsx';
+import { noWrite, PageHeader, siteTrail } from '../../../editorial-page.tsx';
 import { itemTitle } from '../../../item-title.ts';
 import { updateContentAction } from '../../actions.ts';
 import { readContentVersions } from '../../content-versions.ts';
@@ -45,7 +44,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
   if (contentId === undefined) notFound();
   const read = await readContentVersions(siteId, contentId);
   if (read === undefined) return null;
-  const { actor, versions } = read;
+  const { actor, versions, site } = read;
   const db = getDb().db;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
@@ -61,17 +60,14 @@ export default async function EditContentPage({ params, searchParams }: Params &
 
   return (
     <section aria-labelledby="edit-content-title" className="form-width space-y-4">
-      <p className="text-sm">
-        <Link
-          href={`/sites/${siteId}/conteudos/${contentId}`}
-          className="underline underline-offset-4"
-        >
-          Versões do conteúdo
-        </Link>
-      </p>
-      <h1 id="edit-content-title" className="text-2xl font-semibold">
-        Editar “{latest.data.title}”
-      </h1>
+      <PageHeader
+        id="edit-content-title"
+        trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
+          { label: latest.data.title, href: `/sites/${siteId}/conteudos/${contentId}` },
+          { label: 'Editar' },
+        ])}
+        title={<>Editar “{latest.data.title}”</>}
+      />
       <p className="text-sm text-muted-foreground">
         Partindo da versão {latest.version}; salvar grava a versão {latest.version + 1} em rascunho.
       </p>

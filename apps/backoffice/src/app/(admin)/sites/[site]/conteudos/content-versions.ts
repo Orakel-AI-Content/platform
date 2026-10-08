@@ -10,7 +10,8 @@ import { lookupSite } from '../editorial-page.tsx';
 /**
  * Versões de um conteúdo e quem pede, lidas uma vez por requisição: o título da aba
  * (`generateMetadata`) e a página compartilham o resultado (#79, `cache` do React, como o
- * `lookupSite`), com o fuso do site para as datas (#90). `undefined` sem sessão.
+ * `lookupSite`), com o fuso do site para as datas (#90) e o nome dele para a trilha (#174).
+ * `undefined` sem sessão.
  */
 export const readContentVersions = cache(async (siteId: string, contentId: number) => {
   const actor = await currentActor();
@@ -19,5 +20,6 @@ export const readContentVersions = cache(async (siteId: string, contentId: numbe
   // A mesma busca do layout (`cache`); sem site, o layout já respondeu e o fuso não aparece.
   const lookup = await lookupSite(siteId);
   const timeZone = lookup.kind === 'found' ? lookup.site.timeZone : DEFAULT_TIME_ZONE;
-  return { actor: actor.value, versions, timeZone };
+  const site = { id: siteId, name: lookup.kind === 'found' ? lookup.site.name : siteId };
+  return { actor: actor.value, versions, timeZone, site };
 });
