@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Layout do site (#78, workspace#32) contra o ambiente local: título da aba com a área e o
 // site, "não encontrado" de site e de item com o link certo e status 404, o carregamento
-// entre áreas do mesmo site com o cabeçalho visível e a barra lateral de áreas (#171).
+// entre áreas do mesmo site com o cabeçalho visível, a barra lateral de áreas (#171) e o
+// seletor de site no topo dela (#172).
 
 const OPERATOR = 'operacao@orakel.local';
 const SITE = 'exemplo-a';
@@ -143,4 +144,65 @@ test('a barra é navegável só com teclado', async ({ page }) => {
 
   await expect(page).toHaveURL(new RegExp(`/sites/${SITE}/taxonomias$`));
   await expect(taxonomies).toHaveAttribute('aria-current', 'page');
+});
+
+const switcher = (page: Page) => page.getByRole('button', { name: `${SITE_NAME}, trocar de site` });
+
+test('o seletor troca de site em 2 cliques, na mesma área; item leva à lista', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+
+  await page.goto(`/sites/${SITE}/midia`);
+  await switcher(page).click();
+  await page.getByRole('link', { name: 'Exemplo B — Receitas' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-b\/midia$/);
+
+  await page.goto(`/sites/${SITE}/autores/novo`);
+  await switcher(page).click();
+  await page.getByRole('link', { name: 'Exemplo B — Receitas' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-b\/autores$/);
+});
+
+test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites');
+  const visible = await page
+    .getByRole('table')
+    .getByRole('row')
+    .filter({ has: page.getByRole('cell') })
+    .count();
+
+  await page.goto(`/sites/${SITE}`);
+  await switcher(page).click();
+  const list = page.locator('[popover]:popover-open');
+  await expect(list.getByRole('link')).toHaveCount(visible);
+  await expect(list.locator('[aria-current="true"]')).toHaveText(SITE_NAME);
+});
+
+test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao botão', async ({
+  page,
+}) => {
+  await loginAs(page, OPERATOR);
+  await page.goto(`/sites/${SITE}/taxonomias`);
+  const button = switcher(page);
+
+  for (let step = 0; step < 40; step += 1) {
+    if (await button.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(button).toBeFocused();
+  await page.keyboard.press('Enter');
+  const list = page.locator('[popover]:popover-open');
+  await expect(list).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(list).toHaveCount(0);
+  await expect(button).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  const other = page.getByRole('link', { name: 'Exemplo B — Receitas' });
+  for (let step = 0; step < 10; step += 1) {
+    if (await other.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/sites\/exemplo-b\/taxonomias$/);
 });
