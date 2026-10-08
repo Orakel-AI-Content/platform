@@ -99,6 +99,7 @@ export function ReviewPanel({
               defaultValues={Object.fromEntries(checklist.map((item) => [item.key, false]))}
               labels={Object.fromEntries(checklist.map((item) => [item.key, item.label]))}
               submitLabel="Aprovar"
+              pendingLabel="Aprovando…"
               submitDisabled={blocked}
               submitDescribedBy={blocked ? `${id}-blocked` : undefined}
               onSubmit={async (value) => {

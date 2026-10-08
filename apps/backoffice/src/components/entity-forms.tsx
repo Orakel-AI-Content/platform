@@ -7,7 +7,6 @@ import {
   TaxonomySchema,
 } from '@orakel/content-model/v1';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import type * as z from 'zod';
 
 import { mediaField, type PickerOption } from '@/components/forms/picker-fields';
@@ -109,6 +108,7 @@ export function EntityForm({
       hints={config.hints}
       fields={config.fields?.(media)}
       submitLabel={mode === 'create' ? 'Criar' : 'Salvar'}
+      pendingLabel={mode === 'create' ? 'Criando…' : 'Salvando…'}
       onSubmit={async (value) => {
         const result = await action(value);
         if (!result.ok) {
@@ -142,30 +142,21 @@ export function InstitutionalTextsForm({
   action: (value: unknown) => Promise<EntityFormResult>;
 }) {
   const router = useRouter();
-  const [status, setStatus] = useState('');
   return (
-    <div className="space-y-2">
-      <SchemaForm
-        schema={InstitutionalTextsSchema}
-        defaultValues={defaultValues}
-        labels={INSTITUTIONAL_LABELS}
-        fields={INSTITUTIONAL_FIELDS}
-        submitLabel="Salvar textos"
-        onSubmit={async (value) => {
-          setStatus('');
-          const result = await action(value);
-          if (!result.ok) {
-            return result.issues.length > 0
-              ? result.issues
-              : [{ path: [], message: result.message }];
-          }
-          setStatus(result.message);
-          router.refresh();
-        }}
-      />
-      <p role="status" className="text-sm text-muted-foreground">
-        {status}
-      </p>
-    </div>
+    <SchemaForm
+      schema={InstitutionalTextsSchema}
+      defaultValues={defaultValues}
+      labels={INSTITUTIONAL_LABELS}
+      fields={INSTITUTIONAL_FIELDS}
+      submitLabel="Salvar textos"
+      onSubmit={async (value) => {
+        const result = await action(value);
+        if (!result.ok) {
+          return result.issues.length > 0 ? result.issues : [{ path: [], message: result.message }];
+        }
+        router.refresh();
+        return { success: result.message };
+      }}
+    />
   );
 }
