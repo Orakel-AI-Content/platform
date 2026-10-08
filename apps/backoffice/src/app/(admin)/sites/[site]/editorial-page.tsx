@@ -91,11 +91,29 @@ export function noWrite(siteId: string): ReactNode {
 /** Item da trilha: com `href`, é link; sem, é a tela atual (o último). */
 export type TrailItem = { label: string; href?: string };
 
-/** Trilha das telas de um site (#173): `Sites › <nome> [› <área>]`. */
-export function siteTrail(site: { id: string; name: string }, area?: string): TrailItem[] {
+/** Área da trilha: só o rótulo (tela da área) ou rótulo e segmento (link, nas telas de item). */
+type TrailArea = string | { label: string; segment: string };
+
+/**
+ * Trilha das telas de um site (#173, #174): `Sites › <nome> [› <área> [› <itens>]]`. Com
+ * itens, a área vira link para a lista dela (`/sites/<id>/<segment>`).
+ */
+export function siteTrail(
+  site: { id: string; name: string },
+  area?: TrailArea,
+  items: readonly TrailItem[] = [],
+): TrailItem[] {
   const sites = { label: 'Sites', href: '/sites' };
   if (area === undefined) return [sites, { label: site.name }];
-  return [sites, { label: site.name, href: `/sites/${site.id}` }, { label: area }];
+  const siteItem = { label: site.name, href: `/sites/${site.id}` };
+  if (typeof area === 'string') return [sites, siteItem, { label: area }];
+  if (items.length === 0) return [sites, siteItem, { label: area.label }];
+  return [
+    sites,
+    siteItem,
+    { label: area.label, href: `/sites/${site.id}/${area.segment}` },
+    ...items,
+  ];
 }
 
 /** Trilha de navegação acima do título: links até a tela atual, que leva `aria-current`. */

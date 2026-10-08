@@ -59,3 +59,42 @@ describe('trilha do PageHeader', () => {
     expect(screen.queryByRole('navigation')).toBeNull();
   });
 });
+
+describe('siteTrail nas telas de item (#174)', () => {
+  it('com itens, a área vira link para a lista e os itens vêm depois', () => {
+    expect(
+      siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
+        { label: 'Guia', href: '/sites/exemplo-a/conteudos/7' },
+        { label: 'Versão 2' },
+      ]),
+    ).toEqual([
+      { label: 'Sites', href: '/sites' },
+      { label: 'Exemplo A — Guias', href: '/sites/exemplo-a' },
+      { label: 'Conteúdos', href: '/sites/exemplo-a/conteudos' },
+      { label: 'Guia', href: '/sites/exemplo-a/conteudos/7' },
+      { label: 'Versão 2' },
+    ]);
+  });
+
+  it('sem itens, a área é a tela atual, como nas telas de área', () => {
+    expect(siteTrail(site, { label: 'Mídia', segment: 'midia' })).toEqual(siteTrail(site, 'Mídia'));
+  });
+
+  it('a última camada do item tem aria-current; as anteriores são links', () => {
+    render(
+      <PageHeader
+        id="t"
+        trail={siteTrail(site, { label: 'Autores', segment: 'autores' }, [{ label: 'Ana' }])}
+        title="Editar “Ana”"
+      />,
+    );
+
+    const nav = screen.getByRole('navigation', { name: 'Trilha de navegação' });
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/sites', '/sites/exemplo-a', '/sites/exemplo-a/autores']);
+    expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe('Ana');
+  });
+});
