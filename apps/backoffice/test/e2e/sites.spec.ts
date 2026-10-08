@@ -232,9 +232,9 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   await page.goto(`/sites/${siteId}`);
   await page.getByLabel('Janela própria (segundos)').fill('30');
   await page.getByRole('button', { name: 'Salvar janela' }).click();
-  await expect(page.getByText('Janela efetiva: 30 s (própria)')).toBeVisible();
+  await expect(page.getByText('Janela efetiva: 30 s, própria')).toBeVisible();
   await page.getByRole('button', { name: 'Usar padrão' }).click();
-  await expect(page.getByText(/Janela efetiva: \d+ s \(padrão\)/)).toBeVisible();
+  await expect(page.getByText(/Janela efetiva: \d+ s( \(.+\))?, padrão/)).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
   await page.goto('/sites');

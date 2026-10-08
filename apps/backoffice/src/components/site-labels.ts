@@ -107,6 +107,25 @@ export function formatDateTime(date: Date, timeZone: string): string {
   return format.format(date);
 }
 
+/**
+ * Duração em segundos e, a partir de 1 min, na unidade maior entre parênteses, sem componentes
+ * zerados: "45 s", "300 s (5 min)", "5400 s (1 h 30 min)". Formatação própria em vez de
+ * `Intl.DurationFormat` para sair igual no servidor e no navegador (#147).
+ */
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds} s`;
+  const parts = [
+    [Math.floor(seconds / 3600), 'h'],
+    [Math.floor((seconds % 3600) / 60), 'min'],
+    [seconds % 60, 's'],
+  ] as const;
+  const readable = parts
+    .filter(([value]) => value > 0)
+    .map(([value, unit]) => `${value} ${unit}`)
+    .join(' ');
+  return `${seconds} s (${readable})`;
+}
+
 /** Tipo de taxonomia (lista de taxonomias e seletor do editor). */
 export const TAXONOMY_KIND_LABEL: Record<'category' | 'tag' | 'series', string> = {
   category: 'Categoria',

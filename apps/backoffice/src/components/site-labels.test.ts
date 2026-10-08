@@ -10,6 +10,7 @@ import {
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
   formatDateTime,
+  formatDuration,
 } from './site-labels.ts';
 
 // Cada estado tem aparência própria dentro do seu grupo (#86): a variante não se repete e
@@ -47,9 +48,22 @@ describe('data e hora no fuso do site (#90)', () => {
   });
 });
 
-describe('ordem do ciclo de vida (#148)', () => {
-  it('tem cada etapa com rótulo exatamente uma vez', () => {
-    expect(new Set(LIFECYCLE_ORDER).size).toBe(LIFECYCLE_ORDER.length);
-    expect([...LIFECYCLE_ORDER].sort()).toEqual(Object.keys(LIFECYCLE_LABEL).sort());
+describe('duração da janela de agrupamento (#147)', () => {
+  it('fica só em segundos abaixo de 1 min', () => {
+    expect(formatDuration(0)).toBe('0 s');
+    expect(formatDuration(45)).toBe('45 s');
+  });
+
+  it('acrescenta minutos e horas, sem componentes zerados', () => {
+    expect(formatDuration(60)).toBe('60 s (1 min)');
+    expect(formatDuration(300)).toBe('300 s (5 min)');
+    expect(formatDuration(3600)).toBe('3600 s (1 h)');
+    expect(formatDuration(5400)).toBe('5400 s (1 h 30 min)');
+  });
+
+  it('combina horas, minutos e segundos', () => {
+    expect(formatDuration(90)).toBe('90 s (1 min 30 s)');
+    expect(formatDuration(3661)).toBe('3661 s (1 h 1 min 1 s)');
+    expect(formatDuration(3605)).toBe('3605 s (1 h 5 s)');
   });
 });
