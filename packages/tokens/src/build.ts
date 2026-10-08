@@ -14,6 +14,7 @@ import {
   PRIMITIVE_GROUP,
   SEMANTIC_TOKENS,
   ThemeExtensionSchema,
+  toHex,
   type Issue,
   type ResolvedToken,
   type Result,
@@ -32,9 +33,18 @@ export type ThemeFont = {
   preload: boolean;
 };
 
+/** Cores da amostra do tema (hex dos semânticos já resolvidos). */
+export const SUMMARY_COLORS = ['background', 'text', 'accent'] as const;
+
+export type ThemeSummary = {
+  name: string;
+  colors: Record<(typeof SUMMARY_COLORS)[number], string>;
+};
+
 export type BuiltTheme = {
   id: string;
   css: string;
+  summary: ThemeSummary;
   fonts: ThemeFont[];
   /** Conteúdo das fontes, por `file`; gravado em dist/fonts/. */
   fontFiles: Map<string, Uint8Array>;
@@ -121,13 +131,24 @@ export function buildTheme(
 
   if (issues.length > 0) return { ok: false, issues };
   const css = renderThemeCss({ id, extension: extension.data, tokens, fontFaces: fonts });
-  return { ok: true, value: { id, css, fonts, fontFiles } };
+  const colors = Object.fromEntries(
+    SUMMARY_COLORS.map((name) => {
+      // O conjunto fixo já foi conferido: `color.<name>` existe e é cor.
+      const token = tokens.get(`color.${name}`);
+      return [name, token?.type === 'color' ? toHex(token.value) : ''];
+    }),
+  ) as ThemeSummary['colors'];
+  const summary: ThemeSummary = { name: extension.data.name, colors };
+  return { ok: true, value: { id, css, summary, fonts, fontFiles } };
 }
 
 /** Módulo de entrada do pacote: CSS embutido, sem ler arquivo em runtime. */
 export function renderIndex(themes: readonly BuiltTheme[]): { js: string; dts: string } {
   const data = Object.fromEntries(
-    themes.map((theme) => [theme.id, { css: theme.css, fonts: theme.fonts }]),
+    themes.map((theme) => [
+      theme.id,
+      { css: theme.css, fonts: theme.fonts, summary: theme.summary },
+    ]),
   );
   const js = `// @orakel/tokens — gerado por src/build.ts; não edite.
 const THEMES = ${JSON.stringify(data, null, 2)};
@@ -144,6 +165,14 @@ export function themeCss(id) {
 
 export function themeFonts(id) {
   return isThemeId(id) ? THEMES[id].fonts : undefined;
+}
+
+export const THEME_SUMMARIES = Object.freeze(
+  THEME_IDS.map((id) => Object.freeze({ id, ...THEMES[id].summary })),
+);
+
+export function themeSummary(id) {
+  return THEME_SUMMARIES.find((summary) => summary.id === id);
 }
 `;
   const ids = themes.map((theme) => JSON.stringify(theme.id)).join(' | ') || 'never';
@@ -167,6 +196,19 @@ export declare function isThemeId(id: string): id is ThemeId;
 /** CSS do tema (@font-face + variáveis em :root), ou undefined se o tema não existe. */
 export declare function themeCss(id: string): string | undefined;
 export declare function themeFonts(id: string): readonly ThemeFont[] | undefined;
+
+export interface ThemeSummary {
+  readonly id: ThemeId;
+  /** Nome legível, para escolher o tema. */
+  readonly name: string;
+  /** Amostra do tema: hex (#rrggbb) dos semânticos de fundo, texto e destaque. */
+  readonly colors: { readonly background: string; readonly text: string; readonly accent: string };
+}
+
+/** Um resumo por tema, na ordem de THEME_IDS. */
+export declare const THEME_SUMMARIES: readonly ThemeSummary[];
+/** Nome e amostra do tema, ou undefined se o tema não existe. */
+export declare function themeSummary(id: string): ThemeSummary | undefined;
 `;
   return { js, dts };
 }

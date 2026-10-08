@@ -2,6 +2,7 @@
   "$description": "Exemplo A: editorial claro, serifada nos títulos.",
   "$extensions": {
     "ai.orakel.theme": {
+      "name": "Editorial claro",
       "colorScheme": "light",
       "fontFaces": [
         {
