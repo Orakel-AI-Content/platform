@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFixture } from '../../src/bin/seed.ts';
 import { createDb, createPool } from '../../src/db/client.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
+import { recordBuild } from '../../src/domain/builds/builds.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
@@ -11,12 +12,18 @@ import { removeSites } from './cleanup.ts';
 // Lista de sites legível de relance (#100): com 20 sites numa janela de 1280 px, a tabela
 // não rola na horizontal e nenhuma linha passa de duas linhas de texto. Os 18 sites além dos
 // do seed são gravados pelo domínio (cadastrar 18 pela tela só tornaria o teste lento) e
-// removidos no fim.
+// removidos no fim. O pior caso de largura fica na própria rodada, sem depender do banco
+// (#153): um site pausado por falha permanente, com motivo longo, e um com último build
+// publicado e versão longa.
 
 const stamp = Date.now();
 const created = Array.from({ length: 18 }, (_, index) => `e2e-lista-${stamp}-${index + 1}`);
 /** Nome e domínio longos: o corte com `title` tem de segurar a largura e a altura. */
 const LONG_NAME = 'Guia completo de receitas regionais brasileiras para o dia a dia';
+
+/** Motivo da pausa longo, no formato `<etapa>: <mensagem>` de uma falha permanente. */
+const LONG_FAILURE = 'Tema "padrao-editorial-receitas" não existe nesta release do site-builder';
+const LONG_VERSION = '3f9c2a7e-5b1d-4c8e-9a6f-0d2e4b7c1a95';
 
 /** Nome e `SITE_ID · domínio` na célula do site; as outras células têm uma linha só. */
 const MAX_LINES_PER_CELL = 2;
@@ -42,6 +49,51 @@ test.beforeAll(async () => {
       );
       if (!result.ok) throw new Error(JSON.stringify(result.issues));
     }
+    const run = (siteId: string) => ({
+      siteId,
+      release: 'e2e',
+      jobId: undefined,
+      attempt: 1,
+      startedAt: new Date(),
+    });
+    await db.transaction(async (tx) => {
+      // Falha permanente: grava o build falho e pausa o site com `render: <mensagem>`.
+      await recordBuild(tx, run(created[1]!), {
+        status: 'failed',
+        stage: 'render',
+        failure: { kind: 'permanent', message: LONG_FAILURE },
+      });
+      await recordBuild(tx, run(created[2]!), {
+        status: 'ok',
+        render: {
+          formatVersion: 1,
+          status: 'ok',
+          site: created[2]!,
+          release: 'e2e',
+          durationMs: 1,
+          pendingChangeIds: [],
+          pages: 1,
+          files: 1,
+          redirectUsage: {
+            static: 0,
+            dynamic: 0,
+            limits: { static: 0, dynamic: 0 },
+            alert: false,
+          },
+        },
+        publish: {
+          formatVersion: 1,
+          status: 'ok',
+          site: created[2]!,
+          target: 'local',
+          versionId: LONG_VERSION,
+          cacheKey: 'e2e',
+          durationMs: 1,
+        },
+        renderMs: 1,
+        publishMs: 1,
+      });
+    });
   } finally {
     await pool.end();
   }
@@ -116,6 +168,13 @@ test('com 20 sites em 1280 px, sem rolagem horizontal e linhas de até duas linh
     await expect(row.getByText(text, { exact: true })).toBeVisible();
   }
   await expect(page.getByRole('columnheader', { name: 'SITE_ID' })).toHaveCount(0);
+
+  // O pior caso está na lista, cortado, com o texto inteiro em `title` (#153).
+  const paused = rows.filter({ hasText: `${created[1]} · ` });
+  await expect(paused.getByText('Pausado', { exact: true })).toBeVisible();
+  await expect(paused.getByTitle(`render: ${LONG_FAILURE}`)).toBeVisible();
+  const built = rows.filter({ hasText: `${created[2]} · ` });
+  await expect(built.getByTitle(new RegExp(` · ${LONG_VERSION}$`))).toBeVisible();
 
   // O cadastro registrou a configuração v1: a pendência se destaca e leva à tela dela.
   const pending = row.getByRole('link', { name: `1 mudança pendente em ${created[0]}` });
