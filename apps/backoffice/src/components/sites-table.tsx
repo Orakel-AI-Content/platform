@@ -56,50 +56,11 @@ function Truncated({ text, className }: { text: string; className: string }) {
 
 /** Último build: a lista mistura fusos, cada linha com a sigla; data e versão cortadas. */
 function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; timeZone: string }) {
-  if (build === null) return <span className="text-muted-foreground">—</span>;
-  const when = `${formatDateTime(new Date(build.finishedAt), timeZone)}${build.versionId ? ` · ${build.versionId}` : ''}`;
-  return (
-    <TwoLines secondary={<Truncated text={when} className="max-w-40" />}>
-      <Badge variant={BUILD_STATUS_VARIANT[build.status]}>{BUILD_STATUS_LABEL[build.status]}</Badge>
-    </TwoLines>
-  );
-}
-
-/**
- * Enfileira o build já. O retorno vai para a região `role="status"` da tabela, não para a
- * linha: a mensagem não aumenta a altura dela.
- */
-function PublishNowButton({
-  siteId,
-  action,
-  onResult,
-}: {
-  siteId: string;
-  action: PublishNow;
-  onResult: (status: PublishStatus) => void;
-}) {
-  const [pending, startTransition] = useTransition();
-  return (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={() => startTransition(async () => onResult(await action(siteId)))}
-      className={buttonVariants({ variant: 'outline', size: 'sm' })}
-    >
-      {pending ? 'Enfileirando…' : 'Publicar agora'}
-      <span className="sr-only"> {siteId}</span>
-    </button>
-  );
-}
-
-/** Pendências maiores que 0 se destacam e levam à tela de pendências do site (#99). */
-function PendingCell({ siteId, count }: { siteId: string; count: number }) {
-  if (count === 0) return <span className="text-muted-foreground">0</span>;
   return (
     <LastBuildSummary
       build={build}
       timeZone={timeZone}
-      details={(text) => <Truncated text={text} className="max-w-44" />}
+      details={(text) => <Truncated text={text} className="max-w-40" />}
     />
   );
 }
