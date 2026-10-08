@@ -305,4 +305,55 @@ test.describe('barra de ações do editor (#109)', () => {
     await expect(page.getByRole('group', { name: /^Bloco \d+:/ })).toHaveCount(20);
     await expect(page.getByRole('main').getByRole('alert')).toHaveText('');
   });
+
+  test('com alterações não salvas, sair pede confirmação; depois de salvar, não (#111)', async ({
+    page,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
+    await page.goto(editPath);
+    const titleField = page.getByLabel('Título', { exact: true });
+    const versions = page.getByRole('link', { name: 'Versões do conteúdo' });
+    const dialogs: string[] = [];
+
+    // Link interno com alteração: cancelar fica no editor com o texto digitado.
+    await titleField.fill(`${title} (rascunho)`);
+    page.once('dialog', (dialog) => {
+      dialogs.push(dialog.type());
+      void dialog.dismiss();
+    });
+    await versions.click();
+    await expect(page).toHaveURL(new RegExp(`${editPath}$`));
+    await expect(titleField).toHaveValue(`${title} (rascunho)`);
+
+    // Depois de salvar, nenhuma pergunta: o link navega direto.
+    await page.getByRole('button', { name: 'Salvar nova versão' }).click();
+    await expect(page.getByRole('main').getByRole('status')).toHaveText(/Versão \d+ salva\./);
+    page.on('dialog', (dialog) => {
+      dialogs.push(`inesperado: ${dialog.type()}`);
+      void dialog.dismiss();
+    });
+    await versions.click();
+    await expect(page).toHaveURL(new RegExp(`/conteudos/${contentId}$`));
+    page.removeAllListeners('dialog');
+
+    // Confirmar navega; fechar a aba com alteração dispara o beforeunload.
+    await page.goto(editPath);
+    await titleField.fill(`${title} (de novo)`);
+    page.once('dialog', (dialog) => {
+      dialogs.push(dialog.type());
+      void dialog.accept();
+    });
+    await versions.click();
+    await expect(page).toHaveURL(new RegExp(`/conteudos/${contentId}$`));
+
+    await page.goto(editPath);
+    await titleField.fill(`${title} (fechar)`);
+    page.once('dialog', (dialog) => {
+      dialogs.push(dialog.type());
+      void dialog.dismiss();
+    });
+    await page.close({ runBeforeUnload: true });
+    await expect.poll(() => dialogs).toEqual(['confirm', 'confirm', 'beforeunload']);
+  });
 });
