@@ -67,6 +67,17 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   );
   await expect(page).toHaveURL(/\/conteudos\/novo$/);
 
+  // Controles de bloco são botões de ícone com alvo de pelo menos 24×24 px (#131).
+  for (const name of ['Mover bloco 2 para cima', 'Mover bloco 2 para baixo', 'Remover bloco 2']) {
+    const box = await page.getByRole('button', { name }).boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(24);
+    expect(box?.height).toBeGreaterThanOrEqual(24);
+  }
+  await expect(page.getByRole('button', { name: 'Mover bloco 1 para cima' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+
   // Reordenar e remover pelo teclado: a FAQ sobe e volta, nada se perde.
   await page.getByRole('button', { name: 'Mover bloco 3 para cima' }).focus();
   await page.keyboard.press('Enter');
