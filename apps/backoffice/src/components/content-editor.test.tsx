@@ -303,3 +303,38 @@ describe('ver prévia (#110)', () => {
     );
   });
 });
+
+describe('aviso ao sair (#111)', () => {
+  const confirm = vi.fn<(message?: string) => boolean>(() => false);
+  const leave = () => {
+    const unload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(unload);
+    return unload.defaultPrevented;
+  };
+
+  it('liga com alterações, desliga ao desfazer à mão e depois de salvar', async () => {
+    window.confirm = confirm;
+    const user = userEvent.setup();
+    renderEditor({
+      defaultValues: { ...meta, blocks: [toc(1, 'A')] },
+      result: {
+        ok: true,
+        message: 'Versão 2 salva.',
+        id: 7,
+        saved: { ...meta, title: 'Guia!', blocks: [toc(1, 'A')] } as never,
+      },
+    });
+    const title = screen.getByLabelText('Título', { exact: true });
+    expect(leave()).toBe(false);
+
+    await user.type(title, '!');
+    await waitFor(() => expect(leave()).toBe(true));
+    await user.type(title, '{Backspace}');
+    await waitFor(() => expect(leave()).toBe(false));
+
+    await user.type(title, '!');
+    await save(user);
+    await screen.findByText('Versão 2 salva.');
+    await waitFor(() => expect(leave()).toBe(false));
+  });
+});
