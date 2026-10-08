@@ -2,9 +2,9 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Block } from '@orakel/content-model/v1';
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useId, useState, useTransition } from 'react';
+import { Fragment, useEffect, useId, useState, useTransition } from 'react';
 import { FormProvider, get, useFieldArray, useForm, type FieldValues } from 'react-hook-form';
 
 import {
@@ -20,6 +20,7 @@ import { entityField, mediaField, type PickerOption } from '@/components/forms/p
 import { richTextField } from '@/components/forms/rich-text-field';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form';
 import { BLOCK_TYPE_LABEL } from '@/components/site-labels.ts';
+import { ActionsMenu } from '@/components/ui/actions-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { useLeaveGuard } from '@/components/use-leave-guard.ts';
@@ -166,18 +167,27 @@ export function ContentEditor({
     setRemoved({ index, value, position: index + 1 });
   };
 
+  /** Depois de desenhar: o primeiro campo do bloco, ou o próprio bloco (texto rico). */
+  const focusBlock = (index: number) =>
+    requestAnimationFrame(() => {
+      const block = document.getElementById(`${id}-block-${index}`);
+      const field = block?.querySelector<HTMLElement>(FOCUSABLE_FIELD);
+      (field ?? block)?.focus();
+    });
+
   const undoRemove = () => {
     if (!removed) return;
     const { index, value, position } = removed;
     blocks.insert(index, value, { shouldFocus: false });
     setRemoved(null);
     setSaved(`Bloco ${position} devolvido.`);
-    // Depois de desenhar: o primeiro campo do bloco, ou o próprio bloco (texto rico).
-    requestAnimationFrame(() => {
-      const block = document.getElementById(`${id}-block-${index}`);
-      const field = block?.querySelector<HTMLElement>(FOCUSABLE_FIELD);
-      (field ?? block)?.focus();
-    });
+    focusBlock(index);
+  };
+
+  /** Bloco novo do tipo escolhido nesta posição (#134); os seguintes são renumerados. */
+  const insertBlock = (index: number, type: Block['type']) => {
+    blocks.insert(index, newBlock(type), { shouldFocus: false });
+    focusBlock(index);
   };
 
   const onValid = (value: FieldValues) =>
@@ -264,45 +274,64 @@ export function ContentEditor({
             if (!isBlockType(type)) return null;
             const position = index + 1;
             return (
-              <fieldset
-                key={field.id}
-                id={`${id}-block-${index}`}
-                tabIndex={-1}
-                className="space-y-4 rounded-md border border-border p-4"
-              >
-                <legend className="px-1 text-sm font-semibold">
-                  {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
-                </legend>
-                <SchemaFields
-                  schema={BLOCK_SCHEMAS[type]}
-                  prefix={`blocks.${index}`}
-                  labels={BLOCK_LABELS}
-                  hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
-                  fields={blockFields[type]}
-                />
-                <div className="flex flex-wrap gap-1">
-                  <IconButton
-                    label={`Mover bloco ${position} para cima`}
-                    icon={<ArrowUp />}
-                    // aria-disabled (não disabled): o foco fica no botão depois de mover.
-                    aria-disabled={index === 0}
-                    onClick={() => index > 0 && blocks.move(index, index - 1)}
+              <Fragment key={field.id}>
+                <ActionsMenu
+                  trigger={{ label: `Inserir bloco na posição ${position}`, icon: <Plus /> }}
+                >
+                  {offered.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={buttonVariants({
+                        variant: 'ghost',
+                        size: 'sm',
+                        className: 'justify-start',
+                      })}
+                      onClick={() => insertBlock(index, option)}
+                    >
+                      {BLOCK_TYPE_LABEL[option]}
+                    </button>
+                  ))}
+                </ActionsMenu>
+                <fieldset
+                  id={`${id}-block-${index}`}
+                  tabIndex={-1}
+                  className="space-y-4 rounded-md border border-border p-4"
+                >
+                  <legend className="px-1 text-sm font-semibold">
+                    {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
+                  </legend>
+                  <SchemaFields
+                    schema={BLOCK_SCHEMAS[type]}
+                    prefix={`blocks.${index}`}
+                    labels={BLOCK_LABELS}
+                    hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
+                    fields={blockFields[type]}
                   />
-                  <IconButton
-                    label={`Mover bloco ${position} para baixo`}
-                    icon={<ArrowDown />}
-                    aria-disabled={index === blocks.fields.length - 1}
-                    onClick={() =>
-                      index < blocks.fields.length - 1 && blocks.move(index, index + 1)
-                    }
-                  />
-                  <IconButton
-                    label={`Remover bloco ${position}`}
-                    icon={<Trash2 />}
-                    onClick={() => removeBlock(index)}
-                  />
-                </div>
-              </fieldset>
+                  <div className="flex flex-wrap gap-1">
+                    <IconButton
+                      label={`Mover bloco ${position} para cima`}
+                      icon={<ArrowUp />}
+                      // aria-disabled (não disabled): o foco fica no botão depois de mover.
+                      aria-disabled={index === 0}
+                      onClick={() => index > 0 && blocks.move(index, index - 1)}
+                    />
+                    <IconButton
+                      label={`Mover bloco ${position} para baixo`}
+                      icon={<ArrowDown />}
+                      aria-disabled={index === blocks.fields.length - 1}
+                      onClick={() =>
+                        index < blocks.fields.length - 1 && blocks.move(index, index + 1)
+                      }
+                    />
+                    <IconButton
+                      label={`Remover bloco ${position}`}
+                      icon={<Trash2 />}
+                      onClick={() => removeBlock(index)}
+                    />
+                  </div>
+                </fieldset>
+              </Fragment>
             );
           })}
           {blocksError && <p className="text-sm text-destructive">{blocksError}</p>}
