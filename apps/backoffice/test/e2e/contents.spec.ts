@@ -79,6 +79,10 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await expect(textEditor).toBeFocused();
   await expect(textEditor.locator('a')).toHaveAttribute('href', '/guias/');
   await expect(textEditor).toContainText('Primeiro parágrafo do artigo. Veja /guias/');
+  // Cursor dentro do link (não na borda do fim): o campo abre com o endereço atual.
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect(linkButton).toHaveAttribute('aria-pressed', 'true');
   await linkButton.focus();
   await page.keyboard.press('Enter');
   await expect(href).toHaveValue('/guias/');
