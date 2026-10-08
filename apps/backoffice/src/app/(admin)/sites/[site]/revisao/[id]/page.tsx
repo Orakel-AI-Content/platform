@@ -11,7 +11,7 @@ import { getEnv } from '@/env.ts';
 import { itemTitle } from '../../item-title.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
 import { positiveInt } from '../../conteudos/params.ts';
-import { PageHeader, sitePageContext } from '../../editorial-page.tsx';
+import { PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
 import { approveAction } from '../actions.ts';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +57,9 @@ export default async function ReviewPage({ params }: Params) {
     <section aria-labelledby="review-title" className="list-width space-y-4">
       <PageHeader
         id="review-title"
-        back={{ href: `/sites/${site.id}/revisao`, label: `Revisão de ${site.name}` }}
+        trail={siteTrail(site, { label: 'Revisão', segment: 'revisao' }, [
+          { label: latest.data.title },
+        ])}
         title={<>Revisão de “{latest.data.title}”</>}
       />
       <p className="text-sm text-muted-foreground">

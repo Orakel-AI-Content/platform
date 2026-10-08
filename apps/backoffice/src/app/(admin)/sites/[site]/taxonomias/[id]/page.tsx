@@ -14,6 +14,7 @@ import {
   readTaxonomies,
   sitePageContext,
   withoutId,
+  siteTrail,
 } from '../../editorial-page.tsx';
 import { itemTitle } from '../../item-title.ts';
 
@@ -52,7 +53,9 @@ export default async function EditTaxonomyPage({ params }: Params) {
     <section aria-labelledby="edit-taxonomy-title" className="form-width space-y-4">
       <PageHeader
         id="edit-taxonomy-title"
-        back={{ href: `/sites/${site.id}/taxonomias`, label: `Taxonomias de ${site.id}` }}
+        trail={siteTrail(site, { label: 'Taxonomias', segment: 'taxonomias' }, [
+          { label: taxonomy.name },
+        ])}
         title={`Editar “${taxonomy.name}”`}
       />
       <EntityForm

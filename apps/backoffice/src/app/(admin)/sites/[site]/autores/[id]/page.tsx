@@ -15,6 +15,7 @@ import {
   readAuthors,
   sitePageContext,
   withoutId,
+  siteTrail,
 } from '../../editorial-page.tsx';
 import { itemTitle } from '../../item-title.ts';
 
@@ -52,7 +53,7 @@ export default async function EditAuthorPage({ params }: Params) {
     <section aria-labelledby="edit-author-title" className="form-width space-y-4">
       <PageHeader
         id="edit-author-title"
-        back={{ href: `/sites/${site.id}/autores`, label: `Autores de ${site.id}` }}
+        trail={siteTrail(site, { label: 'Autores', segment: 'autores' }, [{ label: author.name }])}
         title={`Editar “${author.name}”`}
       />
       <EntityForm
