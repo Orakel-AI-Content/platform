@@ -14,6 +14,14 @@ export const LIFECYCLE_LABEL: Record<SiteSummary['lifecycle'], string> = {
   publicado: 'Publicado',
 };
 
+/** Ordem fixa das etapas do ciclo de vida (stepper da página do site). */
+export const LIFECYCLE_ORDER = [
+  'cadastrado',
+  'infra_aplicada',
+  'zona_ativa',
+  'publicado',
+] as const satisfies readonly SiteSummary['lifecycle'][];
+
 /** Tipo do conteúdo (lista de conteúdos e versões). */
 export const CONTENT_KIND_LABEL: Record<ContentListItem['kind'], string> = {
   article: 'Artigo',

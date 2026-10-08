@@ -5,6 +5,8 @@ import {
   BUILD_STATUS_VARIANT,
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_VARIANT,
+  LIFECYCLE_LABEL,
+  LIFECYCLE_ORDER,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
   formatDateTime,
@@ -42,5 +44,12 @@ describe('data e hora no fuso do site (#90)', () => {
   it('reaproveita o formatador do fuso sem misturar fusos', () => {
     expect(formatDateTime(instant, 'Europe/Lisbon')).toBe(formatDateTime(instant, 'Europe/Lisbon'));
     expect(formatDateTime(instant, 'UTC')).toBe('01/10/2026, 12:00 UTC');
+  });
+});
+
+describe('ordem do ciclo de vida (#148)', () => {
+  it('tem cada etapa com rótulo exatamente uma vez', () => {
+    expect(new Set(LIFECYCLE_ORDER).size).toBe(LIFECYCLE_ORDER.length);
+    expect([...LIFECYCLE_ORDER].sort()).toEqual(Object.keys(LIFECYCLE_LABEL).sort());
   });
 });
