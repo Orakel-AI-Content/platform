@@ -90,6 +90,25 @@ export function getBuildRunnerEnv(): BuildRunnerEnv {
   return parseBuildRunnerEnv(process.env);
 }
 
+/**
+ * Só o banco (#145): para quem abre o Postgres e não precisa do ambiente do app inteiro, como
+ * a limpeza do E2E. Uma variável do app ausente (ex.: `PREVIEW_BASE_URL` num `.env.local`
+ * antigo) não impede de chegar ao banco.
+ */
+export const DatabaseEnvSchema = EnvSchema.pick({ DATABASE_URL: true });
+
+export function parseDatabaseEnv(source: Record<string, string | undefined>): string {
+  const parsed = DatabaseEnvSchema.safeParse(source);
+  if (parsed.success) return parsed.data.DATABASE_URL;
+  const lines = parsed.error.issues.map((issue) => `- ${issue.path.join('.')}: ${issue.message}`);
+  throw new Error(`Variáveis de ambiente inválidas ou ausentes:\n${lines.join('\n')}`);
+}
+
+/** URL do Postgres, sem validar o resto do ambiente do app. */
+export function getDatabaseUrl(): string {
+  return parseDatabaseEnv(process.env);
+}
+
 let cached: Env | undefined;
 
 export function getEnv(): Env {

@@ -1,14 +1,19 @@
 import { sql } from 'drizzle-orm';
 
 import { createDb, createPool } from '../../src/db/client.ts';
-import { getEnv } from '../../src/env.ts';
+import { getDatabaseUrl } from '../../src/env.ts';
 
 // Limpeza dos sites que o E2E cadastra no banco local (e2e-<timestamp>): sem ela, cada
 // rodada deixa sites pausados na lista. O produto não remove sites; aqui é direto no banco.
 
-/** Tabelas com site_id, das dependentes para as de que dependem. */
-const SITE_TABLES = [
+/**
+ * Tabelas com chave estrangeira para `sites`, das dependentes para as de que dependem. O
+ * contrato `e2e-cleanup.contract.test.ts` confere a lista contra o catálogo do Postgres: uma
+ * tabela fora dela faz o `delete from sites` falhar e desfaz a limpeza inteira (#145).
+ */
+export const SITE_TABLES = [
   'builds',
+  'reviews',
   'pending_changes',
   'content_versions',
   'contents',
@@ -30,7 +35,9 @@ const SITE_TABLES = [
 export async function removeSites(siteIds: readonly string[]): Promise<void> {
   if (siteIds.length === 0) return;
   const ids = [...siteIds];
-  const pool = createPool(getEnv().DATABASE_URL);
+  // Só a DATABASE_URL (#145): uma variável do app ausente no `.env.local` não pode impedir a
+  // limpeza e deixar os sites da rodada no banco.
+  const pool = createPool(getDatabaseUrl());
   try {
     await createDb(pool).transaction(async (tx) => {
       for (const table of SITE_TABLES) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseBuildRunnerEnv, parseEnv } from './env.ts';
+import { parseBuildRunnerEnv, parseDatabaseEnv, parseEnv } from './env.ts';
 
 const valid = {
   DATABASE_URL: 'postgres://orakel:x@localhost:5432/orakel',
@@ -87,5 +87,18 @@ describe('parseBuildRunnerEnv', () => {
     expect(() =>
       parseBuildRunnerEnv({ ...runner, DOCKER_HOST: 'unix:///var/run/docker.sock' }),
     ).toThrow(/DOCKER_HOST/);
+  });
+});
+
+describe('parseDatabaseEnv (#145)', () => {
+  it('exige só a DATABASE_URL: o resto do ambiente do app pode faltar', () => {
+    expect(parseDatabaseEnv({ DATABASE_URL: valid.DATABASE_URL })).toBe(valid.DATABASE_URL);
+    // Sem PREVIEW_BASE_URL (e o resto), o ambiente completo recusa; o do banco, não.
+    expect(() => parseEnv({ DATABASE_URL: valid.DATABASE_URL })).toThrow(/PREVIEW_BASE_URL/);
+  });
+
+  it('sem DATABASE_URL, ou com uma URL inválida, recusa com o nome da variável', () => {
+    expect(() => parseDatabaseEnv({})).toThrow(/DATABASE_URL/);
+    expect(() => parseDatabaseEnv({ DATABASE_URL: 'banco' })).toThrow(/DATABASE_URL/);
   });
 });
