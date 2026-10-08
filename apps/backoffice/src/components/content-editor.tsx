@@ -353,7 +353,7 @@ export function ContentEditor({
                 <fieldset
                   id={`${id}-block-${index}`}
                   tabIndex={-1}
-                  className="space-y-4 rounded-md border border-border p-4"
+                  className="rounded-md border border-border p-4"
                 >
                   {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
                   <legend className="sr-only">{`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}</legend>
@@ -400,7 +400,7 @@ export function ContentEditor({
                     </div>
                   </div>
                   {/* Recolhido, só oculto: os campos seguem registrados e o TipTap guarda o texto. */}
-                  <div id={`${id}-block-body-${index}`} hidden={isCollapsed}>
+                  <div id={`${id}-block-body-${index}`} hidden={isCollapsed} className="mt-4">
                     <SchemaFields
                       schema={BLOCK_SCHEMAS[type]}
                       prefix={`blocks.${index}`}
