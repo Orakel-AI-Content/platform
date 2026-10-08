@@ -524,3 +524,76 @@ describe('SchemaForm: resumo de erros', () => {
     expect(within(alert).queryByRole('button')).toBeNull();
   });
 });
+
+describe('SchemaForm: seções com índice', () => {
+  const schema = z.object({
+    name: z.string(),
+    theme: z.string(),
+    indexavel: z.boolean(),
+    extra: z.string(),
+  });
+
+  function renderSections() {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ name: 'A', theme: 'padrao', indexavel: false, extra: '' }}
+        labels={{ name: 'Nome', theme: 'Tema', indexavel: 'Indexável', extra: 'Extra' }}
+        sections={[
+          { id: 'identidade', title: 'Identidade', paths: ['name'] },
+          { id: 'aparencia', title: 'Aparência', paths: ['theme', 'indexavel'] },
+        ]}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+  }
+
+  it('cada seção tem um h2 e só os seus campos; a chave fora de seção vem depois', () => {
+    renderSections();
+
+    const headings = screen.getAllByRole('heading', { level: 2 });
+    expect(headings.map((heading) => heading.textContent)).toEqual(['Identidade', 'Aparência']);
+    const identity = screen.getByRole('region', { name: 'Identidade' });
+    expect(within(identity).getByLabelText('Nome')).toBeTruthy();
+    expect(within(identity).queryByLabelText('Tema')).toBeNull();
+    const look = screen.getByRole('region', { name: 'Aparência' });
+    expect(within(look).getByLabelText('Tema')).toBeTruthy();
+    expect(within(look).getByLabelText('Indexável')).toBeTruthy();
+    // Fora de toda seção: aparece, depois da última.
+    const extra = screen.getByLabelText('Extra');
+    expect(look.contains(extra)).toBe(false);
+    expect(look.compareDocumentPosition(extra) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('o índice no topo liga cada item à âncora do título da seção', () => {
+    renderSections();
+
+    const nav = screen.getByRole('navigation', { name: 'Seções do formulário' });
+    const links = within(nav).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual(['Identidade', 'Aparência']);
+    for (const link of links) {
+      const target = document.getElementById(link.getAttribute('href')?.slice(1) ?? '');
+      expect(target?.tagName).toBe('H2');
+      expect(target?.textContent).toBe(link.textContent);
+    }
+    // No topo: antes do primeiro campo.
+    expect(
+      nav.compareDocumentPosition(screen.getByLabelText('Nome')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('sem seções não há índice nem h2', () => {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ name: 'A', theme: 'padrao', indexavel: false, extra: '' }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.queryByRole('heading')).toBeNull();
+  });
+});

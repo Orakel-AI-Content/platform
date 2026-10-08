@@ -46,6 +46,9 @@ export type FieldProps = {
 
 export type FieldRenderer = (props: FieldProps) => ReactNode;
 
+/** Grupo de chaves de topo do schema, com título; `id` vira a âncora `#secao-<id>`. */
+export type SchemaFormSection = { id: string; title: string; paths: string[] };
+
 export type SchemaFormProps<T> = {
   schema: z.ZodType<T>;
   defaultValues: Record<string, unknown>;
@@ -58,6 +61,11 @@ export type SchemaFormProps<T> = {
   readOnly?: string[];
   /** Campos especiais por caminho; têm prioridade sobre o desenho padrão. */
   fields?: Record<string, FieldRenderer>;
+  /**
+   * Seções na mesma página, com um índice no topo. Chave de topo fora de todas vai depois
+   * delas, sem título; sem seções, o desenho é uma coluna só.
+   */
+  sections?: SchemaFormSection[];
   submitLabel: string;
   /** Rótulo do botão durante o envio (desabilitado até a resposta); padrão "Salvando…". */
   pendingLabel?: string;
@@ -439,6 +447,8 @@ export type SchemaFieldsProps = {
   hidden?: string[];
   readOnly?: string[];
   fields?: Record<string, FieldRenderer>;
+  /** Só na raiz (`prefix` vazio): agrupa as chaves de topo em seções com `h2`. */
+  sections?: SchemaFormSection[];
 };
 
 /**
@@ -455,6 +465,7 @@ export function SchemaFields({
   hidden = [],
   readOnly = [],
   fields = {},
+  sections,
 }: SchemaFieldsProps) {
   const id = useId();
   const {
@@ -474,10 +485,36 @@ export function SchemaFields({
     readOnly: new Set(readOnly),
     fields,
   };
-  return root.kind === 'object' ? (
-    <Children ctx={ctx} shape={root.shape} prefix={prefix} />
-  ) : (
-    <p className="text-sm text-warning">O gerador espera um schema de objeto.</p>
+  if (root.kind !== 'object') {
+    return <p className="text-sm text-warning">O gerador espera um schema de objeto.</p>;
+  }
+  if (sections === undefined || prefix !== '') {
+    return <Children ctx={ctx} shape={root.shape} prefix={prefix} />;
+  }
+  const pick = (keys: string[]) =>
+    Object.fromEntries(Object.entries(root.shape).filter(([key]) => keys.includes(key)));
+  const inSection = new Set(sections.flatMap((section) => section.paths));
+  return (
+    <>
+      {sections.map((section) => (
+        <section
+          key={section.id}
+          aria-labelledby={`secao-${section.id}`}
+          className="space-y-4 pt-2"
+        >
+          <h2 id={`secao-${section.id}`} className="text-lg font-semibold">
+            {section.title}
+          </h2>
+          <Children ctx={ctx} shape={pick(section.paths)} prefix="" />
+        </section>
+      ))}
+      {/* Chave de topo fora de todas as seções: depois delas, nunca omitida. */}
+      <Children
+        ctx={ctx}
+        shape={pick(Object.keys(root.shape).filter((key) => !inSection.has(key)))}
+        prefix=""
+      />
+    </>
   );
 }
 
@@ -490,6 +527,7 @@ export function SchemaForm<T>({
   hidden,
   readOnly,
   fields,
+  sections,
   submitLabel,
   pendingLabel = 'Salvando…',
   submitDisabled = false,
@@ -553,6 +591,19 @@ export function SchemaForm<T>({
           )(event);
         }}
       >
+        {sections && (
+          <nav aria-label="Seções do formulário">
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              {sections.map((section) => (
+                <li key={section.id}>
+                  <a href={`#secao-${section.id}`} className="underline underline-offset-4">
+                    {section.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
         <div
           role="alert"
           className={cn(
@@ -595,6 +646,7 @@ export function SchemaForm<T>({
           hidden={hidden}
           readOnly={readOnly}
           fields={fields}
+          sections={sections}
         />
         <div className="flex flex-wrap items-center gap-3">
           <Button

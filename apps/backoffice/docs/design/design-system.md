@@ -131,7 +131,11 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   um item por campo inválido, "<rótulo>: <mensagem>", com a posição em cada lista
   ("Pergunta (pergunta 2)"), na ordem do schema, e acompanha a correção. Cada item é um botão
   que leva o foco ao campo (`setFocus`; campo registrado precisa ligar o `ref`); o erro da
-  lista inteira vem sem botão. A recusa do servidor sem `path` aparece acima da lista. Durante o envio o botão fica desabilitado e mostra `pendingLabel`
+  lista inteira vem sem botão. A recusa do servidor sem `path` aparece acima da lista.
+  Formulário longo (a configuração do site) passa `sections` (`{ id, title, paths }`, chaves
+  de topo): cada seção vira `<section>` com `h2` (`#secao-<id>`), todas na mesma página, sem
+  abas, com um índice de âncoras no topo (`nav` "Seções do formulário"). Chave de topo fora
+  de todas as seções aparece depois delas; sem `sections`, uma coluna só. Durante o envio o botão fica desabilitado e mostra `pendingLabel`
   ("Salvando…" por padrão; "Cadastrando…", "Criando…", "Aprovando…" por quem chama), sem
   segundo envio. Quem fica na tela confirma devolvendo `{ success: mensagem }`: o texto
   aparece ao lado do botão, numa região `role="status"` em `text-success`, e some no próximo
