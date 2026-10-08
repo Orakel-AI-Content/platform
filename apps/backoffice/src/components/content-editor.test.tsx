@@ -465,3 +465,61 @@ describe('controles de bloco com ícones (#131)', () => {
     ).toEqual(['A', 'B', 'C']);
   });
 });
+
+describe('inserir bloco em qualquer posição (#134)', () => {
+  const three = { ...meta, blocks: [toc(1, 'A'), toc(2, 'B'), toc(3, 'C')] };
+  const listOf = (trigger: HTMLElement) => {
+    const list = document.getElementById(trigger.getAttribute('popovertarget') ?? '');
+    if (list === null) throw new Error('gatilho sem lista');
+    return list;
+  };
+
+  it('há um ponto antes de cada bloco, com a posição no nome e os tipos da release', () => {
+    renderEditor({ defaultValues: three, blockTypes: ['text', 'toc', 'image'] });
+
+    const triggers = screen.getAllByRole('button', { name: /^Inserir bloco na posição/ });
+    expect(triggers.map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Inserir bloco na posição 1',
+      'Inserir bloco na posição 2',
+      'Inserir bloco na posição 3',
+    ]);
+    expect(
+      [...listOf(triggers[1] as HTMLElement).querySelectorAll('button')].map((b) => b.textContent),
+    ).toEqual(['Texto', 'Sumário', 'Imagem']);
+  });
+
+  it('escolher um tipo insere ali, renumera os seguintes, fecha a lista e leva o foco ao bloco novo', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor({ defaultValues: three });
+    const trigger = screen.getByRole('button', { name: 'Inserir bloco na posição 2' });
+    const list = listOf(trigger);
+    const hide = vi.fn();
+    list.hidePopover = hide;
+
+    await user.click(within(list).getByRole('button', { name: 'Sumário' }));
+
+    expect(hide).toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: 'Bloco 2: Sumário' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Remover bloco 4' })).toBeTruthy();
+    const titles = screen.getAllByLabelText<HTMLInputElement>('Título do sumário');
+    expect(titles.map((input) => input.value)).toEqual(['A', '', 'B', 'C']);
+    await waitFor(() => expect(document.activeElement).toBe(titles[1]));
+
+    await user.type(titles[1] as HTMLElement, 'Novo');
+    await save(user);
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(action.mock.calls[0]?.[0].blocks).toEqual([
+      toc(1, 'A'),
+      { new: true, type: 'toc', title: 'Novo' },
+      toc(2, 'B'),
+      toc(3, 'C'),
+    ]);
+  });
+
+  it('sem blocos, só o "Adicionar bloco"', () => {
+    renderEditor({ mode: 'create', defaultValues: { ...meta, blocks: [] } });
+
+    expect(screen.queryByRole('button', { name: /^Inserir bloco/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Adicionar bloco' })).toBeTruthy();
+  });
+});
