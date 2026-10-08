@@ -7,6 +7,7 @@ import { emptySiteConfig } from '@/components/site-config-form-values.ts';
 import { SiteConfigForm } from '@/components/site-config-form';
 import { can } from '@/domain/access/rbac.ts';
 
+import { PageHeader } from '../[site]/editorial-page.tsx';
 import { createSiteAction } from '../actions.ts';
 
 export const dynamic = 'force-dynamic';
@@ -22,9 +23,11 @@ export default async function NewSitePage() {
   }
   return (
     <section aria-labelledby="new-site-title" className="form-width space-y-6">
-      <h1 id="new-site-title" className="text-2xl font-semibold">
-        Cadastrar site
-      </h1>
+      <PageHeader
+        id="new-site-title"
+        trail={[{ label: 'Sites', href: '/sites' }, { label: 'Cadastrar site' }]}
+        title="Cadastrar site"
+      />
       <SiteConfigForm
         mode="create"
         defaultValues={emptySiteConfig(RESOURCES)}
