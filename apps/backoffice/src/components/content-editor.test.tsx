@@ -67,6 +67,7 @@ function renderEditor({
     <ContentEditor
       mode={mode}
       siteId="exemplo-a"
+      timeZone="America/Sao_Paulo"
       defaultValues={defaultValues}
       options={{ ...options, blockTypes }}
       action={action}
@@ -648,5 +649,23 @@ describe('recolher e expandir blocos (#135)', () => {
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getAllByLabelText('Título do sumário')[2]),
     );
+  });
+
+  it('a data de publicação é um seletor no fuso do site, gravado com o offset dele (#183)', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor();
+
+    const date = screen.getByLabelText('Data de publicação');
+    expect(date.getAttribute('type')).toBe('datetime-local');
+    expect((date as HTMLInputElement).value).toBe('2026-10-06T12:00');
+    expect(document.getElementById(date.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      'Horário de America/Sao_Paulo',
+    );
+
+    fireEvent.change(date, { target: { value: '2026-10-07T09:15' } });
+    await save(user);
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(action.mock.calls[0]?.[0].publishedAt).toBe('2026-10-07T09:15:00-03:00');
   });
 });
