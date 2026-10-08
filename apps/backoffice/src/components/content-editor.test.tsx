@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FieldValues } from 'react-hook-form';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
 import type { ContentFormResult } from './content-editor-values.ts';
-import { ContentEditor, type ContentEditorOptions } from './content-editor.tsx';
+import { ContentEditor, UNDO_MS, type ContentEditorOptions } from './content-editor.tsx';
 
 // Editor de conteúdo (#45): tipos da release, seletores do site, teclado e erros por campo.
 
@@ -336,5 +336,97 @@ describe('aviso ao sair (#111)', () => {
     await save(user);
     await screen.findByText('Versão 2 salva.');
     await waitFor(() => expect(leave()).toBe(false));
+  });
+});
+
+describe('desfazer a remoção de bloco (#112)', () => {
+  const three = { ...meta, blocks: [toc(1, 'A'), toc(2, 'B'), toc(3, 'C')] };
+  const status = () => screen.getByRole('status').textContent;
+  const titles = () =>
+    screen.getAllByLabelText<HTMLInputElement>('Título do sumário').map((input) => input.value);
+  const remove = (user: ReturnType<typeof userEvent.setup>, position: number) =>
+    user.click(screen.getByRole('button', { name: `Remover bloco ${position}` }));
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('remover mostra "Bloco N removido." em role="status", com o botão Desfazer', async () => {
+    const user = userEvent.setup();
+    renderEditor({ defaultValues: three });
+
+    await remove(user, 2);
+
+    expect(status()).toBe('Bloco 2 removido.');
+    expect(screen.getByRole('button', { name: 'Desfazer' })).toBeTruthy();
+    expect(titles()).toEqual(['A', 'C']);
+  });
+
+  it('o desfazer fica por 10 s e some depois', () => {
+    // Timers falsos: o `userEvent` espera timers de verdade; o clique aqui é síncrono.
+    vi.useFakeTimers();
+    renderEditor({ defaultValues: three });
+    fireEvent.click(screen.getByRole('button', { name: 'Remover bloco 1' }));
+
+    act(() => {
+      vi.advanceTimersByTime(UNDO_MS - 1);
+    });
+    expect(screen.getByRole('button', { name: 'Desfazer' })).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull();
+    expect(status()).toBe('');
+    expect(UNDO_MS).toBeGreaterThanOrEqual(10_000);
+  });
+
+  it('desfazer devolve no mesmo índice, com os valores editados, o mesmo n e o foco', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor({ defaultValues: three });
+    const second = screen.getAllByLabelText('Título do sumário')[1] as HTMLElement;
+    await user.clear(second);
+    await user.type(second, 'B editado');
+
+    await remove(user, 2);
+    await user.click(screen.getByRole('button', { name: 'Desfazer' }));
+
+    expect(titles()).toEqual(['A', 'B editado', 'C']);
+    expect(screen.getByRole('group', { name: 'Bloco 2: Sumário' })).toBeTruthy();
+    expect(status()).toBe('Bloco 2 devolvido.');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getAllByLabelText('Título do sumário')[1]),
+    );
+    await save(user);
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(action.mock.calls[0]?.[0].blocks).toEqual([
+      toc(1, 'A'),
+      toc(2, 'B editado'),
+      toc(3, 'C'),
+    ]);
+  });
+
+  it('remover outro bloco troca o desfazer pelo da remoção mais recente', async () => {
+    const user = userEvent.setup();
+    renderEditor({ defaultValues: three });
+
+    await remove(user, 1);
+    await remove(user, 2);
+    expect(status()).toBe('Bloco 2 removido.');
+    expect(screen.getAllByRole('button', { name: 'Desfazer' })).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Desfazer' }));
+    expect(titles()).toEqual(['B', 'C']);
+  });
+
+  it('salvar descarta o desfazer', async () => {
+    const user = userEvent.setup();
+    renderEditor({ defaultValues: three });
+
+    await remove(user, 3);
+    await save(user);
+
+    expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull();
   });
 });
