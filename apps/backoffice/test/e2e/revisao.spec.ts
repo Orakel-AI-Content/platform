@@ -58,10 +58,10 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
   await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Em revisão');
   await expect(page.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);
 
-  // A fila é acessível pela navegação do site e mostra título, tipo, versão e data.
+  // A fila é acessível pela barra lateral do site e mostra título, tipo, versão e data.
   await page.goto('/sites/exemplo-a');
   await page
-    .getByRole('navigation', { name: 'Conteúdo editorial do site' })
+    .getByRole('navigation', { name: 'Áreas do site' })
     .getByRole('link', { name: 'Revisão' })
     .click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/revisao$/);
@@ -81,7 +81,7 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
   // O revisor também alcança a fila pela navegação.
   await reviewer.goto('/sites/exemplo-a');
   await reviewer
-    .getByRole('navigation', { name: 'Conteúdo editorial do site' })
+    .getByRole('navigation', { name: 'Áreas do site' })
     .getByRole('link', { name: 'Revisão' })
     .click();
   await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toBeVisible();

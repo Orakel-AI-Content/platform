@@ -1,12 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Layout do site (#78, workspace#32) contra o ambiente local: título da aba com a área e o
-// site, "não encontrado" de site e de item com o link certo e status 404, e o carregamento
-// entre áreas do mesmo site com o cabeçalho visível.
+// site, "não encontrado" de site e de item com o link certo e status 404, o carregamento
+// entre áreas do mesmo site com o cabeçalho visível e a barra lateral de áreas (#171).
 
 const OPERATOR = 'operacao@orakel.local';
 const SITE = 'exemplo-a';
 const SITE_NAME = 'Exemplo A — Guias';
+
+const AREAS = ['Visão geral', 'Conteúdos', 'Revisão', 'Mídia', 'Autores', 'Taxonomias', 'Menus'];
 
 async function loginAs(page: Page, email: string): Promise<void> {
   await page.goto('/sites');
@@ -84,4 +86,61 @@ test('entre áreas do mesmo site, o carregamento aparece com o cabeçalho visív
   await expect(page).toHaveTitle(`Mídia · ${SITE_NAME} · Orakel Backoffice`);
   await expect(page.getByRole('status').filter({ hasText: 'Carregando' })).toHaveCount(0);
   await expect(page.getByRole('banner')).toContainText(OPERATOR);
+});
+
+test('a barra lateral lista as áreas, sem Textos institucionais para quem não edita', async ({
+  page,
+}) => {
+  await loginAs(page, OPERATOR);
+  await page.goto(`/sites/${SITE}`);
+  const bar = page.getByRole('navigation', { name: 'Áreas do site' });
+  await expect(bar.getByRole('link')).toHaveText(AREAS);
+  // A página do site não repete as áreas; "Editar configuração" continua nela.
+  await expect(page.getByRole('link', { name: 'Autores', exact: true })).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'Editar configuração' })).toBeVisible();
+});
+
+test('com content.write, a barra também tem Textos institucionais', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto(`/sites/${SITE}/midia`);
+  await expect(
+    page.getByRole('navigation', { name: 'Áreas do site' }).getByRole('link'),
+  ).toHaveText([...AREAS, 'Textos institucionais']);
+});
+
+test('a área atual tem aria-current, também em telas de item, criar e editar', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+  const bar = page.getByRole('navigation', { name: 'Áreas do site' });
+  const current = bar.locator('[aria-current="page"]');
+
+  for (const [path, area] of [
+    ['', 'Visão geral'],
+    ['/autores', 'Autores'],
+    ['/autores/novo', 'Autores'],
+    ['/conteudos/novo', 'Conteúdos'],
+    ['/revisao', 'Revisão'],
+    ['/configuracao', 'Visão geral'],
+  ]) {
+    await page.goto(`/sites/${SITE}${path}`);
+    await expect(current).toHaveCount(1);
+    await expect(current).toHaveText(area);
+  }
+});
+
+test('a barra é navegável só com teclado', async ({ page }) => {
+  await loginAs(page, OPERATOR);
+  await page.goto(`/sites/${SITE}`);
+  const taxonomies = page
+    .getByRole('navigation', { name: 'Áreas do site' })
+    .getByRole('link', { name: 'Taxonomias' });
+
+  for (let step = 0; step < 40; step += 1) {
+    if (await taxonomies.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(taxonomies).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(new RegExp(`/sites/${SITE}/taxonomias$`));
+  await expect(taxonomies).toHaveAttribute('aria-current', 'page');
 });

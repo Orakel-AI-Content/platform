@@ -25,7 +25,7 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   const category = `Categoria ${stamp}`;
   await loginAs(page, 'editor@orakel.local');
   await page.goto('/sites/exemplo-a');
-  const nav = page.getByRole('navigation', { name: 'Conteúdo editorial do site' });
+  const nav = page.getByRole('navigation', { name: 'Áreas do site' });
 
   await nav.getByRole('link', { name: 'Autores' }).click();
   // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
@@ -115,7 +115,7 @@ test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
   await page.goto('/sites/exemplo-a');
   await page
-    .getByRole('navigation', { name: 'Conteúdo editorial do site' })
+    .getByRole('navigation', { name: 'Áreas do site' })
     .getByRole('link', { name: 'Textos institucionais' })
     .click();
 
@@ -134,7 +134,7 @@ test('editor altera o texto "sobre" com rich text', async ({ page }) => {
 test('revisor não vê formulário nem links de criar e editar', async ({ page }) => {
   await loginAs(page, 'revisor@orakel.local');
   await page.goto('/sites/exemplo-a');
-  const nav = page.getByRole('navigation', { name: 'Conteúdo editorial do site' });
+  const nav = page.getByRole('navigation', { name: 'Áreas do site' });
   await expect(nav.getByRole('link', { name: 'Autores' })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Textos institucionais' })).toHaveCount(0);
 
