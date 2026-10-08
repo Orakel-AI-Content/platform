@@ -166,8 +166,10 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   marca da URL (como o `?criado=1` do conteúdo).
   Dentro de um formulário maior (`FormProvider`), `SchemaFields` desenha um schema sob um
   prefixo (`blocks.2`), com os caminhos completos no registro (`blocks.*.content`): é como o
-  editor de conteúdo monta cada bloco. Referências do site: `mediaField(opções)` (`<select>`,
-  `{ optional: true }` para capa) e `entityField(opções, aviso)` (caixas de seleção para
+  editor de conteúdo monta cada bloco. Referências do site: `mediaField(source)` (miniatura
+  do valor atual lida por ID, "Escolher imagem"/"Trocar" pelo `MediaPicker` e, com
+  `{ optional: true }` para capa e avatar, "Remover"; `source` são as actions da leitura
+  paginada e por IDs ligadas ao site pela página) e `entityField(opções, aviso)` (caixas de seleção para
   `authorIds` e `taxonomyIds`), em `src/components/forms/picker-fields.tsx`.
   Campos registrados recebem `ref` (ligue ao controle focável, para o foco do erro chegar) e
   `readOnly` (caminhos em `readOnly`). Para listas de texto, feature flags e opções de
