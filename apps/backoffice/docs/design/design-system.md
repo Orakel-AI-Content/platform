@@ -15,7 +15,10 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   Espaço) também fecha a lista, por um `onClick` no contêiner que chama `hidePopover()`, sem
   estado React. A posição é por CSS anchor positioning. O happy-dom não implementa popover: o
   teste de componente confere o nome, a ligação botão → lista e a chamada a `hidePopover`
-  (espionado), e o E2E confere abrir, fechar, Esc e o fechamento ao acionar um item.
+  (espionado), e o E2E confere abrir, fechar, Esc e o fechamento ao acionar um item. Com
+  `text` (`{ visible, label }`), o botão mostra um texto próprio no lugar de "Mais ações", e
+  o nome acessível contém esse texto; `align="start"` abre a lista para a direita (menu na
+  borda esquerda, como o seletor de site).
 - **Botão de ícone:** `IconButton` (`src/components/ui/icon-button.tsx`), próprio (o tooltip
   do shadcn usaria Radix), para ações repetidas e compactas, como os controles de cada bloco do
   editor. O nome vem de `label` (`aria-label`, com a posição: "Mover bloco 3 para cima"); a dica
@@ -84,7 +87,11 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   coluna de conteúdo. `SiteNav` (`src/components/site-nav.tsx`, `nav` "Áreas do site")
   recebe os itens prontos do servidor (Textos institucionais só com `content.write`) e marca
   a área atual pelo primeiro segmento depois do site, com `aria-current="page"` e
-  `bg-muted`, também nas telas de item; Configuração e Pendências marcam a Visão geral.
+  `bg-muted`, também nas telas de item; Configuração e Pendências marcam a Visão geral. No
+  topo da barra, `SiteSwitcher` (`src/components/site-switcher.tsx`): `ActionsMenu` com o
+  nome do site, listando os sites de `listSites` (vindos do `lookupSite`), cada um levando à
+  mesma área (`sameAreaIn`: item, criar e editar caem na lista); o atual com
+  `aria-current="true"`.
 - **Estados:** badge com o texto do estado e uma variante própria dentro do grupo, sem ícone
   (o texto distingue os estados em tons de cinza). O mapa fica ao lado dos rótulos, em
   `src/components/site-labels.ts` (`CONTENT_STATUS_VARIANT`, `SITE_STATE_VARIANT`,
