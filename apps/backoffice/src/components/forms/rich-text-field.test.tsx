@@ -12,6 +12,13 @@ import { SchemaForm } from './schema-form.tsx';
 
 afterEach(cleanup);
 
+// Botões da barra, sem os do popover de link (#132): no navegador o popover fechado não
+// aparece nem conta na árvore de acessibilidade; o happy-dom não implementa popover.
+const toolbarButtons = (toolbar: HTMLElement) =>
+  within(toolbar)
+    .getAllByRole('button')
+    .filter((button) => button.closest('[popover]') === null);
+
 const textBlock = {
   n: 1,
   type: 'text',
@@ -42,7 +49,7 @@ describe('campo de rich text', () => {
     expect(editor.textContent).toBe('Olá mundo');
     const toolbar = screen.getByRole('toolbar', { name: 'Formatação: Texto' });
     // Pelo nome acessível: com o botão de ícone, o texto dentro dele é só a dica.
-    const buttons = within(toolbar).getAllByRole('button');
+    const buttons = toolbarButtons(toolbar);
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Negrito',
       'Itálico',
@@ -62,9 +69,9 @@ describe('campo de rich text', () => {
     // Marcas | estrutura: um separador entre "Link" e "Intertítulo 2".
     const separator = within(toolbar).getByRole('separator');
     expect(separator.getAttribute('aria-orientation')).toBe('vertical');
-    const order = [...toolbar.querySelectorAll('button, [role="separator"]')].map(
-      (node) => node.getAttribute('aria-label') ?? '|',
-    );
+    const order = [...toolbar.querySelectorAll('button, [role="separator"]')]
+      .filter((node) => node.closest('[popover]') === null)
+      .map((node) => node.getAttribute('aria-label') ?? '|');
     expect(order.slice(3, 6)).toEqual(['Link', '|', 'Intertítulo 2']);
   });
 
@@ -113,7 +120,7 @@ describe('campo de rich text', () => {
     const toolbar = screen.getByRole('toolbar', { name: 'Formatação: Citação' });
     expect(within(toolbar).queryByRole('button', { name: /Intertítulo|Lista/ })).toBeNull();
     // Só as marcas, sem separador (#133).
-    expect(within(toolbar).getAllByRole('button')).toHaveLength(4);
+    expect(toolbarButtons(toolbar)).toHaveLength(4);
     expect(within(toolbar).queryByRole('separator')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Salvar' }));

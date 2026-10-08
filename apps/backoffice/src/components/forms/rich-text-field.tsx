@@ -7,6 +7,8 @@ import type { ReactNode } from 'react';
 
 import { IconButton } from '@/components/ui/icon-button';
 
+import { LinkPopover } from './link-popover.tsx';
+
 import {
   inlinesDocFromTipTap,
   inlinesDocToTipTap,
@@ -35,7 +37,8 @@ type Action = {
   label: string;
   icon: ReactNode;
   active: (editor: Editor) => boolean;
-  run: (editor: Editor) => void;
+  /** Sem `run`: a ação abre o popover de link (#132). */
+  run?: (editor: Editor) => void;
 };
 
 const MARK_ACTIONS: Action[] = [
@@ -61,14 +64,6 @@ const MARK_ACTIONS: Action[] = [
     label: 'Link',
     icon: <Link />,
     active: (e) => e.isActive('link'),
-    run: (e) => {
-      if (e.isActive('link')) {
-        e.chain().focus().unsetLink().run();
-        return;
-      }
-      const href = window.prompt('Endereço do link (caminho iniciado por / ou URL http/https)');
-      if (href) e.chain().focus().setLink({ href }).run();
-    },
   },
 ];
 
@@ -120,6 +115,12 @@ function Toolbar({ editor, mode, label }: { editor: Editor; mode: RichTextMode; 
           )}
           {group.map((action) => {
             const index = actions.indexOf(action);
+            const { run } = action;
+            if (!run) {
+              return (
+                <LinkPopover key={action.label} editor={editor} pressed={pressed[index] ?? false} />
+              );
+            }
             return (
               <IconButton
                 key={action.label}
@@ -127,7 +128,7 @@ function Toolbar({ editor, mode, label }: { editor: Editor; mode: RichTextMode; 
                 icon={action.icon}
                 aria-pressed={pressed[index] ?? false}
                 className="aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-                onClick={() => action.run(editor)}
+                onClick={() => run(editor)}
               />
             );
           })}
