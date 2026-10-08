@@ -15,8 +15,14 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Sites' };
 
-/** Registro de instâncias: um site por linha, com estado, release e mudanças pendentes. */
-export default async function SitesPage() {
+type SearchParams = { searchParams: Promise<{ cadastrado?: string | string[] }> };
+
+/**
+ * Registro de instâncias: um site por linha, com estado, release e mudanças pendentes.
+ * `?cadastrado=<id>` vem do cadastro: a tabela anuncia a confirmação no topo.
+ */
+export default async function SitesPage({ searchParams }: SearchParams) {
+  const { cadastrado } = await searchParams;
   const actor = await currentActor();
   if (!actor.ok) return null;
   const sites = await listSites(getDb().db, actor.value);
@@ -55,6 +61,7 @@ export default async function SitesPage() {
         publishNow={can(actor.value, 'operations.run') ? publishNow : undefined}
         canConfigure={canConfigure}
         emptyAction={register}
+        created={typeof cadastrado === 'string' ? cadastrado : undefined}
       />
     </section>
   );

@@ -290,6 +290,69 @@ describe('SchemaForm com o servidor', () => {
     expect(screen.getByRole('alert').textContent).toBe('Tente de novo.');
   });
 
+  it('durante o envio o botão mostra o rótulo pendente, fica desabilitado e não reenvia', async () => {
+    const user = userEvent.setup();
+    let finish: (outcome: { success: string }) => void = () => undefined;
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<{ success: string }>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(
+      <SchemaForm
+        schema={AuthorSchema.omit({ id: true })}
+        defaultValues={{ slug: 'ana', name: 'Ana' }}
+        labels={{ name: 'Nome' }}
+        submitLabel="Criar"
+        pendingLabel="Criando…"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Criar' }));
+    const pending = await screen.findByRole('button', { name: 'Criando…' });
+    expect(pending).toHaveProperty('disabled', true);
+    await user.click(pending);
+    await user.type(screen.getByLabelText('Nome'), '{Enter}');
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+
+    finish({ success: 'Autor salvo.' });
+    const status = await screen.findByText('Autor salvo.');
+    expect(status.getAttribute('role')).toBe('status');
+    expect(status.className).toContain('text-success');
+    expect(screen.getByRole('button', { name: 'Criar' })).toHaveProperty('disabled', false);
+  });
+
+  it('sem rótulo pendente usa "Salvando…"; o próximo envio apaga a confirmação', async () => {
+    const user = userEvent.setup();
+    const outcomes: ((outcome: { success: string } | undefined) => void)[] = [];
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<{ success: string } | undefined>((resolve) => {
+          outcomes.push(resolve);
+        }),
+    );
+    render(
+      <SchemaForm
+        schema={AuthorSchema.omit({ id: true })}
+        defaultValues={{ slug: 'ana', name: 'Ana' }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(await screen.findByRole('button', { name: 'Salvando…' })).toBeTruthy();
+    outcomes[0]?.({ success: 'Salvo.' });
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Salvo.'));
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(''));
+    outcomes[1]?.(undefined);
+    await screen.findByRole('button', { name: 'Salvar' });
+  });
+
   it('rich text opcional apagado é enviado como ausente, sem erro', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

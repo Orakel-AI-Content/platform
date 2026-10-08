@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EntityForm, type EntityFormResult } from './entity-forms.tsx';
+import { EntityForm, InstitutionalTextsForm, type EntityFormResult } from './entity-forms.tsx';
 
 // Formulários de entidades (#46): rótulos por tipo, recusa no campo e volta para a lista.
 
@@ -98,5 +98,48 @@ describe('formulários de entidades', () => {
       items: [{ label: 'Começo', href: '/' }],
     });
     expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/menus');
+  });
+
+  it('criar: "Criando…" com o botão desabilitado até a resposta', async () => {
+    const user = userEvent.setup();
+    let finish: (result: EntityFormResult) => void = () => undefined;
+    const action = vi.fn(
+      () =>
+        new Promise<EntityFormResult>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(
+      <EntityForm
+        kind="taxonomy"
+        mode="create"
+        siteId="exemplo-a"
+        defaultValues={{ kind: 'category', slug: 'guias', name: 'Guias' }}
+        action={action}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Criar' }));
+
+    expect(await screen.findByRole('button', { name: 'Criando…' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    finish(ok);
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/taxonomias'));
+  });
+
+  it('textos institucionais: a confirmação aparece ao lado do botão', async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(() =>
+      Promise.resolve<EntityFormResult>({ ok: true, message: 'Textos salvos.' }),
+    );
+    render(<InstitutionalTextsForm defaultValues={{}} action={action} />);
+
+    await user.click(screen.getByRole('button', { name: 'Salvar textos' }));
+
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Textos salvos.'));
+    expect(screen.getByRole('status').className).toContain('text-success');
+    expect(router.refresh).toHaveBeenCalled();
   });
 });

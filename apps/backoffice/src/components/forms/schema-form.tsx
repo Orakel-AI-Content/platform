@@ -59,13 +59,16 @@ export type SchemaFormProps<T> = {
   /** Campos especiais por caminho; têm prioridade sobre o desenho padrão. */
   fields?: Record<string, FieldRenderer>;
   submitLabel: string;
+  /** Rótulo do botão durante o envio (desabilitado até a resposta); padrão "Salvando…". */
+  pendingLabel?: string;
   /** Envio bloqueado (ex.: aprovação com erro de validação); o motivo vai em `submitDescribedBy`. */
   submitDisabled?: boolean;
   /** `id` do texto que explica o bloqueio do envio (`aria-describedby` do botão). */
   submitDescribedBy?: string;
   /**
    * Recebe o valor validado pelo schema. Pode devolver a recusa do servidor: cada issue com
-   * `path` vira erro do campo; sem `path`, vai para o resumo.
+   * `path` vira erro do campo; sem `path`, vai para o resumo. `{ success }` é a confirmação,
+   * mostrada ao lado do botão.
    */
   onSubmit: (value: T) => SubmitOutcome | Promise<SubmitOutcome>;
 };
@@ -73,7 +76,7 @@ export type SchemaFormProps<T> = {
 /** Recusa do servidor (serializável; `path` aponta o campo). */
 export type SchemaFormIssue = { path: (string | number)[]; message: string };
 
-type SubmitOutcome = void | readonly SchemaFormIssue[];
+type SubmitOutcome = void | readonly SchemaFormIssue[] | { success: string };
 
 type Ctx = {
   id: string;
@@ -416,11 +419,13 @@ export function SchemaForm<T>({
   readOnly,
   fields,
   submitLabel,
+  pendingLabel = 'Salvando…',
   submitDisabled = false,
   submitDescribedBy,
   onSubmit,
 }: SchemaFormProps<T>) {
   const [summary, setSummary] = useState<string[]>([]);
+  const [success, setSuccess] = useState('');
   const resolver = zodResolver(
     z
       .unknown()
@@ -428,17 +433,29 @@ export function SchemaForm<T>({
       .pipe(schema) as unknown as z.ZodType<FieldValues, FieldValues>,
   );
   const form = useForm<FieldValues>({ resolver, defaultValues });
+  const { isSubmitting } = form.formState;
 
   return (
     <FormProvider {...form}>
       <form
         noValidate
         className="space-y-4"
-        onSubmit={(event) =>
+        onSubmit={(event) => {
+          // Um envio por vez: Enter num campo durante o envio também não dispara outro.
+          if (isSubmitting) {
+            event.preventDefault();
+            return;
+          }
           void form.handleSubmit(
             async (value) => {
               setSummary([]);
-              const issues = (await onSubmit(value as T)) ?? [];
+              setSuccess('');
+              const outcome = await onSubmit(value as T);
+              if (outcome !== undefined && 'success' in outcome) {
+                setSuccess(outcome.success);
+                return;
+              }
+              const issues = outcome ?? [];
               const top: string[] = [];
               let focused = false;
               for (const issue of issues) {
@@ -457,9 +474,12 @@ export function SchemaForm<T>({
                 setSummary(top.length > 0 ? top : ['Corrija os campos destacados.']);
               }
             },
-            () => setSummary(['Corrija os campos destacados.']),
-          )(event)
-        }
+            () => {
+              setSuccess('');
+              setSummary(['Corrija os campos destacados.']);
+            },
+          )(event);
+        }}
       >
         <div role="alert" className={cn(summary.length > 0 && 'text-sm text-destructive')}>
           {summary.map((line) => (
@@ -474,9 +494,18 @@ export function SchemaForm<T>({
           readOnly={readOnly}
           fields={fields}
         />
-        <Button type="submit" disabled={submitDisabled} aria-describedby={submitDescribedBy}>
-          {submitLabel}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="submit"
+            disabled={submitDisabled || isSubmitting}
+            aria-describedby={submitDescribedBy}
+          >
+            {isSubmitting ? pendingLabel : submitLabel}
+          </Button>
+          <p role="status" className="text-sm text-success">
+            {success}
+          </p>
+        </div>
       </form>
     </FormProvider>
   );
