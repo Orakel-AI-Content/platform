@@ -42,7 +42,6 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const triggers = await listPolicyTriggers(db, actor, siteId);
   const g1 = triggers.ok ? triggers.value.find((record) => record.trigger === 'G1') : undefined;
   const canConfigure = can(actor, 'site.configure');
-  const canWriteContent = can(actor, 'content.write');
   const canPublish = can(actor, 'operations.run') && site.state !== 'pausado';
 
   const sectionClass = 'space-y-3 rounded-md border border-border p-4';
@@ -64,30 +63,6 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
       <p className="text-sm text-muted-foreground">
         {site.domain} · Indexável: {site.indexavel ? 'sim' : 'não'}
       </p>
-
-      <nav aria-label="Conteúdo editorial do site">
-        <ul className="flex flex-wrap gap-2">
-          {[
-            ['conteudos', 'Conteúdos'],
-            ['revisao', 'Revisão'],
-            ['midia', 'Mídia'],
-            ['autores', 'Autores'],
-            ['taxonomias', 'Taxonomias'],
-            ['menus', 'Menus'],
-            // Só para quem edita: a tela é um formulário (content.write).
-            ...(canWriteContent ? [['institucionais', 'Textos institucionais']] : []),
-          ].map(([segment, label]) => (
-            <li key={segment}>
-              <Link
-                href={`/sites/${site.id}/${segment}`}
-                className={buttonVariants({ variant: 'outline', size: 'sm' })}
-              >
-                {label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
 
       <section aria-labelledby="lifecycle-title" className={sectionClass}>
         <h2 id="lifecycle-title" className="text-lg font-semibold">
