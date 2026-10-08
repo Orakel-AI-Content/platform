@@ -19,6 +19,15 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   `text` (`{ visible, label }`), o botão mostra um texto próprio no lugar de "Mais ações", e
   o nome acessível contém esse texto; `align="start"` abre a lista para a direita (menu na
   borda esquerda, como o seletor de site).
+- **Diálogo de grade de miniaturas:** `MediaPicker` (`src/components/media-picker.tsx`),
+  próprio (o shadcn usaria Radix): um botão (`aria-haspopup="dialog"`) abre um `<dialog>`
+  nativo com `showModal`, que prende o foco e torna o resto da página inerte. Dentro, o título
+  "Escolher imagem", a página de miniaturas vinda de `load(page)` (a Server Action da leitura
+  paginada), cada uma um botão comum "Mídia N · L×A", "Anterior"/"Próxima" desabilitados nas
+  pontas e "Página X de Y · N imagens" em `role="status"` (também carregando, erro e vazio).
+  Escolher chama `onSelect(id)` e fecha; Esc fecha sem escolher; no `close` o foco volta ao
+  botão de origem por `focus()`, sem depender do navegador. A miniatura é a `MediaThumbnail`
+  (`media-library.tsx`), a mesma da biblioteca.
 - **Botão de ícone:** `IconButton` (`src/components/ui/icon-button.tsx`), próprio (o tooltip
   do shadcn usaria Radix), para ações repetidas e compactas, como os controles de cada bloco do
   editor. O nome vem de `label` (`aria-label`, com a posição: "Mover bloco 3 para cima"); a dica

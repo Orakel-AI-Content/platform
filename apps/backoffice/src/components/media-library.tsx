@@ -20,6 +20,28 @@ export type MediaItem = {
   src: string;
 };
 
+/**
+ * Miniatura quadrada de uma mídia (#181): formatos preferidos em `<source>` e a reserva na
+ * `<img>`. A mesma na biblioteca e na grade do editor; o texto fica com quem a usa.
+ */
+export function MediaThumbnail({ item }: { item: MediaItem }) {
+  return (
+    <picture>
+      {item.sources.map((source) => (
+        <source key={source.type} type={source.type} srcSet={source.url} />
+      ))}
+      <img
+        src={item.src}
+        alt=""
+        width={item.width}
+        height={item.height}
+        loading="lazy"
+        className="aspect-square w-full rounded-md border border-border object-cover"
+      />
+    </picture>
+  );
+}
+
 type Status = { kind: 'info' | 'error'; text: string };
 
 /** Formatos que a rota aceita (a assinatura do arquivo é conferida no domínio). */
@@ -157,19 +179,7 @@ export function MediaLibrary({
         {items.map((item) => (
           <li key={item.id}>
             <figure className="space-y-1">
-              <picture>
-                {item.sources.map((source) => (
-                  <source key={source.type} type={source.type} srcSet={source.url} />
-                ))}
-                <img
-                  src={item.src}
-                  alt=""
-                  width={item.width}
-                  height={item.height}
-                  loading="lazy"
-                  className="aspect-square w-full rounded-md border border-border object-cover"
-                />
-              </picture>
+              <MediaThumbnail item={item} />
               <figcaption className="text-xs text-muted-foreground">
                 Mídia {item.id} · {item.width}×{item.height}
               </figcaption>
