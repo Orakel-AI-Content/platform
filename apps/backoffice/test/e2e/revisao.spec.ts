@@ -28,7 +28,11 @@ async function createDraft(page: Page, title: string, slug: string): Promise<str
   await page.getByRole('button', { name: 'Criar conteúdo' }).click();
   // Depois de criar, o editor continua aberto no conteúdo criado (#109).
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos\/\d+\/editar$/);
-  await page.getByRole('link', { name: 'Versões do conteúdo' }).click();
+  // As versões, pela trilha (#174): o título do conteúdo leva a elas.
+  await page
+    .getByRole('navigation', { name: 'Trilha de navegação' })
+    .getByRole('link', { name: title })
+    .click();
   await expect(page.getByRole('heading', { name: `Versões de “${title}”` })).toBeVisible();
   return new URL(page.url()).pathname;
 }
