@@ -22,9 +22,20 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+const photo = (id: number) => ({
+  id,
+  width: 1200,
+  height: 800,
+  sources: [],
+  src: `https://media.exemplo-a.test/${id}.webp`,
+});
+
 const options: ContentEditorOptions = {
   blockTypes: ['text', 'toc', 'quote', 'image', 'faq'],
-  media: [{ id: 1, label: 'Mídia 1 (1200×800)' }],
+  media: {
+    load: (page) => Promise.resolve({ items: [photo(1)], total: 1, page, pageSize: 24 }),
+    byIds: (ids) => Promise.resolve(ids.includes(1) ? [photo(1)] : []),
+  },
   authors: [
     { id: 1, label: 'Ana' },
     { id: 2, label: 'Bia' },

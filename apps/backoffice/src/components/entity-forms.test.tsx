@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,6 +16,13 @@ afterEach(() => {
 });
 
 const ok: EntityFormResult = { ok: true, message: 'Salvo.' };
+const avatar = {
+  id: 2,
+  width: 400,
+  height: 400,
+  sources: [],
+  src: 'https://media.exemplo-a.test/2.webp',
+};
 
 describe('formulários de entidades', () => {
   it('autor: cria com a foto escolhida e volta para a lista', async () => {
@@ -27,14 +34,20 @@ describe('formulários de entidades', () => {
         mode="create"
         siteId="exemplo-a"
         defaultValues={{ slug: '', name: '' }}
-        media={[{ id: 2, label: 'Mídia 2 (400×400)' }]}
+        media={{
+          load: (page) => Promise.resolve({ items: [avatar], total: 1, page, pageSize: 24 }),
+          byIds: () => Promise.resolve([avatar]),
+        }}
         action={action}
       />,
     );
 
     await user.type(screen.getByLabelText('Nome'), 'Carla Dias');
     await user.type(screen.getByLabelText('Slug'), 'carla-dias');
-    await user.selectOptions(screen.getByLabelText('Foto'), 'Mídia 2 (400×400)');
+    // A foto pela grade de miniaturas (#182).
+    const photo = screen.getByRole('group', { name: 'Foto' });
+    await user.click(within(photo).getByRole('button', { name: 'Escolher imagem' }));
+    await user.click(await within(photo).findByRole('button', { name: 'Mídia 2 · 400×400' }));
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
     await waitFor(() => expect(action).toHaveBeenCalled());

@@ -9,7 +9,7 @@ import {
 import { useRouter } from 'next/navigation';
 import type * as z from 'zod';
 
-import { mediaField, type PickerOption } from '@/components/forms/picker-fields';
+import { mediaField, type MediaSource } from '@/components/forms/picker-fields';
 import { richTextField } from '@/components/forms/rich-text-field';
 import {
   SchemaForm,
@@ -32,7 +32,8 @@ type EntityConfig = {
   segment: string;
   labels: Record<string, string>;
   hints?: Record<string, string>;
-  fields?: (media: readonly PickerOption[]) => Record<string, FieldRenderer>;
+  /** Campos especiais; os de mídia usam a biblioteca do site (só quando a página a passa). */
+  fields?: (media: MediaSource | undefined) => Record<string, FieldRenderer>;
 };
 
 const SLUG_HINT = 'Minúsculas, números e hífens.';
@@ -49,7 +50,8 @@ export const ENTITY_CONFIG: Record<EntityKind, EntityConfig> = {
       avatarMediaId: 'Foto',
     },
     hints: { slug: SLUG_HINT },
-    fields: (media) => ({ avatarMediaId: mediaField(media, { optional: true }) }),
+    fields: (media): Record<string, FieldRenderer> =>
+      media ? { avatarMediaId: mediaField(media, { optional: true }) } : {},
   },
   taxonomy: {
     schema: TaxonomySchema.omit({ id: true }),
@@ -88,14 +90,15 @@ export function EntityForm({
   mode,
   siteId,
   defaultValues,
-  media = [],
+  media,
   action,
 }: {
   kind: EntityKind;
   mode: 'create' | 'edit';
   siteId: string;
   defaultValues: Record<string, unknown>;
-  media?: readonly PickerOption[];
+  /** Biblioteca do site para o avatar (#182); as outras entidades não usam mídia. */
+  media?: MediaSource;
   action: (value: unknown) => Promise<EntityFormResult>;
 }) {
   const router = useRouter();
