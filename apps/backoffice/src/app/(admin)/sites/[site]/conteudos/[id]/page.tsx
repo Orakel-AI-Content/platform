@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ContentVersionsTable } from '@/components/content-versions-table';
@@ -8,6 +7,7 @@ import { noRead } from '@/components/forbidden-screen';
 import { SubmitForReview } from '@/components/submit-for-review';
 import { can } from '@/domain/access/rbac.ts';
 
+import { PageHeader, siteTrail } from '../../editorial-page.tsx';
 import { itemTitle } from '../../item-title.ts';
 import { submitForReviewAction } from '../actions.ts';
 import { readContentVersions } from '../content-versions.ts';
@@ -37,7 +37,7 @@ export default async function ContentVersionsPage({ params }: Params) {
   if (contentId === undefined) notFound();
   const read = await readContentVersions(siteId, contentId);
   if (read === undefined) return null;
-  const { actor, versions, timeZone } = read;
+  const { actor, versions, timeZone, site } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return noRead;
@@ -47,14 +47,13 @@ export default async function ContentVersionsPage({ params }: Params) {
 
   return (
     <section aria-labelledby="versions-title" className="list-width space-y-4">
-      <p className="text-sm">
-        <Link href={`/sites/${siteId}/conteudos`} className="underline underline-offset-4">
-          Conteúdos de {siteId}
-        </Link>
-      </p>
-      <h1 id="versions-title" className="text-2xl font-semibold">
-        Versões de “{latest.data.title}”
-      </h1>
+      <PageHeader
+        id="versions-title"
+        trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
+          { label: latest.data.title },
+        ])}
+        title={<>Versões de “{latest.data.title}”</>}
+      />
       <p className="text-sm text-muted-foreground">
         {CONTENT_KIND_LABEL[latest.data.kind]} · ID {contentId} · /{latest.data.slug}
       </p>

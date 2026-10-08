@@ -206,3 +206,61 @@ test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao bot
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/sites\/exemplo-b\/taxonomias$/);
 });
+
+test('trilha nas telas de item: Sites › Site › Área › Item, sem link de volta solto', async ({
+  page,
+}) => {
+  await loginAs(page, 'editor@orakel.local');
+  const trail = page.getByRole('navigation', { name: 'Trilha de navegação' });
+  const main = page.getByRole('main');
+  const expectTrail = async (items: readonly string[]) => {
+    await expect(trail.getByRole('listitem')).toHaveText(
+      items.map((item, index) => (index === 0 ? item : `›${item}`)),
+    );
+    await expect(trail.getByRole('link')).toHaveCount(items.length - 1);
+    await expect(trail.locator('[aria-current="page"]')).toHaveText(items.at(-1) ?? '');
+    await expect(
+      main.getByRole('link', { name: /^(Conteúdos|Autores|Taxonomias|Menus) de / }),
+    ).toHaveCount(0);
+    await expect(
+      main.getByRole('link', { name: /Todas as versões|Versões do conteúdo/ }),
+    ).toHaveCount(0);
+    await expect(page.getByRole('heading', { level: 1 })).not.toContainText(`(${SITE})`);
+  };
+
+  for (const [path, area, item] of [
+    ['autores/novo', 'Autores', 'Criar autor'],
+    ['taxonomias/novo', 'Taxonomias', 'Criar taxonomia'],
+    ['menus/novo', 'Menus', 'Criar menu'],
+    ['conteudos/novo', 'Conteúdos', 'Criar conteúdo'],
+  ] as const) {
+    await page.goto(`/sites/${SITE}/${path}`);
+    await expectTrail(['Sites', SITE_NAME, area, item]);
+  }
+
+  // Editar um item existente: o último nível é o nome dele.
+  await page.goto(`/sites/${SITE}/autores`);
+  const firstAuthor = main.getByRole('table').getByRole('row').nth(1);
+  const authorName = ((await firstAuthor.getByRole('cell').first().textContent()) ?? '').trim();
+  await firstAuthor.getByRole('link', { name: `Editar ${authorName}` }).click();
+  await expectTrail(['Sites', SITE_NAME, 'Autores', authorName]);
+
+  // Conteúdo: versões, editar e uma versão.
+  await page.goto(`/sites/${SITE}/conteudos`);
+  await main
+    .getByRole('table')
+    .getByRole('link', { name: /\(versões\)/ })
+    .first()
+    .click();
+  const heading = (await page.getByRole('heading', { level: 1 }).textContent()) ?? '';
+  const title = /“(.+)”/.exec(heading)?.[1] ?? '';
+  await expectTrail(['Sites', SITE_NAME, 'Conteúdos', title]);
+  const versionsPath = new URL(page.url()).pathname;
+
+  await page.goto(`${versionsPath}/editar`);
+  await expectTrail(['Sites', SITE_NAME, 'Conteúdos', title, 'Editar']);
+  await expect(trail.getByRole('link', { name: title })).toHaveAttribute('href', versionsPath);
+
+  await page.goto(`${versionsPath}/versoes/1`);
+  await expectTrail(['Sites', SITE_NAME, 'Conteúdos', title, 'Versão 1']);
+});

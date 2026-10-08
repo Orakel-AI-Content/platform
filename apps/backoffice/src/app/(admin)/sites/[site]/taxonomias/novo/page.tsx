@@ -1,7 +1,7 @@
 import { EntityForm } from '@/components/entity-forms';
 
 import { createTaxonomyAction } from '../../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext } from '../../editorial-page.tsx';
+import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,9 @@ export default async function NewTaxonomyPage({ params }: { params: Promise<{ si
     <section aria-labelledby="new-taxonomy-title" className="form-width space-y-4">
       <PageHeader
         id="new-taxonomy-title"
-        back={{ href: `/sites/${site.id}/taxonomias`, label: `Taxonomias de ${site.id}` }}
+        trail={siteTrail(site, { label: 'Taxonomias', segment: 'taxonomias' }, [
+          { label: 'Criar taxonomia' },
+        ])}
         title="Criar taxonomia"
       />
       <EntityForm

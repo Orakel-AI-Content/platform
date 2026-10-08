@@ -14,6 +14,7 @@ import {
   readMenus,
   sitePageContext,
   withoutId,
+  siteTrail,
 } from '../../editorial-page.tsx';
 import { itemTitle } from '../../item-title.ts';
 
@@ -50,7 +51,7 @@ export default async function EditMenuPage({ params }: Params) {
     <section aria-labelledby="edit-menu-title" className="form-width space-y-4">
       <PageHeader
         id="edit-menu-title"
-        back={{ href: `/sites/${site.id}/menus`, label: `Menus de ${site.id}` }}
+        trail={siteTrail(site, { label: 'Menus', segment: 'menus' }, [{ label: menu.key }])}
         title={`Editar “${menu.key}”`}
       />
       <EntityForm

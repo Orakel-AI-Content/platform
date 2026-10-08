@@ -365,7 +365,10 @@ test.describe('barra de ações do editor (#109)', () => {
     const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
     await page.goto(editPath);
     const titleField = page.getByLabel('Título', { exact: true });
-    const versions = page.getByRole('link', { name: 'Versões do conteúdo' });
+    // O conteúdo na trilha (#174) leva às versões; pelo destino, porque o título muda ao salvar.
+    const versions = page
+      .getByRole('navigation', { name: 'Trilha de navegação' })
+      .locator(`a[href$="/conteudos/${contentId}"]`);
     const dialogs: string[] = [];
 
     // Link interno com alteração: cancelar fica no editor com o texto digitado.

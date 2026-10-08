@@ -1,7 +1,7 @@
 import { EntityForm } from '@/components/entity-forms';
 
 import { createMenuAction } from '../../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext } from '../../editorial-page.tsx';
+import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,7 @@ export default async function NewMenuPage({ params }: { params: Promise<{ site: 
     <section aria-labelledby="new-menu-title" className="form-width space-y-4">
       <PageHeader
         id="new-menu-title"
-        back={{ href: `/sites/${site.id}/menus`, label: `Menus de ${site.id}` }}
+        trail={siteTrail(site, { label: 'Menus', segment: 'menus' }, [{ label: 'Criar menu' }])}
         title="Criar menu"
       />
       <EntityForm

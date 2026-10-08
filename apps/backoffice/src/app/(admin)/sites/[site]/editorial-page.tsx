@@ -91,11 +91,29 @@ export function noWrite(siteId: string): ReactNode {
 /** Item da trilha: com `href`, é link; sem, é a tela atual (o último). */
 export type TrailItem = { label: string; href?: string };
 
-/** Trilha das telas de um site (#173): `Sites › <nome> [› <área>]`. */
-export function siteTrail(site: { id: string; name: string }, area?: string): TrailItem[] {
+/** Área da trilha: só o rótulo (tela da área) ou rótulo e segmento (link, nas telas de item). */
+type TrailArea = string | { label: string; segment: string };
+
+/**
+ * Trilha das telas de um site (#173, #174): `Sites › <nome> [› <área> [› <itens>]]`. Com
+ * itens, a área vira link para a lista dela (`/sites/<id>/<segment>`).
+ */
+export function siteTrail(
+  site: { id: string; name: string },
+  area?: TrailArea,
+  items: readonly TrailItem[] = [],
+): TrailItem[] {
   const sites = { label: 'Sites', href: '/sites' };
   if (area === undefined) return [sites, { label: site.name }];
-  return [sites, { label: site.name, href: `/sites/${site.id}` }, { label: area }];
+  const siteItem = { label: site.name, href: `/sites/${site.id}` };
+  if (typeof area === 'string') return [sites, siteItem, { label: area }];
+  if (items.length === 0) return [sites, siteItem, { label: area.label }];
+  return [
+    sites,
+    siteItem,
+    { label: area.label, href: `/sites/${site.id}/${area.segment}` },
+    ...items,
+  ];
 }
 
 /** Trilha de navegação acima do título: links até a tela atual, que leva `aria-current`. */
@@ -125,21 +143,18 @@ function Trail({ items }: { items: readonly TrailItem[] }) {
 }
 
 /**
- * Cabeçalho da tela (#87): trilha (#173) ou link de volta (telas de item, até a #174),
- * título à esquerda e a ação principal à direita. A página só passa `action` quando quem
- * pede tem permissão para ela.
+ * Cabeçalho da tela (#87): trilha (#173, #174), título à esquerda e a ação principal à
+ * direita. A página só passa `action` quando quem pede tem permissão para ela.
  */
 export function PageHeader({
   id,
   trail,
-  back,
   title,
   action,
 }: {
   id: string;
   /** Caminho até a tela, do mais geral ao atual (`siteTrail`). */
   trail?: readonly TrailItem[];
-  back?: { href: string; label: string };
   title: ReactNode;
   /** Ação principal (e as secundárias, agrupadas): link de criar, de cadastrar. */
   action?: ReactNode;
@@ -152,13 +167,6 @@ export function PageHeader({
   return (
     <>
       {trail && <Trail items={trail} />}
-      {back && (
-        <p className="text-sm">
-          <Link href={back.href} className="underline underline-offset-4">
-            {back.label}
-          </Link>
-        </p>
-      )}
       {action ? (
         <div className="flex flex-wrap items-center justify-between gap-4">
           {heading}

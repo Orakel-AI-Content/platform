@@ -2,7 +2,7 @@ import { EntityForm } from '@/components/entity-forms';
 
 import { editorOptions } from '../../conteudos/editor-options.ts';
 import { createAuthorAction } from '../../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext } from '../../editorial-page.tsx';
+import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,9 @@ export default async function NewAuthorPage({ params }: { params: Promise<{ site
     <section aria-labelledby="new-author-title" className="form-width space-y-4">
       <PageHeader
         id="new-author-title"
-        back={{ href: `/sites/${site.id}/autores`, label: `Autores de ${site.id}` }}
+        trail={siteTrail(site, { label: 'Autores', segment: 'autores' }, [
+          { label: 'Criar autor' },
+        ])}
         title="Criar autor"
       />
       <EntityForm
