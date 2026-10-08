@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
-import { SchemaForm } from './schema-form.tsx';
-import { choiceField, flagsField, linesField } from './site-fields.tsx';
+import { SchemaForm, type SchemaFormIssue } from './schema-form.tsx';
+import { choiceField, flagsField, linesField, themeField } from './site-fields.tsx';
 
 // Campos da configuração do site no gerador (#47): linhas ↔ lista, flags ↔ registro e
 // escolha entre as opções recebidas.
@@ -105,5 +105,92 @@ describe('campos da configuração do site', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect((await submitted(onSubmit)).preset).toBe('revista');
+  });
+});
+
+describe('tema (#163)', () => {
+  const themes = [
+    {
+      id: 'exemplo-a',
+      name: 'Editorial claro',
+      colors: { background: '#ffffff', text: '#1c1a17', accent: '#a61b1b' },
+    },
+    {
+      id: 'exemplo-b',
+      name: 'Tecnológico escuro',
+      colors: { background: '#0e1116', text: '#eef1f5', accent: '#ffb224' },
+    },
+  ] as const;
+
+  function renderTheme(
+    theme: string,
+    onSubmit: (value: unknown) => void | SchemaFormIssue[] = vi.fn(),
+  ) {
+    render(
+      <SchemaForm
+        schema={z.object({ theme: z.string() })}
+        defaultValues={{ theme }}
+        labels={{ theme: 'Tema' }}
+        fields={{ theme: themeField(themes) }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+  }
+
+  it('um rádio por tema, com nome legível e amostra das cores; sem texto livre', () => {
+    renderTheme('exemplo-a');
+
+    const group = screen.getByRole('radiogroup', { name: 'Tema' });
+    const radios = within(group).getAllByRole('radio');
+    expect(radios).toHaveLength(2);
+    expect(within(group).getByRole('radio', { name: /Editorial claro/ })).toHaveProperty(
+      'checked',
+      true,
+    );
+    expect(within(group).getByRole('radio', { name: /Tecnológico escuro/ })).toHaveProperty(
+      'checked',
+      false,
+    );
+    expect(screen.queryByRole('textbox')).toBeNull();
+    for (const theme of themes) {
+      const option = within(group).getByRole('radio', { name: new RegExp(theme.name) });
+      const swatches = [
+        ...(option.closest('label')?.querySelectorAll('[data-swatch]') ?? []),
+      ] as HTMLElement[];
+      expect(swatches.map((swatch) => swatch.dataset.swatch)).toEqual([
+        theme.colors.background,
+        theme.colors.text,
+        theme.colors.accent,
+      ]);
+      expect(swatches[0]?.parentElement?.getAttribute('aria-hidden')).toBe('true');
+    }
+  });
+
+  it('escolher pelo teclado envia o id do tema', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderTheme('exemplo-a', onSubmit);
+
+    screen.getByRole('radio', { name: /Editorial claro/ }).focus();
+    await user.keyboard('{ArrowDown}');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await submitted(onSubmit);
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({ theme: 'exemplo-b' });
+  });
+
+  it('a recusa do servidor no tema leva o foco ao rádio marcado', async () => {
+    const user = userEvent.setup();
+    renderTheme('exemplo-b', () => [{ path: ['theme'], message: 'Tema "x" não existe' }]);
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('radio', { name: /Tecnológico escuro/ }),
+      ),
+    );
+    expect(screen.getByRole('radiogroup').getAttribute('aria-invalid')).toBe('true');
   });
 });
