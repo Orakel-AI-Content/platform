@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // Foco visível (#85): navegando só com Tab, link, campo e botão mostram o contorno --ring
-// de 2px, vindo da regra global de globals.css, nos dois temas.
+// de 2px, vindo da regra global de globals.css, nos dois temas. O "Pular para o conteúdo"
+// (#170), primeira parada do Tab, também.
 
 async function loginAs(page: Page, email: string): Promise<void> {
   await page.goto('/sites');
@@ -48,6 +49,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const ring = await ringColor(page);
 
     const targets = [
+      page.getByRole('link', { name: 'Pular para o conteúdo' }),
       main.getByRole('link').first(),
       main.getByLabel('Nome', { exact: true }),
       main.getByRole('button', { name: 'Criar', exact: true }),
