@@ -1,7 +1,13 @@
 import Link from 'next/link';
 
-import { BuildWindowForm, LifecycleAction, RegisterG1Form } from '@/components/site-actions';
-import { formatDateTime, LIFECYCLE_LABEL } from '@/components/site-labels.ts';
+import { LifecycleSteps } from '@/components/lifecycle-steps';
+import {
+  BuildWindowForm,
+  LifecycleAction,
+  LifecycleActionScope,
+  RegisterG1Form,
+} from '@/components/site-actions';
+import { formatDateTime } from '@/components/site-labels.ts';
 import { buttonVariants } from '@/components/ui/button';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
@@ -74,14 +80,20 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         <h2 id="lifecycle-title" className="text-lg font-semibold">
           Ciclo de vida
         </h2>
-        <p>
-          Etapa atual: <strong>{LIFECYCLE_LABEL[site.lifecycle]}</strong>
-        </p>
-        {canConfigure && (
-          <LifecycleAction
-            lifecycle={site.lifecycle}
-            action={advanceLifecycleAction.bind(null, site.id)}
-          />
+        {canConfigure ? (
+          <LifecycleActionScope>
+            <LifecycleSteps
+              current={site.lifecycle}
+              action={
+                <LifecycleAction
+                  lifecycle={site.lifecycle}
+                  action={advanceLifecycleAction.bind(null, site.id)}
+                />
+              }
+            />
+          </LifecycleActionScope>
+        ) : (
+          <LifecycleSteps current={site.lifecycle} />
         )}
       </section>
 
