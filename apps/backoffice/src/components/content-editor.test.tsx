@@ -523,3 +523,130 @@ describe('inserir bloco em qualquer posição (#134)', () => {
     expect(screen.getByRole('button', { name: 'Adicionar bloco' })).toBeTruthy();
   });
 });
+
+describe('recolher e expandir blocos (#135)', () => {
+  const three = { ...meta, blocks: [toc(1, 'A'), toc(2, 'Neste guia'), toc(3, 'C')] };
+  const toggle = (position: number) =>
+    screen.getByRole('button', { name: `Conteúdo do bloco ${position}` });
+  const body = (button: HTMLElement) =>
+    document.getElementById(button.getAttribute('aria-controls') ?? '');
+
+  it('o botão do bloco alterna aria-expanded, mostra o resumo com o texto em title e mantém o foco', async () => {
+    const user = userEvent.setup();
+    renderEditor({ defaultValues: three });
+    const button = toggle(2);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(body(button)?.hidden).toBe(false);
+
+    await user.click(button);
+
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(body(button)?.hidden).toBe(true);
+    const group = screen.getByRole('group', { name: 'Bloco 2: Sumário' });
+    const summary = within(group).getByText('Neste guia');
+    expect(summary.getAttribute('title')).toBe('Neste guia');
+    expect(summary.className).toContain('truncate');
+    expect(document.activeElement).toBe(button);
+
+    button.focus();
+    await user.keyboard('{Enter}');
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(within(group).queryByText('Neste guia', { selector: 'span' })).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('expandir mostra o conteúdo intacto, inclusive o rich text editado antes de recolher', async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      defaultValues: {
+        ...meta,
+        blocks: [
+          {
+            n: 1,
+            type: 'text',
+            content: [{ type: 'paragraph', children: [{ type: 'text', text: 'Olá' }] }],
+          },
+        ],
+      },
+    });
+    const editor = await screen.findByRole('textbox', { name: 'Texto' });
+    await user.click(editor);
+    // Substitui o texto (o happy-dom não move o cursor com End num contenteditable).
+    await user.keyboard('{Control>}a{/Control}Olá mundo editado');
+
+    await user.click(toggle(1));
+    expect(screen.getByRole('group', { name: 'Bloco 1: Texto' }).textContent).toContain(
+      'Olá mundo editado',
+    );
+    await user.click(toggle(1));
+
+    expect(screen.getByRole('textbox', { name: 'Texto' }).textContent).toBe('Olá mundo editado');
+  });
+
+  it('"Recolher todos" e "Expandir todos" no topo da seção Blocos', async () => {
+    const user = userEvent.setup();
+    renderEditor({ defaultValues: three });
+    const states = () =>
+      [1, 2, 3].map((position) => toggle(position).getAttribute('aria-expanded'));
+
+    await user.click(screen.getByRole('button', { name: 'Recolher todos' }));
+    expect(states()).toEqual(['false', 'false', 'false']);
+    await user.click(screen.getByRole('button', { name: 'Expandir todos' }));
+    expect(states()).toEqual(['true', 'true', 'true']);
+  });
+
+  it('salvar mantém recolhido o que estava recolhido', async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      defaultValues: three,
+      result: { ok: true, message: 'Versão 2 salva.', id: 7, saved: three as never },
+    });
+    await user.click(toggle(2));
+
+    await save(user);
+    await screen.findByText('Versão 2 salva.');
+
+    expect([1, 2, 3].map((position) => toggle(position).getAttribute('aria-expanded'))).toEqual([
+      'true',
+      'false',
+      'true',
+    ]);
+  });
+
+  it('erro de validação num bloco recolhido o expande e o foco chega ao campo', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor({
+      defaultValues: { ...meta, blocks: [{ n: 1, type: 'image', mediaId: 1 }] },
+    });
+    await user.click(toggle(1));
+
+    await save(user);
+
+    await waitFor(() => expect(toggle(1).getAttribute('aria-expanded')).toBe('true'));
+    const alt = screen.getByLabelText('Texto alternativo');
+    await waitFor(() => expect(document.activeElement).toBe(alt));
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it('erro do servidor num bloco recolhido também o expande e foca o campo', async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      defaultValues: three,
+      result: {
+        ok: false,
+        message: 'Não foi possível salvar o conteúdo.',
+        issues: [{ path: ['blocks', 2, 'title'], message: 'Título recusado' }],
+      },
+    });
+    await user.click(screen.getByRole('button', { name: 'Recolher todos' }));
+
+    await save(user);
+
+    await screen.findByText('Título recusado');
+    expect(toggle(3).getAttribute('aria-expanded')).toBe('true');
+    expect(toggle(1).getAttribute('aria-expanded')).toBe('false');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getAllByLabelText('Título do sumário')[2]),
+    );
+  });
+});
