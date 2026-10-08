@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Block } from '@orakel/content-model/v1';
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Fragment, useEffect, useId, useState, useTransition } from 'react';
 import { FormProvider, get, useFieldArray, useForm, type FieldValues } from 'react-hook-form';
@@ -20,6 +20,7 @@ import { entityField, mediaField, type PickerOption } from '@/components/forms/p
 import { richTextField } from '@/components/forms/rich-text-field';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form';
 import { BLOCK_TYPE_LABEL } from '@/components/site-labels.ts';
+import { blockSummary, blockText } from '@/components/block-summary.ts';
 import { ActionsMenu } from '@/components/ui/actions-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -126,6 +127,34 @@ export function ContentEditor({
     defaultValues,
   });
   const blocks = useFieldArray({ control: form.control, name: 'blocks' });
+  // Blocos recolhidos (#135), pelo `field.id`, só enquanto a tela está aberta.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const toggleBlock = (fieldId: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (!next.delete(fieldId)) next.add(fieldId);
+      return next;
+    });
+  // O `reset` de salvar troca os `field.id`: as posições recolhidas atravessam o reset (salvar
+  // não muda a ordem). Ajuste durante o render, quando a lista de ids muda.
+  const [carried, setCarried] = useState<number[] | null>(null);
+  const fieldIds = blocks.fields.map((field) => field.id).join(' ');
+  const [seenIds, setSeenIds] = useState(fieldIds);
+  if (fieldIds !== seenIds) {
+    setSeenIds(fieldIds);
+    if (carried) {
+      setCollapsed(new Set(carried.flatMap((index) => blocks.fields[index]?.id ?? [])));
+      setCarried(null);
+    }
+  }
+  /** Expande os blocos dos índices e, no quadro seguinte, foca o primeiro campo inválido. */
+  const revealErrors = (indexes: readonly number[]) => {
+    const ids = new Set(indexes.flatMap((index) => blocks.fields[index]?.id ?? []));
+    setCollapsed((current) => new Set([...current].filter((fieldId) => !ids.has(fieldId))));
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>(`#${CSS.escape(id)}-form [aria-invalid="true"]`)?.focus(),
+    );
+  };
   const offered = options.blockTypes.filter(isBlockType);
   const [nextType, setNextType] = useState<Block['type'] | undefined>(offered[0]);
 
@@ -202,6 +231,9 @@ export function ContentEditor({
           router.replace(`/sites/${siteId}/conteudos/${result.id}/editar?criado=1`);
           return;
         }
+        setCarried(
+          blocks.fields.flatMap((field, index) => (collapsed.has(field.id) ? [index] : [])),
+        );
         if (result.saved) form.reset(savedFormValues(result.saved, sent) as FieldValues);
         // O `n` do bloco removido não existe na versão salva: não há mais o que desfazer.
         setRemoved(null);
@@ -211,6 +243,11 @@ export function ContentEditor({
       }
       const top: string[] = [];
       let focused = false;
+      revealErrors(
+        result.issues.flatMap((issue) =>
+          issue.path[0] === 'blocks' && typeof issue.path[1] === 'number' ? [issue.path[1]] : [],
+        ),
+      );
       for (const issue of result.issues) {
         if (issue.path.length === 0) {
           top.push(issue.message);
@@ -245,12 +282,19 @@ export function ContentEditor({
   return (
     <FormProvider {...form}>
       <form
+        id={`${id}-form`}
         noValidate
         className="space-y-6"
         onSubmit={(event) =>
-          void form.handleSubmit(onValid, () => setSummary(['Corrija os campos destacados.']))(
-            event,
-          )
+          void form.handleSubmit(onValid, (errors) => {
+            setSummary(['Corrija os campos destacados.']);
+            const blockErrors: unknown = errors.blocks;
+            revealErrors(
+              Array.isArray(blockErrors)
+                ? blockErrors.flatMap((error, index) => (error ? [index] : []))
+                : [],
+            );
+          })(event)
         }
       >
         <fieldset className="space-y-4 rounded-md border border-border p-4">
@@ -266,13 +310,26 @@ export function ContentEditor({
         </fieldset>
 
         <section aria-labelledby={`${id}-blocks`} className="space-y-4">
-          <h2 id={`${id}-blocks`} className="text-lg font-semibold">
-            Blocos
-          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id={`${id}-blocks`} className="mr-auto text-lg font-semibold">
+              Blocos
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCollapsed(new Set(blocks.fields.map((field) => field.id)))}
+            >
+              Recolher todos
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set())}>
+              Expandir todos
+            </Button>
+          </div>
           {blocks.fields.map((field, index) => {
             const { type } = field as { type?: unknown };
             if (!isBlockType(type)) return null;
             const position = index + 1;
+            const isCollapsed = collapsed.has(field.id);
             return (
               <Fragment key={field.id}>
                 <ActionsMenu
@@ -298,36 +355,58 @@ export function ContentEditor({
                   tabIndex={-1}
                   className="space-y-4 rounded-md border border-border p-4"
                 >
-                  <legend className="px-1 text-sm font-semibold">
-                    {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
-                  </legend>
-                  <SchemaFields
-                    schema={BLOCK_SCHEMAS[type]}
-                    prefix={`blocks.${index}`}
-                    labels={BLOCK_LABELS}
-                    hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
-                    fields={blockFields[type]}
-                  />
-                  <div className="flex flex-wrap gap-1">
+                  {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
+                  <legend className="sr-only">{`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}</legend>
+                  <div className="flex items-center gap-2">
                     <IconButton
-                      label={`Mover bloco ${position} para cima`}
-                      icon={<ArrowUp />}
-                      // aria-disabled (não disabled): o foco fica no botão depois de mover.
-                      aria-disabled={index === 0}
-                      onClick={() => index > 0 && blocks.move(index, index - 1)}
+                      label={`Conteúdo do bloco ${position}`}
+                      icon={isCollapsed ? <ChevronRight /> : <ChevronDown />}
+                      aria-expanded={!isCollapsed}
+                      aria-controls={`${id}-block-body-${index}`}
+                      onClick={() => toggleBlock(field.id)}
                     />
-                    <IconButton
-                      label={`Mover bloco ${position} para baixo`}
-                      icon={<ArrowDown />}
-                      aria-disabled={index === blocks.fields.length - 1}
-                      onClick={() =>
-                        index < blocks.fields.length - 1 && blocks.move(index, index + 1)
-                      }
-                    />
-                    <IconButton
-                      label={`Remover bloco ${position}`}
-                      icon={<Trash2 />}
-                      onClick={() => removeBlock(index)}
+                    <span aria-hidden="true" className="shrink-0 text-sm font-semibold">
+                      {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
+                    </span>
+                    {isCollapsed && (
+                      <span
+                        className="min-w-0 flex-1 truncate text-sm text-muted-foreground"
+                        title={blockText(form.getValues(`blocks.${index}`)) || undefined}
+                      >
+                        {blockSummary(form.getValues(`blocks.${index}`))}
+                      </span>
+                    )}
+                    <div className="ml-auto flex shrink-0 gap-1">
+                      <IconButton
+                        label={`Mover bloco ${position} para cima`}
+                        icon={<ArrowUp />}
+                        // aria-disabled (não disabled): o foco fica no botão depois de mover.
+                        aria-disabled={index === 0}
+                        onClick={() => index > 0 && blocks.move(index, index - 1)}
+                      />
+                      <IconButton
+                        label={`Mover bloco ${position} para baixo`}
+                        icon={<ArrowDown />}
+                        aria-disabled={index === blocks.fields.length - 1}
+                        onClick={() =>
+                          index < blocks.fields.length - 1 && blocks.move(index, index + 1)
+                        }
+                      />
+                      <IconButton
+                        label={`Remover bloco ${position}`}
+                        icon={<Trash2 />}
+                        onClick={() => removeBlock(index)}
+                      />
+                    </div>
+                  </div>
+                  {/* Recolhido, só oculto: os campos seguem registrados e o TipTap guarda o texto. */}
+                  <div id={`${id}-block-body-${index}`} hidden={isCollapsed}>
+                    <SchemaFields
+                      schema={BLOCK_SCHEMAS[type]}
+                      prefix={`blocks.${index}`}
+                      labels={BLOCK_LABELS}
+                      hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
+                      fields={blockFields[type]}
                     />
                   </div>
                 </fieldset>
