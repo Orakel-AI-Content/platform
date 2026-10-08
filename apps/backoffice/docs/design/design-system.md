@@ -127,7 +127,13 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   esses dois ao controle). Nó sem desenho e sem campo registrado aparece como aviso.
   O `onSubmit` pode devolver a recusa do servidor (`{ path, message }[]`): com `path`, vira
   erro do campo; sem, vai para o resumo. Lista vazia em campo opcional (rich text apagado) é
-  enviada como ausente.
+  enviada como ausente. Durante o envio o botão fica desabilitado e mostra `pendingLabel`
+  ("Salvando…" por padrão; "Cadastrando…", "Criando…", "Aprovando…" por quem chama), sem
+  segundo envio. Quem fica na tela confirma devolvendo `{ success: mensagem }`: o texto
+  aparece ao lado do botão, numa região `role="status"` em `text-success`, e some no próximo
+  envio. Quem sai da tela confirma no destino: o cadastro de site vai para
+  `/sites?cadastrado=<id>`, e a tabela anuncia na região do topo depois de montar e tira a
+  marca da URL (como o `?criado=1` do conteúdo).
   Dentro de um formulário maior (`FormProvider`), `SchemaFields` desenha um schema sob um
   prefixo (`blocks.2`), com os caminhos completos no registro (`blocks.*.content`): é como o
   editor de conteúdo monta cada bloco. Referências do site: `mediaField(opções)` (`<select>`,
