@@ -20,6 +20,7 @@ import { richTextField } from '@/components/forms/rich-text-field';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form';
 import { BLOCK_TYPE_LABEL } from '@/components/site-labels.ts';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { useLeaveGuard } from '@/components/use-leave-guard.ts';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 import { cn } from '@/lib/utils';
 
@@ -174,6 +175,16 @@ export function ContentEditor({
       setSummary(top.length > 0 ? top : [result.message]);
     });
 
+  // Os valores iniciais vêm sem os campos vazios (descrição, SEO, capa), que a tela registra
+  // com `''`: sem completar, editar e desfazer deixaria o formulário "alterado" (#111). Uma
+  // vez, ao montar: um `router.refresh` depois não pode apagar o que se digita.
+  const [initial] = useState(defaultValues);
+  useEffect(() => {
+    form.reset(savedFormValues(initial, form.getValues()) as FieldValues);
+  }, [form, initial]);
+
+  // Sair com alterações não salvas pede confirmação (#111); salvar zera o `isDirty`.
+  useLeaveGuard(form.formState.isDirty);
   const blocksError = errorAt(form.formState.errors, 'blocks');
   const previewNote = !previewUrl
     ? 'Salve para ver a prévia.'
