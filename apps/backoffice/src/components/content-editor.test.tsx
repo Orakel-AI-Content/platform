@@ -111,6 +111,10 @@ describe('editor de conteúdo', () => {
 
     screen.getByRole('button', { name: 'Mover bloco 2 para cima' }).focus();
     await user.keyboard('{Enter}');
+    // O foco fica no botão acionado, agora do bloco 1 (#131).
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Mover bloco 1 para cima' }),
+    );
     screen.getByRole('button', { name: 'Remover bloco 3' }).focus();
     await user.keyboard('{Enter}');
     await save(user);
@@ -428,5 +432,36 @@ describe('desfazer a remoção de bloco (#112)', () => {
 
     expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull();
+  });
+});
+
+describe('controles de bloco com ícones (#131)', () => {
+  it('mover e remover são botões de ícone com a posição no nome; as pontas ficam indisponíveis e focáveis', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    for (const name of ['Mover bloco 2 para cima', 'Mover bloco 2 para baixo', 'Remover bloco 2']) {
+      const button = screen.getByRole('button', { name });
+      // O texto visível é só a dica, fora da árvore de acessibilidade.
+      expect(button.lastElementChild?.getAttribute('aria-hidden')).toBe('true');
+      expect(button.lastElementChild?.textContent).toBe(name);
+      expect(button.querySelector('svg')).toBeTruthy();
+    }
+    const first = screen.getByRole('button', { name: 'Mover bloco 1 para cima' });
+    const last = screen.getByRole('button', { name: 'Mover bloco 3 para baixo' });
+    expect(first.getAttribute('aria-disabled')).toBe('true');
+    expect(last.getAttribute('aria-disabled')).toBe('true');
+    expect(
+      screen.getByRole('button', { name: 'Mover bloco 2 para cima' }).getAttribute('aria-disabled'),
+    ).toBe('false');
+
+    first.focus();
+    await user.keyboard('{Enter}');
+    expect(document.activeElement).toBe(first);
+    expect(
+      screen
+        .getAllByLabelText('Título do sumário')
+        .map((input) => (input as HTMLInputElement).value),
+    ).toEqual(['A', 'B', 'C']);
   });
 });

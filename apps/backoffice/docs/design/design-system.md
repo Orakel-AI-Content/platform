@@ -16,6 +16,15 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   estado React. A posição é por CSS anchor positioning. O happy-dom não implementa popover: o
   teste de componente confere o nome, a ligação botão → lista e a chamada a `hidePopover`
   (espionado), e o E2E confere abrir, fechar, Esc e o fechamento ao acionar um item.
+- **Botão de ícone:** `IconButton` (`src/components/ui/icon-button.tsx`), próprio (o tooltip
+  do shadcn usaria Radix), para ações repetidas e compactas, como os controles de cada bloco do
+  editor. O nome vem de `label` (`aria-label`, com a posição: "Mover bloco 3 para cima"); a dica
+  visível repete o texto num `span` `aria-hidden`, mostrado só no hover e no `focus-visible`,
+  e o ícone (`lucide-react`, 16 px) também fica fora da árvore de acessibilidade. Alvo de 32 px
+  (`buttonVariants({ size: 'icon' })`), acima do mínimo de 24 px. Ação indisponível que deve
+  continuar focável (o foco fica no botão depois de mover) usa `aria-disabled`, que o
+  `buttonVariants` desenha como indisponível (opacidade e cursor), e o `onClick` confere a
+  condição; `disabled` só quando o foco não precisa ficar no botão.
 - **Estilização:** Tailwind 4, só com os tokens de `src/app/globals.css` (`background`,
   `foreground`, `muted`, `border`, `primary`, `destructive`, `warning`, `success`, `info`,
   `ring`); nada de cor solta.

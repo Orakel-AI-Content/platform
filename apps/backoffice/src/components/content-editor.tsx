@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Block } from '@orakel/content-model/v1';
+import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useId, useState, useTransition } from 'react';
 import { FormProvider, get, useFieldArray, useForm, type FieldValues } from 'react-hook-form';
@@ -20,6 +21,7 @@ import { richTextField } from '@/components/forms/rich-text-field';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form';
 import { BLOCK_TYPE_LABEL } from '@/components/site-labels.ts';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { useLeaveGuard } from '@/components/use-leave-guard.ts';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 import { cn } from '@/lib/utils';
@@ -278,29 +280,27 @@ export function ContentEditor({
                   hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
                   fields={blockFields[type]}
                 />
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                <div className="flex flex-wrap gap-1">
+                  <IconButton
+                    label={`Mover bloco ${position} para cima`}
+                    icon={<ArrowUp />}
                     // aria-disabled (não disabled): o foco fica no botão depois de mover.
                     aria-disabled={index === 0}
                     onClick={() => index > 0 && blocks.move(index, index - 1)}
-                  >
-                    {`Mover bloco ${position} para cima`}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  />
+                  <IconButton
+                    label={`Mover bloco ${position} para baixo`}
+                    icon={<ArrowDown />}
                     aria-disabled={index === blocks.fields.length - 1}
                     onClick={() =>
                       index < blocks.fields.length - 1 && blocks.move(index, index + 1)
                     }
-                  >
-                    {`Mover bloco ${position} para baixo`}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => removeBlock(index)}>
-                    {`Remover bloco ${position}`}
-                  </Button>
+                  />
+                  <IconButton
+                    label={`Remover bloco ${position}`}
+                    icon={<Trash2 />}
+                    onClick={() => removeBlock(index)}
+                  />
                 </div>
               </fieldset>
             );

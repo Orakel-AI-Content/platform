@@ -48,6 +48,7 @@
     "drizzle-orm": "catalog:",
     "graphile-worker": "catalog:",
     "jose": "catalog:",
+    "lucide-react": "catalog:",
     "next": "catalog:",
     "pg": "catalog:",
     "pino": "catalog:",
