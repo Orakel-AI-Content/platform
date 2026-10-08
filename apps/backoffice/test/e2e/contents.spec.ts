@@ -54,6 +54,42 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await page.getByRole('textbox', { name: 'Texto', exact: true }).click();
   await page.keyboard.type('Primeiro parágrafo do artigo.');
 
+  // Link pelo popover, só com teclado (#132): inválido não aplica, Enter aplica, Esc fecha, e
+  // o foco volta ao editor.
+  const textEditor = page.getByRole('textbox', { name: 'Texto', exact: true });
+  const linkButton = page.getByRole('button', { name: 'Link', exact: true });
+  const linkPopover = page.locator(`[id="${await linkButton.getAttribute('popovertarget')}"]`);
+  const href = linkPopover.getByLabel('Endereço do link');
+  // Sem seleção, com o cursor no fim do parágrafo: o endereço entra como link dentro da frase
+  // (um link que fosse o parágrafo inteiro perderia a exceção de alvo em linha do axe).
+  await page.keyboard.type(' Veja ');
+  await linkButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(href).toBeFocused();
+  await page.keyboard.type('javascript:alert(1)');
+  await page.keyboard.press('Enter');
+  await expect(href).toHaveAttribute('aria-invalid', 'true');
+  await expect(href).toHaveAccessibleDescription(
+    /Use um caminho iniciado por \/ ou uma URL http\(s\)/,
+  );
+  await expect(textEditor.locator('a')).toHaveCount(0);
+  await href.fill('/guias/');
+  await page.keyboard.press('Enter');
+  await expect(linkPopover).toBeHidden();
+  await expect(textEditor).toBeFocused();
+  await expect(textEditor.locator('a')).toHaveAttribute('href', '/guias/');
+  await expect(textEditor).toContainText('Primeiro parágrafo do artigo. Veja /guias/');
+  // Cursor dentro do link (não na borda do fim): o campo abre com o endereço atual.
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowLeft');
+  await expect(linkButton).toHaveAttribute('aria-pressed', 'true');
+  await linkButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(href).toHaveValue('/guias/');
+  await page.keyboard.press('Escape');
+  await expect(linkPopover).toBeHidden();
+  await expect(textEditor).toBeFocused();
+
   await addBlock(page, 'Imagem');
   await page.getByLabel('Mídia', { exact: true }).selectOption({ index: 1 });
 
