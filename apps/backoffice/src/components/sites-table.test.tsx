@@ -151,6 +151,19 @@ describe('tabela de sites', () => {
     expect(publishNow).toHaveBeenCalledWith('exemplo-b');
   });
 
+  it('site pausado não tem "Publicar agora"; o ativo tem (#155)', () => {
+    const publishNow = vi.fn(() => Promise.resolve({ ok: true, message: '' }));
+    render(
+      <SitesTable
+        rows={[site, { ...site, id: 'exemplo-b', state: 'pausado', pausedReason: 'cota' }]}
+        publishNow={publishNow}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Publicar agora exemplo-a' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Publicar agora exemplo-b' })).toBeNull();
+  });
+
   it('sem sites mostra o estado vazio no lugar da tabela (#87)', () => {
     render(<SitesTable rows={[]} />);
 
