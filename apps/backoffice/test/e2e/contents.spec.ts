@@ -46,6 +46,11 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
     .check();
 
   await addBlock(page, 'Texto');
+  // A barra de formatação do bloco de texto cabe numa linha a 1280 px (#133): a altura da
+  // toolbar é a de um botão de ícone (32 px), sem segunda fileira.
+  expect(page.viewportSize()?.width).toBe(1280);
+  const toolbarBox = await page.getByRole('toolbar', { name: 'Formatação: Texto' }).boundingBox();
+  expect(toolbarBox?.height).toBeLessThanOrEqual(40);
   await page.getByRole('textbox', { name: 'Texto', exact: true }).click();
   await page.keyboard.type('Primeiro parágrafo do artigo.');
 

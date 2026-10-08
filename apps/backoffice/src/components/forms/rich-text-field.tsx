@@ -2,8 +2,10 @@
 
 import type { Inline, RichText } from '@orakel/content-model/v1';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
+import { Bold, Code, Heading2, Heading3, Italic, Link, List, ListOrdered } from 'lucide-react';
+import type { ReactNode } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 
 import {
   inlinesDocFromTipTap,
@@ -31,6 +33,7 @@ const fromDoc = (mode: RichTextMode, doc: TipTapNode) =>
 
 type Action = {
   label: string;
+  icon: ReactNode;
   active: (editor: Editor) => boolean;
   run: (editor: Editor) => void;
 };
@@ -38,21 +41,25 @@ type Action = {
 const MARK_ACTIONS: Action[] = [
   {
     label: 'Negrito',
+    icon: <Bold />,
     active: (e) => e.isActive('bold'),
     run: (e) => e.chain().focus().toggleBold().run(),
   },
   {
     label: 'Itálico',
+    icon: <Italic />,
     active: (e) => e.isActive('italic'),
     run: (e) => e.chain().focus().toggleItalic().run(),
   },
   {
     label: 'Código',
+    icon: <Code />,
     active: (e) => e.isActive('code'),
     run: (e) => e.chain().focus().toggleCode().run(),
   },
   {
     label: 'Link',
+    icon: <Link />,
     active: (e) => e.isActive('link'),
     run: (e) => {
       if (e.isActive('link')) {
@@ -68,44 +75,63 @@ const MARK_ACTIONS: Action[] = [
 const BLOCK_ACTIONS: Action[] = [
   {
     label: 'Intertítulo 2',
+    icon: <Heading2 />,
     active: (e) => e.isActive('heading', { level: 2 }),
     run: (e) => e.chain().focus().toggleHeading({ level: 2 }).run(),
   },
   {
     label: 'Intertítulo 3',
+    icon: <Heading3 />,
     active: (e) => e.isActive('heading', { level: 3 }),
     run: (e) => e.chain().focus().toggleHeading({ level: 3 }).run(),
   },
   {
     label: 'Lista',
+    icon: <List />,
     active: (e) => e.isActive('bulletList'),
     run: (e) => e.chain().focus().toggleBulletList().run(),
   },
   {
     label: 'Lista numerada',
+    icon: <ListOrdered />,
     active: (e) => e.isActive('orderedList'),
     run: (e) => e.chain().focus().toggleOrderedList().run(),
   },
 ];
 
+/**
+ * Barra de formatação (#133): botões de ícone com dica, em dois grupos — marcas e, no
+ * `richText`, estrutura — separados por um `role="separator"` dentro da mesma `toolbar`.
+ * O botão ativo tem `aria-pressed`, e o visual vem do mesmo atributo.
+ */
 function Toolbar({ editor, mode, label }: { editor: Editor; mode: RichTextMode; label: string }) {
-  const actions = mode === 'richText' ? [...MARK_ACTIONS, ...BLOCK_ACTIONS] : MARK_ACTIONS;
+  const groups = mode === 'richText' ? [MARK_ACTIONS, BLOCK_ACTIONS] : [MARK_ACTIONS];
+  const actions = groups.flat();
   const pressed = useEditorState({
     editor,
     selector: ({ editor: current }) => actions.map((action) => action.active(current)),
   });
   return (
-    <div role="toolbar" aria-label={`Formatação: ${label}`} className="flex flex-wrap gap-1">
-      {actions.map((action, index) => (
-        <Button
-          key={action.label}
-          variant={pressed[index] ? 'default' : 'ghost'}
-          size="sm"
-          aria-pressed={pressed[index] ?? false}
-          onClick={() => action.run(editor)}
-        >
-          {action.label}
-        </Button>
+    <div role="toolbar" aria-label={`Formatação: ${label}`} className="flex items-center gap-1">
+      {groups.map((group, groupIndex) => (
+        <div key={groupIndex} className="contents">
+          {groupIndex > 0 && (
+            <div role="separator" aria-orientation="vertical" className="mx-1 h-5 w-px bg-border" />
+          )}
+          {group.map((action) => {
+            const index = actions.indexOf(action);
+            return (
+              <IconButton
+                key={action.label}
+                label={action.label}
+                icon={action.icon}
+                aria-pressed={pressed[index] ?? false}
+                className="aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                onClick={() => action.run(editor)}
+              />
+            );
+          })}
+        </div>
       ))}
     </div>
   );

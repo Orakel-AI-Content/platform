@@ -7,7 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { richTextField } from './rich-text-field.tsx';
 import { SchemaForm } from './schema-form.tsx';
 
-// Campo de rich text no gerador (#43): nome acessível, barra, teclado e valor válido.
+// Campo de rich text no gerador (#43): nome acessível, barra, teclado e valor válido. Barra
+// com ícones em dois grupos, separados (#133).
 
 afterEach(cleanup);
 
@@ -40,11 +41,9 @@ describe('campo de rich text', () => {
     expect(editor.getAttribute('aria-multiline')).toBe('true');
     expect(editor.textContent).toBe('Olá mundo');
     const toolbar = screen.getByRole('toolbar', { name: 'Formatação: Texto' });
-    expect(
-      within(toolbar)
-        .getAllByRole('button')
-        .map((button) => button.textContent),
-    ).toEqual([
+    // Pelo nome acessível: com o botão de ícone, o texto dentro dele é só a dica.
+    const buttons = within(toolbar).getAllByRole('button');
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Negrito',
       'Itálico',
       'Código',
@@ -54,6 +53,19 @@ describe('campo de rich text', () => {
       'Lista',
       'Lista numerada',
     ]);
+    // Botões de ícone, todos com o estado em aria-pressed e o ícone fora da leitura.
+    for (const button of buttons) {
+      expect(button.querySelector('svg')).toBeTruthy();
+      expect(button.getAttribute('aria-pressed')).toBe('false');
+      expect(button.className).toContain('aria-pressed:bg-primary');
+    }
+    // Marcas | estrutura: um separador entre "Link" e "Intertítulo 2".
+    const separator = within(toolbar).getByRole('separator');
+    expect(separator.getAttribute('aria-orientation')).toBe('vertical');
+    const order = [...toolbar.querySelectorAll('button, [role="separator"]')].map(
+      (node) => node.getAttribute('aria-label') ?? '|',
+    );
+    expect(order.slice(3, 6)).toEqual(['Link', '|', 'Intertítulo 2']);
   });
 
   it('atalho de negrito marca o texto, e o valor enviado passa no TextBlockSchema', async () => {
@@ -100,6 +112,9 @@ describe('campo de rich text', () => {
     expect(editor.getAttribute('aria-multiline')).toBe('false');
     const toolbar = screen.getByRole('toolbar', { name: 'Formatação: Citação' });
     expect(within(toolbar).queryByRole('button', { name: /Intertítulo|Lista/ })).toBeNull();
+    // Só as marcas, sem separador (#133).
+    expect(within(toolbar).getAllByRole('button')).toHaveLength(4);
+    expect(within(toolbar).queryByRole('separator')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
