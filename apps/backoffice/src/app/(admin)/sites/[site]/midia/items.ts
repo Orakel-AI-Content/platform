@@ -3,6 +3,12 @@ import { mediaUrl } from '@orakel/core/v1';
 
 import type { MediaItem } from '@/components/media-library';
 
+/**
+ * Mídias por página na grade do editor (#180). Fica fora de `actions.ts` porque um módulo
+ * `'use server'` só exporta funções; o cliente não escolhe o tamanho.
+ */
+export const MEDIA_PAGE_SIZE = 24;
+
 /** Formatos da miniatura, do preferido ao de reserva (`<source>` antes, `<img>` por último). */
 const THUMBNAIL_FORMATS = ['avif', 'webp'];
 
