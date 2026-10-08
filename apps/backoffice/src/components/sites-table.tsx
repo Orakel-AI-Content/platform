@@ -61,7 +61,7 @@ function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; t
   if (build === null) return <span className="text-muted-foreground">—</span>;
   const when = `${formatDateTime(new Date(build.finishedAt), timeZone)}${build.versionId ? ` · ${build.versionId}` : ''}`;
   return (
-    <TwoLines secondary={<Truncated text={when} className="max-w-44" />}>
+    <TwoLines secondary={<Truncated text={when} className="max-w-40" />}>
       <Badge variant={BUILD_STATUS_VARIANT[build.status]}>{BUILD_STATUS_LABEL[build.status]}</Badge>
     </TwoLines>
   );
@@ -147,7 +147,7 @@ const columns = column.columns([
       const site = info.row.original;
       const reason = site.state === 'pausado' ? site.pausedReason : null;
       return (
-        <TwoLines secondary={reason ? <Truncated text={reason} className="max-w-36" /> : undefined}>
+        <TwoLines secondary={reason ? <Truncated text={reason} className="max-w-32" /> : undefined}>
           <Badge variant={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</Badge>
         </TwoLines>
       );
