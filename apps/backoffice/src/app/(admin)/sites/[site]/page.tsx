@@ -1,20 +1,33 @@
 import Link from 'next/link';
 
 import { BuildWindowForm, LifecycleAction, RegisterG1Form } from '@/components/site-actions';
-import { formatDateTime, formatDuration, LIFECYCLE_LABEL } from '@/components/site-labels.ts';
+import {
+  formatDateTime,
+  formatDuration,
+  LIFECYCLE_LABEL,
+  SITE_STATE_LABEL,
+  SITE_STATE_VARIANT,
+} from '@/components/site-labels.ts';
+import { LastBuildSummary, PendingCount, PublishNowPanel } from '@/components/site-status';
+import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
 
-import { advanceLifecycleAction, registerG1Action, setBuildWindowAction } from '../actions.ts';
+import {
+  advanceLifecycleAction,
+  publishNow,
+  registerG1Action,
+  setBuildWindowAction,
+} from '../actions.ts';
 import { sitePageContext } from './editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Página do site: ciclo de vida, registro do G1 e janela de agrupamento. Lê o site pelo
- * sitePageContext (a mesma busca do layout) e os gatilhos; as ações só aparecem com site.configure e o domínio
- * confere de novo.
+ * Página do site: ciclo de vida, publicação, registro do G1 e janela de agrupamento. Lê o site
+ * pelo sitePageContext (a mesma busca do layout) e os gatilhos; as ações só aparecem com
+ * site.configure ("Publicar agora", com operations.run) e o domínio confere de novo.
  */
 export default async function SitePage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
@@ -25,6 +38,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const g1 = triggers.ok ? triggers.value.find((record) => record.trigger === 'G1') : undefined;
   const canConfigure = can(actor, 'site.configure');
   const canWriteContent = can(actor, 'content.write');
+  const canPublish = can(actor, 'operations.run') && site.state !== 'pausado';
 
   const sectionClass = 'space-y-3 rounded-md border border-border p-4';
   return (
@@ -89,6 +103,32 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         ) : (
           <LifecycleSteps current={site.lifecycle} />
         )}
+      </section>
+
+      <section aria-labelledby="publication-title" className={sectionClass}>
+        <h2 id="publication-title" className="text-lg font-semibold">
+          Publicação
+        </h2>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+          <dt className="text-muted-foreground">Estado</dt>
+          <dd className="space-y-1">
+            <Badge variant={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</Badge>
+            {site.state === 'pausado' && site.pausedReason && (
+              <p className="text-sm">{site.pausedReason}</p>
+            )}
+          </dd>
+          <dt className="text-muted-foreground">Release</dt>
+          <dd>{site.release ?? 'Sem release'}</dd>
+          <dt className="text-muted-foreground">Mudanças pendentes</dt>
+          <dd>
+            <PendingCount siteId={site.id} count={site.pendingChanges} />
+          </dd>
+          <dt className="text-muted-foreground">Último build</dt>
+          <dd>
+            <LastBuildSummary build={site.lastBuild} timeZone={site.timeZone} />
+          </dd>
+        </dl>
+        {canPublish && <PublishNowPanel siteId={site.id} action={publishNow} />}
       </section>
 
       <section aria-labelledby="g1-title" className={sectionClass}>
