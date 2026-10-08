@@ -233,11 +233,44 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   ).toBeVisible();
 });
 
+test('operação vê a publicação do site e o publica pela página', async ({ page }) => {
+  await loginAs(page, 'operacao@orakel.local');
+  await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
+  const publication = page.getByRole('region', { name: 'Publicação' });
+  const value = (term: string) =>
+    publication
+      .getByRole('definition')
+      .nth(['Estado', 'Release', 'Mudanças pendentes', 'Último build'].indexOf(term));
+  await expect(publication.getByRole('term')).toHaveText([
+    'Estado',
+    'Release',
+    'Mudanças pendentes',
+    'Último build',
+  ]);
+  await expect(value('Estado')).toHaveText('Ativo');
+  await expect(value('Release')).not.toBeEmpty();
+  await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
+  await expect(value('Último build')).toHaveText(/^(—|Publicado|Falhou)/);
+
+  // Mesma ação da lista; o retorno vai para a região de status da seção.
+  await page.waitForLoadState('networkidle');
+  await publication.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+  await expect(publication.getByRole('status')).toHaveText('Build de exemplo-a enfileirado.');
+  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+});
+
 test('editor vê a página do site sem as ações', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
   await expect(page.getByRole('heading', { name: 'Ciclo de vida' })).toBeVisible();
-  for (const name of [/^Marcar/, 'Registrar G1', 'Salvar janela', 'Usar padrão']) {
+  await expect(page.getByRole('heading', { name: 'Publicação' })).toBeVisible();
+  for (const name of [
+    /^Marcar/,
+    /^Publicar agora/,
+    'Registrar G1',
+    'Salvar janela',
+    'Usar padrão',
+  ]) {
     await expect(page.getByRole('button', { name })).toHaveCount(0);
   }
   await expect(page.getByRole('link', { name: 'Editar configuração' })).toHaveCount(0);
