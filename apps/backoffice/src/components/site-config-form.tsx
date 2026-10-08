@@ -7,7 +7,6 @@ import {
   type SiteConfig,
 } from '@orakel/content-model/v1';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 
 import { SchemaForm, type FieldRenderer } from '@/components/forms/schema-form';
 import { choiceField, flagsField, linesField } from '@/components/forms/site-fields';
@@ -65,7 +64,9 @@ const HINTS: Record<string, string> = {
 /**
  * Formulário da configuração do site, para o cadastro e a edição (na edição o SITE_ID não
  * muda), gerado do SiteConfigSchema. A Server Action só delega ao domínio; as issues dele
- * voltam para o campo do `path` (com foco) e a mensagem geral para o resumo (role=alert).
+ * voltam para o campo do `path` (com foco) e a mensagem geral para o resumo (role=alert). A
+ * edição confirma ao lado do botão; o cadastro vai para `/sites?cadastrado=<id>`, que confirma
+ * no topo da lista.
  */
 export function SiteConfigForm({
   mode,
@@ -79,7 +80,6 @@ export function SiteConfigForm({
   action: (config: SiteConfig) => Promise<SiteFormResult>;
 }) {
   const router = useRouter();
-  const [status, setStatus] = useState('');
   const fields: Record<string, FieldRenderer> = {
     domains: linesField(),
     featureFlags: flagsField(),
@@ -97,34 +97,26 @@ export function SiteConfigForm({
   };
 
   return (
-    <div className="space-y-2">
-      <SchemaForm
-        schema={SiteConfigSchema}
-        defaultValues={defaultValues}
-        labels={LABELS}
-        hints={{
-          ...HINTS,
-          siteId: mode === 'edit' ? 'Não muda depois do cadastro.' : 'kebab-case, ex.: meu-site.',
-        }}
-        hidden={['institutionalTexts']}
-        readOnly={mode === 'edit' ? ['siteId'] : []}
-        fields={fields}
-        submitLabel={mode === 'create' ? 'Cadastrar site' : 'Salvar configuração'}
-        onSubmit={async (config) => {
-          setStatus('');
-          const result = await action(config);
-          if (!result.ok) return [...result.issues, { path: [], message: result.message }];
-          if (mode === 'create') {
-            router.push('/sites');
-            router.refresh();
-          } else {
-            setStatus(result.message);
-          }
-        }}
-      />
-      <p role="status" className="text-sm text-muted-foreground">
-        {status}
-      </p>
-    </div>
+    <SchemaForm
+      schema={SiteConfigSchema}
+      defaultValues={defaultValues}
+      labels={LABELS}
+      hints={{
+        ...HINTS,
+        siteId: mode === 'edit' ? 'Não muda depois do cadastro.' : 'kebab-case, ex.: meu-site.',
+      }}
+      hidden={['institutionalTexts']}
+      readOnly={mode === 'edit' ? ['siteId'] : []}
+      fields={fields}
+      submitLabel={mode === 'create' ? 'Cadastrar site' : 'Salvar configuração'}
+      pendingLabel={mode === 'create' ? 'Cadastrando…' : 'Salvando…'}
+      onSubmit={async (config) => {
+        const result = await action(config);
+        if (!result.ok) return [...result.issues, { path: [], message: result.message }];
+        if (mode === 'edit') return { success: result.message };
+        router.push(`/sites?cadastrado=${encodeURIComponent(config.siteId)}`);
+        router.refresh();
+      }}
+    />
   );
 }
