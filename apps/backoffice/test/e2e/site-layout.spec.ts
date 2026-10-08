@@ -120,7 +120,7 @@ test('a área atual tem aria-current, também em telas de item, criar e editar',
     ['/conteudos/novo', 'Conteúdos'],
     ['/revisao', 'Revisão'],
     ['/configuracao', 'Visão geral'],
-  ]) {
+  ] as const) {
     await page.goto(`/sites/${SITE}${path}`);
     await expect(current).toHaveCount(1);
     await expect(current).toHaveText(area);
