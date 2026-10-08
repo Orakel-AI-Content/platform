@@ -23,6 +23,8 @@ function closeOnItem(event: MouseEvent<HTMLDivElement>) {
 export function ActionsMenu({
   label,
   trigger,
+  text,
+  align = 'end',
   children,
   className,
 }: {
@@ -33,6 +35,13 @@ export function ActionsMenu({
    * acessível e a dica ("Inserir bloco na posição 2").
    */
   trigger?: { label: string; icon: ReactNode };
+  /**
+   * Botão com texto próprio no lugar de "Mais ações" (#172, seletor de site): `visible` é o
+   * texto mostrado e `label` o nome acessível, que contém o texto visível (WCAG 2.5.3).
+   */
+  text?: { visible: string; label: string };
+  /** Lado para onde a lista abre: `end` (padrão) cresce para a esquerda; `start`, para a direita. */
+  align?: 'start' | 'end';
   /** Links e botões do menu, já com o estilo (ex.: `buttonVariants({ variant: 'ghost' })`). */
   children: ReactNode;
   className?: string;
@@ -54,11 +63,11 @@ export function ActionsMenu({
         <button
           type="button"
           popoverTarget={id}
-          aria-label={label ? `Mais ações: ${label}` : undefined}
+          aria-label={text ? text.label : label ? `Mais ações: ${label}` : undefined}
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), className)}
           style={{ anchorName: anchor }}
         >
-          Mais ações
+          {text ? text.visible : 'Mais ações'}
         </button>
       )}
       {/* Sem anchor positioning, a lista fica no posicionamento padrão do popover (centro). */}
@@ -67,7 +76,12 @@ export function ActionsMenu({
         popover="auto"
         style={{ positionAnchor: anchor }}
         onClick={closeOnItem}
-        className="min-w-40 flex-col items-stretch gap-1 rounded-md border border-border bg-background p-1 text-foreground shadow-md open:flex supports-[position-anchor:--a]:inset-auto supports-[position-anchor:--a]:m-0 supports-[position-anchor:--a]:mt-1 supports-[position-anchor:--a]:[position-area:bottom_span-left] supports-[position-anchor:--a]:[position-try-fallbacks:flip-block]"
+        className={cn(
+          'min-w-40 flex-col items-stretch gap-1 rounded-md border border-border bg-background p-1 text-foreground shadow-md open:flex supports-[position-anchor:--a]:inset-auto supports-[position-anchor:--a]:m-0 supports-[position-anchor:--a]:mt-1 supports-[position-anchor:--a]:[position-try-fallbacks:flip-block]',
+          align === 'start'
+            ? 'supports-[position-anchor:--a]:[position-area:bottom_span-right]'
+            : 'supports-[position-anchor:--a]:[position-area:bottom_span-left]',
+        )}
       >
         {children}
       </div>

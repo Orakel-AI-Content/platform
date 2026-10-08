@@ -24,7 +24,13 @@ export type SitePageContext = {
 
 /** O site da URL e quem pede, ou por que não há site (sem sessão, sem `site.read`, inexistente). */
 export type SiteLookup =
-  | { kind: 'found'; actor: Actor; site: SiteSummary }
+  | {
+      kind: 'found';
+      actor: Actor;
+      site: SiteSummary;
+      /** Todos os sites que quem pede pode ver (`listSites`): o seletor de site (#172). */
+      sites: SiteSummary[];
+    }
   | { kind: 'missing'; actor: Actor }
   | { kind: 'forbidden'; actor: Actor }
   | { kind: 'no-session' };
@@ -41,7 +47,7 @@ export const lookupSite = cache(async (siteId: string): Promise<SiteLookup> => {
   const site = sites.value.find((summary) => summary.id === siteId);
   return site === undefined
     ? { kind: 'missing', actor: actor.value }
-    : { kind: 'found', actor: actor.value, site };
+    : { kind: 'found', actor: actor.value, site, sites: sites.value };
 });
 
 /**

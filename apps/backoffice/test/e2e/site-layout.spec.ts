@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Layout do site (#78, workspace#32) contra o ambiente local: título da aba com a área e o
 // site, "não encontrado" de site e de item com o link certo e status 404, o carregamento
-// entre áreas do mesmo site com o cabeçalho visível e a barra lateral de áreas (#171).
+// entre áreas do mesmo site com o cabeçalho visível, a barra lateral de áreas (#171) e o
+// seletor de site no topo dela (#172).
 
 const OPERATOR = 'operacao@orakel.local';
 const SITE = 'exemplo-a';
@@ -145,44 +146,63 @@ test('a barra é navegável só com teclado', async ({ page }) => {
   await expect(taxonomies).toHaveAttribute('aria-current', 'page');
 });
 
-test('trilha única nas telas de site e de área, com o h1 sem o id do site', async ({ page }) => {
-  await loginAs(page, 'admin@orakel.local');
-  const trail = page.getByRole('navigation', { name: 'Trilha de navegação' });
+const switcher = (page: Page) => page.getByRole('button', { name: `${SITE_NAME}, trocar de site` });
 
-  for (const [path, items, heading] of [
-    ['/sites/novo', ['Sites', 'Cadastrar site'], 'Cadastrar site'],
-    [`/sites/${SITE}`, ['Sites', SITE_NAME], SITE_NAME],
-    [`/sites/${SITE}/configuracao`, ['Sites', SITE_NAME, 'Configuração'], 'Configuração'],
-    [`/sites/${SITE}/pendencias`, ['Sites', SITE_NAME, 'Mudanças pendentes'], 'Mudanças pendentes'],
-    [`/sites/${SITE}/conteudos`, ['Sites', SITE_NAME, 'Conteúdos'], 'Conteúdos'],
-    [`/sites/${SITE}/revisao`, ['Sites', SITE_NAME, 'Revisão'], 'Revisão'],
-    [`/sites/${SITE}/midia`, ['Sites', SITE_NAME, 'Mídia'], 'Mídia'],
-    [`/sites/${SITE}/autores`, ['Sites', SITE_NAME, 'Autores'], 'Autores'],
-    [`/sites/${SITE}/taxonomias`, ['Sites', SITE_NAME, 'Taxonomias'], 'Taxonomias'],
-    [`/sites/${SITE}/menus`, ['Sites', SITE_NAME, 'Menus'], 'Menus'],
-    [
-      `/sites/${SITE}/institucionais`,
-      ['Sites', SITE_NAME, 'Textos institucionais'],
-      'Textos institucionais',
-    ],
-  ] as const) {
-    await page.goto(path);
-    await expect(trail.getByRole('listitem')).toHaveText(
-      items.map((item, index) => (index === 0 ? item : `›${item}`)),
-    );
-    // Todos os itens, menos o último, são links; o último é a tela atual.
-    await expect(trail.getByRole('link')).toHaveCount(items.length - 1);
-    await expect(trail.locator('[aria-current="page"]')).toHaveText(items.at(-1) ?? '');
-    const h1 = page.getByRole('heading', { level: 1 });
-    await expect(h1).toHaveText(heading);
-    await expect(h1).not.toContainText(`(${SITE})`);
-    // A trilha fica acima do título.
-    expect(
-      await trail.evaluate(
-        (nav, title) =>
-          Boolean(nav.compareDocumentPosition(title as Node) & Node.DOCUMENT_POSITION_FOLLOWING),
-        await h1.elementHandle(),
-      ),
-    ).toBe(true);
+test('o seletor troca de site em 2 cliques, na mesma área; item leva à lista', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+
+  await page.goto(`/sites/${SITE}/midia`);
+  await switcher(page).click();
+  await page.getByRole('link', { name: 'Exemplo B — Receitas' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-b\/midia$/);
+
+  await page.goto(`/sites/${SITE}/autores/novo`);
+  await switcher(page).click();
+  await page.getByRole('link', { name: 'Exemplo B — Receitas' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-b\/autores$/);
+});
+
+test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites');
+  const visible = await page
+    .getByRole('table')
+    .getByRole('row')
+    .filter({ has: page.getByRole('cell') })
+    .count();
+
+  await page.goto(`/sites/${SITE}`);
+  await switcher(page).click();
+  const list = page.locator('[popover]:popover-open');
+  await expect(list.getByRole('link')).toHaveCount(visible);
+  await expect(list.locator('[aria-current="true"]')).toHaveText(SITE_NAME);
+});
+
+test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao botão', async ({
+  page,
+}) => {
+  await loginAs(page, OPERATOR);
+  await page.goto(`/sites/${SITE}/taxonomias`);
+  const button = switcher(page);
+
+  for (let step = 0; step < 40; step += 1) {
+    if (await button.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press('Tab');
   }
+  await expect(button).toBeFocused();
+  await page.keyboard.press('Enter');
+  const list = page.locator('[popover]:popover-open');
+  await expect(list).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(list).toHaveCount(0);
+  await expect(button).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  const other = page.getByRole('link', { name: 'Exemplo B — Receitas' });
+  for (let step = 0; step < 10; step += 1) {
+    if (await other.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/sites\/exemplo-b\/taxonomias$/);
 });

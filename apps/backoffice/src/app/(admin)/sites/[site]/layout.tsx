@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { SiteNav, type SiteNavItem } from '@/components/site-nav';
+import { SiteSwitcher } from '@/components/site-switcher';
 import { can } from '@/domain/access/rbac.ts';
 
 import { lookupSite } from './editorial-page.tsx';
@@ -45,7 +46,13 @@ export default async function SiteLayout({ children, params }: Params & { childr
   ];
   return (
     <div className="grid gap-8 md:grid-cols-[12rem_minmax(0,1fr)]">
-      <SiteNav siteId={lookup.site.id} items={items} />
+      <div className="space-y-4">
+        <SiteSwitcher
+          current={{ id: lookup.site.id, name: lookup.site.name }}
+          sites={lookup.sites.map((site) => ({ id: site.id, name: site.name }))}
+        />
+        <SiteNav siteId={lookup.site.id} items={items} />
+      </div>
       <div className="min-w-0">{children}</div>
     </div>
   );
