@@ -193,12 +193,22 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   await expect(page.getByRole('heading', { name: new RegExp(siteId) })).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
-  // Ciclo de vida: só o próximo passo manual.
-  await page.getByRole('button', { name: 'Marcar infra aplicada' }).click();
+  // Ciclo de vida: quatro etapas em ordem; só o próximo passo manual, no item que ele conclui.
+  const steps = page.getByRole('region', { name: 'Ciclo de vida' }).getByRole('list');
+  const currentStep = steps.locator('[aria-current="step"]');
+  await expect(steps.getByRole('listitem')).toHaveCount(4);
+  await expect(currentStep).toContainText('Cadastrado (atual)');
+  await steps
+    .getByRole('listitem')
+    .filter({ hasText: 'Infra aplicada' })
+    .getByRole('button', { name: 'Marcar infra aplicada' })
+    .click();
   await expect(status(page, 'Infra aplicada marcada.')).toBeVisible();
-  await expect(page.getByText('Etapa atual: Infra aplicada')).toBeVisible();
+  await expect(currentStep).toContainText('Infra aplicada (atual)');
+  await expect(steps.getByRole('listitem').first()).toContainText('(concluída)');
   await page.getByRole('button', { name: 'Marcar zona ativa' }).click();
-  await expect(page.getByText('Etapa atual: Zona ativa')).toBeVisible();
+  await expect(status(page, 'Zona ativa marcada.')).toBeVisible();
+  await expect(currentStep).toContainText('Zona ativa (atual)');
   await expect(page.getByRole('button', { name: /^Marcar/ })).toHaveCount(0);
 
   // Indexação sem G1 é recusada; depois do G1 pela página, a mesma edição é aceita.
@@ -237,6 +247,7 @@ test('editor vê a página do site sem as ações', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
   await expect(page.getByRole('heading', { name: 'Ciclo de vida' })).toBeVisible();
+  await expect(page.locator('[aria-current="step"]')).toHaveCount(1);
   for (const name of [/^Marcar/, 'Registrar G1', 'Salvar janela', 'Usar padrão']) {
     await expect(page.getByRole('button', { name })).toHaveCount(0);
   }
