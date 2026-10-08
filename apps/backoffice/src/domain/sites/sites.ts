@@ -7,6 +7,7 @@ import {
   type SiteConfig,
 } from '@orakel/content-model/v1';
 import type { Result } from '@orakel/content-model';
+import { isThemeId } from '@orakel/tokens';
 import { and, count, desc, eq, isNull } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
@@ -53,6 +54,19 @@ function parseSiteConfig(input: SiteConfig, resources: Resources): Result<SiteCo
         message: i.message,
         path: i.path,
       })),
+    };
+  }
+  // Tema contra os temas do código atual (@orakel/tokens), não os da release (workspace#26).
+  if (!isThemeId(parsed.data.theme)) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'site.theme_unknown',
+          message: `Tema "${parsed.data.theme}" não existe`,
+          path: ['theme'],
+        },
+      ],
     };
   }
   return validateSiteConfig(parsed.data, resources);

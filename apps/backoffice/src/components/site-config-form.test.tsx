@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { RESOURCES, SiteConfigSchema, type SiteConfig } from '@orakel/content-model/v1';
+import { THEME_IDS, THEME_SUMMARIES } from '@orakel/tokens';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -26,7 +27,7 @@ const config: SiteConfig = {
   language: 'pt-BR',
   timeZone: 'America/Sao_Paulo',
   indexavel: false,
-  theme: 'padrao',
+  theme: 'exemplo-a',
   presets: { home: 'revista', artigo: 'padrao', categoria: 'padrao', autor: 'padrao' },
   variants: { articleCard: 'horizontal' },
   featureFlags: { busca: true, comentarios: false },
@@ -34,7 +35,11 @@ const config: SiteConfig = {
   integrations: { ga4: { enabled: true, measurementId: 'G-ABC123' } },
 };
 
-const options = { presets: RESOURCES.presets, variants: RESOURCES.variants };
+const options = {
+  presets: RESOURCES.presets,
+  variants: RESOURCES.variants,
+  themes: THEME_SUMMARIES,
+};
 
 function renderForm(mode: 'create' | 'edit', result: SiteFormResult | Promise<SiteFormResult>) {
   const action = vi.fn<(value: SiteConfig) => Promise<SiteFormResult>>(() =>
@@ -169,4 +174,23 @@ describe('seções da configuração do site', () => {
       expect(within(regions[4] as HTMLElement).getByLabelText('Indexável')).toBeTruthy();
     },
   );
+});
+
+describe('tema na configuração do site (#163)', () => {
+  it('escolhe entre todos os temas de THEME_IDS, pelo nome, sem texto livre nem a dica antiga', () => {
+    renderForm('edit', { ok: true, message: '' });
+
+    const group = screen.getByRole('radiogroup', { name: 'Tema' });
+    const radios = within(group).getAllByRole<HTMLInputElement>('radio');
+    expect(radios.map((radio) => radio.value)).toEqual([...THEME_IDS]);
+    for (const summary of THEME_SUMMARIES) {
+      expect(within(group).getByRole('radio', { name: new RegExp(summary.name) })).toBeTruthy();
+    }
+    expect(within(group).getByRole('radio', { name: /Editorial claro/ })).toHaveProperty(
+      'checked',
+      true,
+    );
+    expect(within(group).queryByRole('textbox')).toBeNull();
+    expect(screen.queryByText('ID do tema em @orakel/tokens.')).toBeNull();
+  });
 });

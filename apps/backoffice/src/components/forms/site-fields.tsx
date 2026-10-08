@@ -1,5 +1,6 @@
 'use client';
 
+import type { ThemeSummary } from '@orakel/tokens';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -10,8 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import type { FieldProps, FieldRenderer } from './schema-form.tsx';
 
 // Campos do gerador para o que o schema da configuração do site não desenha sozinho: listas
-// de texto (um item por linha), feature flags (registro nome → ligado) e escolha entre opções
-// que vêm dos recursos da release, não do schema. O valor é sempre o da SiteConfig.
+// de texto (um item por linha), feature flags (registro nome → ligado), escolha entre opções
+// que vêm dos recursos da release, não do schema, e o tema com amostra. O valor é sempre o
+// da SiteConfig.
 
 const selectClass =
   'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm aria-invalid:border-destructive';
@@ -170,4 +172,63 @@ export function choiceField(options: readonly string[]): FieldRenderer {
     );
   }
   return ChoiceField;
+}
+
+/**
+ * Tema: um rádio por tema recebido (THEME_SUMMARIES, montado no servidor; o pacote não entra
+ * no bundle do navegador), com a amostra de fundo, texto e destaque e o nome legível. O `ref`
+ * vai no rádio marcado (ou no primeiro), para o foco do erro chegar ao grupo.
+ */
+export function themeField(themes: readonly ThemeSummary[]): FieldRenderer {
+  function ThemeField({ id, name, label, value, onChange, invalid, describedBy, ref }: FieldProps) {
+    const selected = typeof value === 'string' ? value : '';
+    const focusable = Math.max(
+      0,
+      themes.findIndex((theme) => theme.id === selected),
+    );
+    return (
+      <div
+        id={id}
+        role="radiogroup"
+        aria-label={label}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
+        className="grid gap-2 sm:grid-cols-2"
+      >
+        {themes.map((theme, index) => (
+          <label
+            key={theme.id}
+            className="flex min-h-11 items-center gap-3 rounded-md border border-border p-3 text-sm has-checked:border-primary"
+          >
+            <input
+              type="radio"
+              name={name}
+              value={theme.id}
+              ref={index === focusable ? ref : undefined}
+              checked={selected === theme.id}
+              onChange={() => onChange(theme.id)}
+              className="size-4 shrink-0 accent-primary"
+            />
+            <span aria-hidden="true" className="flex shrink-0 -space-x-1">
+              {[theme.colors.background, theme.colors.text, theme.colors.accent].map(
+                (color, swatch) => (
+                  <span
+                    key={swatch}
+                    data-swatch={color}
+                    className="size-5 rounded-full border border-border"
+                    style={{ backgroundColor: color }}
+                  />
+                ),
+              )}
+            </span>
+            <span className="flex flex-col">
+              <span className="font-medium">{theme.name}</span>
+              <span className="text-muted-foreground">{theme.id}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+  return ThemeField;
 }

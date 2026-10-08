@@ -27,6 +27,7 @@
     "@orakel/build-contract": "workspace:*",
     "@orakel/content-model": "workspace:*",
     "@orakel/core": "workspace:*",
+    "@orakel/tokens": "workspace:*",
     "@sentry/nextjs": "catalog:",
     "@sentry/node": "catalog:",
     "@tanstack/react-table": "catalog:",

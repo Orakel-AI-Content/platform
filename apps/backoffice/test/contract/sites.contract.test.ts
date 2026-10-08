@@ -110,6 +110,49 @@ describe('configuração de outro site (#97)', () => {
   });
 });
 
+describe('tema do site (#163)', () => {
+  const fixtureConfig = async (siteId: string) => {
+    const line = (await readFixture(siteId)).find((l) => l.type === 'config');
+    if (line?.type !== 'config') throw new Error('fixture sem config');
+    return line.data;
+  };
+
+  it('recusa cadastrar com tema inexistente, no campo theme, sem gravar nada', async () => {
+    const result = await db.transaction(async (tx) =>
+      createSite(tx, SYSTEM_ACTOR, {
+        ...(await fixtureConfig('exemplo-a')),
+        siteId: 'exemplo-c',
+        theme: 'padrao',
+      }),
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      issues: [
+        { code: 'site.theme_unknown', message: 'Tema "padrao" não existe', path: ['theme'] },
+      ],
+    });
+    expect(await db.select().from(sites).where(eq(sites.id, 'exemplo-c'))).toEqual([]);
+  });
+
+  it('recusa editar para tema inexistente e aceita outro tema de THEME_IDS', async () => {
+    const config = await fixtureConfig('exemplo-a');
+
+    const refused = await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-a', { ...config, theme: 'nao-existe' }),
+    );
+    expect(refused).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.theme_unknown', path: ['theme'] }],
+    });
+
+    const accepted = await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-a', { ...config, theme: 'exemplo-b' }),
+    );
+    expect(accepted.ok).toBe(true);
+  });
+});
+
 describe('sites.auto.tfvars.json', () => {
   it('lista todos os sites por SITE_ID, com os domínios (o principal primeiro)', async () => {
     const result = await exportSitesTfvars(db, SYSTEM_ACTOR);

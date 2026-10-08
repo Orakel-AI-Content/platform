@@ -6,6 +6,7 @@ import {
   VARIANT_COMPONENTS,
   type SiteConfig,
 } from '@orakel/content-model/v1';
+import type { ThemeSummary } from '@orakel/tokens';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -13,10 +14,15 @@ import {
   type FieldRenderer,
   type SchemaFormSection,
 } from '@/components/forms/schema-form';
-import { choiceField, flagsField, linesField } from '@/components/forms/site-fields';
+import { choiceField, flagsField, linesField, themeField } from '@/components/forms/site-fields';
 import type { SiteFormResult } from '@/components/site-config-form-values.ts';
 
-type Options = { presets: Record<string, string[]>; variants: Record<string, string[]> };
+type Options = {
+  presets: Record<string, string[]>;
+  variants: Record<string, string[]>;
+  /** THEME_SUMMARIES de @orakel/tokens, montado no servidor (o pacote embute o CSS). */
+  themes: readonly ThemeSummary[];
+};
 
 const PAGE_TYPE_LABEL: Record<string, string> = {
   home: 'Home',
@@ -60,7 +66,6 @@ const HINTS: Record<string, string> = {
   language: 'Tag BCP 47, ex.: pt-BR.',
   timeZone: 'Fuso IANA, ex.: America/Sao_Paulo.',
   indexavel: 'Desligado: noindex em todas as respostas. Ligar exige o G1 registrado.',
-  theme: 'ID do tema em @orakel/tokens.',
   'crawlers.allow': 'User-agents, um por linha; vazio usa só a lista da plataforma.',
   'crawlers.block': 'User-agents, um por linha.',
 };
@@ -99,6 +104,7 @@ export function SiteConfigForm({
   const router = useRouter();
   const fields: Record<string, FieldRenderer> = {
     domains: linesField(),
+    theme: themeField(options.themes),
     featureFlags: flagsField(),
     'crawlers.allow': linesField({ rows: 2 }),
     'crawlers.block': linesField({ rows: 2 }),

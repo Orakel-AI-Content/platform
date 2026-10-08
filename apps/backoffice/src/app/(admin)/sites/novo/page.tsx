@@ -1,4 +1,5 @@
 import { RESOURCES } from '@orakel/content-model/v1';
+import { THEME_SUMMARIES } from '@orakel/tokens';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import { backToSites, ForbiddenScreen } from '@/components/forbidden-screen';
@@ -27,7 +28,11 @@ export default async function NewSitePage() {
       <SiteConfigForm
         mode="create"
         defaultValues={emptySiteConfig(RESOURCES)}
-        options={{ presets: RESOURCES.presets, variants: RESOURCES.variants }}
+        options={{
+          presets: RESOURCES.presets,
+          variants: RESOURCES.variants,
+          themes: THEME_SUMMARIES,
+        }}
         action={createSiteAction}
       />
     </section>
