@@ -48,7 +48,7 @@ describe('trilha do PageHeader', () => {
     expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe(site.name);
   });
 
-  it('a trilha vem antes do título; sem trilha nem back, só o título', () => {
+  it('a trilha vem antes do título; sem trilha, só o título', () => {
     render(<PageHeader id="t" trail={siteTrail(site, 'Menus')} title="Menus" />);
     const nav = screen.getByRole('navigation');
     const heading = screen.getByRole('heading', { level: 1, name: 'Menus' });

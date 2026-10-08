@@ -143,21 +143,18 @@ function Trail({ items }: { items: readonly TrailItem[] }) {
 }
 
 /**
- * Cabeçalho da tela (#87): trilha (#173) ou link de volta (telas de item, até a #174),
- * título à esquerda e a ação principal à direita. A página só passa `action` quando quem
- * pede tem permissão para ela.
+ * Cabeçalho da tela (#87): trilha (#173, #174), título à esquerda e a ação principal à
+ * direita. A página só passa `action` quando quem pede tem permissão para ela.
  */
 export function PageHeader({
   id,
   trail,
-  back,
   title,
   action,
 }: {
   id: string;
   /** Caminho até a tela, do mais geral ao atual (`siteTrail`). */
   trail?: readonly TrailItem[];
-  back?: { href: string; label: string };
   title: ReactNode;
   /** Ação principal (e as secundárias, agrupadas): link de criar, de cadastrar. */
   action?: ReactNode;
@@ -170,13 +167,6 @@ export function PageHeader({
   return (
     <>
       {trail && <Trail items={trail} />}
-      {back && (
-        <p className="text-sm">
-          <Link href={back.href} className="underline underline-offset-4">
-            {back.label}
-          </Link>
-        </p>
-      )}
       {action ? (
         <div className="flex flex-wrap items-center justify-between gap-4">
           {heading}
