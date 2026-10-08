@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
-import { RESOURCES, type SiteConfig } from '@orakel/content-model/v1';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { RESOURCES, SiteConfigSchema, type SiteConfig } from '@orakel/content-model/v1';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { editValues } from './site-config-form-values.ts';
 import type { SiteFormResult } from './site-config-form-values.ts';
-import { SiteConfigForm } from './site-config-form.tsx';
+import { SITE_CONFIG_HIDDEN, SITE_CONFIG_SECTIONS, SiteConfigForm } from './site-config-form.tsx';
 
 // Formulário da configuração do site no gerador (#47): ida e volta da SiteConfig, SITE_ID só
 // leitura na edição e recusa do domínio no campo, com foco.
@@ -129,4 +129,44 @@ describe('formulário da configuração do site', () => {
       'Não foi possível salvar a configuração.',
     );
   });
+});
+
+describe('seções da configuração do site', () => {
+  it('cada chave visível do schema está em exatamente uma seção', () => {
+    const declared = SITE_CONFIG_SECTIONS.flatMap((section) => section.paths);
+    const visible = Object.keys(SiteConfigSchema.shape).filter(
+      (key) => !SITE_CONFIG_HIDDEN.includes(key),
+    );
+    expect([...declared].sort()).toEqual([...visible].sort());
+  });
+
+  it.each(['create', 'edit'] as const)(
+    '%s: seis seções com h2, índice no topo e todos os campos dentro de uma seção',
+    (mode) => {
+      renderForm(mode, { ok: true, message: '' });
+
+      const titles = SITE_CONFIG_SECTIONS.map((section) => section.title);
+      expect(
+        screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+      ).toEqual(titles);
+      const nav = screen.getByRole('navigation', { name: 'Seções do formulário' });
+      expect(
+        within(nav)
+          .getAllByRole('link')
+          .map((link) => link.textContent),
+      ).toEqual(titles);
+
+      const regions = titles.map((title) => screen.getByRole('region', { name: title }));
+      const form = screen
+        .getByRole('button', { name: /Cadastrar site|Salvar configuração/ })
+        .closest('form') as HTMLFormElement;
+      const controls = [...form.querySelectorAll('input, select, textarea')];
+      expect(controls.length).toBeGreaterThan(0);
+      for (const control of controls) {
+        expect(regions.some((region) => region.contains(control))).toBe(true);
+      }
+      expect(within(regions[2] as HTMLElement).getByLabelText('Tema')).toBeTruthy();
+      expect(within(regions[4] as HTMLElement).getByLabelText('Indexável')).toBeTruthy();
+    },
+  );
 });

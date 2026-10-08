@@ -8,7 +8,11 @@ import {
 } from '@orakel/content-model/v1';
 import { useRouter } from 'next/navigation';
 
-import { SchemaForm, type FieldRenderer } from '@/components/forms/schema-form';
+import {
+  SchemaForm,
+  type FieldRenderer,
+  type SchemaFormSection,
+} from '@/components/forms/schema-form';
 import { choiceField, flagsField, linesField } from '@/components/forms/site-fields';
 import type { SiteFormResult } from '@/components/site-config-form-values.ts';
 
@@ -61,6 +65,19 @@ const HINTS: Record<string, string> = {
   'crawlers.block': 'User-agents, um por linha.',
 };
 
+/** Seções da configuração, na ordem da página; cobrem todas as chaves visíveis do schema. */
+export const SITE_CONFIG_SECTIONS: SchemaFormSection[] = [
+  { id: 'identidade', title: 'Identidade', paths: ['siteId', 'name', 'language', 'timeZone'] },
+  { id: 'dominios', title: 'Domínios', paths: ['domains'] },
+  { id: 'aparencia', title: 'Aparência', paths: ['theme', 'presets', 'variants'] },
+  { id: 'recursos', title: 'Recursos', paths: ['featureFlags'] },
+  { id: 'robos', title: 'Robôs e indexação', paths: ['indexavel', 'crawlers'] },
+  { id: 'integracoes', title: 'Integrações', paths: ['integrations'] },
+];
+
+/** Chaves do schema sem campo na tela (os textos têm formulário próprio). */
+export const SITE_CONFIG_HIDDEN = ['institutionalTexts'];
+
 /**
  * Formulário da configuração do site, para o cadastro e a edição (na edição o SITE_ID não
  * muda), gerado do SiteConfigSchema. A Server Action só delega ao domínio; as issues dele
@@ -105,9 +122,10 @@ export function SiteConfigForm({
         ...HINTS,
         siteId: mode === 'edit' ? 'Não muda depois do cadastro.' : 'kebab-case, ex.: meu-site.',
       }}
-      hidden={['institutionalTexts']}
+      hidden={SITE_CONFIG_HIDDEN}
       readOnly={mode === 'edit' ? ['siteId'] : []}
       fields={fields}
+      sections={SITE_CONFIG_SECTIONS}
       submitLabel={mode === 'create' ? 'Cadastrar site' : 'Salvar configuração'}
       pendingLabel={mode === 'create' ? 'Cadastrando…' : 'Salvando…'}
       onSubmit={async (config) => {
