@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { readFixture } from '../../src/bin/seed.ts';
 import { createDb, createPool } from '../../src/db/client.ts';
-import { contents, contentVersions } from '../../src/db/schema/index.ts';
+import { contents, contentVersions, media, mediaVariants } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
@@ -90,8 +90,24 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await expect(linkPopover).toBeHidden();
   await expect(textEditor).toBeFocused();
 
+  // A imagem do bloco pela grade de miniaturas (#182), só com o teclado.
   await addBlock(page, 'Imagem');
-  await page.getByLabel('Mídia', { exact: true }).selectOption({ index: 1 });
+  const imageField = page.getByRole('group', { name: 'Mídia', exact: true });
+  await imageField.getByRole('button', { name: 'Escolher imagem' }).focus();
+  await page.keyboard.press('Enter');
+  const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
+  await expect(grid.getByRole('list', { name: 'Imagens da biblioteca' })).toBeVisible();
+  const firstImage = grid.getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ }).first();
+  const chosen = (await firstImage.textContent()) ?? '';
+  for (let step = 0; step < 5; step += 1) {
+    if (await firstImage.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(firstImage).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(grid).toBeHidden();
+  await expect(imageField.getByText(chosen, { exact: true }).first()).toBeVisible();
+  await expect(imageField.getByRole('button', { name: 'Trocar' })).toBeFocused();
 
   await addBlock(page, 'FAQ');
   await page.getByRole('button', { name: 'Adicionar pergunta' }).click();
@@ -479,5 +495,65 @@ test.describe('barra de ações do editor (#109)', () => {
       page.locator('button[aria-label^="Conteúdo do bloco"][aria-expanded="true"]'),
     ).toHaveCount(20);
     await expect(expanded).toHaveCount(20);
+  });
+});
+
+const MEDIA_SITE = `e2e-midia-grade-${Date.now()}`;
+const MEDIA_COUNT = 2000;
+
+test.describe('grade de imagens com 2.000 mídias (#182)', () => {
+  test.beforeAll(async () => {
+    const config = (await readFixture('exemplo-b')).find((line) => line.type === 'config');
+    if (config?.type !== 'config') throw new Error('fixture sem config');
+    const pool = createPool(getEnv().DATABASE_URL);
+    try {
+      const db = createDb(pool);
+      const site = await db.transaction((tx) =>
+        createSite(tx, SYSTEM_ACTOR, {
+          ...config.data,
+          siteId: MEDIA_SITE,
+          name: `Site ${MEDIA_SITE}`,
+          domains: [`${MEDIA_SITE}.example.com`],
+        }),
+      );
+      if (!site.ok) throw new Error(JSON.stringify(site.issues));
+      const ids = Array.from({ length: MEDIA_COUNT }, (_, index) => index + 1);
+      await db.transaction(async (tx) => {
+        await tx
+          .insert(media)
+          .values(ids.map((id) => ({ siteId: MEDIA_SITE, id, width: 800, height: 600 })));
+        await tx.insert(mediaVariants).values(
+          ids.map((id) => ({
+            siteId: MEDIA_SITE,
+            mediaId: id,
+            width: 400,
+            format: 'webp',
+            path: `/media/${id}-400.webp`,
+          })),
+        );
+      });
+    } finally {
+      await pool.end();
+    }
+  });
+
+  test.afterAll(async () => {
+    await removeSites([MEDIA_SITE]);
+  });
+
+  test('a grade abre com a primeira página em menos de 2 s', async ({ page }) => {
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${MEDIA_SITE}/conteudos/novo`);
+    await addBlock(page, 'Imagem');
+    const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
+
+    const started = Date.now();
+    await page
+      .getByRole('group', { name: 'Mídia', exact: true })
+      .getByRole('button', { name: 'Escolher imagem' })
+      .click();
+    await expect(grid.getByRole('status')).toHaveText(`Página 1 de 84 · ${MEDIA_COUNT} imagens`);
+    expect(Date.now() - started).toBeLessThan(2000);
+    await expect(grid.getByRole('button', { name: /^Mídia \d+ · 800×600$/ })).toHaveCount(24);
   });
 });
