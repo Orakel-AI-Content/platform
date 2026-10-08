@@ -16,7 +16,12 @@ import {
   savedFormValues,
   type ContentFormResult,
 } from '@/components/content-editor-values.ts';
-import { entityField, mediaField, type PickerOption } from '@/components/forms/picker-fields';
+import {
+  entityField,
+  mediaField,
+  type MediaSource,
+  type PickerOption,
+} from '@/components/forms/picker-fields';
 import { richTextField } from '@/components/forms/rich-text-field';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form';
 import { zonedDateTimeField } from '@/components/forms/zoned-datetime-field';
@@ -74,7 +79,8 @@ const BLOCK_LABELS: Record<string, string> = {
 export type ContentEditorOptions = {
   /** Tipos de bloco que a release suporta (`RESOURCES.blockTypes`). */
   blockTypes: readonly string[];
-  media: readonly PickerOption[];
+  /** Biblioteca do site pela grade (#182): actions ligadas ao site pela página. */
+  media: MediaSource;
   authors: readonly PickerOption[];
   taxonomies: readonly PickerOption[];
 };

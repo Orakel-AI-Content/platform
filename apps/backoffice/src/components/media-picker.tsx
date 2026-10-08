@@ -22,12 +22,16 @@ export function MediaPicker({
   label,
   load,
   onSelect,
+  buttonRef,
 }: {
   /** Texto do botão que abre o diálogo ("Escolher imagem", "Trocar"). */
   label: string;
   /** Página `page` (a partir de 1), ou `null` quando não pôde ser lida. */
   load: (page: number) => Promise<MediaPickerPage | null>;
-  onSelect: (id: number) => void;
+  /** Recebe também o item escolhido, para quem chama mostrar a miniatura sem nova leitura. */
+  onSelect: (id: number, item: MediaItem) => void;
+  /** `ref` do botão que abre, para o foco vindo de fora (resumo de erros, recusa do servidor). */
+  buttonRef?: (element: HTMLButtonElement | null) => void;
 }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -45,9 +49,15 @@ export function MediaPicker({
     void show(1);
   };
 
-  const choose = (mediaId: number) => {
-    onSelect(mediaId);
+  const choose = (item: MediaItem) => {
+    onSelect(item.id, item);
     dialog.current?.close();
+  };
+
+  // O botão de origem é o mesmo para o retorno do foco e para quem chama (`buttonRef`).
+  const setTrigger = (element: HTMLButtonElement | null) => {
+    trigger.current = element;
+    buttonRef?.(element);
   };
 
   const page = state.kind === 'ready' ? state.data.page : state.page;
@@ -64,7 +74,7 @@ export function MediaPicker({
 
   return (
     <>
-      <Button ref={trigger} variant="outline" size="sm" aria-haspopup="dialog" onClick={open}>
+      <Button ref={setTrigger} variant="outline" size="sm" aria-haspopup="dialog" onClick={open}>
         {label}
       </Button>
       <dialog
@@ -95,7 +105,7 @@ export function MediaPicker({
                 <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => choose(item.id)}
+                    onClick={() => choose(item)}
                     className="w-full space-y-1 rounded-md text-left hover:bg-muted"
                   >
                     <MediaThumbnail item={item} />

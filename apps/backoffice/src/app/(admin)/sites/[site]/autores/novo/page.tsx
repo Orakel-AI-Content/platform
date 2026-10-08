@@ -1,6 +1,6 @@
 import { EntityForm } from '@/components/entity-forms';
 
-import { editorOptions } from '../../conteudos/editor-options.ts';
+import { mediaSource } from '../../conteudos/editor-options.ts';
 import { createAuthorAction } from '../../editorial-actions.ts';
 import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
 
@@ -12,9 +12,8 @@ export default async function NewAuthorPage({ params }: { params: Promise<{ site
   const { site: siteId } = await params;
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
-  const { actor, db, site, canWrite } = context.value;
+  const { site, canWrite } = context.value;
   if (!canWrite) return noWrite(site.id);
-  const options = await editorOptions(db, actor, site.id);
 
   return (
     <section aria-labelledby="new-author-title" className="form-width space-y-4">
@@ -30,7 +29,7 @@ export default async function NewAuthorPage({ params }: { params: Promise<{ site
         mode="create"
         siteId={site.id}
         defaultValues={{ slug: '', name: '' }}
-        media={options?.media ?? []}
+        media={mediaSource(site.id)}
         action={createAuthorAction.bind(null, site.id)}
       />
     </section>
