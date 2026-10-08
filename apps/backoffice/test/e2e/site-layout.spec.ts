@@ -144,3 +144,45 @@ test('a barra é navegável só com teclado', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/sites/${SITE}/taxonomias$`));
   await expect(taxonomies).toHaveAttribute('aria-current', 'page');
 });
+
+test('trilha única nas telas de site e de área, com o h1 sem o id do site', async ({ page }) => {
+  await loginAs(page, 'admin@orakel.local');
+  const trail = page.getByRole('navigation', { name: 'Trilha de navegação' });
+
+  for (const [path, items, heading] of [
+    ['/sites/novo', ['Sites', 'Cadastrar site'], 'Cadastrar site'],
+    [`/sites/${SITE}`, ['Sites', SITE_NAME], SITE_NAME],
+    [`/sites/${SITE}/configuracao`, ['Sites', SITE_NAME, 'Configuração'], 'Configuração'],
+    [`/sites/${SITE}/pendencias`, ['Sites', SITE_NAME, 'Mudanças pendentes'], 'Mudanças pendentes'],
+    [`/sites/${SITE}/conteudos`, ['Sites', SITE_NAME, 'Conteúdos'], 'Conteúdos'],
+    [`/sites/${SITE}/revisao`, ['Sites', SITE_NAME, 'Revisão'], 'Revisão'],
+    [`/sites/${SITE}/midia`, ['Sites', SITE_NAME, 'Mídia'], 'Mídia'],
+    [`/sites/${SITE}/autores`, ['Sites', SITE_NAME, 'Autores'], 'Autores'],
+    [`/sites/${SITE}/taxonomias`, ['Sites', SITE_NAME, 'Taxonomias'], 'Taxonomias'],
+    [`/sites/${SITE}/menus`, ['Sites', SITE_NAME, 'Menus'], 'Menus'],
+    [
+      `/sites/${SITE}/institucionais`,
+      ['Sites', SITE_NAME, 'Textos institucionais'],
+      'Textos institucionais',
+    ],
+  ] as const) {
+    await page.goto(path);
+    await expect(trail.getByRole('listitem')).toHaveText(
+      items.map((item, index) => (index === 0 ? item : `›${item}`)),
+    );
+    // Todos os itens, menos o último, são links; o último é a tela atual.
+    await expect(trail.getByRole('link')).toHaveCount(items.length - 1);
+    await expect(trail.locator('[aria-current="page"]')).toHaveText(items.at(-1) ?? '');
+    const h1 = page.getByRole('heading', { level: 1 });
+    await expect(h1).toHaveText(heading);
+    await expect(h1).not.toContainText(`(${SITE})`);
+    // A trilha fica acima do título.
+    expect(
+      await trail.evaluate(
+        (nav, title) =>
+          Boolean(nav.compareDocumentPosition(title as Node) & Node.DOCUMENT_POSITION_FOLLOWING),
+        await h1.elementHandle(),
+      ),
+    ).toBe(true);
+  }
+});
