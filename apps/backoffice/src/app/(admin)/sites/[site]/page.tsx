@@ -1,10 +1,15 @@
 import Link from 'next/link';
 
-import { BuildWindowForm, LifecycleAction, RegisterG1Form } from '@/components/site-actions';
+import { LifecycleSteps } from '@/components/lifecycle-steps';
+import {
+  BuildWindowForm,
+  LifecycleAction,
+  LifecycleActionScope,
+  RegisterG1Form,
+} from '@/components/site-actions';
 import {
   formatDateTime,
   formatDuration,
-  LIFECYCLE_LABEL,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
 } from '@/components/site-labels.ts';

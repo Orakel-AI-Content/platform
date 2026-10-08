@@ -67,3 +67,10 @@ describe('duração da janela de agrupamento (#147)', () => {
     expect(formatDuration(3605)).toBe('3605 s (1 h 5 s)');
   });
 });
+
+describe('ordem do ciclo de vida (#148)', () => {
+  it('tem cada etapa com rótulo exatamente uma vez', () => {
+    expect(new Set(LIFECYCLE_ORDER).size).toBe(LIFECYCLE_ORDER.length);
+    expect([...LIFECYCLE_ORDER].sort()).toEqual(Object.keys(LIFECYCLE_LABEL).sort());
+  });
+});
