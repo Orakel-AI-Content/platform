@@ -4,10 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
-import { entityField, mediaField } from './picker-fields.tsx';
+import type { MediaItem } from '../media-library.tsx';
+import { entityField, mediaField, type MediaSource } from './picker-fields.tsx';
 import { SchemaForm } from './schema-form.tsx';
 
-// Seletores de mídia e de entidades no gerador (#45): só o que existe no site, por teclado.
+// Seletores de mídia e de entidades no gerador (#45): só o que existe no site, por teclado. A
+// mídia é escolhida pela grade de miniaturas (#182), com a miniatura do valor atual por ID.
 
 afterEach(cleanup);
 
@@ -17,21 +19,42 @@ const schema = z.object({
   authorIds: z.array(z.number().int().positive()),
 });
 
-const media = [
-  { id: 1, label: 'Mídia 1 (1200×800)' },
-  { id: 2, label: 'Mídia 2 (800×600)' },
-];
+const thumb = (id: number, width: number, height: number): MediaItem => ({
+  id,
+  width,
+  height,
+  sources: [],
+  src: `https://media.exemplo-a.test/${id}.webp`,
+});
+const library = [thumb(1, 1200, 800), thumb(2, 800, 600)];
+
+/** Biblioteca falsa: uma página só, e a leitura por IDs. */
+function fakeSource(): MediaSource & { byIds: ReturnType<typeof vi.fn> } {
+  return {
+    load: vi.fn((page: number) =>
+      Promise.resolve({ items: library, total: library.length, page, pageSize: 24 }),
+    ),
+    byIds: vi.fn((ids: number[]) =>
+      Promise.resolve(library.filter((item) => ids.includes(item.id))),
+    ),
+  };
+}
 const authors = [
   { id: 1, label: 'Ana' },
   { id: 2, label: 'Bia' },
   { id: 3, label: 'Caio' },
 ];
 
-function renderForm(onSubmit = vi.fn(), authorOptions = authors) {
+function renderForm(
+  onSubmit = vi.fn(),
+  authorOptions = authors,
+  defaults: Record<string, unknown> = { mediaId: undefined, authorIds: [3] },
+  media = fakeSource(),
+) {
   render(
     <SchemaForm
       schema={schema}
-      defaultValues={{ mediaId: undefined, authorIds: [3] }}
+      defaultValues={defaults}
       labels={{ mediaId: 'Mídia', coverMediaId: 'Capa', authorIds: 'Autores' }}
       fields={{
         mediaId: mediaField(media),
@@ -42,31 +65,44 @@ function renderForm(onSubmit = vi.fn(), authorOptions = authors) {
       onSubmit={onSubmit}
     />,
   );
-  return onSubmit;
+  return { onSubmit, media };
 }
 
-describe('seletores', () => {
-  it('a mídia só oferece as do site; a obrigatória vazia é recusada', async () => {
-    const user = userEvent.setup();
-    const onSubmit = renderForm();
+const dialogOf = (group: HTMLElement) => group.querySelector('dialog') as HTMLDialogElement;
 
-    const select = screen.getByLabelText('Mídia');
-    expect(
-      within(select)
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual(['Escolha uma mídia', 'Mídia 1 (1200×800)', 'Mídia 2 (800×600)']);
+describe('seletores', () => {
+  it('mídia vazia mostra "Nenhuma imagem"; a obrigatória vazia é recusada no campo', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm();
+
+    const field = screen.getByRole('group', { name: 'Mídia' });
+    expect(within(field).getByText('Nenhuma imagem')).toBeTruthy();
+    expect(within(field).getByRole('button', { name: 'Escolher imagem' })).toBeTruthy();
+    expect(within(field).queryByRole('button', { name: 'Remover' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    await waitFor(() => expect(select.getAttribute('aria-invalid')).toBe('true'));
+    await waitFor(() => expect(field.getAttribute('aria-invalid')).toBe('true'));
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('escolhe mídia e autores pelo teclado e envia os IDs', async () => {
+  it('escolher na grade mostra a miniatura, fecha e devolve o foco ao botão do campo', async () => {
     const user = userEvent.setup();
-    const onSubmit = renderForm();
+    const { onSubmit } = renderForm();
 
-    await user.selectOptions(screen.getByLabelText('Mídia'), 'Mídia 2 (800×600)');
+    const field = screen.getByRole('group', { name: 'Mídia' });
+    const choose = within(field).getByRole('button', { name: 'Escolher imagem' });
+    await user.click(choose);
+    const option = await within(dialogOf(field)).findByRole('button', {
+      name: 'Mídia 2 · 800×600',
+    });
+    option.focus();
+    await user.keyboard('{Enter}');
+
+    expect(dialogOf(field).open).toBe(false);
+    expect(within(field).getByText('Mídia 2 · 800×600', { selector: 'p' })).toBeTruthy();
+    const change = within(field).getByRole('button', { name: 'Trocar' });
+    expect(document.activeElement).toBe(change);
+
     const group = screen.getByRole('group', { name: 'Autores' });
     within(group).getByRole('checkbox', { name: 'Ana' }).focus();
     await user.keyboard(' ');
@@ -74,6 +110,60 @@ describe('seletores', () => {
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0]?.[0]).toEqual({ mediaId: 2, authorIds: [1, 3] });
+  });
+
+  it('ao reabrir um valor salvo, a miniatura vem da leitura por ID', async () => {
+    const { media } = renderForm(vi.fn(), authors, { mediaId: 1, coverMediaId: 2, authorIds: [] });
+
+    const field = screen.getByRole('group', { name: 'Mídia' });
+    expect(await within(field).findByText('Mídia 1 · 1200×800', { selector: 'p' })).toBeTruthy();
+    expect(field.querySelector('img')?.getAttribute('src')).toBe(
+      'https://media.exemplo-a.test/1.webp',
+    );
+    expect(media.byIds).toHaveBeenCalledWith([1]);
+    expect(within(field).getByRole('button', { name: 'Trocar' })).toBeTruthy();
+  });
+
+  it('a opcional tem "Remover", que deixa o campo vazio e leva o foco a "Escolher imagem"', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm(vi.fn(), authors, {
+      mediaId: 1,
+      coverMediaId: 2,
+      authorIds: [],
+    });
+
+    const cover = screen.getByRole('group', { name: 'Capa' });
+    await within(cover).findByText('Mídia 2 · 800×600', { selector: 'p' });
+    // A obrigatória não tem "Remover".
+    expect(
+      within(screen.getByRole('group', { name: 'Mídia' })).queryByRole('button', {
+        name: 'Remover',
+      }),
+    ).toBeNull();
+    await user.click(within(cover).getByRole('button', { name: 'Remover' }));
+
+    expect(within(cover).getByText('Nenhuma imagem')).toBeTruthy();
+    expect(document.activeElement).toBe(
+      within(cover).getByRole('button', { name: 'Escolher imagem' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({ mediaId: 1, authorIds: [] });
+  });
+
+  it('o erro da mídia obrigatória leva o foco ao botão do campo pelo resumo', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    const summary = screen.getByRole('alert');
+    await user.click(await within(summary).findByRole('button', { name: /^Mídia: / }));
+
+    expect(document.activeElement).toBe(
+      within(screen.getByRole('group', { name: 'Mídia' })).getByRole('button', {
+        name: 'Escolher imagem',
+      }),
+    );
   });
 
   it('sem entidades cadastradas mostra o aviso', () => {
