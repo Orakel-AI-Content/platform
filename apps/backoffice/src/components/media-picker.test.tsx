@@ -88,7 +88,7 @@ describe('grade de miniaturas', () => {
     second.focus();
     await user.keyboard('{Enter}');
 
-    expect(onSelect).toHaveBeenCalledWith(2);
+    expect(onSelect).toHaveBeenCalledWith(2, expect.objectContaining({ id: 2, width: 800 }));
     expect(dialogEl().open).toBe(false);
     expect(document.activeElement).toBe(trigger);
   });
@@ -100,11 +100,11 @@ describe('grade de miniaturas', () => {
     await user.click(trigger);
     (await inDialog().findByRole('button', { name: 'Mídia 1 · 800×600' })).focus();
     await user.keyboard(' ');
-    expect(onSelect).toHaveBeenLastCalledWith(1);
+    expect(onSelect).toHaveBeenLastCalledWith(1, expect.objectContaining({ id: 1 }));
 
     await user.click(trigger);
     await user.click(await inDialog().findByRole('button', { name: 'Mídia 2 · 800×600' }));
-    expect(onSelect).toHaveBeenLastCalledWith(2);
+    expect(onSelect).toHaveBeenLastCalledWith(2, expect.objectContaining({ id: 2 }));
     expect(dialogEl().open).toBe(false);
   });
 
@@ -155,5 +155,14 @@ describe('grade de miniaturas', () => {
         'Não foi possível carregar as imagens.',
       ),
     );
+  });
+
+  it('buttonRef recebe o botão que abre (foco vindo de fora)', () => {
+    const buttonRef = vi.fn();
+    render(
+      <MediaPicker label="Trocar" load={library(1)} onSelect={vi.fn()} buttonRef={buttonRef} />,
+    );
+
+    expect(buttonRef).toHaveBeenCalledWith(screen.getByRole('button', { name: 'Trocar' }));
   });
 });
