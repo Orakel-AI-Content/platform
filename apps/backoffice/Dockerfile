@@ -31,13 +31,17 @@ FROM base AS build
 COPY --from=prune /repo/out/json/ .
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=prune /repo/out/full/ .
-RUN pnpm --filter @orakel/backoffice build
+# O dist/ do @orakel/tokens não é commitado: gerado antes do Next (páginas) e levado para a
+# imagem final (o domínio, no worker e no build-runner, roda direto do .ts).
+RUN pnpm turbo run build --filter=@orakel/tokens \
+ && pnpm --filter @orakel/backoffice build
 
 FROM node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runtime
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /repo
 COPY --from=deps --chown=node:node /repo/ ./
 COPY --from=prune --chown=node:node /repo/out/full/ ./
+COPY --from=build --chown=node:node /repo/packages/tokens/dist ./packages/tokens/dist
 COPY --from=build --chown=node:node /repo/apps/backoffice/.next/standalone ./apps/backoffice/.next/standalone
 COPY --from=build --chown=node:node /repo/apps/backoffice/.next/static ./apps/backoffice/.next/standalone/apps/backoffice/.next/static
 WORKDIR /repo/apps/backoffice
