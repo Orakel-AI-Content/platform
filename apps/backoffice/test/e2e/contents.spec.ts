@@ -405,4 +405,40 @@ test.describe('barra de ações do editor (#109)', () => {
     await expect(page.getByRole('group', { name: /^Bloco \d+:/ })).toHaveCount(21);
     await expect(page.getByRole('button', { name: 'Remover bloco 21', exact: true })).toBeVisible();
   });
+
+  test('recolhe e expande blocos só pelo teclado; recolhido, o bloco ocupa uma linha (#135)', async ({
+    page,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    const toggle = page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true });
+    const group = page.getByRole('group', { name: 'Bloco 1: Sumário', exact: true });
+
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toBeFocused();
+    await expect(group.getByText('Seção 1', { exact: true })).toHaveAttribute('title', 'Seção 1');
+    await expect(group.getByLabel('Título do sumário')).toBeHidden();
+    // Uma linha: a altura do bloco é a do cabeçalho (botões de 32 px) mais o espaçamento.
+    const box = await group.boundingBox();
+    expect(box?.height).toBeLessThanOrEqual(72);
+
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(group.getByLabel('Título do sumário')).toHaveValue('Seção 1');
+
+    const expanded = page.locator('button[aria-expanded][aria-label^="Conteúdo do bloco"]');
+    await page.getByRole('button', { name: 'Recolher todos' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.locator('button[aria-label^="Conteúdo do bloco"][aria-expanded="false"]'),
+    ).toHaveCount(20);
+    await page.getByRole('button', { name: 'Expandir todos' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.locator('button[aria-label^="Conteúdo do bloco"][aria-expanded="true"]'),
+    ).toHaveCount(20);
+    await expect(expanded).toHaveCount(20);
+  });
 });
