@@ -79,6 +79,12 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   uma coluna legível. `list-width` (largura cheia do `main`) para as listas e tabelas: sites,
   conteúdos, versões, autores, taxonomias, menus e mídia. O componente de formulário não
   define largura; quem define é a página.
+- **Barra lateral do site:** o layout `sites/[site]/layout.tsx` põe as telas de um site num
+  grid barra (12rem) + conteúdo, uma coluna só abaixo de `md`; `list-width` é a largura da
+  coluna de conteúdo. `SiteNav` (`src/components/site-nav.tsx`, `nav` "Áreas do site")
+  recebe os itens prontos do servidor (Textos institucionais só com `content.write`) e marca
+  a área atual pelo primeiro segmento depois do site, com `aria-current="page"` e
+  `bg-muted`, também nas telas de item; Configuração e Pendências marcam a Visão geral.
 - **Estados:** badge com o texto do estado e uma variante própria dentro do grupo, sem ícone
   (o texto distingue os estados em tons de cinza). O mapa fica ao lado dos rótulos, em
   `src/components/site-labels.ts` (`CONTENT_STATUS_VARIANT`, `SITE_STATE_VARIANT`,
