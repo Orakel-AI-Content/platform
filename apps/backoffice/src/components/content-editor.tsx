@@ -19,6 +19,7 @@ import {
 import { entityField, mediaField, type PickerOption } from '@/components/forms/picker-fields';
 import { richTextField } from '@/components/forms/rich-text-field';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form';
+import { zonedDateTimeField } from '@/components/forms/zoned-datetime-field';
 import { BLOCK_TYPE_LABEL } from '@/components/site-labels.ts';
 import { blockSummary, blockText } from '@/components/block-summary.ts';
 import { ActionsMenu } from '@/components/ui/actions-menu';
@@ -53,7 +54,6 @@ const META_LABELS: Record<string, string> = {
 
 const META_HINTS: Record<string, string> = {
   slug: 'Minúsculas, números e hífens.',
-  publishedAt: 'Data e hora com fuso, ex.: 2026-10-06T12:00:00-03:00.',
 };
 
 const BLOCK_LABELS: Record<string, string> = {
@@ -96,6 +96,7 @@ const errorAt = (errors: FieldValues, path: string): string | undefined => {
 export function ContentEditor({
   mode,
   siteId,
+  timeZone,
   defaultValues,
   options,
   action,
@@ -104,6 +105,8 @@ export function ContentEditor({
 }: {
   mode: 'create' | 'edit';
   siteId: string;
+  /** Fuso IANA do site: a data de publicação é escolhida e mostrada nele (#183). */
+  timeZone: string;
   defaultValues: FieldValues;
   options: ContentEditorOptions;
   action: (input: ContentEdit) => Promise<ContentFormResult>;
@@ -172,6 +175,7 @@ export function ContentEditor({
     authorIds: entityField(options.authors, 'Nenhum autor cadastrado neste site.'),
     taxonomyIds: entityField(options.taxonomies, 'Nenhuma taxonomia cadastrada neste site.'),
     coverMediaId: mediaField(options.media, { optional: true }),
+    publishedAt: zonedDateTimeField(timeZone),
   };
 
   // No quadro seguinte à montagem: texto já presente quando a região `role="status"` aparece
@@ -302,7 +306,7 @@ export function ContentEditor({
           <SchemaFields
             schema={ContentMetaSchema}
             labels={META_LABELS}
-            hints={META_HINTS}
+            hints={{ ...META_HINTS, publishedAt: `Horário de ${timeZone}` }}
             // O tipo não muda depois de criado; `updatedAt` é do site, não do editor.
             hidden={mode === 'edit' ? ['kind', 'updatedAt'] : ['updatedAt']}
             fields={metaFields}
