@@ -106,7 +106,10 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await typeInto(page, page.getByLabel('ID', { exact: true }), siteId);
   await typeInto(page, page.getByLabel('Nome', { exact: true }), 'Site do E2E');
   await typeInto(page, page.getByLabel('Domínios'), `${siteId}.example.com`);
-  await typeInto(page, page.getByLabel('Tema'), 'padrao');
+  // Tema (#163): escolhido no grupo, pelo nome legível, só com o teclado.
+  await tabTo(page, page.getByRole('radio', { name: /Editorial claro/ }));
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('radio', { name: /Editorial claro/ })).toBeChecked();
   await tabTo(page, page.getByRole('button', { name: 'Cadastrar site' }));
   await page.keyboard.press('Enter');
 
@@ -160,7 +163,7 @@ test('preset fora dos recursos é recusado com a mensagem do domínio', async ({
   await page.getByLabel('ID', { exact: true }).fill(siteId);
   await page.getByLabel('Nome', { exact: true }).fill('Preset forçado');
   await page.getByLabel('Domínios').fill(`${siteId}.example.com`);
-  await page.getByLabel('Tema').fill('padrao');
+  await page.getByRole('radio', { name: /Editorial claro/ }).check();
   // Valor forçado: uma opção que RESOURCES não lista.
   const home = page.getByLabel('Preset da página Home');
   await home.evaluate((select: HTMLSelectElement) => {
@@ -200,7 +203,7 @@ async function newSite(page: Page, siteId: string): Promise<void> {
   await page.getByLabel('ID', { exact: true }).fill(siteId);
   await page.getByLabel('Nome', { exact: true }).fill(`Site ${siteId}`);
   await page.getByLabel('Domínios').fill(`${siteId}.example.com`);
-  await page.getByLabel('Tema').fill('padrao');
+  await page.getByRole('radio', { name: /Editorial claro/ }).check();
   await page.getByRole('button', { name: 'Cadastrar site' }).click();
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
 }
