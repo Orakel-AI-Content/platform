@@ -90,6 +90,7 @@ describe('envio de imagem', () => {
     });
     const request = new Request('http://backoffice/sites/exemplo-a/midia/envio', {
       method: 'POST',
+      headers: { 'x-file-name': 'foto.jpg' },
       body: stream,
       duplex: 'half',
     } as RequestInit);
