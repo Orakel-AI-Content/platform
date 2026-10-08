@@ -110,4 +110,35 @@ describe('menu Mais ações', () => {
     expect(screen.queryByRole('button', { name: /Mais ações/ })).toBeNull();
     expect(menuOf(button).querySelector('button')?.textContent).toBe('Texto');
   });
+
+  it('com text, o botão mostra o texto e o nome acessível recebido (#172)', () => {
+    render(
+      <ActionsMenu text={{ visible: 'Exemplo A', label: 'Exemplo A, trocar de site' }}>
+        <Link href="/sites/exemplo-b">Exemplo B</Link>
+      </ActionsMenu>,
+    );
+
+    const button = screen.getByRole('button', { name: 'Exemplo A, trocar de site' });
+    expect(button.textContent).toBe('Exemplo A');
+    expect(screen.queryByText('Mais ações')).toBeNull();
+    expect(menuOf(button).querySelector('a')?.getAttribute('href')).toBe('/sites/exemplo-b');
+  });
+
+  it('align start abre a lista para a direita; o padrão, para a esquerda', () => {
+    render(
+      <>
+        <ActionsMenu label="padrao">
+          <button type="button">A</button>
+        </ActionsMenu>
+        <ActionsMenu label="inicio" align="start">
+          <button type="button">B</button>
+        </ActionsMenu>
+      </>,
+    );
+
+    const area = (name: string) =>
+      menuOf(screen.getByRole('button', { name })).className.match(/position-area:([\w-]+)/)?.[1];
+    expect(area('Mais ações: padrao')).toBe('bottom_span-left');
+    expect(area('Mais ações: inicio')).toBe('bottom_span-right');
+  });
 });
