@@ -2,6 +2,7 @@
   "$description": "Exemplo B: tecnológico escuro, sem serifa geométrica.",
   "$extensions": {
     "ai.orakel.theme": {
+      "name": "Tecnológico escuro",
       "colorScheme": "dark",
       "fontFaces": [
         {

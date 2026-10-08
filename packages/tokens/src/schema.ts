@@ -105,6 +105,8 @@ export const FontFaceSchema = z.strictObject({
 export type FontFace = z.infer<typeof FontFaceSchema>;
 
 export const ThemeExtensionSchema = z.strictObject({
+  /** Nome legível do tema, para quem escolhe (ex.: seletor do Backoffice). */
+  name: z.string().min(1),
   colorScheme: z.enum(['light', 'dark']),
   fontFaces: z.array(FontFaceSchema),
 });

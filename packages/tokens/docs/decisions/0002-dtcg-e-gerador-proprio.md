@@ -6,7 +6,7 @@
 ## Decisão
 
 - Cada tema é `themes/<id>/theme.tokens.json` no formato DTCG (Design Tokens Format Module 2025.10), num subconjunto: `color` (objeto `srgb` com `components` e `hex` opcional, conferido), `dimension` (`px`, `rem`), `fontFamily`, `number`, `shadow`. `$type` herdado do grupo; aliases `{caminho}` no valor inteiro ou nos campos da sombra.
-- O que é da plataforma e não do DTCG fica em `$extensions["ai.orakel.theme"]`: `colorScheme` e `fontFaces`.
+- O que é da plataforma e não do DTCG fica em `$extensions["ai.orakel.theme"]`: `name` (nome legível, obrigatório; #162), `colorScheme` e `fontFaces`.
 - O gerador é código próprio (`src/`), rodado direto pelo Node 24: flatten → aliases → valores (Zod) → conjunto fixo → contraste → CSS. Todos os erros de todos os temas saem juntos; com qualquer erro, `dist/` não é tocado.
 
 ## Alternativas consideradas

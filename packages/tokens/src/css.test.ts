@@ -52,7 +52,7 @@ describe('CSS do tema', () => {
     ]);
     const css = renderThemeCss({
       id: 'teste',
-      extension: { colorScheme: 'light', fontFaces: [] },
+      extension: { name: 'Teste', colorScheme: 'light', fontFaces: [] },
       tokens,
       fontFaces: [
         {
