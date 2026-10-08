@@ -127,7 +127,11 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   esses dois ao controle). Nó sem desenho e sem campo registrado aparece como aviso.
   O `onSubmit` pode devolver a recusa do servidor (`{ path, message }[]`): com `path`, vira
   erro do campo; sem, vai para o resumo. Lista vazia em campo opcional (rich text apagado) é
-  enviada como ausente. Durante o envio o botão fica desabilitado e mostra `pendingLabel`
+  enviada como ausente. O resumo (`role="alert"`, sempre montado) sai de `formState.errors`:
+  um item por campo inválido, "<rótulo>: <mensagem>", com a posição em cada lista
+  ("Pergunta (pergunta 2)"), na ordem do schema, e acompanha a correção. Cada item é um botão
+  que leva o foco ao campo (`setFocus`; campo registrado precisa ligar o `ref`); o erro da
+  lista inteira vem sem botão. A recusa do servidor sem `path` aparece acima da lista. Durante o envio o botão fica desabilitado e mostra `pendingLabel`
   ("Salvando…" por padrão; "Cadastrando…", "Criando…", "Aprovando…" por quem chama), sem
   segundo envio. Quem fica na tela confirma devolvendo `{ success: mensagem }`: o texto
   aparece ao lado do botão, numa região `role="status"` em `text-success`, e some no próximo

@@ -19,13 +19,14 @@ import { SchemaFields, SchemaForm, type FieldProps } from './schema-form.tsx';
 afterEach(cleanup);
 
 /** Campo de rich text simplificado (o de verdade, com TipTap, é da #43). */
-function PlainInlines({ id, label, value, onChange, invalid, describedBy }: FieldProps) {
+function PlainInlines({ id, label, value, onChange, invalid, describedBy, ref }: FieldProps) {
   const text = Array.isArray(value)
     ? value.map((inline: { text?: string }) => inline.text ?? '').join('')
     : '';
   return (
     <textarea
       id={id}
+      ref={ref}
       aria-label={label}
       aria-invalid={invalid}
       aria-describedby={describedBy}
@@ -133,7 +134,11 @@ describe('SchemaForm', () => {
     await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'));
     const describedBy = name.getAttribute('aria-describedby') ?? '';
     expect(document.getElementById(describedBy)?.textContent).toMatch(/\S/);
-    expect(screen.getByRole('alert').textContent).toBe('Corrija os campos destacados.');
+    // Sem rótulo em `labels`, o resumo usa o nome do campo, com a mesma mensagem do campo.
+    const item = within(screen.getByRole('alert')).getByRole('button');
+    expect(item.textContent).toBe(`name: ${document.getElementById(describedBy)?.textContent}`);
+    await user.click(item);
+    expect(document.activeElement).toBe(name);
     expect(onSubmit).not.toHaveBeenCalled();
     // Opcionais vazios não acusam erro.
     expect(screen.getByLabelText('bio').getAttribute('aria-invalid')).toBe('false');
@@ -287,7 +292,11 @@ describe('SchemaForm com o servidor', () => {
     expect(document.getElementById(slug.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
       'Já existe um autor com o slug ana neste site',
     );
-    expect(screen.getByRole('alert').textContent).toBe('Tente de novo.');
+    const alert = screen.getByRole('alert');
+    expect(within(alert).getByText('Tente de novo.')).toBeTruthy();
+    expect(within(alert).getByRole('button').textContent).toBe(
+      'Slug: Já existe um autor com o slug ana neste site',
+    );
   });
 
   it('durante o envio o botão mostra o rótulo pendente, fica desabilitado e não reenvia', async () => {
@@ -435,5 +444,83 @@ describe('SchemaForm: foco, dica do boolean e só leitura', () => {
       document.getElementById(indexavel.getAttribute('aria-describedby') ?? '')?.textContent,
     ).toBe('Ligar exige o G1 registrado.');
     expect(screen.getByLabelText('SITE_ID').hasAttribute('readonly')).toBe(true);
+  });
+});
+
+describe('SchemaForm: resumo de erros', () => {
+  const faqLabels = {
+    items: 'Perguntas',
+    'items.*': 'pergunta',
+    'items.*.question': 'Pergunta',
+    'items.*.answer': 'Resposta',
+  };
+
+  function renderFaq(items: unknown[]) {
+    render(
+      <SchemaForm
+        schema={FaqBlockSchema}
+        defaultValues={{ n: 1, type: 'faq', items }}
+        labels={faqLabels}
+        hidden={['n', 'type']}
+        fields={{ 'items.*.answer': PlainInlines }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+  }
+
+  it('lista cada campo inválido, com a posição na lista, e cada item leva o foco ao campo', async () => {
+    const user = userEvent.setup();
+    renderFaq([
+      { question: 'P1', answer: inline('R1') },
+      { question: '', answer: [] },
+    ]);
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toBe('');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    // A mesma região, que já estava montada, recebe o conteúdo: é anunciada ao mudar.
+    await waitFor(() => expect(screen.getByRole('alert')).toBe(alert));
+    const items = await within(alert).findAllByRole('button');
+    expect(items.map((item) => item.textContent?.split(':')[0])).toEqual([
+      'Pergunta (pergunta 2)',
+      'Resposta (pergunta 2)',
+    ]);
+    expect(within(alert).getByText('Corrija os campos destacados:')).toBeTruthy();
+
+    // Campo nativo dentro da lista.
+    items[0]?.focus();
+    await user.keyboard('{Enter}');
+    expect(document.activeElement).toBe(screen.getAllByLabelText('Pergunta')[1]);
+
+    // Campo registrado dentro da lista.
+    await user.click(items[1] as HTMLElement);
+    expect(document.activeElement).toBe(screen.getAllByLabelText('Resposta')[1]);
+  });
+
+  it('o resumo acompanha a correção: o campo corrigido sai da lista', async () => {
+    const user = userEvent.setup();
+    renderFaq([{ question: '', answer: inline('R1') }]);
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+    const item = await within(screen.getByRole('alert')).findByRole('button');
+    expect(item.textContent).toMatch(/^Pergunta \(pergunta 1\): /);
+
+    await user.type(screen.getByLabelText('Pergunta'), 'P1');
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(''));
+  });
+
+  it('o erro da lista inteira aparece com o rótulo da lista, sem link', async () => {
+    const user = userEvent.setup();
+    renderFaq([]);
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    const alert = screen.getByRole('alert');
+    await waitFor(() =>
+      expect(within(alert).getByRole('listitem').textContent).toMatch(/^Perguntas: /),
+    );
+    expect(within(alert).queryByRole('button')).toBeNull();
   });
 });

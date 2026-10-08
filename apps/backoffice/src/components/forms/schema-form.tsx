@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
-import { clean, describe, emptyValue, pattern } from './schema-walk.ts';
+import { clean, describe, emptyValue, pattern, type FieldNode } from './schema-walk.ts';
 
 // Gerador de formulários a partir de um schema Zod de objeto (padrão do Backoffice,
 // docs/design/design-system.md). Desenha texto, número, booleano, enum, objeto e lista de
@@ -93,20 +93,92 @@ type Ctx = {
 const selectClass =
   'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm aria-invalid:border-destructive';
 
+/** Primeira mensagem de erro num nó da árvore de erros (pode estar num item interno). */
+function firstMessage(node: unknown): string | undefined {
+  if (node === null || typeof node !== 'object') return undefined;
+  if ('message' in node && typeof node.message === 'string' && node.message !== '') {
+    return node.message;
+  }
+  for (const child of Object.values(node)) {
+    const message = firstMessage(child);
+    if (message) return message;
+  }
+  return undefined;
+}
+
 /** Primeira mensagem de erro sob um caminho (o erro pode estar num item interno). */
 function messageAt(errors: FieldErrors<FieldValues>, path: string): string | undefined {
-  const find = (node: unknown): string | undefined => {
-    if (node === null || typeof node !== 'object') return undefined;
+  return firstMessage(get(errors, path));
+}
+
+/** Um erro do resumo: o campo (`path`) e se ele tem controle focável (lista não tem). */
+type ErrorItem = { path: string; message: string; focusable: boolean };
+
+/**
+ * Um item por campo inválido, na ordem do schema. O erro sob um campo registrado conta como
+ * um só (como em `messageAt`); o da lista inteira (`root` ou o próprio nó) vai sem foco.
+ */
+function errorItems(
+  errors: FieldErrors<FieldValues>,
+  schema: z.ZodType,
+  registered: ReadonlySet<string>,
+): ErrorItem[] {
+  const items: ErrorItem[] = [];
+  const visit = (node: unknown, kind: FieldNode | undefined, path: string) => {
+    if (node === null || typeof node !== 'object') return;
+    const list = kind?.kind === 'array';
+    if (path !== '' && registered.has(pattern(path))) {
+      const message = firstMessage(node);
+      if (message) items.push({ path, message, focusable: true });
+      return;
+    }
     if ('message' in node && typeof node.message === 'string' && node.message !== '') {
-      return node.message;
+      items.push({ path, message: node.message, focusable: !list });
+      return;
     }
-    for (const child of Object.values(node)) {
-      const message = find(child);
-      if (message) return message;
+    const root = list && 'root' in node ? firstMessage(node.root) : undefined;
+    if (root) items.push({ path, message: root, focusable: false });
+    const keys = Object.keys(node).filter((key) => key !== 'root' && key !== 'ref');
+    // Objeto: ordem do schema, e o que não está nele (caminho do servidor) por último.
+    const ordered =
+      kind?.kind === 'object'
+        ? [
+            ...Object.keys(kind.shape).filter((key) => keys.includes(key)),
+            ...keys.filter((key) => !(key in kind.shape)),
+          ]
+        : keys;
+    for (const key of ordered) {
+      const child =
+        kind?.kind === 'object'
+          ? kind.shape[key]
+          : kind?.kind === 'array'
+            ? kind.element
+            : undefined;
+      visit(
+        (node as Record<string, unknown>)[key],
+        child && describe(child).node,
+        path === '' ? key : `${path}.${key}`,
+      );
     }
-    return undefined;
   };
-  return find(get(errors, path));
+  visit(errors, describe(schema).node, '');
+  return items;
+}
+
+/** Rótulo do campo no resumo, com a posição em cada lista (`Pergunta (pergunta 2)`). */
+function summaryLabel(labels: Record<string, string>, path: string): string {
+  const segments = path.split('.');
+  const own = segments.findLast((segment) => !/^\d+$/.test(segment)) ?? path;
+  const positions = segments.flatMap((segment, index) =>
+    /^\d+$/.test(segment)
+      ? [
+          `${labels[`${pattern(segments.slice(0, index).join('.'))}.*`] ?? 'item'} ${Number(segment) + 1}`,
+        ]
+      : [],
+  );
+  const base = /^\d+$/.test(segments.at(-1) ?? '') ? undefined : (labels[pattern(path)] ?? own);
+  if (base === undefined) return positions.join(', ');
+  return positions.length > 0 ? `${base} (${positions.join(', ')})` : base;
 }
 
 const labelOf = (ctx: Ctx, path: string, key: string) => ctx.labels[pattern(path)] ?? key;
@@ -424,7 +496,8 @@ export function SchemaForm<T>({
   submitDescribedBy,
   onSubmit,
 }: SchemaFormProps<T>) {
-  const [summary, setSummary] = useState<string[]>([]);
+  // Recusa do servidor sem `path`; os erros de campo vêm de `formState.errors`.
+  const [general, setGeneral] = useState<string[]>([]);
   const [success, setSuccess] = useState('');
   const resolver = zodResolver(
     z
@@ -433,7 +506,8 @@ export function SchemaForm<T>({
       .pipe(schema) as unknown as z.ZodType<FieldValues, FieldValues>,
   );
   const form = useForm<FieldValues>({ resolver, defaultValues });
-  const { isSubmitting } = form.formState;
+  const { isSubmitting, errors } = form.formState;
+  const items = errorItems(errors, schema, new Set(Object.keys(fields ?? {})));
 
   return (
     <FormProvider {...form}>
@@ -448,7 +522,7 @@ export function SchemaForm<T>({
           }
           void form.handleSubmit(
             async (value) => {
-              setSummary([]);
+              setGeneral([]);
               setSuccess('');
               const outcome = await onSubmit(value as T);
               if (outcome !== undefined && 'success' in outcome) {
@@ -470,21 +544,49 @@ export function SchemaForm<T>({
                 );
                 focused = true;
               }
-              if (issues.length > 0) {
-                setSummary(top.length > 0 ? top : ['Corrija os campos destacados.']);
-              }
+              setGeneral(top);
             },
             () => {
               setSuccess('');
-              setSummary(['Corrija os campos destacados.']);
+              setGeneral([]);
             },
           )(event);
         }}
       >
-        <div role="alert" className={cn(summary.length > 0 && 'text-sm text-destructive')}>
-          {summary.map((line) => (
+        <div
+          role="alert"
+          className={cn(
+            (general.length > 0 || items.length > 0) && 'space-y-1 text-sm text-destructive',
+          )}
+        >
+          {general.map((line) => (
             <p key={line}>{line}</p>
           ))}
+          {items.length > 0 && (
+            <>
+              <p>Corrija os campos destacados:</p>
+              <ul className="list-disc space-y-1 pl-5">
+                {items.map((item) => {
+                  const text = `${summaryLabel(labels ?? {}, item.path)}: ${item.message}`;
+                  return (
+                    <li key={item.path}>
+                      {item.focusable ? (
+                        <button
+                          type="button"
+                          className="text-left underline underline-offset-4"
+                          onClick={() => form.setFocus(item.path)}
+                        >
+                          {text}
+                        </button>
+                      ) : (
+                        text
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </div>
         <SchemaFields
           schema={schema}
