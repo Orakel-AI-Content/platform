@@ -5,7 +5,7 @@ import { listAuthors } from '@/domain/content/authors.ts';
 import { noRead } from '@/components/forbidden-screen';
 import { buttonVariants } from '@/components/ui/button';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,8 +33,8 @@ export default async function AuthorsPage({ params }: { params: Promise<{ site: 
     <section aria-labelledby="authors-title" className="list-width space-y-4">
       <PageHeader
         id="authors-title"
-        back={{ href: `/sites/${site.id}`, label: site.name }}
-        title={`Autores (${site.id})`}
+        trail={siteTrail(site, 'Autores')}
+        title="Autores"
         action={create}
       />
       <EntityTable

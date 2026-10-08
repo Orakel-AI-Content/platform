@@ -5,7 +5,7 @@ import { listContents } from '@/domain/content/contents.ts';
 import { noRead } from '@/components/forbidden-screen';
 import { buttonVariants } from '@/components/ui/button';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,12 +33,8 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
     <section aria-labelledby="contents-title" className="list-width space-y-4">
       <PageHeader
         id="contents-title"
-        back={{ href: `/sites/${site.id}`, label: site.name }}
-        title={
-          <>
-            Conteúdos <span className="text-muted-foreground">({site.id})</span>
-          </>
-        }
+        trail={siteTrail(site, 'Conteúdos')}
+        title="Conteúdos"
         action={create}
       />
       <ContentsTable

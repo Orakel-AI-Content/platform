@@ -2,7 +2,7 @@ import { MediaLibrary } from '@/components/media-library';
 import { listMedia } from '@/domain/content/media.ts';
 import { noRead } from '@/components/forbidden-screen';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 import { listMediaAction } from './actions.ts';
 import { mediaItems } from './items.ts';
 
@@ -21,11 +21,7 @@ export default async function MediaPage({ params }: { params: Promise<{ site: st
 
   return (
     <section aria-labelledby="media-title" className="list-width space-y-4">
-      <PageHeader
-        id="media-title"
-        back={{ href: `/sites/${site.id}`, label: site.name }}
-        title={`Mídia (${site.id})`}
-      />
+      <PageHeader id="media-title" trail={siteTrail(site, 'Mídia')} title="Mídia" />
       <MediaLibrary
         siteId={site.id}
         items={mediaItems(site.domain, media.value)}
