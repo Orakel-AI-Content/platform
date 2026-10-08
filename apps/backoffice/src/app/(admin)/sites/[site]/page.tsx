@@ -25,7 +25,7 @@ import {
   registerG1Action,
   setBuildWindowAction,
 } from '../actions.ts';
-import { sitePageContext } from './editorial-page.tsx';
+import { PageHeader, sitePageContext, siteTrail } from './editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,19 +47,21 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const sectionClass = 'space-y-3 rounded-md border border-border p-4';
   return (
     <section aria-labelledby="site-title" className="form-width space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 id="site-title" className="text-2xl font-semibold">
-          {site.name} <span className="text-muted-foreground">({site.id})</span>
-        </h1>
-        {canConfigure && (
-          <Link
-            href={`/sites/${site.id}/configuracao`}
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
-            Editar configuração
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        id="site-title"
+        trail={siteTrail(site)}
+        title={site.name}
+        action={
+          canConfigure ? (
+            <Link
+              href={`/sites/${site.id}/configuracao`}
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              Editar configuração
+            </Link>
+          ) : undefined
+        }
+      />
       <p className="text-sm text-muted-foreground">
         {site.domain} · Indexável: {site.indexavel ? 'sim' : 'não'}
       </p>

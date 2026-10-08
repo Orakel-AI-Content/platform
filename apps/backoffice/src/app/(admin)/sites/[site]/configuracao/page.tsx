@@ -11,6 +11,7 @@ import { can } from '@/domain/access/rbac.ts';
 import { currentConfig } from '@/domain/sites/sites.ts';
 
 import { updateSiteConfigAction } from '../../actions.ts';
+import { PageHeader, siteTrail } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,9 +32,11 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
   if (config === undefined) notFound();
   return (
     <section aria-labelledby="site-config-title" className="form-width space-y-6">
-      <h1 id="site-config-title" className="text-2xl font-semibold">
-        Configuração de {config.name} <span className="text-muted-foreground">({site})</span>
-      </h1>
+      <PageHeader
+        id="site-config-title"
+        trail={siteTrail({ id: site, name: config.name }, 'Configuração')}
+        title="Configuração"
+      />
       <SiteConfigForm
         mode="edit"
         defaultValues={editValues(config)}

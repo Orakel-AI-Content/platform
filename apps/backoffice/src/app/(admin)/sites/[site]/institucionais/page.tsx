@@ -3,7 +3,7 @@ import { getInstitutionalTexts } from '@/domain/sites/sites.ts';
 import { noRead } from '@/components/forbidden-screen';
 
 import { updateInstitutionalTextsAction } from '../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { noWrite, PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,8 +30,8 @@ export default async function InstitutionalTextsPage({
     <section aria-labelledby="institutional-title" className="form-width space-y-4">
       <PageHeader
         id="institutional-title"
-        back={{ href: `/sites/${site.id}`, label: site.name }}
-        title={`Textos institucionais (${site.id})`}
+        trail={siteTrail(site, 'Textos institucionais')}
+        title="Textos institucionais"
       />
       <InstitutionalTextsForm
         defaultValues={texts.value}

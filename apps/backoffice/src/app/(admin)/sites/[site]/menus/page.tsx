@@ -5,7 +5,7 @@ import { listMenus } from '@/domain/content/menus.ts';
 import { noRead } from '@/components/forbidden-screen';
 import { buttonVariants } from '@/components/ui/button';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +28,7 @@ export default async function MenusPage({ params }: { params: Promise<{ site: st
 
   return (
     <section aria-labelledby="menus-title" className="list-width space-y-4">
-      <PageHeader
-        id="menus-title"
-        back={{ href: `/sites/${site.id}`, label: site.name }}
-        title={`Menus (${site.id})`}
-        action={create}
-      />
+      <PageHeader id="menus-title" trail={siteTrail(site, 'Menus')} title="Menus" action={create} />
       <EntityTable
         basePath={`/sites/${site.id}/menus`}
         headers={['Chave', 'Itens']}

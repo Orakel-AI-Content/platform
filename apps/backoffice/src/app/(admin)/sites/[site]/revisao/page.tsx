@@ -2,7 +2,7 @@ import { ReviewQueueTable } from '@/components/review-queue-table';
 import { noRead } from '@/components/forbidden-screen';
 import { listReviewQueue } from '@/domain/content/contents.ts';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,15 +22,7 @@ export default async function ReviewQueuePage({ params }: { params: Promise<{ si
 
   return (
     <section aria-labelledby="review-queue-title" className="list-width space-y-4">
-      <PageHeader
-        id="review-queue-title"
-        back={{ href: `/sites/${site.id}`, label: site.name }}
-        title={
-          <>
-            Revisão <span className="text-muted-foreground">({site.id})</span>
-          </>
-        }
-      />
+      <PageHeader id="review-queue-title" trail={siteTrail(site, 'Revisão')} title="Revisão" />
       <ReviewQueueTable siteId={site.id} timeZone={site.timeZone} rows={queue.value} />
     </section>
   );

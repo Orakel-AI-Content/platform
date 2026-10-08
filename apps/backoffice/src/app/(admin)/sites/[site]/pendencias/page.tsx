@@ -2,7 +2,7 @@ import { noRead } from '@/components/forbidden-screen';
 import { PendingChangesTable } from '@/components/pending-changes-table';
 import { listPendingChanges } from '@/domain/pending-changes/list.ts';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,8 +28,8 @@ export default async function PendingChangesPage({
     <section aria-labelledby="pending-title" className="list-width space-y-4">
       <PageHeader
         id="pending-title"
-        back={{ href: `/sites/${site.id}`, label: site.name }}
-        title={`Mudanças pendentes (${site.id})`}
+        trail={siteTrail(site, 'Mudanças pendentes')}
+        title="Mudanças pendentes"
       />
       <PendingChangesTable siteId={site.id} timeZone={site.timeZone} rows={changes.value} />
     </section>

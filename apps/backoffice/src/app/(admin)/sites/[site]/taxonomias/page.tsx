@@ -6,7 +6,7 @@ import { listTaxonomies } from '@/domain/content/taxonomies.ts';
 import { noRead } from '@/components/forbidden-screen';
 import { buttonVariants } from '@/components/ui/button';
 
-import { PageHeader, sitePageContext } from '../editorial-page.tsx';
+import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,8 +34,8 @@ export default async function TaxonomiesPage({ params }: { params: Promise<{ sit
     <section aria-labelledby="taxonomies-title" className="list-width space-y-4">
       <PageHeader
         id="taxonomies-title"
-        back={{ href: `/sites/${site.id}`, label: site.name }}
-        title={`Taxonomias (${site.id})`}
+        trail={siteTrail(site, 'Taxonomias')}
+        title="Taxonomias"
         action={create}
       />
       <EntityTable
