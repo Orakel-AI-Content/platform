@@ -75,6 +75,14 @@ export type ContentEditorOptions = {
   taxonomies: readonly PickerOption[];
 };
 
+/** Por quanto tempo o "Desfazer" da remoção de bloco fica disponível (#112). */
+export const UNDO_MS = 10_000;
+
+/** Campo que recebe o foco no bloco devolvido; sem ele (texto rico), o próprio bloco. */
+const FOCUSABLE_FIELD = 'input:not([type="hidden"]), textarea, select, [contenteditable="true"]';
+
+type RemovedBlock = { index: number; value: FieldValues; position: number };
+
 /** Mensagem de erro sob um caminho (para os erros de lista, como "ao menos um bloco"). */
 const errorAt = (errors: FieldValues, path: string): string | undefined => {
   const node = get(errors, path) as { message?: string; root?: { message?: string } } | undefined;
@@ -106,6 +114,8 @@ export function ContentEditor({
   const [pending, startTransition] = useTransition();
   const [summary, setSummary] = useState<string[]>([]);
   const [saved, setSaved] = useState('');
+  // Último bloco removido (#112): devolvido pelo "Desfazer" por 10 s, ou até salvar.
+  const [removed, setRemoved] = useState<RemovedBlock | null>(null);
   const form = useForm<FieldValues>({
     resolver: zodResolver(
       ContentEditorSchema as unknown as Parameters<typeof zodResolver>[0],
@@ -141,6 +151,33 @@ export function ContentEditor({
     return () => cancelAnimationFrame(frame);
   }, [created, pathname, router]);
 
+  useEffect(() => {
+    if (!removed) return;
+    const timer = setTimeout(() => setRemoved(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [removed]);
+
+  const removeBlock = (index: number) => {
+    const value = form.getValues(`blocks.${index}`) as FieldValues;
+    blocks.remove(index);
+    setSaved('');
+    setRemoved({ index, value, position: index + 1 });
+  };
+
+  const undoRemove = () => {
+    if (!removed) return;
+    const { index, value, position } = removed;
+    blocks.insert(index, value, { shouldFocus: false });
+    setRemoved(null);
+    setSaved(`Bloco ${position} devolvido.`);
+    // Depois de desenhar: o primeiro campo do bloco, ou o próprio bloco (texto rico).
+    requestAnimationFrame(() => {
+      const block = document.getElementById(`${id}-block-${index}`);
+      const field = block?.querySelector<HTMLElement>(FOCUSABLE_FIELD);
+      (field ?? block)?.focus();
+    });
+  };
+
   const onValid = (value: FieldValues) =>
     startTransition(async () => {
       setSummary([]);
@@ -154,6 +191,8 @@ export function ContentEditor({
           return;
         }
         if (result.saved) form.reset(savedFormValues(result.saved, sent) as FieldValues);
+        // O `n` do bloco removido não existe na versão salva: não há mais o que desfazer.
+        setRemoved(null);
         setSaved(result.message);
         router.refresh();
         return;
@@ -223,7 +262,12 @@ export function ContentEditor({
             if (!isBlockType(type)) return null;
             const position = index + 1;
             return (
-              <fieldset key={field.id} className="space-y-4 rounded-md border border-border p-4">
+              <fieldset
+                key={field.id}
+                id={`${id}-block-${index}`}
+                tabIndex={-1}
+                className="space-y-4 rounded-md border border-border p-4"
+              >
                 <legend className="px-1 text-sm font-semibold">
                   {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
                 </legend>
@@ -254,7 +298,7 @@ export function ContentEditor({
                   >
                     {`Mover bloco ${position} para baixo`}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => blocks.remove(index)}>
+                  <Button variant="ghost" size="sm" onClick={() => removeBlock(index)}>
                     {`Remover bloco ${position}`}
                   </Button>
                 </div>
@@ -320,9 +364,15 @@ export function ContentEditor({
           >
             {previewNote}
           </p>
+          {/* Uma região só: a confirmação do salvamento ou a remoção, a mais recente (#112). */}
           <p role="status" className="text-sm text-muted-foreground">
-            {saved}
+            {removed ? `Bloco ${removed.position} removido.` : saved}
           </p>
+          {removed && (
+            <Button variant="outline" size="sm" onClick={undoRemove}>
+              Desfazer
+            </Button>
+          )}
           <div role="alert" className={cn(summary.length > 0 && 'text-sm text-destructive')}>
             {summary.map((line) => (
               <p key={line}>{line}</p>
