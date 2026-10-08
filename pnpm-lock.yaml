@@ -260,6 +260,9 @@ importers:
       '@orakel/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@orakel/tokens':
+        specifier: workspace:*
+        version: link:../../packages/tokens
       '@sentry/nextjs':
         specifier: 'catalog:'
         version: 11.1.0(@babel/core@7.29.7(supports-color@10.2.2))(next@16.3.6(@babel/core@7.29.7(supports-color@10.2.2))(@opentelemetry/api@1.9.1)(@playwright/test@1.63.0)(@types/node@24.19.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
