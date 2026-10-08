@@ -1,6 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import { readFixture } from '../../src/bin/seed.ts';
+import { createDb, createPool } from '../../src/db/client.ts';
+import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
+import { pauseSite } from '../../src/domain/builds/site-state.ts';
+import { createSite } from '../../src/domain/sites/sites.ts';
+import { getDatabaseUrl } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
 
 // E2E contra o ambiente local (pnpm local:up && pnpm local:seed): Caddy + access-mock +
@@ -266,6 +272,48 @@ test('operação vê a publicação do site e o publica pela página', async ({ 
   await page.waitForLoadState('networkidle');
   await publication.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
   await expect(publication.getByRole('status')).toHaveText('Build de exemplo-a enfileirado.');
+  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+});
+
+/**
+ * Site pausado gravado pelo domínio (#155): a tela não pausa site, e um site pausado no seed
+ * mudaria a lista para os outros testes. Entra em `created` antes de gravar, para a limpeza.
+ */
+async function createPausedSite(siteId: string, reason: string): Promise<void> {
+  created.push(siteId);
+  const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
+  if (line?.type !== 'config') throw new Error('fixture sem config');
+  const pool = createPool(getDatabaseUrl());
+  try {
+    await createDb(pool).transaction(async (tx) => {
+      const result = await createSite(tx, SYSTEM_ACTOR, {
+        ...line.data,
+        siteId,
+        name: `Site ${siteId}`,
+        domains: [`${siteId}.example.com`],
+      });
+      if (!result.ok) throw new Error(JSON.stringify(result.issues));
+      await pauseSite(tx, siteId, reason);
+    });
+  } finally {
+    await pool.end();
+  }
+}
+
+test('operação vê o site pausado com o motivo e sem Publicar agora', async ({ page }) => {
+  const siteId = `e2e-pausado-${Date.now()}`;
+  const reason =
+    'render: Tema "padrao-editorial-receitas" não existe nesta release do site-builder';
+  await createPausedSite(siteId, reason);
+
+  await loginAs(page, 'operacao@orakel.local');
+  await page.goto(`/sites/${siteId}`);
+  const publication = page.getByRole('region', { name: 'Publicação' });
+  await expect(publication.getByText('Pausado', { exact: true })).toBeVisible();
+  // Motivo inteiro, sem corte: é o que a operação precisa para retomar o site.
+  await expect(publication.getByText(reason, { exact: true })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('button', { name: /^Publicar agora/ })).toHaveCount(0);
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 });
 
