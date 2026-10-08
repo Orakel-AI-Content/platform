@@ -111,6 +111,8 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await page.keyboard.press('Enter');
 
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+  // A confirmação do cadastro aparece no topo da lista (#159).
+  await expect(page.getByRole('main').getByRole('status')).toHaveText(`Site ${siteId} cadastrado.`);
   const row = page.getByRole('row').filter({ hasText: siteId });
   await expect(row.getByText('Cadastrado', { exact: true })).toBeVisible();
 

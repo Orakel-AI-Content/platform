@@ -9,7 +9,13 @@ import { SitesTable } from './sites-table.tsx';
 
 // Registro de instâncias: cada site leva aos seus conteúdos, para qualquer papel (#44).
 
-afterEach(cleanup);
+const router = vi.hoisted(() => ({ replace: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => '/sites' }));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const site: SiteSummary = {
   id: 'exemplo-a',
@@ -162,6 +168,25 @@ describe('tabela de sites', () => {
 
     expect(screen.getByRole('button', { name: 'Publicar agora exemplo-a' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Publicar agora exemplo-b' })).toBeNull();
+  });
+
+  it('acabou de cadastrar: anuncia a confirmação na região do topo e tira a marca da URL', async () => {
+    render(<SitesTable rows={[site]} created="exemplo-a" />);
+
+    const status = screen.getByRole('status');
+    await waitFor(() => expect(status.textContent).toBe('Site exemplo-a cadastrado.'));
+    // No topo: a região vem antes da tabela.
+    expect(
+      status.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(router.replace).toHaveBeenCalledWith('/sites', { scroll: false });
+  });
+
+  it('sem a marca de cadastro a região começa vazia e a URL fica como está', () => {
+    render(<SitesTable rows={[site]} />);
+
+    expect(screen.getByRole('status').textContent).toBe('');
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it('sem sites mostra o estado vazio no lugar da tabela (#87)', () => {
