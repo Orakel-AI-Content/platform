@@ -1,4 +1,5 @@
 import { RESOURCES } from '@orakel/content-model/v1';
+import { THEME_SUMMARIES } from '@orakel/tokens';
 import { notFound } from 'next/navigation';
 
 import { currentActor } from '@/auth/request-actor.ts';
@@ -36,7 +37,11 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
       <SiteConfigForm
         mode="edit"
         defaultValues={editValues(config)}
-        options={{ presets: RESOURCES.presets, variants: RESOURCES.variants }}
+        options={{
+          presets: RESOURCES.presets,
+          variants: RESOURCES.variants,
+          themes: THEME_SUMMARIES,
+        }}
         action={updateSiteConfigAction.bind(null, site)}
       />
     </section>
