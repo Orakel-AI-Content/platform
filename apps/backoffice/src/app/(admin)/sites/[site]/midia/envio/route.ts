@@ -1,6 +1,6 @@
 import { currentActor } from '@/auth/request-actor.ts';
 import { getDb } from '@/db/client.ts';
-import { receiveUpload } from '@/domain/media/upload.ts';
+import { FILE_NAME_HEADER, receiveUpload } from '@/domain/media/upload.ts';
 import { getEnv } from '@/env.ts';
 import { problem } from '@/lib/problem.ts';
 import { createS3Client, s3ObjectStore } from '@/lib/s3.ts';
@@ -33,6 +33,8 @@ export async function POST(
   store ??= s3ObjectStore(createS3Client(getEnv()));
   const result = await receiveUpload({ db: getDb().db, store }, actor.value, site, {
     contentLength: request.headers.get('content-length'),
+    // Nome original (#184), codificado com encodeURIComponent; o domínio decodifica e valida.
+    fileName: request.headers.get(FILE_NAME_HEADER),
     body: request.body,
   });
   if (!result.ok) {

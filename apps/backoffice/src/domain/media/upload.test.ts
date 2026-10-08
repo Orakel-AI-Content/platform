@@ -25,10 +25,27 @@ function bodyOf(...chunks: Uint8Array[]): ReadableStream<Uint8Array> {
   });
 }
 
-async function send(actor: Actor, contentLength: string | null, ...chunks: Uint8Array[]) {
+async function send(
+  actor: Actor,
+  contentLength: string | null,
+  ...chunks: Uint8Array[]
+): Promise<{
+  result: Awaited<ReturnType<typeof receiveUpload>>;
+  store: ReturnType<typeof memoryStore>;
+}> {
+  return sendNamed(actor, encodeURIComponent('foto.jpg'), contentLength, ...chunks);
+}
+
+async function sendNamed(
+  actor: Actor,
+  fileName: string | null,
+  contentLength: string | null,
+  ...chunks: Uint8Array[]
+) {
   const store = memoryStore();
   const result = await receiveUpload({ db: untouchableDb, store }, actor, 'exemplo-a', {
     contentLength,
+    fileName,
     body: bodyOf(...chunks),
   });
   return { result, store };
@@ -69,6 +86,32 @@ describe('receiveUpload', () => {
     await expect(send(editor, String(JPEG_HEAD.length), ...pieces)).rejects.toThrow(
       'o banco não devia ser consultado',
     );
+  });
+});
+
+describe('nome do arquivo (#184)', () => {
+  it('sem o cabeçalho do nome, recusa sem ler o corpo nem gravar', async () => {
+    const { result, store } = await sendNamed(editor, null, String(JPEG_HEAD.length), JPEG_HEAD);
+
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'media.name_required' }] });
+    expect(store.objects.size).toBe(0);
+  });
+
+  it.each([
+    ['vazio', ''],
+    ['só espaços', encodeURIComponent('   ')],
+    ['maior que 255 caracteres', encodeURIComponent(`${'a'.repeat(252)}.jpg`)],
+    ['com codificação quebrada', '%E0%A4%A'],
+  ])('nome %s é recusado, sem gravar', async (_, fileName) => {
+    const { result, store } = await sendNamed(
+      editor,
+      fileName,
+      String(JPEG_HEAD.length),
+      JPEG_HEAD,
+    );
+
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'media.name_invalid' }] });
+    expect(store.objects.size).toBe(0);
   });
 });
 

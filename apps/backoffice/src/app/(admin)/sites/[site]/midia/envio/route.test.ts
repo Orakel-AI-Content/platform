@@ -7,7 +7,7 @@ import { POST } from './route.ts';
 // A rota traduz as recusas do domínio para HTTP e repassa o corpo em streaming. O banco é
 // um dublê mínimo (site existe, job enfileirado); o S3, o armazenamento em memória.
 
-const mocks = vi.hoisted(() => ({ currentActor: vi.fn(), execute: vi.fn() }));
+const mocks = vi.hoisted(() => ({ currentActor: vi.fn(), execute: vi.fn(), insert: vi.fn() }));
 const store = memoryStore();
 
 vi.mock('@/auth/request-actor.ts', () => ({ currentActor: mocks.currentActor }));
@@ -16,6 +16,8 @@ vi.mock('@/db/client.ts', () => ({
     db: {
       select: () => ({ from: () => ({ where: () => Promise.resolve([{ id: 'exemplo-a' }]) }) }),
       execute: mocks.execute,
+      transaction: (run: (tx: unknown) => Promise<unknown>) =>
+        run({ insert: () => ({ values: mocks.insert }), execute: mocks.execute }),
     },
   }),
 }));
@@ -39,6 +41,7 @@ function upload(body: Uint8Array<ArrayBuffer> | null, headers: Record<string, st
     method: 'POST',
     headers: {
       'content-type': 'image/jpeg',
+      'x-file-name': encodeURIComponent('foto.jpg'),
       ...(body ? { 'content-length': String(body.byteLength) } : {}),
       ...headers,
     },
@@ -50,6 +53,7 @@ function upload(body: Uint8Array<ArrayBuffer> | null, headers: Record<string, st
 beforeEach(() => {
   store.objects.clear();
   mocks.execute.mockReset();
+  mocks.insert.mockReset();
   mocks.currentActor.mockResolvedValue({ ok: true, value: editor });
 });
 
@@ -86,6 +90,7 @@ describe('envio de imagem', () => {
     });
     const request = new Request('http://backoffice/sites/exemplo-a/midia/envio', {
       method: 'POST',
+      headers: { 'x-file-name': 'foto.jpg' },
       body: stream,
       duplex: 'half',
     } as RequestInit);
@@ -107,5 +112,36 @@ describe('envio de imagem', () => {
     expect(uploadKey).toMatch(/^uploads\/exemplo-a\/[0-9a-f-]{36}\.jpg$/);
     expect(store.objects.get(`media-originals/${uploadKey}`)?.byteLength).toBe(size);
     expect(mocks.execute).toHaveBeenCalledOnce();
+  });
+
+  it('registra o envio com o nome original decodificado, acentos e espaços inclusive (#184)', async () => {
+    const response = await upload(jpeg(100), {
+      'x-file-name': encodeURIComponent('Praia ação 01.jpg'),
+    });
+
+    expect(response.status).toBe(202);
+    const { uploadKey } = (await response.json()) as { uploadKey: string };
+    expect(mocks.insert).toHaveBeenCalledWith({
+      uploadKey,
+      siteId: 'exemplo-a',
+      originalName: 'Praia ação 01.jpg',
+    });
+  });
+
+  it('sem o nome do arquivo, ou com nome inválido: 400, sem gravar nada', async () => {
+    const request = new Request('http://backoffice/sites/exemplo-a/midia/envio', {
+      method: 'POST',
+      headers: { 'content-type': 'image/jpeg', 'content-length': '100' },
+      body: jpeg(100),
+    });
+    const missing = await POST(request, { params: Promise.resolve({ site: 'exemplo-a' }) });
+    expect(missing.status).toBe(400);
+
+    const tooLong = await upload(jpeg(100), {
+      'x-file-name': encodeURIComponent(`${'a'.repeat(300)}.jpg`),
+    });
+    expect(tooLong.status).toBe(400);
+    expect(store.objects.size).toBe(0);
+    expect(mocks.insert).not.toHaveBeenCalled();
   });
 });

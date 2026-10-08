@@ -1,5 +1,6 @@
 import type { Content, Menu } from '@orakel/content-model/v1';
 import {
+  index,
   integer,
   jsonb,
   pgTable,
@@ -81,6 +82,29 @@ export const mediaVariants = pgTable(
     path: text().notNull(),
   },
   (t) => [primaryKey({ columns: [t.siteId, t.mediaId, t.width, t.format] })],
+);
+
+/** Estado de um envio de mídia: o worker o fecha como `pronta` ou `recusada` (#185). */
+export const UPLOAD_STATUSES = ['processando', 'pronta', 'recusada'] as const;
+
+/**
+ * Envios de mídia (#184): operacional, fora do snapshot e sem `recordPendingChange`. Fonte do
+ * nome original e da data de envio; a chave é a do objeto em `media-originals/uploads/`.
+ */
+export const mediaUploads = pgTable(
+  'media_uploads',
+  {
+    uploadKey: text().primaryKey(),
+    siteId: siteId(),
+    originalName: text().notNull(),
+    status: text({ enum: UPLOAD_STATUSES }).notNull().default('processando'),
+    /** Motivo da recusa, quando `recusada`. */
+    reason: text(),
+    /** Mídia gerada, quando `pronta`. */
+    mediaId: integer(),
+    uploadedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('media_uploads_site_uploaded_at_idx').on(t.siteId, t.uploadedAt)],
 );
 
 export const redirects = pgTable(
