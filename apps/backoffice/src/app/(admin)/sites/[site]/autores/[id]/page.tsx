@@ -5,7 +5,7 @@ import { EntityForm } from '@/components/entity-forms';
 import { can } from '@/domain/access/rbac.ts';
 import { noRead } from '@/components/forbidden-screen';
 
-import { editorOptions } from '../../conteudos/editor-options.ts';
+import { mediaSource } from '../../conteudos/editor-options.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { updateAuthorAction } from '../../editorial-actions.ts';
 import {
@@ -41,13 +41,12 @@ export default async function EditAuthorPage({ params }: Params) {
   if (authorId === undefined) notFound();
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
-  const { actor, db, site, canWrite } = context.value;
+  const { site, canWrite } = context.value;
   if (!canWrite) return noWrite(site.id);
   const authors = await readAuthors(site.id);
   if (!authors?.ok) return noRead;
   const author = authors.value.find((item) => item.id === authorId);
   if (author === undefined) notFound();
-  const options = await editorOptions(db, actor, site.id);
 
   return (
     <section aria-labelledby="edit-author-title" className="form-width space-y-4">
@@ -61,7 +60,7 @@ export default async function EditAuthorPage({ params }: Params) {
         mode="edit"
         siteId={site.id}
         defaultValues={withoutId(author)}
-        media={options?.media ?? []}
+        media={mediaSource(site.id)}
         action={updateAuthorAction.bind(null, site.id, author.id)}
       />
     </section>
