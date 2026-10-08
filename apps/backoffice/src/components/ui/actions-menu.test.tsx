@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ActionsMenu } from './actions-menu.tsx';
@@ -95,5 +96,18 @@ describe('menu Mais ações', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Conteúdos' }));
     expect(hidePopover).toHaveBeenCalledTimes(2);
+  });
+
+  it('com gatilho em ícone, o botão tem o rótulo dele e aponta para a lista (#134)', () => {
+    render(
+      <ActionsMenu trigger={{ label: 'Inserir bloco na posição 2', icon: <Plus /> }}>
+        <button type="button">Texto</button>
+      </ActionsMenu>,
+    );
+
+    const button = screen.getByRole('button', { name: 'Inserir bloco na posição 2' });
+    expect(button.querySelector('svg')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Mais ações/ })).toBeNull();
+    expect(menuOf(button).querySelector('button')?.textContent).toBe('Texto');
   });
 });

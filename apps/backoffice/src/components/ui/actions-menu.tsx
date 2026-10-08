@@ -3,6 +3,7 @@
 import { useId, type MouseEvent, type ReactNode } from 'react';
 
 import { buttonVariants } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
 
 // Menu "Mais ações" (#98): ações secundárias de uma linha atrás de um botão, sem Radix. A
@@ -21,11 +22,17 @@ function closeOnItem(event: MouseEvent<HTMLDivElement>) {
 
 export function ActionsMenu({
   label,
+  trigger,
   children,
   className,
 }: {
   /** Item da linha no nome acessível: "Mais ações: exemplo-a". */
   label?: string;
+  /**
+   * Gatilho em botão de ícone (#134), no lugar do "Mais ações": o `label` dele é o nome
+   * acessível e a dica ("Inserir bloco na posição 2").
+   */
+  trigger?: { label: string; icon: ReactNode };
   /** Links e botões do menu, já com o estilo (ex.: `buttonVariants({ variant: 'ghost' })`). */
   children: ReactNode;
   className?: string;
@@ -35,15 +42,25 @@ export function ActionsMenu({
   const anchor = `--actions-${id}`;
   return (
     <>
-      <button
-        type="button"
-        popoverTarget={id}
-        aria-label={label ? `Mais ações: ${label}` : undefined}
-        className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), className)}
-        style={{ anchorName: anchor }}
-      >
-        Mais ações
-      </button>
+      {trigger ? (
+        <IconButton
+          label={trigger.label}
+          icon={trigger.icon}
+          popoverTarget={id}
+          className={className}
+          style={{ anchorName: anchor }}
+        />
+      ) : (
+        <button
+          type="button"
+          popoverTarget={id}
+          aria-label={label ? `Mais ações: ${label}` : undefined}
+          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), className)}
+          style={{ anchorName: anchor }}
+        >
+          Mais ações
+        </button>
+      )}
       {/* Sem anchor positioning, a lista fica no posicionamento padrão do popover (centro). */}
       <div
         id={id}
