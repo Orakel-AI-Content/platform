@@ -367,4 +367,37 @@ test.describe('barra de ações do editor (#109)', () => {
     await page.close({ runBeforeUnload: true });
     await expect.poll(() => dialogs).toEqual(['confirm', 'confirm', 'beforeunload']);
   });
+
+  test('insere um bloco no meio só pelo teclado; Esc fecha a lista e devolve o foco (#134)', async ({
+    page,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    const trigger = page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true });
+    const list = page.locator(`[id="${await trigger.getAttribute('popovertarget')}"]`);
+
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    await expect(list).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(list).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    // Abre de novo e chega ao "Sumário" pelo Tab (a lista vem logo depois do gatilho).
+    await page.keyboard.press('Enter');
+    const toc = list.getByRole('button', { name: 'Sumário' });
+    for (let step = 0; step < 6; step += 1) {
+      await page.keyboard.press('Tab');
+      if (await toc.evaluate((node) => node === document.activeElement)) break;
+    }
+    await expect(toc).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect(list).toBeHidden();
+    const inserted = page.getByRole('group', { name: 'Bloco 2: Sumário', exact: true });
+    await expect(inserted.getByLabel('Título do sumário')).toBeFocused();
+    await expect(inserted.getByLabel('Título do sumário')).toHaveValue('');
+    await expect(page.getByRole('group', { name: /^Bloco \d+:/ })).toHaveCount(21);
+    await expect(page.getByRole('button', { name: 'Remover bloco 21', exact: true })).toBeVisible();
+  });
 });
