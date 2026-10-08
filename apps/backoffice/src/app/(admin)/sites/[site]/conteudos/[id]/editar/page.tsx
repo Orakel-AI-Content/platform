@@ -44,7 +44,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
   if (contentId === undefined) notFound();
   const read = await readContentVersions(siteId, contentId);
   if (read === undefined) return null;
-  const { actor, versions, site } = read;
+  const { actor, versions, site, timeZone } = read;
   const db = getDb().db;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
@@ -74,6 +74,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
       <ContentEditor
         mode="edit"
         siteId={siteId}
+        timeZone={timeZone}
         defaultValues={latest.data}
         options={options}
         action={updateContentAction.bind(null, siteId, contentId)}

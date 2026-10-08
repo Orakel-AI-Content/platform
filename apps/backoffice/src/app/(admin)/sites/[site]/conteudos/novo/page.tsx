@@ -33,6 +33,7 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
       <ContentEditor
         mode="create"
         siteId={site.id}
+        timeZone={site.timeZone}
         defaultValues={{
           kind: 'article',
           slug: '',
