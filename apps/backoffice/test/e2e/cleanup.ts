@@ -20,6 +20,7 @@ export const SITE_TABLES = [
   'redirects',
   'media_variants',
   'media',
+  'media_uploads',
   'menus',
   'taxonomies',
   'authors',
