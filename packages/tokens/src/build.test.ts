@@ -21,7 +21,7 @@ afterEach(async () => {
 type ThemeDocument = {
   color: Record<string, unknown>;
   radius: Record<string, unknown>;
-  $extensions?: { 'ai.orakel.theme': { fontFaces: { file: string }[] } };
+  $extensions?: { 'ai.orakel.theme': { name?: string; fontFaces: { file: string }[] } };
 };
 
 /** Cópia dos temas reais com um documento alterado, para os casos de falha. */
@@ -40,6 +40,14 @@ type Index = {
   isThemeId(id: string): boolean;
   themeCss(id: string): string | undefined;
   themeFonts(id: string): readonly { file: string; url: string; preload: boolean }[] | undefined;
+  THEME_SUMMARIES: readonly Summary[];
+  themeSummary(id: string): Summary | undefined;
+};
+
+type Summary = {
+  id: string;
+  name: string;
+  colors: { background: string; text: string; accent: string };
 };
 
 describe('build dos temas reais', () => {
@@ -73,6 +81,37 @@ describe('build dos temas reais', () => {
 
     const dts = await readFile(new URL('index.d.ts', outDir), 'utf8');
     expect(dts).toContain(`export type ThemeId = "exemplo-a" | "exemplo-b";`);
+  });
+
+  it('expõe nome e amostra de cada tema, na ordem de THEME_IDS, sem importar nada', async () => {
+    const outDir = await tempDir();
+    expect((await buildThemes({ themesDir: THEMES, outDir })).ok).toBe(true);
+    const index = (await import(new URL('index.js', outDir).href)) as Index;
+
+    expect(index.THEME_SUMMARIES.map((summary) => [summary.id, summary.name])).toEqual([
+      ['exemplo-a', 'Editorial claro'],
+      ['exemplo-b', 'Tecnológico escuro'],
+    ]);
+    const css = index.themeCss('exemplo-b') ?? '';
+    for (const summary of index.THEME_SUMMARIES) {
+      expect(index.THEME_IDS).toContain(summary.id);
+      expect(Object.keys(summary.colors)).toEqual(['background', 'text', 'accent']);
+      for (const hex of Object.values(summary.colors)) expect(hex).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    // A amostra é a mesma cor que o CSS do tema usa.
+    const accent = index.themeSummary('exemplo-b')?.colors.accent ?? '';
+    expect(css.toLowerCase()).toContain(accent);
+    expect(index.themeSummary('nao-existe')).toBeUndefined();
+    expect(index.themeSummary('toString')).toBeUndefined();
+    expect(Object.isFrozen(index.THEME_SUMMARIES)).toBe(true);
+
+    const js = await readFile(new URL('index.js', outDir), 'utf8');
+    expect(js).not.toMatch(/^\s*import\b|\bimport\(|\brequire\(/m);
+    const dts = await readFile(new URL('index.d.ts', outDir), 'utf8');
+    expect(dts).toContain('export declare const THEME_SUMMARIES: readonly ThemeSummary[];');
+    expect(dts).toContain(
+      'export declare function themeSummary(id: string): ThemeSummary | undefined;',
+    );
   });
 
   it('é idempotente: a mesma entrada gera os mesmos arquivos', async () => {
@@ -119,6 +158,18 @@ describe('build com temas inválidos', () => {
       'exemplo-a json.invalid',
       'exemplo-b alias.missing',
     ]);
+  });
+
+  it('exige o nome legível do tema, sem gravar nada', async () => {
+    const themesDir = await themesWith('exemplo-a', (theme) => {
+      delete theme.$extensions?.['ai.orakel.theme'].name;
+    });
+    const outDir = await tempDir();
+    const result = await buildThemes({ themesDir, outDir });
+    expect(result.ok ? [] : result.issues.map((issue) => `${issue.theme} ${issue.path}`)).toEqual([
+      'exemplo-a $extensions.ai.orakel.theme.name',
+    ]);
+    expect(await readdir(outDir)).toEqual([]);
   });
 
   it('exige a extensão do tema', async () => {
