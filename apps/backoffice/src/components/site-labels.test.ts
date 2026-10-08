@@ -5,6 +5,8 @@ import {
   BUILD_STATUS_VARIANT,
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_VARIANT,
+  LIFECYCLE_LABEL,
+  LIFECYCLE_ORDER,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
   formatDateTime,
@@ -63,5 +65,12 @@ describe('duração da janela de agrupamento (#147)', () => {
     expect(formatDuration(90)).toBe('90 s (1 min 30 s)');
     expect(formatDuration(3661)).toBe('3661 s (1 h 1 min 1 s)');
     expect(formatDuration(3605)).toBe('3605 s (1 h 5 s)');
+  });
+});
+
+describe('ordem do ciclo de vida (#148)', () => {
+  it('tem cada etapa com rótulo exatamente uma vez', () => {
+    expect(new Set(LIFECYCLE_ORDER).size).toBe(LIFECYCLE_ORDER.length);
+    expect([...LIFECYCLE_ORDER].sort()).toEqual(Object.keys(LIFECYCLE_LABEL).sort());
   });
 });

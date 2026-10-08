@@ -91,6 +91,12 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   - Site: ativo `success`, promovendo `info`, pausado `warning` (com o motivo no texto e no
     `title`, sempre visível na lista de sites).
   - Build: publicado `success`, falhou `destructive`.
+- **Sequência de etapas:** `LifecycleSteps` (`src/components/lifecycle-steps.tsx`) para um
+  processo de ordem fixa (ciclo de vida do site), não badge: `<ol>` com número, rótulo e o
+  estado em texto ("concluída", "atual", "pendente"), além do estilo; a atual leva
+  `aria-current="step"`. A ordem vem de `LIFECYCLE_ORDER` em `site-labels.ts`. A ação manual
+  fica no item da etapa que ela conclui e o retorno em `role="status"` abaixo da lista
+  (`LifecycleActionScope`), que sobrevive à revalidação que move o botão de item.
 - **Cabeçalho de página:** `PageHeader` (`src/app/(admin)/sites/[site]/editorial-page.tsx`),
   em toda tela de lista: link de volta (opcional; Sites é a raiz), título (`h1`) à esquerda e a
   ação principal à direita (`action`), que quebra para baixo em tela estreita. A página monta a
