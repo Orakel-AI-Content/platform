@@ -1,6 +1,14 @@
 'use client';
 
-import { useId, useState, useTransition, type FormEvent } from 'react';
+import {
+  createContext,
+  use,
+  useId,
+  useState,
+  useTransition,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +49,27 @@ const NEXT_STEP = {
 
 type Step = (typeof NEXT_STEP)[keyof typeof NEXT_STEP]['step'];
 
-/** Só o próximo passo manual válido; `publicado` vem do build. */
+const LifecycleActionContext = createContext<ReturnType<typeof useAction> | null>(null);
+
+/**
+ * Guarda o estado da ação do ciclo de vida fora do item da etapa: ao avançar, a página
+ * revalida e o botão passa ao item seguinte (remontado), mas o retorno continua em role=status
+ * logo abaixo do stepper (#148).
+ */
+export function LifecycleActionScope({ children }: { children: ReactNode }) {
+  const state = useAction();
+  return (
+    <LifecycleActionContext value={state}>
+      {children}
+      <Status status={state.status} />
+    </LifecycleActionContext>
+  );
+}
+
+/**
+ * Só o próximo passo manual válido; `publicado` vem do build. Sem passo manual não renderiza
+ * nada (zona ativa e publicado). Fica dentro de um `LifecycleActionScope`.
+ */
 export function LifecycleAction({
   lifecycle,
   action,
@@ -49,20 +77,19 @@ export function LifecycleAction({
   lifecycle: SiteSummary['lifecycle'];
   action: (step: Step) => Promise<ActionState>;
 }) {
-  const { pending, status, run } = useAction();
-  const next =
-    lifecycle === 'cadastrado' || lifecycle === 'infra_aplicada' ? NEXT_STEP[lifecycle] : null;
+  const scope = use(LifecycleActionContext);
+  if (scope === null) throw new Error('LifecycleAction fora de um LifecycleActionScope.');
+  if (lifecycle !== 'cadastrado' && lifecycle !== 'infra_aplicada') return null;
+  const next = NEXT_STEP[lifecycle];
   return (
-    <div className="space-y-2">
-      {next ? (
-        <Button variant="outline" disabled={pending} onClick={() => run(() => action(next.step))}>
-          {pending ? 'Salvando…' : next.label}
-        </Button>
-      ) : (
-        <p className="text-sm text-muted-foreground">Nenhuma etapa manual pendente.</p>
-      )}
-      <Status status={status} />
-    </div>
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={scope.pending}
+      onClick={() => scope.run(() => action(next.step))}
+    >
+      {scope.pending ? 'Salvando…' : next.label}
+    </Button>
   );
 }
 
