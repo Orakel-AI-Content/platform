@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { BuildWindowForm, LifecycleAction, RegisterG1Form } from '@/components/site-actions';
-import { formatDateTime, LIFECYCLE_LABEL } from '@/components/site-labels.ts';
+import { formatDateTime, formatDuration, LIFECYCLE_LABEL } from '@/components/site-labels.ts';
 import { buttonVariants } from '@/components/ui/button';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
@@ -89,6 +89,9 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         <h2 id="g1-title" className="text-lg font-semibold">
           G1 (indexação)
         </h2>
+        <p className="text-sm text-muted-foreground">
+          Registro que libera a indexação do site: sem ele, o site não pode ficar indexável.
+        </p>
         {g1 ? (
           <p>
             Registrado por {g1.registeredBy} em {formatDateTime(g1.registeredAt, site.timeZone)}
@@ -106,11 +109,15 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         <h2 id="window-title" className="text-lg font-semibold">
           Janela de agrupamento
         </h2>
+        <p className="text-sm text-muted-foreground">
+          Tempo que as mudanças aguardam antes de virar um build: as que chegam nesse intervalo
+          entram no mesmo build.
+        </p>
         <p>
           Janela efetiva:{' '}
           <strong>
-            {site.effectiveBuildWindowSeconds} s (
-            {site.buildWindowSeconds === null ? 'padrão' : 'própria'})
+            {formatDuration(site.effectiveBuildWindowSeconds)},{' '}
+            {site.buildWindowSeconds === null ? 'padrão' : 'própria'}
           </strong>
         </p>
         {canConfigure && (
