@@ -123,6 +123,21 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await tabTo(page, row.getByRole('link', { name: `Editar configuração ${siteId}` }));
   await page.keyboard.press('Enter');
   await expect(page.getByLabel('ID', { exact: true })).toHaveAttribute('readonly', '');
+  // Seções com índice (#161): o item do índice leva à seção, e o Tab seguinte entra nela.
+  const sections = page.getByRole('navigation', { name: 'Seções do formulário' });
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText([
+    'Identidade',
+    'Domínios',
+    'Aparência',
+    'Recursos',
+    'Robôs e indexação',
+    'Integrações',
+  ]);
+  await tabTo(page, sections.getByRole('link', { name: 'Domínios' }));
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#secao-dominios$/);
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Domínios')).toBeFocused();
   await typeInto(page, page.getByLabel('Domínios'), `novo.${siteId}.example.com`);
   await tabTo(page, page.getByRole('button', { name: 'Salvar configuração' }));
   await page.keyboard.press('Enter');
