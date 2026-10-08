@@ -127,7 +127,11 @@ export function MediaLibrary({
       const response = await fetch(`/sites/${encodeURIComponent(siteId)}/midia/envio`, {
         method: 'POST',
         body: file,
-        headers: file.type ? { 'content-type': file.type } : undefined,
+        headers: {
+          ...(file.type ? { 'content-type': file.type } : {}),
+          // Nome original (#184): cabeçalho HTTP só carrega Latin-1, então vai codificado.
+          'x-file-name': encodeURIComponent(file.name),
+        },
       });
       if (!response.ok) {
         setStatus({ kind: 'error', text: `Envio recusado: ${await refusal(response)}` });

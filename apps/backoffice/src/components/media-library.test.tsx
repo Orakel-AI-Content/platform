@@ -51,6 +51,9 @@ describe('biblioteca de mídia', () => {
     expect(url).toBe('/sites/exemplo-a/midia/envio');
     expect(init?.method).toBe('POST');
     expect(init?.body).toBeInstanceOf(File);
+    expect((init?.headers as Record<string, string>)['x-file-name']).toBe(
+      encodeURIComponent((init?.body as File).name),
+    );
     expect(screen.getByRole('status').textContent).toBe('Imagem enviada; processando…');
     expect(screen.getByText('Processando…')).toBeTruthy();
 
