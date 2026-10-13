@@ -2,7 +2,7 @@ import type { SnapshotLine } from '@orakel/content-model/v1';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { media, mediaVariants } from '../../src/db/schema/index.ts';
+import { media, mediaUploads, mediaVariants } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { getMediaByIds, listMediaPage } from '../../src/domain/content/media.ts';
@@ -111,6 +111,103 @@ describe('leitura paginada', () => {
     expect(result.value.items).toHaveLength(24);
     expect(result.value.total).toBe(fixtureMediaIds(SITE).length + 2000);
     expect(elapsed).toBeLessThan(500);
+  });
+});
+
+/** Envio `pronta` ligado a cada mídia, com o nome dado e a data dada. */
+async function seedUploads(
+  siteId: string,
+  entries: readonly { mediaId: number; name: string; at?: Date }[],
+): Promise<void> {
+  await db.insert(mediaUploads).values(
+    entries.map(({ mediaId, name, at }) => ({
+      uploadKey: `uploads/${siteId}/${mediaId}.jpg`,
+      siteId,
+      originalName: name,
+      status: 'pronta' as const,
+      mediaId,
+      ...(at ? { uploadedAt: at } : {}),
+    })),
+  );
+}
+
+describe('nome, data e busca por nome (#186)', () => {
+  it('traz o nome original e a data do envio; sem envio registrado, nulos', async () => {
+    const [first, second] = await seedMedia(SITE, 2);
+    const at = new Date('2026-10-01T15:30:00Z');
+    await seedUploads(SITE, [{ mediaId: first ?? 0, name: 'Praia ação 01.jpg', at }]);
+
+    const result = await listMediaPage(db, revisor, SITE, { page: 1, pageSize: 100 });
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    const byId = new Map(result.value.items.map((item) => [item.id, item]));
+    expect(byId.get(first ?? 0)).toMatchObject({
+      originalName: 'Praia ação 01.jpg',
+      uploadedAt: at,
+    });
+    expect(byId.get(second ?? 0)).toMatchObject({ originalName: null, uploadedAt: null });
+  });
+
+  it('busca por parte do nome sem diferenciar maiúsculas; mídia sem envio fica de fora', async () => {
+    const ids = await seedMedia(SITE, 3);
+    await seedUploads(SITE, [
+      { mediaId: ids[0] ?? 0, name: 'Praia-Norte.JPG' },
+      { mediaId: ids[1] ?? 0, name: 'montanha.png' },
+    ]);
+
+    const result = await listMediaPage(db, revisor, SITE, {
+      page: 1,
+      pageSize: 10,
+      search: 'praia',
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { total: 1, items: [{ id: ids[0], originalName: 'Praia-Norte.JPG' }] },
+    });
+  });
+
+  it('% e _ na busca são texto, não curinga', async () => {
+    const ids = await seedMedia(SITE, 2);
+    await seedUploads(SITE, [
+      { mediaId: ids[0] ?? 0, name: 'desconto_50%.jpg' },
+      { mediaId: ids[1] ?? 0, name: 'desconto-50.jpg' },
+    ]);
+
+    const result = await listMediaPage(db, revisor, SITE, {
+      page: 1,
+      pageSize: 10,
+      search: '_50%',
+    });
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.items.map((item) => item.originalName)).toEqual(['desconto_50%.jpg']);
+  });
+
+  it('com 2.000 mídias com nome, a primeira página e a busca voltam em menos de 500 ms', async () => {
+    const ids = await seedMedia(SITE, 2000);
+    await seedUploads(
+      SITE,
+      ids.map((id) => ({
+        mediaId: id,
+        name: id % 100 === 0 ? `Promoção ${id}.jpg` : `foto-${id}.jpg`,
+      })),
+    );
+
+    let started = performance.now();
+    const firstPage = await listMediaPage(db, revisor, SITE, { page: 1, pageSize: 24 });
+    expect(performance.now() - started).toBeLessThan(500);
+    started = performance.now();
+    const search = await listMediaPage(db, revisor, SITE, {
+      page: 1,
+      pageSize: 24,
+      search: 'promoção',
+    });
+    expect(performance.now() - started).toBeLessThan(500);
+
+    if (!firstPage.ok || !search.ok) throw new Error('leitura recusada');
+    expect(firstPage.value.items).toHaveLength(24);
+    expect(search.value.total).toBe(20);
   });
 });
 
