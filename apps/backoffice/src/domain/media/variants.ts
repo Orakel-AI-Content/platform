@@ -10,6 +10,7 @@ import type { Db } from '../../db/client.ts';
 import { SYSTEM_ACTOR } from '../access/rbac.ts';
 import { createMedia } from '../content/media.ts';
 import { ORIGINALS_BUCKET, type ObjectStore } from './store.ts';
+import { closeUpload } from './upload.ts';
 
 // Variantes do perfil de imagem (12.0, L4), só no backoffice-worker: a partir do original
 // normalizado, uma por largura × formato em `media-<site>`, com o nome imutável pelo hash do
@@ -24,6 +25,11 @@ export type VariantsPayload = {
   originalKey: string;
   width: number;
   height: number;
+  /**
+   * Envio que gerou o original (#185): fechado como `pronta` junto com a mídia. Ausente nos
+   * jobs enfileirados antes da #185 e no reprocessamento, que não nasce de envio.
+   */
+  uploadKey?: string;
 };
 
 /** Bucket de mídia do site (um por site, como no R2). */
@@ -80,18 +86,31 @@ export async function generateVariants(
 export type RegisteredMedia =
   { status: 'registered'; id: number; variants: number; written: number } | { status: 'missing' };
 
-/** Gera as variantes e registra a mídia (com a mudança pendente do site) pelo sistema. */
+/**
+ * Gera as variantes e registra a mídia (com a mudança pendente do site) pelo sistema; com
+ * `uploadKey`, fecha o envio como `pronta` na mesma transação (#185).
+ */
 export async function registerMediaVariants(
   deps: { db: Db; store: ObjectStore },
   payload: VariantsPayload,
 ): Promise<RegisteredMedia> {
   const generated = await generateVariants(deps.store, payload);
   if (generated.status === 'missing') return generated;
-  const created = await deps.db.transaction((tx) =>
-    createMedia(tx, SYSTEM_ACTOR, payload.siteId, generated.media, {
+  const { uploadKey } = payload;
+  // Mídia e envio na mesma transação: o envio só fica `pronta` com a mídia gravada.
+  const created = await deps.db.transaction(async (tx) => {
+    const result = await createMedia(tx, SYSTEM_ACTOR, payload.siteId, generated.media, {
       originalKey: payload.originalKey,
-    }),
-  );
+    });
+    if (result.ok && uploadKey !== undefined) {
+      await closeUpload(
+        tx,
+        { siteId: payload.siteId, uploadKey },
+        { status: 'pronta', mediaId: result.value.id },
+      );
+    }
+    return result;
+  });
   if (!created.ok) {
     // Variantes geradas pela própria regra do perfil: recusa aqui é bug, não conteúdo.
     throw new Error(`Mídia de ${payload.siteId} recusada: ${JSON.stringify(created.issues)}`);
