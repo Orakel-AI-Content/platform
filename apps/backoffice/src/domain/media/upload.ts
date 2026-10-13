@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 
 import type { Result } from '@orakel/content-model';
-import { sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { mediaUploads } from '../../db/schema/index.ts';
-import type { Actor } from '../access/rbac.ts';
+import { requireRole, type Actor } from '../access/rbac.ts';
 import { checkWrite, refuse } from '../content/write.ts';
 import { siteExists } from '../sites/sites.ts';
 import { detectImageFormat, EXTENSIONS, SIGNATURE_BYTES, type ImageFormat } from './formats.ts';
@@ -147,4 +147,76 @@ export async function enqueueIngest(db: Executor, payload: IngestPayload): Promi
       payload => ${JSON.stringify(payload)}::json,
       max_attempts => 5
     )`);
+}
+
+/** Como um envio termina: pronto com a mídia gerada, ou recusado com o motivo (#185). */
+export type UploadOutcome =
+  { status: 'pronta'; mediaId: number } | { status: 'recusada'; reason: string };
+
+/** Motivo de um arquivo que o worker não conseguiu decodificar. */
+export const UNREADABLE_REASON = 'A imagem está corrompida ou não pôde ser lida';
+/** Motivo de um envio cujas tentativas se esgotaram por falha transitória. */
+export const FAILED_REASON = 'Falha no processamento';
+
+/**
+ * Fecha um envio que ainda está `processando` (#185). Envio já fechado, ou sem registro
+ * (anterior à #184), fica como está: um job repetido não reabre nem troca o resultado.
+ */
+export async function closeUpload(
+  db: Executor,
+  upload: { siteId: string; uploadKey: string },
+  outcome: UploadOutcome,
+): Promise<void> {
+  await db
+    .update(mediaUploads)
+    .set(
+      outcome.status === 'pronta'
+        ? { status: 'pronta', mediaId: outcome.mediaId }
+        : { status: 'recusada', reason: outcome.reason },
+    )
+    .where(
+      and(
+        eq(mediaUploads.uploadKey, upload.uploadKey),
+        eq(mediaUploads.siteId, upload.siteId),
+        eq(mediaUploads.status, 'processando'),
+      ),
+    );
+}
+
+/** Maior lista de chaves aceita numa leitura de envios. */
+export const MAX_UPLOAD_KEYS = 100;
+
+export type UploadState = {
+  uploadKey: string;
+  status: (typeof mediaUploads.$inferSelect)['status'];
+  reason: string | null;
+  mediaId: number | null;
+};
+
+/**
+ * Estado dos envios do site pelas chaves (#185), para a tela acompanhar cada arquivo. Chaves
+ * de outro site ou inexistentes ficam de fora.
+ */
+export async function getUploads(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+  keys: readonly string[],
+): Promise<Result<UploadState[]>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+  if (keys.length > MAX_UPLOAD_KEYS) {
+    return refuse('media.upload_keys_invalid', `Até ${MAX_UPLOAD_KEYS} envios por consulta`);
+  }
+  if (keys.length === 0) return { ok: true, value: [] };
+  const rows = await db
+    .select({
+      uploadKey: mediaUploads.uploadKey,
+      status: mediaUploads.status,
+      reason: mediaUploads.reason,
+      mediaId: mediaUploads.mediaId,
+    })
+    .from(mediaUploads)
+    .where(and(eq(mediaUploads.siteId, siteId), inArray(mediaUploads.uploadKey, [...keys])));
+  return { ok: true, value: rows };
 }
