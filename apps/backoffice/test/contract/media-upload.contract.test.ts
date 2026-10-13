@@ -1,12 +1,16 @@
+import type { JobHelpers } from 'graphile-worker';
 import { eq, sql } from 'drizzle-orm';
+import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { readFixture } from '../../src/bin/seed.ts';
 import type { Db } from '../../src/db/client.ts';
-import { mediaUploads } from '../../src/db/schema/index.ts';
+import { media, mediaUploads } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { memoryStore } from '../../src/domain/media/store.ts';
-import { receiveUpload } from '../../src/domain/media/upload.ts';
+import { getUploads, receiveUpload } from '../../src/domain/media/upload.ts';
+import { createIngestMediaTask } from '../../src/jobs/tasks/ingest-media.ts';
+import { createMediaVariantsTask } from '../../src/jobs/tasks/media-variants.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
@@ -136,5 +140,173 @@ describe('envio de imagem', () => {
     expect(
       await db.select().from(mediaUploads).where(eq(mediaUploads.siteId, 'nao-existe')),
     ).toEqual([]);
+  });
+});
+
+/** Helpers do Graphile Worker para rodar as tasks na mão, guardando o job encadeado. */
+function jobHelpers(attempts = 1, maxAttempts = 5) {
+  const queued: unknown[] = [];
+  const value = {
+    addJob: (_task: string, payload: unknown) => {
+      queued.push(payload);
+      return Promise.resolve();
+    },
+    logger: { info: () => undefined, warn: () => undefined },
+    job: { attempts, max_attempts: maxAttempts },
+  } as unknown as JobHelpers;
+  return { queued, value };
+}
+
+async function sendBytes(bytes: Uint8Array, store = memoryStore(), name = 'foto.jpg') {
+  const result = await send('exemplo-a', store, {
+    fileName: encodeURIComponent(name),
+    contentLength: String(bytes.byteLength),
+    bytes,
+  });
+  if (!result.ok) throw new Error(JSON.stringify(result.issues));
+  return { store, uploadKey: result.value.uploadKey };
+}
+
+const uploadRow = async (uploadKey: string) =>
+  (await db.select().from(mediaUploads).where(eq(mediaUploads.uploadKey, uploadKey)))[0];
+
+describe('fechamento do envio pelos jobs (#185)', () => {
+  it('ingestão e variantes terminam com o envio pronto e o id da mídia criada', async () => {
+    const jpeg = await sharp({
+      create: { width: 800, height: 600, channels: 3, background: '#336699' },
+    })
+      .jpeg()
+      .toBuffer();
+    const { store, uploadKey } = await sendBytes(jpeg);
+
+    const ingest = jobHelpers();
+    await createIngestMediaTask({ db, store })({ siteId: 'exemplo-a', uploadKey }, ingest.value);
+    expect(ingest.queued).toEqual([expect.objectContaining({ uploadKey })]);
+    await createMediaVariantsTask({ db, store })(ingest.queued[0], jobHelpers().value);
+
+    const row = await uploadRow(uploadKey);
+    const created = await db
+      .select({ id: media.id })
+      .from(media)
+      .where(eq(media.siteId, 'exemplo-a'));
+    expect(row).toMatchObject({ status: 'pronta', reason: null });
+    expect(created.map((item) => item.id)).toContain(row?.mediaId);
+  });
+
+  it('assinatura válida com corpo corrompido termina recusada numa tentativa só', async () => {
+    const corrupted = Uint8Array.from([
+      0xff,
+      0xd8,
+      0xff,
+      0xe0,
+      0,
+      0x10,
+      0x4a,
+      0x46,
+      0x49,
+      0x46,
+      0,
+      1,
+      ...Array<number>(300).fill(7),
+    ]);
+    const { store, uploadKey } = await sendBytes(corrupted);
+
+    const ingest = jobHelpers(1, 5);
+    await createIngestMediaTask({ db, store })({ siteId: 'exemplo-a', uploadKey }, ingest.value);
+
+    expect(ingest.queued).toEqual([]);
+    expect(await uploadRow(uploadKey)).toMatchObject({
+      status: 'recusada',
+      reason: 'A imagem está corrompida ou não pôde ser lida',
+      mediaId: null,
+    });
+  });
+
+  it('falha que esgota as tentativas termina recusada com "Falha no processamento"', async () => {
+    const { store, uploadKey } = await sendBytes(JPEG);
+    store.get = () => Promise.reject(new Error('armazenamento fora do ar'));
+
+    await expect(
+      createIngestMediaTask({ db, store })(
+        { siteId: 'exemplo-a', uploadKey },
+        jobHelpers(5, 5).value,
+      ),
+    ).rejects.toThrow('armazenamento fora do ar');
+
+    expect(await uploadRow(uploadKey)).toMatchObject({
+      status: 'recusada',
+      reason: 'Falha no processamento',
+    });
+  });
+
+  it('envio já fechado não muda com um job repetido', async () => {
+    const { store, uploadKey } = await sendBytes(JPEG);
+    store.get = () => Promise.reject(new Error('fora do ar'));
+    await expect(
+      createIngestMediaTask({ db, store })(
+        { siteId: 'exemplo-a', uploadKey },
+        jobHelpers(5, 5).value,
+      ),
+    ).rejects.toThrow();
+    await db
+      .update(mediaUploads)
+      .set({ status: 'pronta', mediaId: 1, reason: null })
+      .where(eq(mediaUploads.uploadKey, uploadKey));
+
+    await expect(
+      createIngestMediaTask({ db, store })(
+        { siteId: 'exemplo-a', uploadKey },
+        jobHelpers(5, 5).value,
+      ),
+    ).rejects.toThrow();
+    expect(await uploadRow(uploadKey)).toMatchObject({ status: 'pronta', mediaId: 1 });
+  });
+
+  it('payload antigo das variantes, sem a chave do envio, processa sem erro', async () => {
+    const jpeg = await sharp({
+      create: { width: 640, height: 480, channels: 3, background: '#000' },
+    })
+      .jpeg()
+      .toBuffer();
+    const { store, uploadKey } = await sendBytes(jpeg);
+    const ingest = jobHelpers();
+    await createIngestMediaTask({ db, store })({ siteId: 'exemplo-a', uploadKey }, ingest.value);
+    const oldPayload = { ...(ingest.queued[0] as Record<string, unknown>) };
+    delete oldPayload.uploadKey;
+
+    await createMediaVariantsTask({ db, store })(oldPayload, jobHelpers().value);
+
+    // A mídia é registrada; o envio fica como estava (o job antigo não sabe de qual veio).
+    expect(await uploadRow(uploadKey)).toMatchObject({ status: 'processando', mediaId: null });
+  });
+});
+
+describe('leitura dos envios por chave (#185)', () => {
+  const revisor: Actor = { email: 'revisor@orakel.local', roles: ['revisor'] };
+
+  it('devolve estado, motivo e mídia só dos envios do site; sem site.read, recusa', async () => {
+    const own = await sendBytes(JPEG);
+    const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
+    if (line?.type !== 'config') throw new Error('fixture sem config');
+    await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, line.data));
+    await db.insert(mediaUploads).values({
+      uploadKey: 'uploads/exemplo-b/outro.jpg',
+      siteId: 'exemplo-b',
+      originalName: 'outro.jpg',
+    });
+
+    expect(
+      await getUploads(db, revisor, 'exemplo-a', [
+        own.uploadKey,
+        'uploads/exemplo-b/outro.jpg',
+        'uploads/exemplo-a/nao-existe.jpg',
+      ]),
+    ).toEqual({
+      ok: true,
+      value: [{ uploadKey: own.uploadKey, status: 'processando', reason: null, mediaId: null }],
+    });
+    expect(
+      await getUploads(db, { email: 'x@orakel.local', roles: [] }, 'exemplo-a', [own.uploadKey]),
+    ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
   });
 });
