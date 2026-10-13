@@ -4,7 +4,7 @@ import sharp from 'sharp';
 
 import { detectImageFormat, EXTENSIONS, type ImageFormat } from './formats.ts';
 import { ORIGINALS_BUCKET, type ObjectStore } from './store.ts';
-import type { IngestPayload } from './upload.ts';
+import { UNREADABLE_REASON, type IngestPayload } from './upload.ts';
 
 // Ingestão (12.0, L4), só no backoffice-worker: o envio cru vira o original normalizado em
 // `media-originals/<site>/<sha256>.<ext>`, base das variantes. O nome pelo hash faz o
@@ -37,11 +37,24 @@ export async function normalizeImage(
 }
 
 export type IngestResult =
-  { status: 'stored'; key: string; width: number; height: number } | { status: 'missing' };
+  | { status: 'stored'; key: string; width: number; height: number }
+  | { status: 'missing' }
+  /** Arquivo que não é imagem aceita ou que o sharp não decodifica: recusa, não repete. */
+  | { status: 'rejected'; reason: string };
+
+/** Normaliza, ou `undefined` se o sharp não consegue decodificar (corpo corrompido). */
+async function decodable(raw: Uint8Array, format: ImageFormat) {
+  try {
+    return await normalizeImage(raw, format);
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Normaliza um envio e guarda o original; o envio cru é apagado só depois. Repetir após uma
- * falha regrava o mesmo original; envio que já não existe (ingerido antes) é ignorado.
+ * falha regrava o mesmo original; envio que já não existe (ingerido antes) é ignorado; arquivo
+ * que não é imagem legível é recusado (#185).
  */
 export async function ingestUpload(
   store: ObjectStore,
@@ -50,8 +63,12 @@ export async function ingestUpload(
   const raw = await store.get(ORIGINALS_BUCKET, payload.uploadKey);
   if (raw === undefined) return { status: 'missing' };
   const format = detectImageFormat(raw);
-  if (format === undefined) throw new Error(`Envio ${payload.uploadKey} não é imagem aceita`);
-  const image = await normalizeImage(raw, format);
+  const image = format === undefined ? undefined : await decodable(raw, format);
+  if (format === undefined || image === undefined) {
+    // Não adianta repetir: o arquivo cru sai e o envio é recusado (#185).
+    await store.delete(ORIGINALS_BUCKET, payload.uploadKey);
+    return { status: 'rejected', reason: UNREADABLE_REASON };
+  }
   const hash = createHash('sha256').update(image.data).digest('hex');
   const key = `${payload.siteId}/${hash}.${EXTENSIONS[format]}`;
   await store.put(ORIGINALS_BUCKET, key, image.data, image.data.byteLength, `image/${format}`);
