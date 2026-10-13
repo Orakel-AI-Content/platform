@@ -13,12 +13,15 @@ export const MEDIA_PAGE_SIZE = 24;
 const THUMBNAIL_FORMATS = ['avif', 'webp'];
 
 /**
- * Miniatura de cada mídia: a menor largura registrada, em `media.<domínio>` (a mesma regra
+ * Miniatura de cada mídia (e, quando vierem, nome e data do envio): a menor largura registrada, em `media.<domínio>` (a mesma regra
  * do site, `mediaUrl`). Formato fora do perfil entra só como reserva.
  */
-export function mediaItems(domain: string, media: readonly Media[]): MediaItem[] {
+export function mediaItems(
+  domain: string,
+  media: readonly (Media & { originalName?: string | null; uploadedAt?: Date | null })[],
+): MediaItem[] {
   const config = { domains: [domain] };
-  return media.map(({ id, width, height, variants }) => {
+  return media.map(({ id, width, height, variants, originalName, uploadedAt }) => {
     const smallest = Math.min(...variants.map((variant) => variant.width));
     const candidates = variants
       .filter((variant) => variant.width === smallest)
@@ -34,6 +37,9 @@ export function mediaItems(domain: string, media: readonly Media[]): MediaItem[]
       height,
       sources: urls.slice(0, -1),
       src: fallback?.url ?? '',
+      // Nome e data do envio (#186), quando a leitura os traz; a data vai em ISO ao cliente.
+      ...(originalName === undefined ? {} : { originalName }),
+      ...(uploadedAt === undefined ? {} : { uploadedAt: uploadedAt?.toISOString() ?? null }),
     };
   });
 }
