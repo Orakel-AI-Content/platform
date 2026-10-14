@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +7,7 @@ import type { ComponentProps } from 'react';
 
 import { MediaLibrary, type MediaItem } from './media-library.tsx';
 import type { MediaPickerPage } from './media-picker.tsx';
+import type { SendFile } from './upload-queue.tsx';
 
 // Biblioteca de mídia (#52, #186): envio pela rota, "processando" até o total da página
 // crescer, recusa com o motivo, grade sem envio para quem não edita, nome e data de cada
@@ -22,7 +23,6 @@ vi.mock('next/navigation', () => ({
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
   vi.clearAllMocks();
   search.value = '';
 });
@@ -56,86 +56,82 @@ function renderLibrary(props: Partial<Props> & Pick<Props, 'items' | 'canWrite' 
       page={1}
       pageSize={24}
       search=""
+      uploadStatus={() => Promise.resolve([])}
+      pollMs={5}
       {...props}
     />,
   );
 }
 
-/** Retorno do envio (a primeira região de status; a da paginação vem depois). */
-const uploadStatus = () => screen.getAllByRole('status')[0];
-
-function stubFetch(response: Response) {
-  const fetch = vi.fn<typeof globalThis.fetch>(() => Promise.resolve(response));
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
-}
-
 describe('biblioteca de mídia', () => {
-  it('envia pela rota, mostra "processando" e sai quando a lista traz um ID novo', async () => {
+  it('envia várias imagens pela fila; a pronta aparece na grade e a recusada mostra o motivo', async () => {
     const user = userEvent.setup();
-    const fetch = stubFetch(
-      Response.json({ uploadKey: 'uploads/x.jpg', format: 'jpeg' }, { status: 202 }),
+    const send = vi.fn<SendFile>((file) =>
+      Promise.resolve(
+        file.name === 'texto.jpg'
+          ? { ok: false, reason: 'O arquivo não é uma imagem JPEG, PNG, WebP ou AVIF' }
+          : { ok: true, uploadKey: `uploads/exemplo-a/${file.name}` },
+      ),
     );
-    const refresh = vi
-      .fn<Props['refresh']>()
-      .mockResolvedValueOnce(pageOf([item(1)]))
-      .mockResolvedValue(pageOf([item(1), item(2)]));
-    renderLibrary({ items: [item(1)], canWrite: true, refresh, pollMs: 5 });
-
-    await user.upload(screen.getByLabelText(/Imagem \(JPEG/), image());
-    await user.click(screen.getByRole('button', { name: 'Enviar imagem' }));
-
-    const [url, init] = fetch.mock.calls[0] ?? [];
-    expect(url).toBe('/sites/exemplo-a/midia/envio');
-    expect(init?.method).toBe('POST');
-    expect(init?.body).toBeInstanceOf(File);
-    expect((init?.headers as Record<string, string>)['x-file-name']).toBe(
-      encodeURIComponent((init?.body as File).name),
+    const uploadStatus = vi.fn((_site: string, keys: string[]) =>
+      Promise.resolve(
+        keys.map((uploadKey) => ({
+          uploadKey,
+          status: 'pronta' as const,
+          reason: null,
+          mediaId: 2,
+        })),
+      ),
     );
-    expect(uploadStatus()?.textContent).toBe('Imagem enviada; processando…');
-    expect(screen.getByText('Processando…')).toBeTruthy();
+    const refresh = vi.fn(() => Promise.resolve(pageOf([item(1), item(2)])));
+    renderLibrary({ items: [item(1)], canWrite: true, refresh, uploadStatus, send });
 
-    await waitFor(() => expect(uploadStatus()?.textContent).toBe('Imagem pronta na biblioteca.'));
-    expect(screen.queryByText('Processando…')).toBeNull();
-    expect(screen.getByText('Sem nome (Mídia 2) · Data de envio não registrada')).toBeTruthy();
+    const input = screen.getByLabelText(/^Imagens \(JPEG/);
+    expect(input.hasAttribute('multiple')).toBe(true);
+    await user.upload(input, [image(), new File(['x'], 'texto.jpg', { type: 'image/jpeg' })]);
+    await user.click(screen.getByRole('button', { name: 'Enviar imagens' }));
+
+    const uploads = screen.getByRole('list', { name: 'Envios' });
+    await waitFor(() =>
+      expect(within(uploads).getByText('foto.jpg').nextElementSibling?.textContent).toBe('pronta'),
+    );
+    expect(within(uploads).getByText('texto.jpg').nextElementSibling?.textContent).toBe(
+      'recusada: O arquivo não é uma imagem JPEG, PNG, WebP ou AVIF',
+    );
+    expect(uploadStatus).toHaveBeenCalledWith('exemplo-a', ['uploads/exemplo-a/foto.jpg']);
+    await waitFor(() =>
+      expect(screen.getByText('Sem nome (Mídia 2) · Data de envio não registrada')).toBeTruthy(),
+    );
     expect(refresh).toHaveBeenCalledWith('exemplo-a', 1, '');
   });
 
-  it('passado o tempo-limite, avisa que ainda está processando', async () => {
-    const user = userEvent.setup();
-    stubFetch(Response.json({ uploadKey: 'uploads/x.jpg', format: 'jpeg' }, { status: 202 }));
-    const refresh = vi.fn(() => Promise.resolve(pageOf([item(1)])));
-    renderLibrary({ items: [item(1)], canWrite: true, refresh, pollMs: 5, timeoutMs: 0 });
+  it('o rótulo do envio usa space-y-1.5, como os outros campos', () => {
+    renderLibrary({ items: [], canWrite: true, refresh: vi.fn(() => Promise.resolve(null)) });
 
-    await user.upload(screen.getByLabelText(/Imagem \(JPEG/), image());
-    await user.click(screen.getByRole('button', { name: 'Enviar imagem' }));
-
-    await waitFor(() => expect(uploadStatus()?.textContent).toMatch(/ainda está processando/));
-    expect(screen.queryByText('Processando…')).toBeNull();
+    expect(screen.getByLabelText(/^Imagens \(JPEG/).parentElement?.className).toContain(
+      'space-y-1.5',
+    );
   });
 
-  it('recusa da rota mostra o motivo do problem+json', async () => {
-    const user = userEvent.setup();
-    stubFetch(
-      new Response(
-        JSON.stringify({
-          title: 'O arquivo não é uma imagem JPEG, PNG, WebP ou AVIF',
-          status: 415,
-        }),
-        { status: 415, headers: { 'content-type': 'application/problem+json' } },
-      ),
-    );
-    const refresh = vi.fn(() => Promise.resolve(pageOf([])));
-    renderLibrary({ items: [], canWrite: true, refresh });
+  it('arrastar arquivos destaca a área de soltar; soltar envia', async () => {
+    const send = vi.fn<SendFile>(() => new Promise(() => undefined));
+    const { container } = renderLibrary({
+      items: [],
+      canWrite: true,
+      refresh: vi.fn(() => Promise.resolve(null)),
+      send,
+    });
+    const area = container.firstElementChild as HTMLElement;
+    const dataTransfer = { types: ['Files'], files: [image()] };
 
-    await user.upload(screen.getByLabelText(/Imagem \(JPEG/), image());
-    await user.click(screen.getByRole('button', { name: 'Enviar imagem' }));
+    fireEvent.dragOver(area, { dataTransfer });
+    expect(area.dataset.dragging).toBe('true');
+    expect(area.className).toContain('border-primary');
+    fireEvent.drop(area, { dataTransfer });
 
-    expect(uploadStatus()?.textContent).toBe(
-      'Envio recusado: O arquivo não é uma imagem JPEG, PNG, WebP ou AVIF',
-    );
-    expect(screen.queryByText('Processando…')).toBeNull();
-    expect(refresh).not.toHaveBeenCalled();
+    expect(area.dataset.dragging).toBeUndefined();
+    await waitFor(() => expect(send).toHaveBeenCalledOnce());
+    expect(screen.getByRole('list', { name: 'Envios' }).textContent).toContain('foto.jpg');
   });
 
   it('sem content.write, mostra a grade e não oferece envio', () => {

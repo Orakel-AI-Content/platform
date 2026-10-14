@@ -4,7 +4,7 @@ import { listMediaPage } from '@/domain/content/media.ts';
 import { noRead } from '@/components/forbidden-screen';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
-import { listMediaPageAction } from './actions.ts';
+import { listMediaPageAction, uploadStatusAction } from './actions.ts';
 import { MEDIA_PAGE_SIZE, mediaItems } from './items.ts';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +52,7 @@ export default async function MediaPage({
         search={search}
         canWrite={canWrite}
         refresh={listMediaPageAction}
+        uploadStatus={uploadStatusAction}
       />
     </section>
   );

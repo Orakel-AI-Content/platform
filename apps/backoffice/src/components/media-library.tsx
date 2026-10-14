@@ -1,19 +1,27 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
 
 import { ListPagination, ListToolbar } from '@/components/list-controls.tsx';
 import { MediaDetails } from '@/components/media-details';
+import {
+  UploadList,
+  useUploadQueue,
+  xhrSend,
+  type SendFile,
+  type UploadStatus,
+} from '@/components/upload-queue';
 import { useListState, type ListConfig } from '@/components/list-state.ts';
 import type { MediaPickerPage } from '@/components/media-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
-// Biblioteca de mídia do site (#52, #186): envio pela rota de envio, "processando" até a
-// mídia aparecer na página (a ingestão e as variantes rodam no backoffice-worker) e a grade
-// paginada no servidor, com busca por nome, nome e data de envio de cada imagem e as
-// miniaturas de media.<domínio>. Busca e página ficam na URL (`q`, `pagina`).
+// Biblioteca de mídia do site (#52, #186, #188): envio de várias imagens pela fila (escolher
+// no campo ou soltar sobre a biblioteca), com o resultado de cada arquivo, e a grade paginada
+// no servidor, com busca por nome, nome e data de envio de cada imagem e as miniaturas de
+// media.<domínio>. Busca e página ficam na URL (`q`, `pagina`).
 
 /** Mídia na grade: a miniatura já resolvida para o endereço de mídia do site. */
 export type MediaItem = {
@@ -53,8 +61,6 @@ export function MediaThumbnail({ item }: { item: MediaItem }) {
   );
 }
 
-type Status = { kind: 'info' | 'error'; text: string };
-
 /** Formatos que a rota aceita (a assinatura do arquivo é conferida no domínio). */
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/avif';
 
@@ -71,8 +77,10 @@ export function MediaLibrary({
   search,
   canWrite,
   refresh,
+  uploadStatus,
+  send,
   pollMs = 2000,
-  timeoutMs = 60_000,
+  timeoutMs = 120_000,
 }: {
   siteId: string;
   /** Fuso IANA do site: a data de envio aparece nele. */
@@ -86,116 +94,82 @@ export function MediaLibrary({
   canWrite: boolean;
   /** Relê a página atual (com a busca); `null` se a leitura foi recusada. */
   refresh: (siteId: string, page: number, search: string) => Promise<MediaPickerPage | null>;
+  /** Estado dos envios pelas chaves (#188); `null` se a leitura foi recusada. */
+  uploadStatus: (siteId: string, keys: string[]) => Promise<UploadStatus[] | null>;
+  /** Subida de um arquivo; por padrão, XHR para a rota de envio. */
+  send?: SendFile;
   pollMs?: number;
   timeoutMs?: number;
 }) {
   const list = useListState(MEDIA_LIST);
   const [items, setItems] = useState(initialItems);
   const [total, setTotal] = useState(initialTotal);
-  const [processing, setProcessing] = useState(0);
-  const [sending, setSending] = useState(false);
-  const [status, setStatus] = useState<Status | null>(null);
-  const knownTotal = useRef(initialTotal);
-  const deadline = useRef(0);
+  const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // Enquanto há envio processando: relê a página; o total que cresce fecha envios.
-  useEffect(() => {
-    if (processing === 0) return;
-    let busy = false;
-    const timer = setInterval(() => {
-      if (busy) return;
-      busy = true;
-      void refresh(siteId, page, search)
-        .then((next) => {
-          if (next !== null) {
-            const added = Math.max(0, next.total - knownTotal.current);
-            knownTotal.current = next.total;
-            setItems(next.items);
-            setTotal(next.total);
-            if (added > 0) {
-              setProcessing((count) => Math.max(0, count - added));
-              setStatus({
-                kind: 'info',
-                text:
-                  added === 1
-                    ? 'Imagem pronta na biblioteca.'
-                    : `${added} imagens prontas na biblioteca.`,
-              });
-              return;
-            }
-          }
-          if (Date.now() > deadline.current) {
-            setProcessing(0);
-            setStatus({
-              kind: 'info',
-              text: 'A imagem ainda está processando; recarregue a página mais tarde.',
-            });
-          }
-        })
-        // Falha de rede numa releitura: a próxima tentativa (ou o tempo-limite) resolve.
-        .catch(() => undefined)
-        .finally(() => {
-          busy = false;
-        });
-    }, pollMs);
-    return () => clearInterval(timer);
-  }, [processing, refresh, siteId, page, search, pollMs]);
+  // Imagem pronta: relê a página atual para ela aparecer na grade.
+  const reload = useCallback(() => {
+    void refresh(siteId, page, search)
+      .then((next) => {
+        if (next === null) return;
+        setItems(next.items);
+        setTotal(next.total);
+      })
+      .catch(() => undefined);
+  }, [refresh, siteId, page, search]);
+  const sendFile = useMemo(() => send ?? xhrSend(siteId), [send, siteId]);
+  const status = useCallback(
+    (keys: string[]) => uploadStatus(siteId, keys),
+    [uploadStatus, siteId],
+  );
+  const queue = useUploadQueue({ send: sendFile, status, onReady: reload, pollMs, timeoutMs });
 
-  async function upload(event: FormEvent<HTMLFormElement>) {
+  function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const file = fileInput.current?.files?.[0];
-    if (file === undefined) {
-      setStatus({ kind: 'error', text: 'Escolha uma imagem para enviar.' });
-      return;
-    }
-    setSending(true);
-    setStatus({ kind: 'info', text: 'Enviando…' });
-    try {
-      const response = await fetch(`/sites/${encodeURIComponent(siteId)}/midia/envio`, {
-        method: 'POST',
-        body: file,
-        headers: {
-          ...(file.type ? { 'content-type': file.type } : {}),
-          // Nome original (#184): cabeçalho HTTP só carrega Latin-1, então vai codificado.
-          'x-file-name': encodeURIComponent(file.name),
-        },
-      });
-      if (!response.ok) {
-        setStatus({ kind: 'error', text: `Envio recusado: ${await refusal(response)}` });
-        return;
-      }
-      deadline.current = Date.now() + timeoutMs;
-      setProcessing((count) => count + 1);
-      setStatus({ kind: 'info', text: 'Imagem enviada; processando…' });
-      form.reset();
-    } catch {
-      setStatus({ kind: 'error', text: 'Envio falhou: sem resposta do servidor.' });
-    } finally {
-      setSending(false);
-    }
+    queue.add([...(fileInput.current?.files ?? [])]);
+    event.currentTarget.reset();
   }
 
+  // Soltar arquivos sobre a biblioteca envia como o campo; o destaque marca a área de soltar.
+  const dropProps = canWrite
+    ? {
+        onDragOver: (event: DragEvent<HTMLDivElement>) => {
+          if (!event.dataTransfer.types.includes('Files')) return;
+          event.preventDefault();
+          setDragging(true);
+        },
+        onDragLeave: (event: DragEvent<HTMLDivElement>) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+        },
+        onDrop: (event: DragEvent<HTMLDivElement>) => {
+          event.preventDefault();
+          setDragging(false);
+          queue.add([...event.dataTransfer.files]);
+        },
+      }
+    : {};
+
   return (
-    <div className="space-y-6">
+    <div
+      {...dropProps}
+      data-dragging={dragging || undefined}
+      className={cn(
+        'space-y-6 rounded-md border-2 border-dashed border-transparent',
+        dragging && 'border-primary bg-muted',
+      )}
+    >
       {canWrite && (
-        <form onSubmit={(event) => void upload(event)} className="flex flex-wrap items-end gap-3">
-          <div className="space-y-2">
-            <Label htmlFor="media-file">Imagem (JPEG, PNG, WebP ou AVIF, até 25 MB)</Label>
-            <Input id="media-file" ref={fileInput} type="file" accept={ACCEPT} required />
+        <form onSubmit={upload} className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="media-file">
+              Imagens (JPEG, PNG, WebP ou AVIF, até 25 MB cada; ou solte aqui)
+            </Label>
+            <Input id="media-file" ref={fileInput} type="file" accept={ACCEPT} multiple required />
           </div>
-          <Button type="submit" disabled={sending}>
-            {sending ? 'Enviando…' : 'Enviar imagem'}
-          </Button>
+          <Button type="submit">Enviar imagens</Button>
         </form>
       )}
-      <p
-        role="status"
-        className={status?.kind === 'error' ? 'text-sm text-destructive' : 'text-sm'}
-      >
-        {status?.text}
-      </p>
+      <UploadList entries={queue.entries} notice={queue.notice} />
       <ListToolbar
         search={search}
         searchLabel="Buscar por nome do arquivo"
@@ -206,22 +180,13 @@ export function MediaLibrary({
         aria-label="Imagens do site"
         className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4"
       >
-        {Array.from({ length: processing }, (_, index) => (
-          <li
-            key={`processando-${index}`}
-            aria-busy="true"
-            className="flex aspect-square items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground"
-          >
-            Processando…
-          </li>
-        ))}
         {items.map((item) => (
           <li key={item.id}>
             <MediaDetails item={item} timeZone={timeZone} />
           </li>
         ))}
       </ul>
-      {items.length === 0 && processing === 0 && (
+      {items.length === 0 && (
         <p className="text-sm text-muted-foreground">
           {search === '' ? 'Nenhuma imagem na biblioteca.' : 'Nenhuma imagem com esse nome.'}
         </p>
@@ -234,10 +199,4 @@ export function MediaLibrary({
       />
     </div>
   );
-}
-
-/** Motivo da recusa, do problem+json da rota (ou o status, se não vier). */
-async function refusal(response: Response): Promise<string> {
-  const body = (await response.json().catch(() => null)) as { title?: unknown } | null;
-  return typeof body?.title === 'string' ? body.title : `HTTP ${response.status}`;
 }
