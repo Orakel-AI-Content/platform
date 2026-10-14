@@ -2,13 +2,18 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
+import { ListPagination, ListToolbar } from '@/components/list-controls.tsx';
+import { useListState, type ListConfig } from '@/components/list-state.ts';
+import type { MediaPickerPage } from '@/components/media-picker';
+import { formatDateTime } from '@/components/site-labels.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-// Biblioteca de mídia do site (#52): envio pela rota de envio, "processando" até a mídia
-// aparecer no listMedia (a ingestão e as variantes rodam no backoffice-worker) e a grade
-// com as miniaturas de media.<domínio>.
+// Biblioteca de mídia do site (#52, #186): envio pela rota de envio, "processando" até a
+// mídia aparecer na página (a ingestão e as variantes rodam no backoffice-worker) e a grade
+// paginada no servidor, com busca por nome, nome e data de envio de cada imagem e as
+// miniaturas de media.<domínio>. Busca e página ficam na URL (`q`, `pagina`).
 
 /** Mídia na grade: a miniatura já resolvida para o endereço de mídia do site. */
 export type MediaItem = {
@@ -18,6 +23,10 @@ export type MediaItem = {
   /** Formatos preferidos, em `<source>`, antes do `src` de reserva. */
   sources: { type: string; url: string }[];
   src: string;
+  /** Nome original do arquivo enviado (#186); `null` sem envio registrado. */
+  originalName?: string | null;
+  /** Data do envio em ISO (#186); `null` sem envio registrado. */
+  uploadedAt?: string | null;
 };
 
 /**
@@ -47,43 +56,70 @@ type Status = { kind: 'info' | 'error'; text: string };
 /** Formatos que a rota aceita (a assinatura do arquivo é conferida no domínio). */
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/avif';
 
+/** Lista sem filtros nem ordenação: só a busca e a página da URL (`list-state`). */
+const MEDIA_LIST: ListConfig = { filters: [], sortable: [] };
+
+/** "<nome> · <data>", com os textos de reserva das mídias sem envio registrado (#186). */
+function caption(item: MediaItem, timeZone: string): string {
+  const name = item.originalName ?? `Sem nome (Mídia ${item.id})`;
+  const date = item.uploadedAt
+    ? formatDateTime(new Date(item.uploadedAt), timeZone)
+    : 'Data de envio não registrada';
+  return `${name} · ${date}`;
+}
+
 export function MediaLibrary({
   siteId,
+  timeZone,
   items: initialItems,
+  total: initialTotal,
+  page,
+  pageSize,
+  search,
   canWrite,
   refresh,
   pollMs = 2000,
   timeoutMs = 60_000,
 }: {
   siteId: string;
+  /** Fuso IANA do site: a data de envio aparece nele. */
+  timeZone: string;
+  /** A página atual, lida no servidor. */
   items: MediaItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  search: string;
   canWrite: boolean;
-  /** Relê a biblioteca; `null` se a leitura foi recusada. */
-  refresh: (siteId: string) => Promise<MediaItem[] | null>;
+  /** Relê a página atual (com a busca); `null` se a leitura foi recusada. */
+  refresh: (siteId: string, page: number, search: string) => Promise<MediaPickerPage | null>;
   pollMs?: number;
   timeoutMs?: number;
 }) {
+  const list = useListState(MEDIA_LIST);
   const [items, setItems] = useState(initialItems);
+  const [total, setTotal] = useState(initialTotal);
   const [processing, setProcessing] = useState(0);
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
-  const knownIds = useRef(new Set(initialItems.map((item) => item.id)));
+  const knownTotal = useRef(initialTotal);
   const deadline = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // Enquanto há envio processando: relê a lista; cada ID novo fecha um envio.
+  // Enquanto há envio processando: relê a página; o total que cresce fecha envios.
   useEffect(() => {
     if (processing === 0) return;
     let busy = false;
     const timer = setInterval(() => {
       if (busy) return;
       busy = true;
-      void refresh(siteId)
+      void refresh(siteId, page, search)
         .then((next) => {
           if (next !== null) {
-            const added = next.filter((item) => !knownIds.current.has(item.id)).length;
-            knownIds.current = new Set(next.map((item) => item.id));
-            setItems(next);
+            const added = Math.max(0, next.total - knownTotal.current);
+            knownTotal.current = next.total;
+            setItems(next.items);
+            setTotal(next.total);
             if (added > 0) {
               setProcessing((count) => Math.max(0, count - added));
               setStatus({
@@ -111,7 +147,7 @@ export function MediaLibrary({
         });
     }, pollMs);
     return () => clearInterval(timer);
-  }, [processing, refresh, siteId, pollMs]);
+  }, [processing, refresh, siteId, page, search, pollMs]);
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -167,6 +203,12 @@ export function MediaLibrary({
       >
         {status?.text}
       </p>
+      <ListToolbar
+        search={search}
+        searchLabel="Buscar por nome do arquivo"
+        onSearchChange={list.setSearch}
+        onClear={list.clearFilters}
+      />
       <ul
         aria-label="Imagens do site"
         className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4"
@@ -185,15 +227,23 @@ export function MediaLibrary({
             <figure className="space-y-1">
               <MediaThumbnail item={item} />
               <figcaption className="text-xs text-muted-foreground">
-                Mídia {item.id} · {item.width}×{item.height}
+                {caption(item, timeZone)}
               </figcaption>
             </figure>
           </li>
         ))}
       </ul>
       {items.length === 0 && processing === 0 && (
-        <p className="text-sm text-muted-foreground">Nenhuma imagem na biblioteca.</p>
+        <p className="text-sm text-muted-foreground">
+          {search === '' ? 'Nenhuma imagem na biblioteca.' : 'Nenhuma imagem com esse nome.'}
+        </p>
       )}
+      <ListPagination
+        total={total}
+        page={page}
+        pageCount={Math.ceil(total / pageSize)}
+        onPageChange={list.setPage}
+      />
     </div>
   );
 }

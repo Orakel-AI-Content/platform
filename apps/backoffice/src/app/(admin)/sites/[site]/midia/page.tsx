@@ -1,32 +1,57 @@
+import { parseListState } from '@/components/list-state.ts';
 import { MediaLibrary } from '@/components/media-library';
-import { listMedia } from '@/domain/content/media.ts';
+import { listMediaPage } from '@/domain/content/media.ts';
 import { noRead } from '@/components/forbidden-screen';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
-import { listMediaAction } from './actions.ts';
-import { mediaItems } from './items.ts';
+import { listMediaPageAction } from './actions.ts';
+import { MEDIA_PAGE_SIZE, mediaItems } from './items.ts';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Mídia' };
 
-/** Biblioteca de mídia do site; enviar imagem só com content.write (a rota confere de novo). */
-export default async function MediaPage({ params }: { params: Promise<{ site: string }> }) {
+type SearchParams = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+/**
+ * Biblioteca de mídia do site, paginada no servidor com busca por nome (#186): `q` e `pagina`
+ * vêm da URL. Enviar imagem só com content.write (a rota confere de novo).
+ */
+export default async function MediaPage({
+  params,
+  searchParams,
+}: { params: Promise<{ site: string }> } & SearchParams) {
   const { site: siteId } = await params;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === 'string') query.set(key, value);
+  }
+  const { search, page } = parseListState(query, { filters: [], sortable: [] });
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
-  const media = await listMedia(db, actor, site.id);
+  const media = await listMediaPage(db, actor, site.id, {
+    page,
+    pageSize: MEDIA_PAGE_SIZE,
+    search,
+  });
   if (!media.ok) return noRead;
 
   return (
     <section aria-labelledby="media-title" className="list-width space-y-4">
       <PageHeader id="media-title" trail={siteTrail(site, 'Mídia')} title="Mídia" />
       <MediaLibrary
+        // Busca ou página nova: a biblioteca recomeça com a página lida no servidor.
+        key={`${search}|${page}`}
         siteId={site.id}
-        items={mediaItems(site.domain, media.value)}
+        timeZone={site.timeZone}
+        items={mediaItems(site.domain, media.value.items)}
+        total={media.value.total}
+        page={page}
+        pageSize={MEDIA_PAGE_SIZE}
+        search={search}
         canWrite={canWrite}
-        refresh={listMediaAction}
+        refresh={listMediaPageAction}
       />
     </section>
   );

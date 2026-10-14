@@ -1,9 +1,9 @@
 import type { Result } from '@orakel/content-model';
 import { MediaSchema, validateMedia, type Media } from '@orakel/content-model/v1';
-import { and, asc, count, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, inArray, type SQL } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { media, mediaVariants } from '../../db/schema/index.ts';
+import { media, mediaUploads, mediaVariants } from '../../db/schema/index.ts';
 import { allocateId } from '../../db/site-ids.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
@@ -129,16 +129,24 @@ export const MAX_MEDIA_PAGE_SIZE = 100;
 const isCount = (value: number, max = Number.MAX_SAFE_INTEGER) =>
   Number.isInteger(value) && value >= 1 && value <= max;
 
+/** Mídia da biblioteca com o envio que a gerou (#186); `null` sem envio registrado. */
+export type LibraryMedia = Media & { originalName: string | null; uploadedAt: Date | null };
+
+/** `%`, `_` e `\\` literais no `ilike` (a busca é por parte do nome, não um padrão). */
+const likeLiteral = (text: string) => text.replace(/[\\%_]/g, (char) => `\\${char}`);
+
 /**
  * Uma página da biblioteca do site (#180): no máximo `pageSize` mídias, em ordem de ID (estável
  * entre páginas), e o total do site. Para a grade do editor, que não carrega tudo de uma vez.
+ * Cada mídia traz o nome original e a data do envio que a gerou (#186); `search` filtra por
+ * parte do nome, sem diferenciar maiúsculas, e mídia sem envio registrado fica de fora.
  */
 export async function listMediaPage(
   db: Executor,
   actor: Actor,
   siteId: string,
-  { page, pageSize }: { page: number; pageSize: number },
-): Promise<Result<{ items: Media[]; total: number }>> {
+  { page, pageSize, search = '' }: { page: number; pageSize: number; search?: string },
+): Promise<Result<{ items: LibraryMedia[]; total: number }>> {
   const allowed = requireRole(actor, 'site.read');
   if (!allowed.ok) return allowed;
   if (!isCount(page) || !isCount(pageSize, MAX_MEDIA_PAGE_SIZE)) {
@@ -153,11 +161,29 @@ export async function listMediaPage(
       ],
     };
   }
-  const [counted] = await db.select({ total: count() }).from(media).where(eq(media.siteId, siteId));
-  const rows = await db
-    .select({ id: media.id, width: media.width, height: media.height })
+  const text = search.trim();
+  const where: SQL | undefined = and(
+    eq(media.siteId, siteId),
+    text === '' ? undefined : ilike(mediaUploads.originalName, `%${likeLiteral(text)}%`),
+  );
+  // O envio só aponta para a mídia quando fica `pronta` (#185): um envio por mídia.
+  const joined = and(eq(mediaUploads.siteId, media.siteId), eq(mediaUploads.mediaId, media.id));
+  const [counted] = await db
+    .select({ total: count() })
     .from(media)
-    .where(eq(media.siteId, siteId))
+    .leftJoin(mediaUploads, joined)
+    .where(where);
+  const rows = await db
+    .select({
+      id: media.id,
+      width: media.width,
+      height: media.height,
+      originalName: mediaUploads.originalName,
+      uploadedAt: mediaUploads.uploadedAt,
+    })
+    .from(media)
+    .leftJoin(mediaUploads, joined)
+    .where(where)
     .orderBy(asc(media.id))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
@@ -166,7 +192,15 @@ export async function listMediaPage(
     siteId,
     rows.map((row) => row.id),
   );
-  return { ok: true, value: { items: withVariants(rows, variants), total: counted?.total ?? 0 } };
+  const items = withVariants(
+    rows.map(({ id, width, height }) => ({ id, width, height })),
+    variants,
+  ).map((item, index) => ({
+    ...item,
+    originalName: rows[index]?.originalName ?? null,
+    uploadedAt: rows[index]?.uploadedAt ?? null,
+  }));
+  return { ok: true, value: { items, total: counted?.total ?? 0 } };
 }
 
 /**

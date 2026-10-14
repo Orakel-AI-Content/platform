@@ -49,6 +49,7 @@ describe('listMediaPageAction', () => {
     expect(mocks.listMediaPage).toHaveBeenCalledWith({}, revisor, 'exemplo-a', {
       page: 2,
       pageSize: MEDIA_PAGE_SIZE,
+      search: '',
     });
     expect(result).toMatchObject({ total: 31, page: 2, pageSize: MEDIA_PAGE_SIZE });
     expect(result?.items.map((item) => item.id)).toEqual([7]);
@@ -61,6 +62,28 @@ describe('listMediaPageAction', () => {
 
     mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
     expect(await listMediaPageAction('exemplo-a', 1)).toBeNull();
+  });
+});
+
+describe('listMediaPageAction com busca e nome (#186)', () => {
+  it('repassa a busca e devolve nome e data do envio (a data em ISO)', async () => {
+    const at = new Date('2026-10-01T15:30:00Z');
+    mocks.listMediaPage.mockResolvedValue({
+      ok: true,
+      value: { items: [{ ...photo, originalName: 'Praia.jpg', uploadedAt: at }], total: 1 },
+    });
+
+    const result = await listMediaPageAction('exemplo-a', 1, 'praia');
+
+    expect(mocks.listMediaPage).toHaveBeenCalledWith({}, revisor, 'exemplo-a', {
+      page: 1,
+      pageSize: MEDIA_PAGE_SIZE,
+      search: 'praia',
+    });
+    expect(result?.items[0]).toMatchObject({
+      originalName: 'Praia.jpg',
+      uploadedAt: '2026-10-01T15:30:00.000Z',
+    });
   });
 });
 

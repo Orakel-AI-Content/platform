@@ -6,7 +6,8 @@ import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
 
 import { getDb } from '../../src/db/client.ts';
-import { media } from '../../src/db/schema/index.ts';
+import { media, mediaUploads, mediaVariants } from '../../src/db/schema/index.ts';
+import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { buildNow } from '../../src/domain/builds/schedule.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
@@ -14,9 +15,10 @@ import { listMedia } from '../../src/domain/content/media.ts';
 import { MAX_ORIGINAL_WIDTH } from '../../src/domain/media/ingest.ts';
 import { ORIGINALS_BUCKET } from '../../src/domain/media/store.ts';
 import { profileVariants } from '../../src/domain/media/variants.ts';
-import { currentConfig } from '../../src/domain/sites/sites.ts';
+import { createSite, currentConfig } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { createS3Client, s3ObjectStore } from '../../src/lib/s3.ts';
+import { removeSites } from './cleanup.ts';
 
 // Mídia de ponta a ponta no ambiente local (#53, workspace#18): a foto de 4.000 px com GPS
 // enviada pela tela vira original ≤ 2.560 px e variantes sem EXIF em media.<site>.localhost,
@@ -66,12 +68,10 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
   await page.goto(`/sites/${SITE}/midia`);
   await page.getByLabel(/^Imagem \(JPEG/).setInputFiles(FIXTURE.pathname);
   await page.getByRole('button', { name: 'Enviar imagem' }).click();
-  await expect(page.getByRole('main').getByRole('status')).toHaveText(
-    'Imagem pronta na biblioteca.',
-    {
-      timeout: 60_000,
-    },
-  );
+  // A paginação também tem uma região de status (#186): só a do envio.
+  await expect(
+    page.getByRole('main').getByRole('status').filter({ hasText: 'Imagem pronta na biblioteca.' }),
+  ).toBeVisible({ timeout: 60_000 });
 
   const { db } = getDb();
   const listed = await listMedia(db, SYSTEM_ACTOR, SITE);
@@ -169,4 +169,91 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
       src: expect.stringMatching(new RegExp(`^https://media\\.${SITE}\\.localhost/.*${hash}`)),
       loaded: true,
     });
+});
+
+const LIBRARY_SITE = `e2e-biblioteca-${Date.now()}`;
+const LIBRARY_COUNT = 2000;
+
+test.describe('biblioteca com 2.000 imagens (#186)', () => {
+  test.beforeAll(async () => {
+    const config = (await readFixture('exemplo-b')).find((line) => line.type === 'config');
+    if (config?.type !== 'config') throw new Error('fixture sem config');
+    const { db } = getDb();
+    const site = await db.transaction((tx) =>
+      createSite(tx, SYSTEM_ACTOR, {
+        ...config.data,
+        siteId: LIBRARY_SITE,
+        name: `Site ${LIBRARY_SITE}`,
+        domains: [`${LIBRARY_SITE}.example.com`],
+      }),
+    );
+    if (!site.ok) throw new Error(JSON.stringify(site.issues));
+    const ids = Array.from({ length: LIBRARY_COUNT }, (_, index) => index + 1);
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(media)
+        .values(ids.map((id) => ({ siteId: LIBRARY_SITE, id, width: 800, height: 600 })));
+      await tx.insert(mediaVariants).values(
+        ids.map((id) => ({
+          siteId: LIBRARY_SITE,
+          mediaId: id,
+          width: 400,
+          format: 'webp',
+          path: `${LIBRARY_SITE}/h${id}-400.webp`,
+        })),
+      );
+      // A cada 100, "Promoção": a busca acha 20.
+      await tx.insert(mediaUploads).values(
+        ids.map((id) => ({
+          uploadKey: `uploads/${LIBRARY_SITE}/${id}.jpg`,
+          siteId: LIBRARY_SITE,
+          originalName: id % 100 === 0 ? `Promoção ${id}.jpg` : `foto-${id}.jpg`,
+          status: 'pronta' as const,
+          mediaId: id,
+        })),
+      );
+    });
+  });
+
+  test.afterAll(async () => {
+    await removeSites([LIBRARY_SITE]);
+  });
+
+  test('abre e busca por nome em menos de 2 s, só com teclado, com a busca na URL', async ({
+    page,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    const count = page.getByRole('navigation', { name: 'Paginação' }).getByRole('status');
+
+    let started = Date.now();
+    await page.goto(`/sites/${LIBRARY_SITE}/midia`);
+    await expect(count).toHaveText('2.000 resultados');
+    expect(Date.now() - started).toBeLessThan(2000);
+    await expect(page.getByText('foto-1.jpg ·', { exact: false })).toBeVisible();
+
+    const searchBox = page.getByRole('searchbox', { name: 'Buscar por nome do arquivo' });
+    for (let step = 0; step < 60; step += 1) {
+      if (await searchBox.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(searchBox).toBeFocused();
+    started = Date.now();
+    // Maiúsculas ASCII: o ilike não depende da collation do banco para elas.
+    await page.keyboard.type('PROMO');
+    await expect(count).toHaveText('20 resultados');
+    expect(Date.now() - started).toBeLessThan(2000);
+    await expect(page).toHaveURL(/[?&]q=PROMO/);
+
+    // A paginação também só com teclado, sem repetir imagem.
+    await page.goto(`/sites/${LIBRARY_SITE}/midia`);
+    const next = page.getByRole('button', { name: 'Próxima' });
+    for (let step = 0; step < 80; step += 1) {
+      if (await next.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/[?&]pagina=2/);
+    await expect(page.getByText('foto-25.jpg ·', { exact: false })).toBeVisible();
+    await expect(page.getByText('foto-24.jpg ·', { exact: false })).toHaveCount(0);
+  });
 });
