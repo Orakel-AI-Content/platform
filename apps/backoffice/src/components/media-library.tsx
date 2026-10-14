@@ -27,6 +27,8 @@ export type MediaItem = {
   originalName?: string | null;
   /** Data do envio em ISO (#186); `null` sem envio registrado. */
   uploadedAt?: string | null;
+  /** Formatos distintos das variantes, em ordem alfabética (#187). */
+  formats?: string[];
 };
 
 /**
