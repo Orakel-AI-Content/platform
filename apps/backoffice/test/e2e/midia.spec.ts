@@ -66,12 +66,15 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
   const before = await maxMediaId();
   await loginAs(page, 'editor@orakel.local');
   await page.goto(`/sites/${SITE}/midia`);
-  await page.getByLabel(/^Imagem \(JPEG/).setInputFiles(FIXTURE.pathname);
-  await page.getByRole('button', { name: 'Enviar imagem' }).click();
-  // A paginação também tem uma região de status (#186): só a do envio.
+  await page.getByLabel(/^Imagens \(JPEG/).setInputFiles(FIXTURE.pathname);
+  await page.getByRole('button', { name: 'Enviar imagens' }).click();
+  // Cada arquivo tem a sua linha na fila de envio (#188).
   await expect(
-    page.getByRole('main').getByRole('status').filter({ hasText: 'Imagem pronta na biblioteca.' }),
-  ).toBeVisible({ timeout: 60_000 });
+    page
+      .getByRole('list', { name: 'Envios' })
+      .getByRole('listitem')
+      .filter({ hasText: 'foto-gps.jpg' }),
+  ).toContainText('pronta', { timeout: 60_000 });
 
   const { db } = getDb();
   const listed = await listMedia(db, SYSTEM_ACTOR, SITE);
@@ -256,4 +259,36 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
     await expect(page.getByText('foto-25.jpg ·', { exact: false })).toBeVisible();
     await expect(page.getByText('foto-24.jpg ·', { exact: false })).toHaveCount(0);
   });
+});
+
+test('envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com o motivo (#188)', async ({
+  page,
+}) => {
+  const small = await sharp({
+    create: { width: 640, height: 480, channels: 3, background: '#2a9d8f' },
+  })
+    .jpeg()
+    .toBuffer();
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto(`/sites/${SITE}/midia`);
+
+  // Só com teclado: o campo de arquivos e o botão, sem arrastar.
+  const input = page.getByLabel(/^Imagens \(JPEG/);
+  await input.setInputFiles([
+    { name: 'foto-gps.jpg', mimeType: 'image/jpeg', buffer: await readFile(FIXTURE) },
+    { name: 'paisagem.jpg', mimeType: 'image/jpeg', buffer: small },
+    { name: 'notas.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('não é imagem') },
+  ]);
+  await input.focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Enviar imagens' })).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  const row = (name: string) =>
+    page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
+  await expect(row('notas.jpg')).toContainText(
+    'recusada: O arquivo não é uma imagem JPEG, PNG, WebP ou AVIF',
+  );
+  await expect(row('foto-gps.jpg')).toContainText('pronta', { timeout: 60_000 });
+  await expect(row('paisagem.jpg')).toContainText('pronta', { timeout: 60_000 });
 });
