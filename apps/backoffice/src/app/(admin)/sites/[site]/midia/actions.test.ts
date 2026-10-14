@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { listMediaPageAction, mediaByIdsAction } from './actions.ts';
+import { listMediaPageAction, mediaByIdsAction, uploadStatusAction } from './actions.ts';
 import { MEDIA_PAGE_SIZE } from './items.ts';
 
 // Actions da grade de mídia (#180): só traduzem. Sessão ou recusa do domínio → null; sucesso →
 // itens com a miniatura no domínio principal do site. Regras e permissão estão no contrato.
 
 const mocks = vi.hoisted(() => ({
+  getUploads: vi.fn(),
   currentActor: vi.fn(),
   listMediaPage: vi.fn(),
   getMediaByIds: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('@/domain/content/media.ts', () => ({
   getMediaByIds: mocks.getMediaByIds,
 }));
 vi.mock('@/domain/sites/sites.ts', () => ({ currentConfig: mocks.currentConfig }));
+vi.mock('@/domain/media/upload.ts', () => ({ getUploads: mocks.getUploads }));
 
 const revisor = { email: 'revisor@orakel.local', roles: ['revisor'] };
 const forbidden = {
@@ -103,5 +105,27 @@ describe('mediaByIdsAction', () => {
 
     mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
     expect(await mediaByIdsAction('exemplo-a', [7])).toBeNull();
+  });
+});
+
+describe('uploadStatusAction (#188)', () => {
+  it('devolve o estado dos envios pelas chaves, do site pedido', async () => {
+    const states = [
+      { uploadKey: 'uploads/exemplo-a/a.jpg', status: 'pronta', reason: null, mediaId: 7 },
+    ];
+    mocks.getUploads.mockResolvedValue({ ok: true, value: states });
+
+    expect(await uploadStatusAction('exemplo-a', ['uploads/exemplo-a/a.jpg'])).toEqual(states);
+    expect(mocks.getUploads).toHaveBeenCalledWith({}, revisor, 'exemplo-a', [
+      'uploads/exemplo-a/a.jpg',
+    ]);
+  });
+
+  it('sem sessão ou sem site.read, null', async () => {
+    mocks.getUploads.mockResolvedValue(forbidden);
+    expect(await uploadStatusAction('exemplo-a', ['x'])).toBeNull();
+
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+    expect(await uploadStatusAction('exemplo-a', ['x'])).toBeNull();
   });
 });

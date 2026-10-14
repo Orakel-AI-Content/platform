@@ -4,6 +4,7 @@ import { currentActor } from '@/auth/request-actor.ts';
 import type { MediaItem } from '@/components/media-library';
 import { getDb } from '@/db/client.ts';
 import { getMediaByIds, listMediaPage } from '@/domain/content/media.ts';
+import { getUploads, type UploadState } from '@/domain/media/upload.ts';
 import { currentConfig } from '@/domain/sites/sites.ts';
 
 import { MEDIA_PAGE_SIZE, mediaItems } from './items.ts';
@@ -53,4 +54,18 @@ export async function mediaByIdsAction(siteId: string, ids: number[]): Promise<M
   const config = await currentConfig(db, siteId);
   if (config === undefined) return null;
   return mediaItems(config.domains[0] ?? '', result.value);
+}
+
+/**
+ * Estado dos envios pelas chaves devolvidas pela rota (#188), para a fila de envio acompanhar
+ * cada arquivo até pronto ou recusado. `null` sem sessão, permissão ou com chaves demais.
+ */
+export async function uploadStatusAction(
+  siteId: string,
+  keys: string[],
+): Promise<UploadState[] | null> {
+  const actor = await currentActor();
+  if (!actor.ok) return null;
+  const result = await getUploads(getDb().db, actor.value, siteId, keys);
+  return result.ok ? result.value : null;
 }
