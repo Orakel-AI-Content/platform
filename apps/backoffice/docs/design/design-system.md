@@ -28,6 +28,14 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   Escolher chama `onSelect(id)` e fecha; Esc fecha sem escolher; no `close` o foco volta ao
   botão de origem por `focus()`, sem depender do navegador. A miniatura é a `MediaThumbnail`
   (`media-library.tsx`), a mesma da biblioteca.
+- **Detalhes da imagem:** `MediaDetails` (`src/components/media-details.tsx`): na biblioteca,
+  cada imagem é um botão (`aria-haspopup="dialog"`) com a miniatura e a legenda "<nome> ·
+  <data>", que abre um `<dialog>` nativo com `showModal`, como o `MediaPicker`: nome no `h2`,
+  miniatura e um `<dl>` com dimensões, formatos disponíveis, identificador e data de envio.
+  "Copiar identificador" usa `navigator.clipboard.writeText` e confirma em `role="status"`
+  ("Identificador copiado."); a falha (sem contexto seguro, permissão negada) mostra o
+  identificador na mesma região, em `text-destructive`. Esc ou "Fechar" limpam a mensagem e
+  devolvem o foco à imagem por `focus()` no `close`.
 - **Botão de ícone:** `IconButton` (`src/components/ui/icon-button.tsx`), próprio (o tooltip
   do shadcn usaria Radix), para ações repetidas e compactas, como os controles de cada bloco do
   editor. O nome vem de `label` (`aria-label`, com a posição: "Mover bloco 3 para cima"); a dica

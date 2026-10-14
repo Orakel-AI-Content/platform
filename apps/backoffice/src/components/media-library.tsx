@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { ListPagination, ListToolbar } from '@/components/list-controls.tsx';
+import { MediaDetails } from '@/components/media-details';
 import { useListState, type ListConfig } from '@/components/list-state.ts';
 import type { MediaPickerPage } from '@/components/media-picker';
-import { formatDateTime } from '@/components/site-labels.ts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +27,8 @@ export type MediaItem = {
   originalName?: string | null;
   /** Data do envio em ISO (#186); `null` sem envio registrado. */
   uploadedAt?: string | null;
+  /** Formatos distintos das variantes, em ordem alfabética (#187). */
+  formats?: string[];
 };
 
 /**
@@ -58,15 +60,6 @@ const ACCEPT = 'image/jpeg,image/png,image/webp,image/avif';
 
 /** Lista sem filtros nem ordenação: só a busca e a página da URL (`list-state`). */
 const MEDIA_LIST: ListConfig = { filters: [], sortable: [] };
-
-/** "<nome> · <data>", com os textos de reserva das mídias sem envio registrado (#186). */
-function caption(item: MediaItem, timeZone: string): string {
-  const name = item.originalName ?? `Sem nome (Mídia ${item.id})`;
-  const date = item.uploadedAt
-    ? formatDateTime(new Date(item.uploadedAt), timeZone)
-    : 'Data de envio não registrada';
-  return `${name} · ${date}`;
-}
 
 export function MediaLibrary({
   siteId,
@@ -224,12 +217,7 @@ export function MediaLibrary({
         ))}
         {items.map((item) => (
           <li key={item.id}>
-            <figure className="space-y-1">
-              <MediaThumbnail item={item} />
-              <figcaption className="text-xs text-muted-foreground">
-                {caption(item, timeZone)}
-              </figcaption>
-            </figure>
+            <MediaDetails item={item} timeZone={timeZone} />
           </li>
         ))}
       </ul>

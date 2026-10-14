@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { mediaItems } from './items.ts';
 
-// Miniatura da biblioteca (#52): menor largura, AVIF antes do WebP, em media.<domínio>.
+// Miniatura da biblioteca (#52): menor largura, AVIF antes do WebP, em media.<domínio>, e os
+// formatos disponíveis (#187).
 
 describe('miniaturas da biblioteca de mídia', () => {
   it('usa a menor largura, com AVIF em <source> e WebP de reserva, em media.<domínio>', () => {
@@ -26,6 +27,8 @@ describe('miniaturas da biblioteca de mídia', () => {
       height: 900,
       sources: [{ type: 'image/avif', url: 'https://media.horta.test/horta/abc-320.avif' }],
       src: 'https://media.horta.test/horta/abc-320.webp',
+      // Formatos distintos das variantes, para os detalhes (#187).
+      formats: ['avif', 'webp'],
     });
   });
 });
