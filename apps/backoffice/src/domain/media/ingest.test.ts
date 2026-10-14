@@ -99,4 +99,29 @@ describe('ingestUpload', () => {
       status: 'missing',
     });
   });
+
+  it('assinatura de JPEG com o corpo corrompido é recusada e o envio cru sai (#185)', async () => {
+    const store = memoryStore();
+    const raw = Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46, 0, 1]),
+      Buffer.alloc(200, 0x2a),
+    ]);
+    await store.put(ORIGINALS_BUCKET, uploadKey, raw, raw.byteLength, 'image/jpeg');
+
+    expect(await ingestUpload(store, { siteId: 'exemplo-a', uploadKey })).toEqual({
+      status: 'rejected',
+      reason: 'A imagem está corrompida ou não pôde ser lida',
+    });
+    expect(store.objects.size).toBe(0);
+  });
+
+  it('o que não é imagem aceita também é recusado, sem lançar', async () => {
+    const store = memoryStore();
+    const gif = Buffer.from('GIF89a', 'ascii');
+    await store.put(ORIGINALS_BUCKET, uploadKey, gif, gif.byteLength, 'image/gif');
+
+    expect(await ingestUpload(store, { siteId: 'exemplo-a', uploadKey })).toMatchObject({
+      status: 'rejected',
+    });
+  });
 });
