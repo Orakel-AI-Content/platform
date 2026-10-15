@@ -17,11 +17,20 @@ pnpm install               # instala e ativa os git hooks (lefthook)
 cp .env.example .env.local # valores locais; nunca commite .env.local
 pnpm local:images          # constrói as imagens (backoffice, site-builder, edge-local)
 pnpm local:up              # sobe o compose, cria os buckets e roda as migrações
-pnpm local:seed            # usuários de teste e os sites de exemplo (<site>.localhost)
+pnpm local:seed            # usuários de teste, sites de exemplo e o Horta em Casa (<site>.localhost)
 pnpm local:trust           # CA do Caddy no Keychain do sistema (macOS; pede a senha)
 pnpm local:check           # confere serviços, hostnames, buckets, redes e o proxy do socket
 pnpm local:publish exemplo-a   # render + publish no edge-local → https://exemplo-a.localhost
+pnpm local:publish horta-em-casa   # o blog completo de demonstração
 ```
+
+O seed cria, se ainda não existirem: os usuários de teste, `exemplo-a` e `exemplo-b` (das
+fixtures do `content-model`; os E2E dependem deles) e cada site completo de
+`infra/local/seeds/<site>/` — hoje o **Horta em Casa** (`horta-em-casa`), com 10 artigos,
+autores, taxonomias, menus e ilustrações de verdade em `imagens/`. As imagens passam pela
+mesma normalização e pelas mesmas variantes de um envio e vão para `media-<site>`; por isso o
+site precisa estar em `LOCAL_SITES` e `LOCAL_MEDIA_HOSTS`. Site que já existe é pulado: para
+recriar, remova-o do banco (ou `pnpm local:reset`) e rode o seed de novo.
 
 Já tinha um `.env.local`? Compare com o `.env.example` e acrescente as variáveis novas
 (backoffice, Access local e o bloco "Ambiente local"); o compose avisa qual falta. Apague ou
@@ -63,7 +72,7 @@ o `admin.orakel.localhost` apontar para o `next dev`.
 | `pnpm local:publish <site>`                                 | `render` (rede export) + `publish` (rede publish) no edge   |
 | `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere no ClickHouse         |
 | `pnpm local:trust`                                          | Instala a CA atual do Caddy no Keychain (macOS)             |
-| `pnpm local:seed`                                           | Roda `db:seed`                                              |
+| `pnpm local:seed`                                           | Roda `db:seed` (usuários, exemplos e `infra/local/seeds/`)  |
 | `pnpm local:down`                                           | Para os containers (mantém os dados)                        |
 | `pnpm local:reset`                                          | Para e **apaga os volumes**                                 |
 | `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit) |

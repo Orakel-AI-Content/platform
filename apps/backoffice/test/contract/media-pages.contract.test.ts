@@ -250,3 +250,45 @@ describe('permissão', () => {
     });
   });
 });
+
+describe('importação com a origem da mídia (seed local)', () => {
+  it('guarda o original e registra o envio pronto: a biblioteca mostra nome e data', async () => {
+    await resetDatabase(db);
+    const [mediaId] = fixtureMediaIds(SITE);
+    if (mediaId === undefined) throw new Error('fixture sem mídia');
+    const uploadedAt = new Date('2026-08-02T11:03:00.000Z');
+    const origins = new Map([
+      [
+        mediaId,
+        { originalKey: `${SITE}/${'ab'.repeat(32)}.jpg`, originalName: 'Horta 01.jpg', uploadedAt },
+      ],
+    ]);
+
+    const imported = await importSnapshot(db, SYSTEM_ACTOR, fixtures[SITE] ?? [], {
+      mediaOrigins: origins,
+    });
+
+    expect(imported.ok).toBe(true);
+    const stored = await db.select().from(media);
+    expect(stored.find((row) => row.id === mediaId)?.originalKey).toBe(
+      `${SITE}/${'ab'.repeat(32)}.jpg`,
+    );
+    const uploads = await db.select().from(mediaUploads);
+    expect(uploads).toEqual([
+      expect.objectContaining({
+        uploadKey: `import/${SITE}/${mediaId}`,
+        siteId: SITE,
+        status: 'pronta',
+        mediaId,
+        originalName: 'Horta 01.jpg',
+        uploadedAt,
+      }),
+    ]);
+    const page = await listMediaPage(db, revisor, SITE, { page: 1, pageSize: 10 });
+    if (!page.ok) throw new Error(JSON.stringify(page.issues));
+    expect(page.value.items.find((item) => item.id === mediaId)).toMatchObject({
+      originalName: 'Horta 01.jpg',
+      uploadedAt,
+    });
+  });
+});
