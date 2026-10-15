@@ -26,7 +26,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: cp .env.example .env.local
       - run: pnpm local:up
-      - run: pnpm local:seed
       - name: Navegador do Playwright
         if: hashFiles('apps/blog/package.json') != ''
         run: pnpm --filter @orakel/blog exec playwright install --with-deps chromium

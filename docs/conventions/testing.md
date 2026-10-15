@@ -43,4 +43,4 @@ export default mergeConfig(baseConfig, withCoverageThreshold(90)); // só nos pa
 - Tudo: `pnpm test`
 - Uma unidade: `pnpm turbo run test --filter=@orakel/<nome>`
 - Um arquivo (na pasta da unidade): `pnpm vitest run src/<arquivo>.test.ts`
-- E2E local: `pnpm local:up && pnpm local:seed && pnpm local:e2e`
+- E2E local: `pnpm local:up && pnpm local:e2e` (o `local:up` já roda o seed)

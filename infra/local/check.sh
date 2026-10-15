@@ -75,7 +75,7 @@ fi
 
 echo "Armazenamento e analytics"
 buckets=$(compose exec -T s3 sh -c 'echo s3.bucket.list | weed shell -master=localhost:9333 -filer=localhost:8888' 2>/dev/null)
-for bucket in media-originals build-cache backups brasil $(env_or LOCAL_SITES exemplo-a,exemplo-b,horta-em-casa | tr ',' ' ' | sed 's/[^ ][^ ]*/media-&/g'); do
+for bucket in media-originals build-cache backups brasil $(echo "$(env_or LOCAL_SITES exemplo-a,exemplo-b),horta-em-casa" | tr ',' ' ' | sed 's/[^ ][^ ]*/media-&/g'); do
   printf '%s' "$buckets" | grep -qw "$bucket" && ok "bucket $bucket" || ko "bucket $bucket" "não existe"
 done
 table=$(clickhouse_query 'EXISTS TABLE analytics.events' 2>/dev/null)

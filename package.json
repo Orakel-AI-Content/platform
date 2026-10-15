@@ -22,7 +22,7 @@
     "test": "turbo run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "local:up": "infra/local/compose.sh up --detach --wait && turbo run db:migrate",
+    "local:up": "infra/local/compose.sh up --detach --wait && turbo run db:migrate && turbo run db:seed",
     "local:seed": "turbo run db:seed",
     "local:down": "infra/local/compose.sh down",
     "local:reset": "infra/local/compose.sh down --volumes --remove-orphans",
