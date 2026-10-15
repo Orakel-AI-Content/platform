@@ -36,6 +36,24 @@ export async function normalizeImage(
   return { data, format, width: info.width, height: info.height };
 }
 
+/** Grava o original normalizado em `media-originals/<site>/<sha256>.<ext>`; devolve a chave. */
+export async function storeOriginal(
+  store: ObjectStore,
+  siteId: string,
+  image: NormalizedImage,
+): Promise<string> {
+  const hash = createHash('sha256').update(image.data).digest('hex');
+  const key = `${siteId}/${hash}.${EXTENSIONS[image.format]}`;
+  await store.put(
+    ORIGINALS_BUCKET,
+    key,
+    image.data,
+    image.data.byteLength,
+    `image/${image.format}`,
+  );
+  return key;
+}
+
 export type IngestResult =
   | { status: 'stored'; key: string; width: number; height: number }
   | { status: 'missing' }
@@ -69,9 +87,7 @@ export async function ingestUpload(
     await store.delete(ORIGINALS_BUCKET, payload.uploadKey);
     return { status: 'rejected', reason: UNREADABLE_REASON };
   }
-  const hash = createHash('sha256').update(image.data).digest('hex');
-  const key = `${payload.siteId}/${hash}.${EXTENSIONS[format]}`;
-  await store.put(ORIGINALS_BUCKET, key, image.data, image.data.byteLength, `image/${format}`);
+  const key = await storeOriginal(store, payload.siteId, image);
   await store.delete(ORIGINALS_BUCKET, payload.uploadKey);
   return { status: 'stored', key, width: image.width, height: image.height };
 }

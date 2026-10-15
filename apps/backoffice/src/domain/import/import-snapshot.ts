@@ -9,6 +9,7 @@ import { createMedia } from '../content/media.ts';
 import { createMenu } from '../content/menus.ts';
 import { createRedirect } from '../content/redirects.ts';
 import { createTaxonomy } from '../content/taxonomies.ts';
+import { recordImportedUpload } from '../media/upload.ts';
 import { createSite } from '../sites/sites.ts';
 
 /** Interrompe a transação com os problemas de uma etapa (vira `Result` fora dela). */
@@ -21,14 +22,19 @@ class ImportAborted extends Error {
   }
 }
 
+/** De onde veio uma mídia importada: o original guardado e o envio para a biblioteca. */
+export type MediaOrigin = { originalKey: string; originalName: string; uploadedAt: Date };
+
 /**
- * Importa um snapshot inteiro (fixtures dos sites de exemplo) pelos módulos de domínio,
- * preservando os IDs, numa única transação. Os conteúdos entram publicados.
+ * Importa um snapshot inteiro (fixtures e seeds dos sites locais) pelos módulos de domínio,
+ * preservando os IDs, numa única transação. Os conteúdos entram publicados. Com
+ * `mediaOrigins`, a mídia guarda o original (reprocessamento) e o envio fica registrado.
  */
 export async function importSnapshot(
   db: Db,
   actor: Actor,
   lines: readonly SnapshotLine[],
+  options: { mediaOrigins?: ReadonlyMap<number, MediaOrigin> } = {},
 ): Promise<Result<{ siteId: string }>> {
   const validated = validateSnapshot(lines);
   if (!validated.ok) return validated;
@@ -39,11 +45,18 @@ export async function importSnapshot(
     await db.transaction(async (tx) => {
       const steps: (() => Promise<Result<unknown>>)[] = [
         () => createSite(tx, actor, snapshot.config),
-        ...snapshot.media.map(
-          ({ id, ...data }) =>
-            () =>
-              createMedia(tx, actor, siteId, data, { id }),
-        ),
+        ...snapshot.media.map(({ id, ...data }) => async () => {
+          const origin = options.mediaOrigins?.get(id);
+          const created = await createMedia(tx, actor, siteId, data, {
+            id,
+            originalKey: origin?.originalKey,
+          });
+          if (created.ok && origin !== undefined) {
+            const { originalName, uploadedAt } = origin;
+            await recordImportedUpload(tx, { siteId, mediaId: id, originalName, uploadedAt });
+          }
+          return created;
+        }),
         ...snapshot.authors.map(
           ({ id, ...data }) =>
             () =>

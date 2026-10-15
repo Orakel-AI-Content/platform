@@ -183,6 +183,32 @@ export async function closeUpload(
     );
 }
 
+/** Envio já concluído que chega por importação (seed local): nome e data na biblioteca. */
+export type ImportedUpload = {
+  siteId: string;
+  mediaId: number;
+  originalName: string;
+  uploadedAt: Date;
+};
+
+/**
+ * Registra como `pronta` o envio de uma mídia importada, com a chave `import/<site>/<id>`
+ * (não há arquivo cru). Repetir não duplica.
+ */
+export async function recordImportedUpload(db: Executor, upload: ImportedUpload): Promise<void> {
+  await db
+    .insert(mediaUploads)
+    .values({
+      uploadKey: `import/${upload.siteId}/${upload.mediaId}`,
+      siteId: upload.siteId,
+      originalName: upload.originalName,
+      status: 'pronta',
+      mediaId: upload.mediaId,
+      uploadedAt: upload.uploadedAt,
+    })
+    .onConflictDoNothing();
+}
+
 /** Maior lista de chaves aceita numa leitura de envios. */
 export const MAX_UPLOAD_KEYS = 100;
 
