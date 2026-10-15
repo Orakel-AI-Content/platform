@@ -40,7 +40,7 @@ services:
     restart: 'no'
     entrypoint: ['sh', '/init.sh']
     environment:
-      LOCAL_SITES: ${LOCAL_SITES:-exemplo-a,exemplo-b}
+      LOCAL_SITES: ${LOCAL_SITES:-exemplo-a,exemplo-b,horta-em-casa}
     volumes:
       - ../local/s3/init.sh:/init.sh:ro
     networks: [internal]
@@ -86,7 +86,7 @@ services:
     environment:
       BACKOFFICE_UPSTREAM: ${BACKOFFICE_UPSTREAM:-backoffice-web:3000}
       BLOG_PREVIEW_UPSTREAM: ${BLOG_PREVIEW_UPSTREAM:-blog-preview:4321}
-      LOCAL_MEDIA_HOSTS: ${LOCAL_MEDIA_HOSTS:-media.exemplo-a.localhost, media.exemplo-b.localhost}
+      LOCAL_MEDIA_HOSTS: ${LOCAL_MEDIA_HOSTS:-media.exemplo-a.localhost, media.exemplo-b.localhost, media.horta-em-casa.localhost}
     volumes:
       - ../local/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

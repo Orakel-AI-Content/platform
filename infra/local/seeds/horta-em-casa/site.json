@@ -1,0 +1,3651 @@
+{
+  "config": {
+    "siteId": "horta-em-casa",
+    "name": "Horta em Casa",
+    "domains": ["hortaemcasa.com.br", "www.hortaemcasa.com.br"],
+    "language": "pt-BR",
+    "timeZone": "America/Sao_Paulo",
+    "indexavel": false,
+    "theme": "exemplo-a",
+    "presets": {
+      "home": "revista",
+      "artigo": "padrao",
+      "categoria": "revista",
+      "autor": "padrao"
+    },
+    "variants": {
+      "articleCard": "vertical"
+    },
+    "featureFlags": {
+      "busca": true
+    },
+    "institutionalTexts": {
+      "about": [
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "O "
+            },
+            {
+              "type": "text",
+              "text": "Horta em Casa",
+              "marks": ["bold"]
+            },
+            {
+              "type": "text",
+              "text": " nasceu de uma varanda de seis metros quadrados e de muitas mudas perdidas. Escrevemos para quem mora em apartamento ou casa pequena e quer colher o próprio tempero, a própria alface e, com um pouco de paciência, o próprio tomate."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Nossos guias partem do que funciona em espaço pequeno, com material fácil de achar e sem veneno. Cada texto é escrito por quem cultiva de verdade e revisado antes de ir ao ar."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "level": 2,
+          "children": [
+            {
+              "type": "text",
+              "text": "Quem escreve"
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": false,
+          "items": [
+            [
+              {
+                "type": "text",
+                "text": "Marina Duarte",
+                "marks": ["bold"]
+              },
+              {
+                "type": "text",
+                "text": ", engenheira agrônoma, cuida de solo, adubação e plantas aromáticas."
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Paulo Teixeira",
+                "marks": ["bold"]
+              },
+              {
+                "type": "text",
+                "text": ", horticultor urbano, cuida de recipientes, rega e hortaliças de fruto."
+              }
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Quer começar agora? Leia o guia "
+            },
+            {
+              "type": "link",
+              "href": "/como-comecar-uma-horta-em-casa/",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "como começar uma horta em casa"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        }
+      ],
+      "contact": [
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Dúvidas, sugestões de pauta ou correções: escreva para "
+            },
+            {
+              "type": "text",
+              "text": "contato@hortaemcasa.com.br",
+              "marks": ["bold"]
+            },
+            {
+              "type": "text",
+              "text": ". Respondemos em até cinco dias úteis."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Não fazemos diagnóstico de planta por mensagem, mas lemos todas as fotos e muitas viram assunto de artigo."
+            }
+          ]
+        }
+      ],
+      "terms": [
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "O conteúdo do Horta em Casa é informativo. As recomendações valem para cultivo doméstico e podem variar com o clima da sua cidade, a época do ano e a espécie cultivada."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Os textos e as ilustrações são do Horta em Casa. Você pode citar trechos com link para a página original."
+            }
+          ]
+        }
+      ],
+      "privacy": [
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Medimos as visitas de forma agregada, sem cookies de rastreamento e sem identificar quem lê. Não vendemos nem compartilhamos dados."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Se você nos escreve por e-mail, usamos o endereço só para responder."
+            }
+          ]
+        }
+      ],
+      "editorialPolicy": [
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Cada artigo é escrito por um autor identificado, com experiência no assunto, e revisado por outra pessoa da equipe antes da publicação."
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            [
+              {
+                "type": "text",
+                "text": "Só recomendamos práticas que testamos em casa ou que têm respaldo técnico."
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Preferimos controle natural de pragas; não indicamos agrotóxico."
+              }
+            ],
+            [
+              {
+                "type": "text",
+                "text": "Quando um texto muda de forma relevante, a data de atualização aparece no topo."
+              }
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "children": [
+            {
+              "type": "text",
+              "text": "Encontrou um erro? Conte pela página de "
+            },
+            {
+              "type": "link",
+              "href": "/contato/",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "contato"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": "."
+            }
+          ]
+        }
+      ]
+    },
+    "integrations": {
+      "ga4": {
+        "enabled": false
+      }
+    }
+  },
+  "authors": [
+    {
+      "id": 1,
+      "slug": "marina-duarte",
+      "name": "Marina Duarte",
+      "bio": "Engenheira agrônoma, cultiva temperos e folhosas numa varanda em Belo Horizonte há oito anos. Escreve sobre solo, compostagem e plantas aromáticas.",
+      "expertise": "Solo, adubação e plantas aromáticas",
+      "avatarMediaId": 15
+    },
+    {
+      "id": 2,
+      "slug": "paulo-teixeira",
+      "name": "Paulo Teixeira",
+      "bio": "Horticultor urbano e educador, mantém uma horta comunitária em São Paulo. Escreve sobre recipientes, irrigação e hortaliças de fruto.",
+      "expertise": "Cultivo em recipientes e irrigação",
+      "avatarMediaId": 16
+    }
+  ],
+  "taxonomies": [
+    {
+      "id": 1,
+      "kind": "category",
+      "slug": "primeiros-passos",
+      "name": "Primeiros passos",
+      "description": "O básico para montar a horta: lugar, luz e recipientes."
+    },
+    {
+      "id": 2,
+      "kind": "category",
+      "slug": "plantas-e-cultivos",
+      "name": "Plantas e cultivos",
+      "description": "Como cultivar cada planta, do tempero ao tomate."
+    },
+    {
+      "id": 3,
+      "kind": "category",
+      "slug": "solo-e-adubacao",
+      "name": "Solo e adubação",
+      "description": "Substrato, compostagem e nutrição das plantas."
+    },
+    {
+      "id": 4,
+      "kind": "category",
+      "slug": "cuidados-e-pragas",
+      "name": "Cuidados e pragas",
+      "description": "Rega, poda e controle natural de pragas."
+    },
+    {
+      "id": 5,
+      "kind": "category",
+      "slug": "colheita-e-cozinha",
+      "name": "Colheita e cozinha",
+      "description": "Quando colher, como conservar e o que fazer com a colheita."
+    },
+    {
+      "id": 6,
+      "kind": "tag",
+      "slug": "iniciantes",
+      "name": "Iniciantes"
+    },
+    {
+      "id": 7,
+      "kind": "tag",
+      "slug": "apartamento",
+      "name": "Apartamento"
+    },
+    {
+      "id": 8,
+      "kind": "tag",
+      "slug": "temperos",
+      "name": "Temperos"
+    },
+    {
+      "id": 9,
+      "kind": "tag",
+      "slug": "hortalicas-de-fruto",
+      "name": "Hortaliças de fruto"
+    },
+    {
+      "id": 10,
+      "kind": "tag",
+      "slug": "sustentabilidade",
+      "name": "Sustentabilidade"
+    },
+    {
+      "id": 11,
+      "kind": "tag",
+      "slug": "rega",
+      "name": "Rega"
+    },
+    {
+      "id": 12,
+      "kind": "tag",
+      "slug": "controle-natural",
+      "name": "Controle natural"
+    },
+    {
+      "id": 13,
+      "kind": "series",
+      "slug": "minha-primeira-horta",
+      "name": "Minha primeira horta",
+      "description": "Cinco passos, na ordem, para sair do zero até a primeira colheita."
+    }
+  ],
+  "menus": [
+    {
+      "id": 1,
+      "key": "principal",
+      "items": [
+        {
+          "label": "Primeiros passos",
+          "href": "/categoria/primeiros-passos/"
+        },
+        {
+          "label": "Plantas e cultivos",
+          "href": "/categoria/plantas-e-cultivos/"
+        },
+        {
+          "label": "Solo e adubação",
+          "href": "/categoria/solo-e-adubacao/"
+        },
+        {
+          "label": "Cuidados e pragas",
+          "href": "/categoria/cuidados-e-pragas/"
+        },
+        {
+          "label": "Colheita e cozinha",
+          "href": "/categoria/colheita-e-cozinha/"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "key": "rodape",
+      "items": [
+        {
+          "label": "Sobre",
+          "href": "/sobre/"
+        },
+        {
+          "label": "Glossário da horta",
+          "href": "/glossario-da-horta/"
+        },
+        {
+          "label": "Minha primeira horta",
+          "href": "/serie/minha-primeira-horta/"
+        },
+        {
+          "label": "Política editorial",
+          "href": "/politica-editorial/"
+        },
+        {
+          "label": "Contato",
+          "href": "/contato/"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "id": 1,
+      "from": "/horta-em-apartamento/",
+      "to": "/como-comecar-uma-horta-em-casa/",
+      "status": 301,
+      "origin": "manual"
+    },
+    {
+      "id": 2,
+      "from": "/regar-horta/",
+      "to": "/como-regar-a-horta/",
+      "status": 301,
+      "origin": "slug-change"
+    }
+  ],
+  "media": [
+    {
+      "id": 1,
+      "file": "01-horta-na-varanda.jpg",
+      "originalName": "horta-na-varanda.jpg",
+      "uploadedAt": "2026-08-02T11:03:00.000Z"
+    },
+    {
+      "id": 2,
+      "file": "02-luz-na-janela.jpg",
+      "originalName": "luz-na-janela.jpg",
+      "uploadedAt": "2026-08-09T11:06:00.000Z"
+    },
+    {
+      "id": 3,
+      "file": "03-vasos-e-jardineiras.jpg",
+      "originalName": "vasos-e-jardineiras.jpg",
+      "uploadedAt": "2026-08-16T11:09:00.000Z"
+    },
+    {
+      "id": 4,
+      "file": "04-substrato.jpg",
+      "originalName": "camadas-do-substrato.jpg",
+      "uploadedAt": "2026-08-23T11:12:00.000Z"
+    },
+    {
+      "id": 5,
+      "file": "05-composteira.jpg",
+      "originalName": "composteira-de-baldes.jpg",
+      "uploadedAt": "2026-08-30T11:15:00.000Z"
+    },
+    {
+      "id": 6,
+      "file": "06-regador.jpg",
+      "originalName": "regador-no-canteiro.jpg",
+      "uploadedAt": "2026-09-06T11:18:00.000Z"
+    },
+    {
+      "id": 7,
+      "file": "07-temperos-na-janela.jpg",
+      "originalName": "temperos-na-janela.jpg",
+      "uploadedAt": "2026-09-13T11:21:00.000Z"
+    },
+    {
+      "id": 8,
+      "file": "08-tomate-cereja.jpg",
+      "originalName": "tomate-cereja-em-vaso.jpg",
+      "uploadedAt": "2026-09-20T11:24:00.000Z"
+    },
+    {
+      "id": 9,
+      "file": "09-joaninha.jpg",
+      "originalName": "joaninha-na-folha.jpg",
+      "uploadedAt": "2026-09-27T11:27:00.000Z"
+    },
+    {
+      "id": 10,
+      "file": "10-cesta-de-colheita.jpg",
+      "originalName": "cesta-de-colheita.jpg",
+      "uploadedAt": "2026-10-04T11:30:00.000Z"
+    },
+    {
+      "id": 11,
+      "file": "semeadura-em-bandeja.jpg",
+      "originalName": "semeadura-em-bandeja.jpg",
+      "uploadedAt": "2026-08-02T11:33:00.000Z"
+    },
+    {
+      "id": 12,
+      "file": "teste-do-dedo.jpg",
+      "originalName": "teste-do-dedo.jpg",
+      "uploadedAt": "2026-09-06T11:36:00.000Z"
+    },
+    {
+      "id": 13,
+      "file": "poda-do-manjericao.jpg",
+      "originalName": "poda-do-manjericao.jpg",
+      "uploadedAt": "2026-09-13T11:39:00.000Z"
+    },
+    {
+      "id": 14,
+      "file": "tutor-do-tomate.jpg",
+      "originalName": "tutor-do-tomate.jpg",
+      "uploadedAt": "2026-09-20T11:42:00.000Z"
+    },
+    {
+      "id": 15,
+      "file": "marina-duarte.jpg",
+      "originalName": "marina-duarte-retrato.jpg",
+      "uploadedAt": "2026-07-30T13:45:00.000Z"
+    },
+    {
+      "id": 16,
+      "file": "paulo-teixeira.jpg",
+      "originalName": "paulo-teixeira-retrato.jpg",
+      "uploadedAt": "2026-07-30T13:48:00.000Z"
+    }
+  ],
+  "contents": [
+    {
+      "id": 1,
+      "kind": "article",
+      "slug": "como-comecar-uma-horta-em-casa",
+      "title": "Como começar uma horta em casa, mesmo sem quintal",
+      "description": "Um roteiro em cinco passos para montar a primeira horta em varanda, janela ou área de serviço, gastando pouco.",
+      "authorIds": [1],
+      "taxonomyIds": [1, 6, 7, 13],
+      "coverMediaId": 1,
+      "publishedAt": "2026-08-03T08:00:00-03:00",
+      "updatedAt": "2026-09-12T10:15:00-03:00",
+      "seo": {
+        "title": "Como começar uma horta em casa, mesmo sem quintal | Horta em Casa",
+        "description": "Um roteiro em cinco passos para montar a primeira horta em varanda, janela ou área de serviço, gastando pouco."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Neste artigo"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Ter uma horta em casa não exige quintal nem grandes investimentos. Uma varanda com algumas horas de sol, três ou quatro vasos e um pouco de constância já bastam para colher tempero fresco em poucas semanas e folhas para a salada em pouco mais de um mês."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Este é o primeiro texto da série "
+                },
+                {
+                  "type": "text",
+                  "text": "Minha primeira horta",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ". Aqui está o mapa; nos próximos artigos aprofundamos cada passo."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "1. Observe o sol antes de comprar qualquer coisa"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O erro mais comum de quem começa é escolher as plantas primeiro e o lugar depois. Passe um dia anotando por quantas horas o sol bate direto no espaço que você tem. Esse número decide o que vai dar certo:"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "6 horas ou mais",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": tomate, pimenta, morango e quase todos os temperos."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "4 a 6 horas",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": alface, rúcula, couve, salsinha e cebolinha."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Menos de 4 horas",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": hortelã, agrião e algumas folhosas, com crescimento mais lento."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O artigo "
+                },
+                {
+                  "type": "link",
+                  "href": "/luz-solar-para-horta/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "luz solar para a horta"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " mostra como medir a luz com mais precisão."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "2. Escolha recipientes com drenagem"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Qualquer recipiente serve, desde que tenha "
+                },
+                {
+                  "type": "text",
+                  "text": "furos no fundo",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " e profundidade compatível com a planta. Temperos se contentam com 15 cm; tomate pede pelo menos 30 cm. Veja as opções em "
+                },
+                {
+                  "type": "link",
+                  "href": "/vasos-e-recipientes/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "vasos, jardineiras e recipientes"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "3. Use substrato, não terra do jardim"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Terra de jardim compacta no vaso e asfixia as raízes. Prefira um substrato leve, com matéria orgânica, que segure umidade sem encharcar. A receita está em "
+                },
+                {
+                  "type": "link",
+                  "href": "/substrato-para-vasos/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "substrato para vasos"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 11,
+          "alt": "Bandeja de semeadura com 24 células de terra, a maioria já com mudas de duas folhas",
+          "caption": [
+            {
+              "type": "text",
+              "text": "Semear em bandeja e transplantar depois aumenta a taxa de sucesso."
+            }
+          ]
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "4. Comece por mudas e por plantas fáceis"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Sementes são baratas, mas mudas encurtam o caminho e dão confiança. Para a primeira leva, escolha plantas que perdoam erros:"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": true,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Cebolinha"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Salsinha"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Manjericão"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Alface"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Rúcula"
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Semente ou muda?"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Rúcula e rabanete vão bem semeados direto no vaso. Manjericão, alface e tomate rendem mais quando você semeia em bandeja e transplanta a muda com quatro a seis folhas."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "5. Crie uma rotina de dez minutos"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Uma horta pequena precisa de pouco tempo, mas precisa de frequência. Reserve dez minutos por dia para olhar as plantas, conferir a umidade da terra e retirar folhas amareladas. É nessa visita diária que você percebe uma praga no começo, quando ainda é fácil resolver."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "quote",
+          "content": [
+            {
+              "type": "text",
+              "text": "A melhor adubação é a sombra do jardineiro."
+            }
+          ],
+          "attribution": "Provérbio popular"
+        },
+        {
+          "n": 6,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Quanto custa montar uma horta pequena?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Com quatro vasos plásticos, um saco de substrato de 20 litros e quatro mudas, o gasto fica entre R$ 80 e R$ 150."
+                }
+              ]
+            },
+            {
+              "question": "Dá para ter horta dentro de casa, sem varanda?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Dá, perto de uma janela que receba pelo menos quatro horas de sol direto. Sem isso, só com luz artificial de cultivo."
+                }
+              ]
+            },
+            {
+              "question": "Em quanto tempo colho alguma coisa?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Rúcula e cebolinha estão prontas para o primeiro corte em 30 a 40 dias; alface, em 45 a 60 dias."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "kind": "article",
+      "slug": "luz-solar-para-horta",
+      "title": "Luz solar: como saber se o seu cantinho serve para horta",
+      "description": "Aprenda a medir as horas de sol direto, a diferença entre luz direta e claridade, e quais plantas aproveitam cada situação.",
+      "authorIds": [2],
+      "taxonomyIds": [1, 6, 7, 13],
+      "coverMediaId": 2,
+      "publishedAt": "2026-08-10T08:00:00-03:00",
+      "seo": {
+        "title": "Luz solar: como saber se o seu cantinho serve para horta | Horta em Casa",
+        "description": "Aprenda a medir as horas de sol direto, a diferença entre luz direta e claridade, e quais plantas aproveitam cada situação."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "O que você vai ler"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Planta não come adubo: ela fabrica o próprio alimento com luz. Por isso a luz é o recurso mais importante da horta, e o único que você não compra na loja. Antes de investir em vasos e mudas, vale um dia de observação."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Luz direta não é o mesmo que claridade"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Um cômodo pode parecer bem iluminado e, ainda assim, não receber "
+                },
+                {
+                  "type": "text",
+                  "text": "nenhum raio de sol direto",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ". Hortaliças precisam de sol batendo nas folhas. A claridade que entra refletida pela parede do vizinho ajuda pouco."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O teste da sombra"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Ao meio-dia, coloque a mão a 30 cm de uma folha de papel no lugar onde ficará a horta. Se a sombra sair nítida, com contorno definido, há luz direta. Sombra borrada indica claridade difusa."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Como contar as horas de sol"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Escolha um dia sem nuvens e anote, de hora em hora, se o sol bate no lugar. Fotografar com o celular a cada hora ajuda a não esquecer."
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": true,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Comece às 7h e termine às 18h."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Marque cada hora em que o sol bate em pelo menos metade da área."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Repita em outra estação: no inverno o sol fica mais baixo e a sombra dos prédios aumenta."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A orientação da janela"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "No hemisfério sul, a face "
+                },
+                {
+                  "type": "text",
+                  "text": "norte",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " recebe sol o dia todo no inverno, a face "
+                },
+                {
+                  "type": "text",
+                  "text": "leste",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " recebe o sol da manhã, mais ameno, e a face "
+                },
+                {
+                  "type": "text",
+                  "text": "oeste",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ", o sol da tarde, mais quente. A face sul é a mais sombreada."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 2,
+          "alt": "Janela ensolarada com três vasos de ervas no parapeito",
+          "caption": [
+            {
+              "type": "text",
+              "text": "O sol da manhã, pela face leste, é o mais gentil com folhosas."
+            }
+          ]
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "E se o sol for pouco?"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Com menos de quatro horas, aposte em folhosas e ervas de meia-sombra e aceite um crescimento mais lento. Pintar de branco a parede atrás dos vasos e usar espelhos aumenta a luz refletida."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Para plantas de fruto, como o "
+                },
+                {
+                  "type": "link",
+                  "href": "/tomate-cereja-em-vaso/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "tomate-cereja"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", não há atalho: abaixo de seis horas de sol a planta cresce, mas floresce pouco."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Vidro da janela atrapalha?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Um pouco. O vidro comum filtra parte da luz; se puder, abra a janela nas horas de sol ou deixe os vasos do lado de fora."
+                }
+              ]
+            },
+            {
+              "question": "Lâmpada comum serve para cultivar?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Não substitui o sol. Para cultivo interno use painéis de LED de espectro completo, a cerca de 30 cm das folhas, por 12 a 14 horas por dia."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "kind": "article",
+      "slug": "vasos-e-recipientes",
+      "title": "Vasos, jardineiras e recipientes: qual escolher para cada planta",
+      "description": "Plástico, barro, tecido ou madeira: vantagens de cada material, a profundidade certa para cada hortaliça e como reaproveitar o que você já tem.",
+      "authorIds": [2],
+      "taxonomyIds": [1, 7, 13],
+      "coverMediaId": 3,
+      "publishedAt": "2026-08-17T08:00:00-03:00",
+      "seo": {
+        "title": "Vasos, jardineiras e recipientes: qual escolher para cada planta | Horta em Casa",
+        "description": "Plástico, barro, tecido ou madeira: vantagens de cada material, a profundidade certa para cada hortaliça e como reaproveitar o que você já tem."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Neste artigo"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O recipiente é a casa da raiz. Se ele for raso demais, a planta seca rápido e para de crescer; se não drenar, a raiz apodrece. Acertar aqui evita metade dos problemas da horta."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Profundidade mínima por tipo de planta"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "15 cm",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": cebolinha, salsinha, rúcula, alface e a maioria dos temperos."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "20 a 25 cm",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": manjericão, couve, morango e pimentas pequenas."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "30 cm ou mais",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": tomate, berinjela, pimentão e cenoura."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Na dúvida, escolha o maior. Mais terra significa mais água guardada e menos rega."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Os materiais, lado a lado"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Plástico"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Leve, barato e retém umidade por mais tempo. Esquenta ao sol se for preto; prefira cores claras."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Barro"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Bonito e \"respira\", o que protege contra encharcamento. Em compensação, seca mais rápido e pesa. Bom para alecrim, tomilho e outras ervas de clima seco."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Vaso de tecido"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Aera as raízes e evita que elas deem voltas no fundo. Seca rápido no verão e precisa de um prato embaixo."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Caixote de madeira"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Ótimo para canteiros maiores. Forre as laterais com plástico furado, nunca o fundo, para a madeira durar mais."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 3,
+          "decorative": true
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Reaproveitar também vale"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Baldes de margarina, galões de água e caixas de feira viram bons vasos. Use uma furadeira ou um prego aquecido para fazer pelo menos "
+                },
+                {
+                  "type": "text",
+                  "text": "quatro furos de 1 cm",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " no fundo de cada recipiente."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Evite embalagens que guardaram produtos químicos, como de detergente ou solvente, mesmo lavadas."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Drenagem: o fundo do vaso"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Uma camada de 2 a 3 cm de argila expandida ou brita, coberta por uma manta de drenagem (ou um pedaço de tecido não tecido), impede que o substrato escorra pelos furos. Depois disso, é só encher com o "
+                },
+                {
+                  "type": "link",
+                  "href": "/substrato-para-vasos/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "substrato certo"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "quote",
+          "content": [
+            {
+              "type": "text",
+              "text": "Vaso pequeno, planta pequena: a raiz não cresce além da casa que você dá a ela."
+            }
+          ],
+          "attribution": "Paulo Teixeira"
+        },
+        {
+          "n": 6,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Posso usar prato embaixo do vaso?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Pode, mas esvazie a água que sobrar meia hora depois da rega. Água parada no prato encharca a raiz e atrai mosquitos."
+                }
+              ]
+            },
+            {
+              "question": "Jardineira comprida serve para tomate?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Só se tiver pelo menos 30 cm de profundidade. A maioria das jardineiras comuns tem 15 a 18 cm, o que é ótimo para temperos e folhosas."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "kind": "article",
+      "slug": "substrato-para-vasos",
+      "title": "Substrato para vasos: a receita que segura água sem encharcar",
+      "description": "O que é substrato, por que terra de jardim não funciona em vaso e uma receita caseira com três ingredientes para a sua horta.",
+      "authorIds": [1],
+      "taxonomyIds": [3, 6, 13],
+      "coverMediaId": 4,
+      "publishedAt": "2026-08-24T08:00:00-03:00",
+      "updatedAt": "2026-10-02T14:40:00-03:00",
+      "seo": {
+        "title": "Substrato para vasos: a receita que segura água sem encharcar | Horta em Casa",
+        "description": "O que é substrato, por que terra de jardim não funciona em vaso e uma receita caseira com três ingredientes para a sua horta."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Neste artigo"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "No vaso, a raiz não tem para onde fugir. Tudo o que ela precisa (água, ar e nutrientes) tem de estar naquele volume pequeno. Por isso o "
+                },
+                {
+                  "type": "text",
+                  "text": "substrato",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " é diferente da terra do chão: mais leve, mais poroso e mais rico."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Por que não usar terra do jardim"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A terra comum tem muita argila. No vaso, depois de algumas regas, ela compacta como um tijolo: a água escorre pelas laterais, o centro fica seco e as raízes ficam sem ar. Também pode trazer sementes de mato, fungos e larvas."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Os três papéis de um bom substrato"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": true,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Reter água",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": " por alguns dias, para a planta não secar entre as regas."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Drenar o excesso",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ", para a raiz respirar."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Nutrir",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ", com matéria orgânica que libera nutrientes aos poucos."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A receita caseira"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Misture em volume, num balde ou numa lona:"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "2 partes de "
+                  },
+                  {
+                    "type": "text",
+                    "text": "terra vegetal",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": " ou substrato comercial para hortaliças"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "1 parte de "
+                  },
+                  {
+                    "type": "text",
+                    "text": "húmus de minhoca",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": " ou composto bem curtido"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "1 parte de "
+                  },
+                  {
+                    "type": "text",
+                    "text": "fibra de coco",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ", perlita ou areia grossa lavada"
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Para cada 10 litros da mistura, acrescente uma colher de sopa cheia de farinha de ossos ou de calcário dolomítico, que corrige a acidez e fornece cálcio."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Como saber se ficou bom"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Aperte um punhado úmido na mão. Ele deve formar um bolo que se desfaz quando você cutuca. Se escorrer água, falta material drenante; se não formar bolo nenhum, falta matéria orgânica."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "quote",
+          "content": [
+            {
+              "type": "text",
+              "text": "Solo sadio, planta sadia, ser humano sadio."
+            }
+          ],
+          "attribution": "Ana Primavesi, agrônoma",
+          "sourceUrl": "https://pt.wikipedia.org/wiki/Ana_Primavesi"
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Renovando o substrato"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O substrato se esgota. A cada ciclo de cultivo, retire as raízes velhas, misture uma camada de 2 cm de húmus ou de "
+                },
+                {
+                  "type": "link",
+                  "href": "/composteira-domestica/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "composto caseiro"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " e revolva levemente. A cada um ou dois anos, troque metade do volume."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Com o substrato pronto, falta aprender a "
+                },
+                {
+                  "type": "link",
+                  "href": "/como-regar-a-horta/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "regar na medida certa"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Substrato de floricultura serve para horta?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Serve como base. Os de \"uso geral\" costumam ser pobres; enriqueça com húmus de minhoca na proporção de uma parte para três."
+                }
+              ]
+            },
+            {
+              "question": "Preciso adubar logo depois de plantar?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Não. Um substrato com húmus alimenta a planta por quatro a seis semanas. Depois disso, adube a cada 15 dias com composto ou biofertilizante."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "kind": "article",
+      "slug": "composteira-domestica",
+      "title": "Composteira doméstica: transforme restos de cozinha em adubo",
+      "description": "Como montar uma composteira de baldes no apartamento, o que pode e o que não pode entrar e como usar o adubo líquido e o composto na horta.",
+      "authorIds": [1],
+      "taxonomyIds": [3, 10],
+      "coverMediaId": 5,
+      "publishedAt": "2026-08-31T08:00:00-03:00",
+      "seo": {
+        "title": "Composteira doméstica: transforme restos de cozinha em adubo | Horta em Casa",
+        "description": "Como montar uma composteira de baldes no apartamento, o que pode e o que não pode entrar e como usar o adubo líquido e o composto na horta."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Neste artigo"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Cerca de metade do lixo de uma casa brasileira é orgânico: cascas, talos, borra de café. Em vez de ir para o aterro, esse material pode virar o melhor adubo da sua horta em dois a três meses, sem cheiro e num canto da área de serviço."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Como funciona"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Minhocas californianas e microrganismos decompõem os restos e devolvem "
+                },
+                {
+                  "type": "text",
+                  "text": "húmus",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ", um material escuro e rico em nutrientes, e "
+                },
+                {
+                  "type": "text",
+                  "text": "chorume",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ", um adubo líquido. Bem cuidada, a composteira não cheira mal: cheiro ruim é sinal de excesso de umidade ou de comida errada."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Montando a composteira de três baldes"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": true,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Separe três baldes iguais com tampa, de 20 a 50 litros."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Nos dois de cima, faça furos de 5 mm no fundo e pequenos furos de ventilação perto da borda."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "O balde de baixo fica sem furos: ele coleta o chorume. Coloque uma torneira nele."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Empilhe: coletor embaixo, dois digestores em cima."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "No digestor do meio, coloque uma camada de composto ou terra com as minhocas e cubra com folhas secas."
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 5,
+          "alt": "Composteira de três baldes verdes empilhados, com cascas e folhas ao lado",
+          "caption": [
+            {
+              "type": "text",
+              "text": "Três baldes empilhados: dois digestores e um coletor de chorume."
+            }
+          ]
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O que pode entrar"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Cascas e restos de frutas, legumes e verduras"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Borra de café e saquinhos de chá sem grampo"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Cascas de ovo trituradas"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Folhas secas, serragem e papelão picado, sem tinta"
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O que fica de fora"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Carnes, laticínios e gorduras"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Frutas cítricas e cebola em grande quantidade"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Fezes de animais domésticos"
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A regra de ouro: cubra sempre"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A cada porção de restos de cozinha, cubra com uma porção igual de "
+                },
+                {
+                  "type": "text",
+                  "text": "material seco",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " (folhas, serragem ou papelão). O seco equilibra a umidade, evita mosquitos e acaba com o cheiro."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Quando o balde do meio encher, troque a posição: o cheio desce para maturar e o vazio sobe para receber os novos restos. Em 60 a 90 dias o composto está pronto para entrar no "
+                },
+                {
+                  "type": "link",
+                  "href": "/substrato-para-vasos/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "substrato"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "quote",
+          "content": [
+            {
+              "type": "text",
+              "text": "Na natureza nada se perde, nada se cria, tudo se transforma."
+            }
+          ],
+          "attribution": "Antoine Lavoisier"
+        },
+        {
+          "n": 6,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Como uso o chorume?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Dilua uma parte de chorume em dez partes de água e regue a terra, nunca as folhas, a cada 15 dias."
+                }
+              ]
+            },
+            {
+              "question": "Apareceram mosquinhas. E agora?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Cubra os restos com mais material seco e deixe a tampa bem fechada. As mosquinhas somem em poucos dias."
+                }
+              ]
+            },
+            {
+              "question": "Preciso comprar minhocas?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Para a composteira de baldes, sim: minhocas californianas, vendidas por quilo em lojas de jardinagem ou por outros composteiros."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "kind": "article",
+      "slug": "como-regar-a-horta",
+      "title": "Como regar a horta: quanto, quando e o teste do dedo",
+      "description": "A rega é a maior causa de perda de plantas em vaso. Aprenda a saber quando a terra precisa de água e a regar do jeito certo.",
+      "authorIds": [2],
+      "taxonomyIds": [4, 6, 11, 13],
+      "coverMediaId": 6,
+      "publishedAt": "2026-09-07T08:00:00-03:00",
+      "seo": {
+        "title": "Como regar a horta: quanto, quando e o teste do dedo | Horta em Casa",
+        "description": "A rega é a maior causa de perda de plantas em vaso. Aprenda a saber quando a terra precisa de água e a regar do jeito certo."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Neste guia"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Mais plantas morrem de "
+                },
+                {
+                  "type": "text",
+                  "text": "excesso",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " de água do que de falta. A raiz encharcada não respira, apodrece e a planta murcha, o que leva muita gente a regar ainda mais. Regar bem é menos uma questão de frequência e mais de observação."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O teste do dedo"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Enfie o dedo indicador na terra até a segunda falange, cerca de 4 cm. Se sair seco, regue. Se sair úmido ou com terra grudada, espere mais um dia."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 12,
+          "alt": "Dedo enfiado na terra de um vaso com duas mudas, testando a umidade",
+          "caption": [
+            {
+              "type": "text",
+              "text": "Dois dedos de profundidade: se estiver seco, é hora de regar."
+            }
+          ]
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Como regar"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": true,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Regue "
+                  },
+                  {
+                    "type": "text",
+                    "text": "devagar",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ", até a água começar a sair pelos furos do fundo."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Molhe a terra, não as folhas: folha molhada à noite favorece fungos."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Esvazie o prato meia hora depois."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Melhor horário"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "De manhã cedo, antes do sol forte. A planta enfrenta o calor hidratada e as folhas secam rápido. No fim da tarde também funciona; evite apenas o meio do dia."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Sinais de que algo está errado"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Falta de água",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": folhas murchas que se recuperam depois da rega, bordas secas e crocantes."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Excesso de água",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": folhas amarelas de baixo para cima, terra sempre úmida, cheiro azedo e mosquinhas."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Viagem de fim de semana"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Agrupe os vasos na sombra e use o truque da garrafa: uma garrafa PET com furinhos na tampa, cheia de água e enterrada de boca para baixo, libera água aos poucos por dois a três dias. Para viagens longas, vale montar um gotejamento simples ligado a um temporizador."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "quote",
+          "content": [
+            {
+              "type": "text",
+              "text": "Antes de regar, pergunte à terra."
+            }
+          ],
+          "attribution": "Ditado de horticultor"
+        },
+        {
+          "n": 6,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Quantas vezes por semana devo regar?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Não existe número fixo. No verão, vasos pequenos podem precisar de rega diária; no inverno, uma ou duas por semana. Use o teste do dedo."
+                }
+              ]
+            },
+            {
+              "question": "Água da torneira serve?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Serve. Se quiser, deixe descansar num balde por algumas horas para o cloro evaporar e a água chegar à temperatura ambiente."
+                }
+              ]
+            },
+            {
+              "question": "Posso usar a água do ar-condicionado?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Pode. Ela é praticamente destilada, sem sais; só não é potável para pessoas."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "kind": "article",
+      "slug": "temperos-na-janela",
+      "title": "Temperos na janela: manjericão, salsinha e cebolinha o ano todo",
+      "description": "Como plantar, podar e colher os três temperos mais usados na cozinha brasileira num parapeito ensolarado.",
+      "authorIds": [1],
+      "taxonomyIds": [2, 7, 8],
+      "coverMediaId": 7,
+      "publishedAt": "2026-09-14T08:00:00-03:00",
+      "seo": {
+        "title": "Temperos na janela: manjericão, salsinha e cebolinha o ano todo | Horta em Casa",
+        "description": "Como plantar, podar e colher os três temperos mais usados na cozinha brasileira num parapeito ensolarado."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Neste artigo"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Se você só tiver espaço para uma jardineira, comece pelos temperos. Eles crescem rápido, perdoam erros e fazem diferença no prato todos os dias. Uma jardineira de 60 cm comporta, com folga, um pé de manjericão, um de salsinha e uma touceira de cebolinha."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Manjericão"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Gosta de calor e de pelo menos cinco horas de sol. Não tolera frio abaixo de 10 °C nem terra encharcada."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A poda que dobra a colheita"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Quando a planta tiver uns 15 cm, corte o topo do caule logo "
+                },
+                {
+                  "type": "text",
+                  "text": "acima de um par de folhas",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ". Dali nascem dois ramos novos. Repita a cada nova ponta: o pé fica cheio em vez de alto e fino."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 13,
+          "alt": "Ramo de manjericão com linha tracejada logo acima de um par de folhas e uma tesoura ao lado",
+          "caption": [
+            {
+              "type": "text",
+              "text": "Corte sempre acima de um par de folhas: dali saem dois ramos."
+            }
+          ]
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Retire as flores assim que aparecerem. Quando o manjericão floresce, as folhas perdem aroma e a planta encerra o ciclo."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Salsinha"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Mais tolerante à meia-sombra. A semente demora até três semanas para germinar; deixe-a de molho em água morna por uma noite antes de semear. Colha sempre as "
+                },
+                {
+                  "type": "text",
+                  "text": "folhas de fora",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ", rente à base, e deixe o miolo crescer."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Cebolinha"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A mais fácil das três. Dá para começar com a parte branca da cebolinha comprada na feira: plante as raízes num vaso e, em duas semanas, ela rebrota. Corte a 3 cm do solo e ela cresce de novo várias vezes."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Adubação dos temperos"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A cada 15 dias, uma colher de sopa de húmus de minhoca na superfície ou uma rega com "
+                },
+                {
+                  "type": "link",
+                  "href": "/composteira-domestica/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "chorume diluído"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Para guardar o excedente, veja "
+                },
+                {
+                  "type": "link",
+                  "href": "/colheita-e-conservacao/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "colheita e conservação"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Por que meu manjericão está com folhas pretas?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Geralmente é frio ou folhas molhadas à noite. Leve o vaso para um lugar abrigado e regue só a terra, pela manhã."
+                }
+              ]
+            },
+            {
+              "question": "Posso plantar hortelã junto com os outros?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Melhor não. A hortelã se espalha pelas raízes e toma o vaso. Plante-a sozinha."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "kind": "article",
+      "slug": "tomate-cereja-em-vaso",
+      "title": "Tomate-cereja em vaso: do plantio à primeira colheita",
+      "description": "Passo a passo para cultivar tomate-cereja na varanda: vaso, tutor, desbrota, adubação e os problemas mais comuns.",
+      "authorIds": [2],
+      "taxonomyIds": [2, 9],
+      "coverMediaId": 8,
+      "publishedAt": "2026-09-21T08:00:00-03:00",
+      "updatedAt": "2026-10-08T09:00:00-03:00",
+      "seo": {
+        "title": "Tomate-cereja em vaso: do plantio à primeira colheita | Horta em Casa",
+        "description": "Passo a passo para cultivar tomate-cereja na varanda: vaso, tutor, desbrota, adubação e os problemas mais comuns."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Etapas do cultivo"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Colher tomate do próprio pé é a recompensa de toda horta de varanda. O "
+                },
+                {
+                  "type": "text",
+                  "text": "tomate-cereja",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " é o mais indicado para vaso: é mais resistente que os tomates grandes, produz por meses e cada pé rende dezenas de frutos."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O que você precisa"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Um vaso de "
+                  },
+                  {
+                    "type": "text",
+                    "text": "pelo menos 30 litros",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": " e 30 cm de profundidade"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Seis horas ou mais de sol direto"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Um tutor (bambu ou estaca) de 1,5 m"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Substrato rico, com bastante húmus"
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Plantio"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Plante a muda "
+                },
+                {
+                  "type": "text",
+                  "text": "mais funda",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " do que estava no copinho, enterrando até as primeiras folhas. O tomateiro solta raízes ao longo do caule enterrado e fica mais firme. Crave o tutor no mesmo dia, a 5 cm do caule, para não ferir raízes depois."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Condução no tutor"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Amarre o caule ao tutor a cada 20 ou 30 cm com fitilho ou tira de pano, fazendo um "
+                },
+                {
+                  "type": "text",
+                  "text": "oito",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " entre o caule e a estaca. O laço folgado evita estrangular a planta quando ela engrossar."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 14,
+          "alt": "Tomateiro preso a uma estaca de madeira por três laços, com frutos vermelhos",
+          "caption": [
+            {
+              "type": "text",
+              "text": "O laço em oito segura sem apertar o caule."
+            }
+          ]
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Desbrota"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Nas axilas entre o caule e as folhas surgem brotos chamados "
+                },
+                {
+                  "type": "text",
+                  "text": "ladrões",
+                  "marks": ["italic"]
+                },
+                {
+                  "type": "text",
+                  "text": ". Retire-os com os dedos enquanto têm até 5 cm e conduza a planta em uma ou duas hastes. Assim a energia vai para os frutos."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Adubação"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Depois do primeiro cacho de flores, adube a cada 15 dias com composto, farinha de ossos ou cinzas de madeira, que são ricas em potássio e ajudam na frutificação."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Problemas comuns"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": true,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Flores caindo",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": calor acima de 32 °C ou rega irregular."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Fundo do fruto escuro",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": falta de cálcio, quase sempre por rega irregular. Mantenha a umidade constante."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Folhas de baixo amarelas",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": normal no envelhecimento; retire-as. Se subir rápido pela planta, pode ser fungo."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Frutos rachados",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": regas grandes depois de dias de seca."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Pulgões e mosca-branca adoram tomateiro; veja como lidar com eles em "
+                },
+                {
+                  "type": "link",
+                  "href": "/controle-natural-de-pragas/",
+                  "children": [
+                    {
+                      "type": "text",
+                      "text": "controle natural de pragas"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "quote",
+          "content": [
+            {
+              "type": "text",
+              "text": "Tomate bom é o que vai do pé para a boca no mesmo dia."
+            }
+          ],
+          "attribution": "Paulo Teixeira"
+        },
+        {
+          "n": 6,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Quanto tempo até a primeira colheita?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "De 60 a 80 dias depois do transplante da muda, dependendo da variedade e do calor."
+                }
+              ]
+            },
+            {
+              "question": "Preciso polinizar as flores?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "O tomate se autopoliniza. Na varanda sem vento, dê leves batidinhas nos cachos floridos de manhã para ajudar."
+                }
+              ]
+            },
+            {
+              "question": "Quando colher?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Quando o fruto estiver com a cor por inteiro e ceder levemente ao toque. Tomates colhidos um pouco antes terminam de amadurecer na fruteira."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "kind": "article",
+      "slug": "controle-natural-de-pragas",
+      "title": "Controle natural de pragas: pulgão, cochonilha e lagarta sem veneno",
+      "description": "Como reconhecer as pragas mais comuns da horta caseira e controlá-las com receitas simples e aliados naturais, como a joaninha.",
+      "authorIds": [1, 2],
+      "taxonomyIds": [4, 10, 12],
+      "coverMediaId": 9,
+      "publishedAt": "2026-09-28T08:00:00-03:00",
+      "seo": {
+        "title": "Controle natural de pragas: pulgão, cochonilha e lagarta sem veneno | Horta em Casa",
+        "description": "Como reconhecer as pragas mais comuns da horta caseira e controlá-las com receitas simples e aliados naturais, como a joaninha."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Neste artigo"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Uma horta saudável não é uma horta sem insetos: é uma horta em equilíbrio. Antes de qualquer receita, lembre que "
+                },
+                {
+                  "type": "text",
+                  "text": "planta forte resiste mais",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ". Sol suficiente, rega correta e solo vivo previnem a maior parte dos ataques."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Inspeção semanal"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Uma vez por semana, olhe com calma o "
+                },
+                {
+                  "type": "text",
+                  "text": "verso das folhas",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " e as pontas dos ramos novos, onde a maioria das pragas se esconde. Pegar um ataque no início faz toda a diferença."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "As pragas mais comuns"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Pulgão"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Pequenos insetos verdes, pretos ou amarelos, agrupados em brotos novos. Deixam as folhas enroladas e pegajosas. Um jato de água forte já remove boa parte."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Cochonilha"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Parecem pequenas escamas ou bolinhas de algodão presas ao caule. Remova com um cotonete embebido em álcool 70% diluído em água, meio a meio."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Lagartas"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Furos grandes nas folhas e bolinhas escuras de fezes. Cate à mão, ao amanhecer ou ao entardecer, quando estão mais ativas."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Receitas caseiras"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Calda de sabão",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ": dissolva uma colher de sopa de sabão de coco ralado em um litro de água morna e borrife sobre os insetos. Funciona por contato contra pulgões e cochonilhas."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Óleo de neem",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ": siga a diluição do fabricante, em geral 5 ml por litro de água com um pouco de sabão neutro para emulsionar. Aplique no fim da tarde."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Teste sempre numa folha antes e aplique fora do sol forte, para não queimar as plantas. Repita a cada cinco dias, por três aplicações."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 9,
+          "alt": "Joaninha vermelha de pintas pretas pousada sobre uma folha verde",
+          "caption": [
+            {
+              "type": "text",
+              "text": "Uma joaninha adulta come dezenas de pulgões por dia."
+            }
+          ]
+        },
+        {
+          "n": 4,
+          "type": "text",
+          "content": [
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Aliados da horta"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Joaninhas",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": " e suas larvas devoram pulgões."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Flores",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": " como calêndula, cravo-de-defunto e capuchinha atraem insetos benéficos e confundem as pragas."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Ervas aromáticas",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": " intercaladas, como manjericão e alecrim, disfarçam o cheiro das hortaliças."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Evite inseticidas de amplo espectro: eles matam também os aliados, e a praga costuma voltar mais forte."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 5,
+          "type": "quote",
+          "content": [
+            {
+              "type": "text",
+              "text": "O controle de pragas começa muito antes de a praga aparecer: começa no solo."
+            }
+          ],
+          "attribution": "Marina Duarte"
+        },
+        {
+          "n": 6,
+          "type": "faq",
+          "items": [
+            {
+              "question": "A calda de sabão prejudica as joaninhas?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Pode atingir as que estiverem no local. Borrife só onde estiver a praga e, se vir joaninhas, deixe que elas façam o trabalho."
+                }
+              ]
+            },
+            {
+              "question": "Formigas na horta são problema?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Às vezes elas \"criam\" pulgões para colher o melado que produzem. Controle os pulgões e as formigas perdem o interesse."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "kind": "article",
+      "slug": "colheita-e-conservacao",
+      "title": "Hora de colher: quando e como colher e conservar a sua horta",
+      "description": "O ponto certo de colheita de folhas, temperos e frutos, e como conservar o excedente na geladeira, no congelador ou desidratado.",
+      "authorIds": [1],
+      "taxonomyIds": [5, 8],
+      "coverMediaId": 10,
+      "publishedAt": "2026-10-05T08:00:00-03:00",
+      "seo": {
+        "title": "Hora de colher: quando e como colher e conservar a sua horta | Horta em Casa",
+        "description": "O ponto certo de colheita de folhas, temperos e frutos, e como conservar o excedente na geladeira, no congelador ou desidratado."
+      },
+      "blocks": [
+        {
+          "n": 1,
+          "type": "toc",
+          "title": "Neste artigo"
+        },
+        {
+          "n": 2,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Colher no momento certo é tão importante quanto plantar bem. Colheita frequente estimula a planta a produzir mais, e o ponto certo garante sabor e durabilidade."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Folhas: colha de fora para dentro"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Em alface, couve e rúcula, colha as "
+                },
+                {
+                  "type": "text",
+                  "text": "folhas externas",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": " e deixe o miolo crescer. Assim um único pé de alface rende várias colheitas por semanas. Use tesoura limpa ou destaque a folha rente à base."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Temperos: corte antes de florescer"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "O sabor e o aroma das ervas estão no auge "
+                },
+                {
+                  "type": "text",
+                  "text": "logo antes da floração",
+                  "marks": ["bold"]
+                },
+                {
+                  "type": "text",
+                  "text": ". Colha de manhã, depois que o orvalho secou, quando os óleos essenciais estão mais concentrados. Nunca tire mais de um terço da planta de uma vez."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Frutos: cor e firmeza"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Tomate, pimenta e morango indicam o ponto pela cor uniforme e por uma leve maciez ao toque. Torça ou corte com o cabinho, para o fruto durar mais."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Conservação"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Na geladeira"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Envolva folhas e ervas em papel-toalha levemente úmido e guarde em pote fechado na gaveta de verduras. Duram de cinco a sete dias."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "No congelador"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Pique salsinha e cebolinha, distribua em forminhas de gelo e complete com azeite ou água. Os cubinhos vão direto para a panela."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Desidratadas"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Pendure maços de orégano, alecrim e tomilho de cabeça para baixo em local seco e ventilado, longe do sol. Em duas semanas estão prontos para guardar em vidro."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 3,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Pesto de manjericão"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "2 xícaras de folhas de manjericão"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "1/2 xícara de azeite"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "1/3 xícara de queijo parmesão ralado"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "2 colheres de sopa de castanhas"
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "1 dente de alho e sal a gosto"
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Bata tudo no processador. Na geladeira, coberto por uma camada de azeite, dura uma semana; no congelador, três meses."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "n": 3,
+          "type": "image",
+          "mediaId": 1,
+          "decorative": true
+        },
+        {
+          "n": 4,
+          "type": "quote",
+          "content": [
+            {
+              "type": "text",
+              "text": "A horta ensina paciência: cada colheita tem o seu tempo."
+            }
+          ],
+          "attribution": "Marina Duarte"
+        },
+        {
+          "n": 5,
+          "type": "faq",
+          "items": [
+            {
+              "question": "Colher muito enfraquece a planta?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Retirar até um terço de cada vez estimula novas brotações. Mais do que isso pode estressar a planta."
+                }
+              ]
+            },
+            {
+              "question": "Posso congelar alface?",
+              "answer": [
+                {
+                  "type": "text",
+                  "text": "Não fica bom: a alface perde a textura. Congele ervas e temperos; folhas para salada só na geladeira."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "kind": "page",
+      "slug": "glossario-da-horta",
+      "title": "Glossário da horta",
+      "description": "Os termos que aparecem nos nossos guias, explicados de um jeito simples.",
+      "authorIds": [],
+      "taxonomyIds": [],
+      "publishedAt": "2026-08-01T09:00:00-03:00",
+      "blocks": [
+        {
+          "n": 1,
+          "type": "text",
+          "content": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "text": "Os termos mais usados nos guias do Horta em Casa, em ordem alfabética."
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "A a D"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Chorume",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": líquido escuro que escorre da composteira; diluído, é um ótimo adubo."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Desbrota",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": retirada dos brotos laterais (os "
+                  },
+                  {
+                    "type": "text",
+                    "text": "ladrões",
+                    "marks": ["italic"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ") para concentrar a energia nos frutos."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Drenagem",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": capacidade do vaso e do substrato de deixar sair o excesso de água."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "E a M"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Húmus de minhoca",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": adubo orgânico produzido pela digestão das minhocas."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Meia-sombra",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": lugar com quatro a seis horas de sol direto por dia."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Muda",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": planta jovem, pronta para ir ao vaso definitivo."
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "heading",
+              "level": 2,
+              "children": [
+                {
+                  "type": "text",
+                  "text": "N a Z"
+                }
+              ]
+            },
+            {
+              "type": "list",
+              "ordered": false,
+              "items": [
+                [
+                  {
+                    "type": "text",
+                    "text": "Substrato",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": mistura leve usada nos vasos no lugar da terra comum. Veja "
+                  },
+                  {
+                    "type": "link",
+                    "href": "/substrato-para-vasos/",
+                    "children": [
+                      {
+                        "type": "text",
+                        "text": "a receita"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "text": "."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Transplante",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": mudança da muda da bandeja para o vaso definitivo."
+                  }
+                ],
+                [
+                  {
+                    "type": "text",
+                    "text": "Tutor",
+                    "marks": ["bold"]
+                  },
+                  {
+                    "type": "text",
+                    "text": ": estaca que sustenta plantas altas, como o tomateiro."
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

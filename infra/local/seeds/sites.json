@@ -1,5 +1,12 @@
 {
-  "$comment": "Só o que é local nos sites de exemplo (ADR 0015 da raiz): domínios <site>.localhost. O seed do backoffice aplica por cima da configuração das fixtures do content-model.",
-  "exemplo-a": { "domains": ["exemplo-a.localhost"] },
-  "exemplo-b": { "domains": ["exemplo-b.localhost"] }
+  "$comment": "Só o que é local nos sites (ADR 0015 da raiz): domínios <site>.localhost. O seed do backoffice aplica por cima da configuração das fixtures do content-model e dos sites completos desta pasta (<site>/site.json).",
+  "exemplo-a": {
+    "domains": ["exemplo-a.localhost"]
+  },
+  "exemplo-b": {
+    "domains": ["exemplo-b.localhost"]
+  },
+  "horta-em-casa": {
+    "domains": ["horta-em-casa.localhost"]
+  }
 }
