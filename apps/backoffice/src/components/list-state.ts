@@ -13,7 +13,6 @@ import {
   sortFns,
   tableFeatures,
   type ColumnFiltersState,
-  type ColumnSort,
   type PaginationState,
   type Row,
   type RowData,
@@ -22,6 +21,8 @@ import {
 } from '@tanstack/react-table';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+
+import { listStateQuery, parseListState, type ListConfig, type ListPatch } from './list-query.ts';
 
 /** Itens por página de toda lista filtrada (sem seletor: decisão da #35). */
 export const PAGE_SIZE = 25;
@@ -56,86 +57,16 @@ export const listFeatures = tableFeatures({
   paginatedRowModel: createPaginatedRowModel(),
 });
 
-/** Filtro de uma coluna: o parâmetro da URL e os valores aceitos (o resto é ignorado). */
-export type ListFilterConfig = { column: string; param: string; values: readonly string[] };
-
-export type ListConfig = {
-  filters: readonly ListFilterConfig[];
-  /** Colunas que aceitam ordenação; `ordem` fora delas cai na padrão. */
-  sortable: readonly string[];
-  /** Sem ordem padrão (e sem `sortable`), a tabela fica na ordem dos dados. */
-  defaultSort?: ColumnSort;
-};
-
-export type ListState = {
-  search: string;
-  /** Valor de cada filtro ativo, pela coluna. */
-  filters: Record<string, string>;
-  /** `undefined`: a ordem dos dados. */
-  sort: ColumnSort | undefined;
-  /** Página a partir de 1. */
-  page: number;
-};
-
-export type ListPatch = {
-  search?: string;
-  /** `undefined` (ou vazio) remove o filtro da coluna. */
-  filters?: Record<string, string | undefined>;
-  sort?: ColumnSort;
-  page?: number;
-};
-
-const SEARCH = 'q';
-const SORT = 'ordem';
-const PAGE = 'pagina';
-
-/** Estado da lista a partir dos `searchParams`; parâmetro inválido cai no padrão. */
-export function parseListState(params: URLSearchParams, config: ListConfig): ListState {
-  const filters: Record<string, string> = {};
-  for (const filter of config.filters) {
-    const value = params.get(filter.param);
-    if (value !== null && filter.values.includes(value)) filters[filter.column] = value;
-  }
-  const sortParam = params.get(SORT) ?? '';
-  const desc = sortParam.startsWith('-');
-  const sortColumn = desc ? sortParam.slice(1) : sortParam;
-  const sort = config.sortable.includes(sortColumn)
-    ? { id: sortColumn, desc }
-    : config.defaultSort && { ...config.defaultSort };
-  const page = Number(params.get(PAGE));
-  return {
-    search: params.get(SEARCH) ?? '',
-    filters,
-    sort,
-    page: Number.isInteger(page) && page > 1 ? page : 1,
-  };
-}
-
-/**
- * Query string com a mudança aplicada; os demais parâmetros da URL ficam. Valor padrão sai
- * do endereço, e mudar a busca ou um filtro volta à página 1.
- */
-export function listStateQuery(params: URLSearchParams, config: ListConfig, patch: ListPatch) {
-  const next = new URLSearchParams(params);
-  const set = (key: string, value: string | undefined) => {
-    if (value === undefined || value === '') next.delete(key);
-    else next.set(key, value);
-  };
-  if (patch.search !== undefined) set(SEARCH, patch.search);
-  for (const [column, value] of Object.entries(patch.filters ?? {})) {
-    const filter = config.filters.find((candidate) => candidate.column === column);
-    if (filter)
-      set(filter.param, value !== undefined && filter.values.includes(value) ? value : '');
-  }
-  if (patch.sort !== undefined) {
-    const { id, desc } = patch.sort;
-    const isDefault = id === config.defaultSort?.id && desc === config.defaultSort.desc;
-    set(SORT, isDefault ? undefined : `${desc ? '-' : ''}${id}`);
-  }
-  if (patch.page !== undefined) set(PAGE, patch.page > 1 ? String(patch.page) : undefined);
-  else if (patch.search !== undefined || patch.filters !== undefined) next.delete(PAGE);
-  return next.toString();
-}
+// Tipos e leitura da URL num módulo sem `'use client'` (`list-query.ts`): a página do servidor
+// também lê `q` e `pagina` (Mídia, #186), e o Next não deixa o servidor chamar função cliente.
+export {
+  listStateQuery,
+  parseListState,
+  type ListConfig,
+  type ListFilterConfig,
+  type ListPatch,
+  type ListState,
+} from './list-query.ts';
 
 /**
  * Estado de uma lista filtrada guardado na URL: a URL é a única fonte (abrir o endereço
