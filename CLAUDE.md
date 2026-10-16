@@ -29,7 +29,7 @@ Geradas:
 - `packages/events` – formato versionado dos eventos, manifesto e script do navegador
 - `apps/blog` – sites Astro por `SITE_ID` (estático) e visualização SSR (`/<site>/<caminho>`); exclui `worker/` do tsconfig e do ESLint
 - `apps/blog/worker` – Worker de borda `/_e/*`: valida pageviews e grava no Analytics Engine
-- `apps/backoffice` – Next.js: UI, API de exportação; processos worker (jobs e agregador) e build-runner (task `build`: render e publish pelo `docker-socket-proxy`)
+- `apps/backoffice` – Next.js: UI (layout e componentes do Ecme), API de exportação; processos worker (jobs e agregador) e build-runner (task `build`: render e publish pelo `docker-socket-proxy`)
 - `packages/build-contract` – contrato do volume `/build` (`result.json`, `publish.json`), só Zod
 - `tooling/build-site` – entrypoints `render`, `publish` e `ssr` da imagem `site-builder`
 - `infra/local/edge-local` – substituto local do deploy: um Worker por site, versões, rollback e `ae-sim`
@@ -50,6 +50,9 @@ Previstas (gere com `/scaffold` no caminho da unidade):
 - Não edite `.agents/`, `.claude/skills/` nem `skills-lock.json` (skills do orakel).
 - Nova decisão de arquitetura → ADR em `docs/decisions/`; mudou a estrutura → atualize `docs/architecture/overview.md`.
 - Unidade nova → linha em "Unidades" acima e em `units:` de `docs/project-spec.yaml`.
+- Tela do Backoffice nova ou alterada: o template Ecme (`Orakel-AI-Content/design-reference`)
+  é a referência de design e de código de frontend; porte seguindo
+  `apps/backoffice/docs/migration/ecme.md` (ADR 0016 da unidade).
 
 ## Workflow orakel
 

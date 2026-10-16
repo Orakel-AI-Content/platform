@@ -112,10 +112,20 @@ decisions:
     }
   design.design_system:
     {
-      value: 'shadcn/ui (componentes copiados) + Tailwind 4.3.3',
-      source: input,
-      input_ref: 'UI e componentes',
+      value: 'Ecme v1.3.10 (Orakel-AI-Content/design-reference) portado para o Next + Tailwind 4.3.3',
+      source: decided,
+      rationale: 'ADR 0016; substitui shadcn/ui (entrada, UI e componentes)',
     }
+  design.visual_reference:
+    { value: 'Template Ecme (design-reference)', source: decided, rationale: ADR 0016 }
+  design.layout:
+    {
+      value: 'CollapsibleSide do Ecme: navegação lateral recolhível + header',
+      source: decided,
+      rationale: ADR 0016,
+    }
+  design.icons_assets:
+    { value: 'react-icons (Phosphor, como no Ecme)', source: decided, rationale: ADR 0016 }
   design.tables: { value: TanStack Table 9.2.4, source: input }
   design.accessibility: { value: WCAG 2.2 AA; axe no E2E, source: inherited }
 
@@ -190,7 +200,7 @@ structure:
     ├── src/auth/                JWT do Access, tokens internos, ator da requisição
     ├── src/jobs/                tasks (build, heartbeat), crontab
     ├── src/bin/                 worker, build-runner, migrate, seed
-    ├── src/components/          ui/ (shadcn) e telas
+    ├── src/components/          ui/, shared/, template/, layouts/ (Ecme) e telas
     ├── src/lib/                 logger, problem, heartbeat, s3, sentry, utils, docker, tar
     └── test/{contract,e2e}/
   paths:
