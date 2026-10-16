@@ -1,65 +1,127 @@
 @import 'tailwindcss';
 
-/* Tokens do Backoffice no padrão do shadcn/ui (neutral). Os temas dos sites são do
-   @orakel/tokens; este é só da ferramenta interna. Contraste AA nos pares de texto e 3:1 no
-   foco, conferidos por globals-contrast.test.ts nos dois temas. */
+/* Paleta do Ecme (#202; docs/migration/ecme.md), portada de src/assets/styles/tailwind/index.css
+   do design-reference (e5f9a1d). Os temas dos sites são do @orakel/tokens; este é só da
+   ferramenta interna. Contraste AA nos pares de texto e 3:1 no foco, conferidos por
+   globals-contrast.test.ts nos dois temas.
+
+   Diferenças em relação ao template, pelo contraste:
+   - primary, info, error, success e warning escurecidos no claro, no mesmo tom (OKLCH), até
+     4,5:1 com branco e com gray-100. Originais do Ecme: primary e info #2a85ff, primary-deep
+     #0069f6, primary-mild #4996ff, error #ff6a55, success #10b981, warning #f59e0b;
+   - no escuro, essas cores voltam aos valores originais, que passam sobre os fundos escuros e
+     não passam sobre o branco: nenhum valor único atende os dois temas. No Ecme o .dark repete o
+     :root; aqui só a escala gray, o neutral e os -subtle ficam iguais nos dois temas. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --border: oklch(0.922 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.5 0.21 27);
-  --destructive-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.42 0.11 70);
-  --success: oklch(0.45 0.13 150);
-  --success-foreground: oklch(0.985 0 0);
-  --info: oklch(0.45 0.14 255);
-  --info-foreground: oklch(0.985 0 0);
-  --ring: oklch(0.55 0.2 260);
+  --neutral: #ffffff;
+  --primary: #006be3;
+  --primary-deep: #004eda;
+  --primary-mild: #2675db;
+  --primary-subtle: #2a85ff1a;
+  --error: #cd3b29;
+  --error-subtle: #ff6a551a;
+  --success: #00804d;
+  --success-subtle: #05eb7624;
+  --info: #006be3;
+  --info-subtle: #2a85ff1a;
+  --warning: #ad5b00;
+  --warning-subtle: #ffd40045;
+  --gray-50: #fafafa;
+  --gray-100: #f5f5f5;
+  --gray-200: #e5e5e5;
+  --gray-300: #d4d4d4;
+  --gray-400: #a3a3a3;
+  --gray-500: #737373;
+  --gray-600: #525252;
+  --gray-700: #404040;
+  --gray-800: #262626;
+  --gray-900: #171717;
+  --gray-950: #0a0a0a;
+
+  /* Apelidos de transição: os nomes do shadcn que as telas ainda usam, apontando para a paleta
+     do Ecme. Cada Story de tela troca os nomes ao migrar; a limpeza do épico os remove. */
+  --background: var(--neutral);
+  --foreground: var(--gray-900);
+  --muted: var(--gray-100);
+  --muted-foreground: var(--gray-600);
+  --border: var(--gray-200);
+  --primary-foreground: var(--neutral);
+  --destructive: var(--error);
+  --destructive-foreground: var(--neutral);
+  --success-foreground: var(--neutral);
+  --info-foreground: var(--neutral);
+  --ring: var(--primary);
   --radius: 0.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.75 0 0);
-    --border: oklch(0.3 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.7 0.19 22);
-    --destructive-foreground: oklch(0.145 0 0);
-    --warning: oklch(0.8 0.12 80);
-    --success: oklch(0.78 0.15 150);
-    --success-foreground: oklch(0.145 0 0);
-    --info: oklch(0.78 0.12 240);
-    --info-foreground: oklch(0.145 0 0);
-    --ring: oklch(0.72 0.14 255);
+    --primary: #2a85ff;
+    --primary-deep: #0069f6;
+    --primary-mild: #4996ff;
+    --error: #ff6a55;
+    --success: #10b981;
+    --info: #2a85ff;
+    --warning: #f59e0b;
+
+    --background: var(--gray-950);
+    --foreground: var(--gray-100);
+    --muted: var(--gray-800);
+    --muted-foreground: var(--gray-400);
+    --border: var(--gray-700);
+    --primary-foreground: var(--gray-950);
+    --destructive-foreground: var(--gray-950);
+    --success-foreground: var(--gray-950);
+    --info-foreground: var(--gray-950);
   }
 }
 
 @theme inline {
+  --font-sans:
+    var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+  --breakpoint-xs: 576px;
+
+  --color-neutral: var(--neutral);
+  --color-primary: var(--primary);
+  --color-primary-deep: var(--primary-deep);
+  --color-primary-mild: var(--primary-mild);
+  --color-primary-subtle: var(--primary-subtle);
+  --color-error: var(--error);
+  --color-error-subtle: var(--error-subtle);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-gray-50: var(--gray-50);
+  --color-gray-100: var(--gray-100);
+  --color-gray-200: var(--gray-200);
+  --color-gray-300: var(--gray-300);
+  --color-gray-400: var(--gray-400);
+  --color-gray-500: var(--gray-500);
+  --color-gray-600: var(--gray-600);
+  --color-gray-700: var(--gray-700);
+  --color-gray-800: var(--gray-800);
+  --color-gray-900: var(--gray-900);
+  --color-gray-950: var(--gray-950);
+
+  /* Apelidos de transição (ver :root). */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
-  --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-warning: var(--warning);
-  --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
-  --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-ring: var(--ring);
   --radius-md: var(--radius);
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Larguras canônicas das telas (#88): formulário e leitura de um item numa coluna legível;
