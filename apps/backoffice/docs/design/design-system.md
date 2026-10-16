@@ -7,10 +7,10 @@
 Consulte ao criar ou mudar telas. Os temas dos sites são do `@orakel/tokens`; este é só da
 ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 
-- **Componentes:** shadcn/ui (estilo new-york), copiados em `src/components/ui/` (tabela, badge,
+- **Componentes:** shadcn/ui (estilo new-york), copiados em `src/components/legacy-ui/` (tabela, badge,
   button, input, label, textarea e checkbox, sem Radix: `<select>` e checkbox nativos). Componente novo do catálogo: copie a fonte do shadcn para ali e
   ajuste aos tokens; o CLI não instala dependências fora do `catalog` da raiz.
-- **Menu "Mais ações":** `ActionsMenu` (`src/components/ui/actions-menu.tsx`), próprio (o
+- **Menu "Mais ações":** `ActionsMenu` (`src/components/legacy-ui/actions-menu.tsx`), próprio (o
   shadcn usaria Radix), para as ações secundárias de uma linha de tabela quando não cabem sem
   aumentar a altura dela; a ação principal da linha fica visível, fora do menu. `label` põe o
   item no nome acessível ("Mais ações: exemplo-a"). Os itens são links e botões comuns, em
@@ -40,7 +40,7 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   ("Identificador copiado."); a falha (sem contexto seguro, permissão negada) mostra o
   identificador na mesma região, em `text-destructive`. Esc ou "Fechar" limpam a mensagem e
   devolvem o foco à imagem por `focus()` no `close`.
-- **Botão de ícone:** `IconButton` (`src/components/ui/icon-button.tsx`), próprio (o tooltip
+- **Botão de ícone:** `IconButton` (`src/components/legacy-ui/icon-button.tsx`), próprio (o tooltip
   do shadcn usaria Radix), para ações repetidas e compactas, como os controles de cada bloco do
   editor. O nome vem de `label` (`aria-label`, com a posição: "Mover bloco 3 para cima"); a dica
   visível repete o texto num `span` `aria-hidden`, mostrado só no hover e no `focus-visible`,
