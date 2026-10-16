@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-// Contraste dos tokens do Backoffice (#85), lidos do próprio globals.css nos dois temas. A
-// razão é a da WCAG 2.x, como em packages/tokens/src/contrast.ts (que o pacote não exporta);
-// a conversão OKLCH → sRGB fica aqui para o Backoffice não depender do @orakel/tokens.
+// Contraste dos tokens do Backoffice (#85; paleta do Ecme desde #202), lidos do próprio
+// globals.css nos dois temas. A razão é a da WCAG 2.x, como em packages/tokens/src/contrast.ts
+// (que o pacote não exporta); a leitura de hex e OKLCH fica aqui para o Backoffice não depender
+// do @orakel/tokens.
 
 const css = readFileSync(new URL('globals.css', import.meta.url), 'utf8');
 
@@ -31,6 +32,16 @@ const dark = new Map([
 ]);
 const THEMES = { claro: light, escuro: dark };
 
+/** Valor final da variável no tema, seguindo `var(--outra)` (os apelidos apontam para o Ecme). */
+function resolve(theme: Theme, name: string, seen: readonly string[] = []): string | undefined {
+  const value = theme.get(name);
+  const reference = value === undefined ? undefined : /^var\(--([\w-]+)\)$/.exec(value);
+  if (!reference) return value;
+  if (seen.includes(name))
+    throw new Error(`Referência circular: --${[...seen, name].join(' → --')}`);
+  return resolve(theme, reference[1]!, [...seen, name]);
+}
+
 /** `oklch(L C h)` → sRGB codificado (0 a 1), cortado na gama. */
 export function oklchToSrgb(value: string): [number, number, number] {
   const match = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)$/.exec(value);
@@ -52,8 +63,20 @@ export function oklchToSrgb(value: string): [number, number, number] {
   }) as [number, number, number];
 }
 
+/** `#rrggbb` ou `#rrggbbaa` → sRGB codificado (0 a 1). O alfa é ignorado: as cores com
+ *  transparência (os `-subtle` do Ecme) são fundos tingidos, fora dos pares de texto. */
+export function hexToSrgb(value: string): [number, number, number] {
+  const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})(?:[\da-f]{2})?$/i.exec(value);
+  if (!match) throw new Error(`Cor fora do formato #rrggbb: ${value}`);
+  return match.slice(1).map((pair) => parseInt(pair, 16) / 255) as [number, number, number];
+}
+
+function toSrgb(value: string): [number, number, number] {
+  return value.startsWith('#') ? hexToSrgb(value) : oklchToSrgb(value);
+}
+
 function luminance(value: string): number {
-  const [r, g, b] = oklchToSrgb(value).map((c) =>
+  const [r, g, b] = toSrgb(value).map((c) =>
     c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
   ) as [number, number, number];
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -67,6 +90,7 @@ function contrast(a: string, b: string): number {
 
 /** [primeiro plano, fundo, mínimo]: texto a 4,5:1 (1.4.3) e foco a 3:1 (1.4.11, 2.4.13). */
 const PAIRS: readonly (readonly [string, string, number])[] = [
+  // Apelidos de transição, como as telas ainda os combinam.
   ['foreground', 'background', 4.5],
   ['foreground', 'muted', 4.5],
   ['muted-foreground', 'background', 4.5],
@@ -74,13 +98,29 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ['primary-foreground', 'primary', 4.5],
   ['destructive-foreground', 'destructive', 4.5],
   ['destructive', 'background', 4.5],
+  ['success-foreground', 'success', 4.5],
+  ['info-foreground', 'info', 4.5],
+  // Cores do Ecme como texto sobre o fundo, como fundo do texto e no hover do botão.
+  ['primary', 'background', 4.5],
+  ['primary-foreground', 'primary-mild', 4.5],
+  ['error', 'background', 4.5],
   ['warning', 'background', 4.5],
   ['success', 'background', 4.5],
-  ['success-foreground', 'success', 4.5],
   ['info', 'background', 4.5],
-  ['info-foreground', 'info', 4.5],
+  ['gray-900', 'gray-100', 4.5],
+  ['gray-600', 'gray-100', 4.5],
+  // Foco.
   ['ring', 'background', 3],
+  ['ring', 'muted', 3],
 ];
+
+describe('conversão hex', () => {
+  it('lê #rrggbb e ignora o alfa de #rrggbbaa', () => {
+    expect(hexToSrgb('#ff0000')).toEqual([1, 0, 0]);
+    expect(hexToSrgb('#2a85ff1a')).toEqual(hexToSrgb('#2a85ff'));
+    expect(() => hexToSrgb('#fff')).toThrow();
+  });
+});
 
 describe('conversão OKLCH', () => {
   it('leva branco, preto e um vermelho conhecido ao sRGB', () => {
@@ -99,8 +139,8 @@ describe('conversão OKLCH', () => {
 
 describe.each(Object.entries(THEMES))('tokens do tema %s', (_, theme) => {
   it.each(PAIRS)('%s sobre %s chega a %d:1', (foreground, background, minimum) => {
-    const fg = theme.get(foreground);
-    const bg = theme.get(background);
+    const fg = resolve(theme, foreground);
+    const bg = resolve(theme, background);
     expect(fg, `--${foreground}`).toBeDefined();
     expect(bg, `--${background}`).toBeDefined();
     expect(contrast(fg!, bg!)).toBeGreaterThanOrEqual(minimum);
