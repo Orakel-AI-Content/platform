@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ListPagination, ListToolbar } from '@/components/list-controls.tsx';
 import { listFeatures, useListState, type ListConfig } from '@/components/list-state.ts';
 
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/legacy-ui/button';
 import {
   Table,
   TableBody,
@@ -17,7 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/legacy-ui/table';
 
 /** Linha de uma lista de entidades: o servidor já formata as células como texto. */
 export type EntityRow = { id: number; name: string; cells: string[] };

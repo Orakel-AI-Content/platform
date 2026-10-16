@@ -8,7 +8,7 @@ import {
   CONTENT_STATUS_VARIANT,
   formatDateTime,
 } from '@/components/site-labels.ts';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/legacy-ui/badge';
 import {
   Table,
   TableBody,
@@ -17,7 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/legacy-ui/table';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 /** Linha da tela de versões: só o que a tabela mostra (sem os dados da versão). */

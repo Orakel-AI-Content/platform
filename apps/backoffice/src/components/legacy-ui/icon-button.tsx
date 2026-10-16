@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/legacy-ui/button';
 import { cn } from '@/lib/utils';
 
 // Botão só de ícone com dica (#131), sem Radix: o nome acessível vem do `aria-label`, e a

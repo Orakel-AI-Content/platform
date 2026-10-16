@@ -5,7 +5,7 @@ import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/r
 import { Bold, Code, Heading2, Heading3, Italic, Link, List, ListOrdered } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { IconButton } from '@/components/ui/icon-button';
+import { IconButton } from '@/components/legacy-ui/icon-button';
 
 import { LinkPopover } from './link-popover.tsx';
 

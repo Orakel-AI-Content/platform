@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/legacy-ui/table';
 import type { ReviewQueueItem } from '@/domain/content/contents.ts';
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).

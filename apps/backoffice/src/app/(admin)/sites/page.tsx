@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { currentActor } from '@/auth/request-actor.ts';
 import { noRead } from '@/components/forbidden-screen';
 import { SitesTable } from '@/components/sites-table';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/legacy-ui/button';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { listSites, TFVARS_FILENAME } from '@/domain/sites/sites.ts';

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/legacy-ui/button';
 
 // Botão "Enviar para revisão" da página do conteúdo (#74), no padrão das ações da página do
 // site: a Server Action delega ao domínio e o retorno é anunciado em role=status. A página o

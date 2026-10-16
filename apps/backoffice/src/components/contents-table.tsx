@@ -14,8 +14,8 @@ import {
   CONTENT_STATUS_VARIANT,
   formatDateTime,
 } from '@/components/site-labels.ts';
-import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/legacy-ui/badge';
+import { Button, buttonVariants } from '@/components/legacy-ui/button';
 import {
   Table,
   TableBody,
@@ -23,7 +23,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/legacy-ui/table';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 const column = createColumnHelper<typeof listFeatures, ContentListItem>();

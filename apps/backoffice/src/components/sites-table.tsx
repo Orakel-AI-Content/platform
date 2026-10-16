@@ -15,9 +15,9 @@ import {
   type PublishStatus,
 } from '@/components/site-status';
 import { EmptyState } from '@/components/empty-state';
-import { ActionsMenu } from '@/components/ui/actions-menu';
-import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { ActionsMenu } from '@/components/legacy-ui/actions-menu';
+import { Badge } from '@/components/legacy-ui/badge';
+import { buttonVariants } from '@/components/legacy-ui/button';
 import {
   Table,
   TableBody,
@@ -26,7 +26,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/legacy-ui/table';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 import { cn } from '@/lib/utils';
 

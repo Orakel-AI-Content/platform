@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media-library';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/legacy-ui/button';
 
 // Grade de miniaturas num diálogo (#181), para os campos de mídia escolherem uma imagem da
 // biblioteca sem carregá-la inteira: `<dialog>` nativo com `showModal` (o navegador prende o

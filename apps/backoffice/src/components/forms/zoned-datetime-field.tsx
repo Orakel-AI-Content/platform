@@ -1,6 +1,6 @@
 'use client';
 
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/legacy-ui/input';
 
 import type { FieldProps, FieldRenderer } from './schema-form.tsx';
 

@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 import { backToSites } from '@/components/forbidden-screen';
 import { StatusScreen } from '@/components/status-screen';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/legacy-ui/button';
 
 // "Não encontrado" dentro do layout (admin) (#77): `notFound()` das páginas e o catch-all
 // `[...rest]` caem aqui, com o cabeçalho do Backoffice (o 404 padrão do Next fica fora dele).

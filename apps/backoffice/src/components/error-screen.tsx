@@ -1,5 +1,5 @@
 import { StatusScreen } from '@/components/status-screen';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/legacy-ui/button';
 
 // Conteúdo da tela de erro (#77), comum ao error.tsx de (admin) e ao global-error.tsx. Nunca
 // mostra a mensagem nem a pilha da exceção: só o digest, que liga a tela aos logs.

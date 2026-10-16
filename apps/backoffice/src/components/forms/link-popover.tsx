@@ -5,10 +5,10 @@ import type { Editor } from '@tiptap/react';
 import { Link } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { IconButton } from '@/components/ui/icon-button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/legacy-ui/button';
+import { IconButton } from '@/components/legacy-ui/icon-button';
+import { Input } from '@/components/legacy-ui/input';
+import { Label } from '@/components/legacy-ui/label';
 
 // Link do rich text (#132), no lugar do `window.prompt`: um popover nativo ancorado ao botão
 // Link da barra, como o `ActionsMenu` (Popover API + anchor positioning). O endereço é

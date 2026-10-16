@@ -2,8 +2,8 @@
 
 import { useId, type MouseEvent, type ReactNode } from 'react';
 
-import { buttonVariants } from '@/components/ui/button';
-import { IconButton } from '@/components/ui/icon-button';
+import { buttonVariants } from '@/components/legacy-ui/button';
+import { IconButton } from '@/components/legacy-ui/icon-button';
 import { cn } from '@/lib/utils';
 
 // Menu "Mais ações" (#98): ações secundárias de uma linha atrás de um botão, sem Radix. A

@@ -7,7 +7,7 @@ import {
   CONTENT_STATUS_VARIANT,
   formatDateTime,
 } from '@/components/site-labels.ts';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/legacy-ui/badge';
 import { noRead } from '@/components/forbidden-screen';
 
 import { PageHeader, siteTrail } from '../../../../editorial-page.tsx';

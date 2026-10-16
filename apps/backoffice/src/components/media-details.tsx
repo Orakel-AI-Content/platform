@@ -4,7 +4,7 @@ import { useId, useRef, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media-library';
 import { formatDateTime } from '@/components/site-labels.ts';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/legacy-ui/button';
 
 // Detalhes de uma imagem da biblioteca (#187): a imagem da grade é um botão que abre um
 // `<dialog>` nativo com `showModal` (sem Radix, como o `MediaPicker`), com nome, dimensões,
