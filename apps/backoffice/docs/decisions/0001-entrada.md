@@ -48,3 +48,6 @@ Texto da entrada, sem edição:
 
 Divergências e recortes em relação a este texto: ADR 0002 (escopo e backlog) e ADR 0007
 (divergências da entrada).
+
+Interface: o shadcn/ui da linha "UI e componentes" foi substituído pelo
+Ecme (ADR 0016); o resto da linha (Tailwind incluído) continua valendo.

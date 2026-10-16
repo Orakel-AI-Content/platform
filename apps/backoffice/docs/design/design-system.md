@@ -1,5 +1,9 @@
 # Design system do Backoffice
 
+> **Em transição para o Ecme** (ADR 0016). Tela nova ou alterada segue
+> `docs/migration/ecme.md`; o que está abaixo vale para as telas ainda não migradas e será
+> reescrito no fim do épico de migração.
+
 Consulte ao criar ou mudar telas. Os temas dos sites são do `@orakel/tokens`; este é só da
 ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 

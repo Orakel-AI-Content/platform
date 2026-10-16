@@ -34,8 +34,8 @@ para um site, inclua a tabela em `EXPORTED_TABLES` e chame `recordPendingChange`
 (só aditivo) → `pnpm db:migrate`.
 
 **Uma tela:** `src/app/(admin)/<rota>/page.tsx` (Server Component chamando o domínio);
-interação em componente cliente em `src/components/`; componente do shadcn em
-`src/components/ui/`.
+interação em componente cliente em `src/components/`; peça portada do Ecme em
+`src/components/ui/`, `shared/`, `template/` ou `layouts/` (`docs/migration/ecme.md`).
 
 **Uma rota da API:** `src/app/api/<…>/route.ts`, fina; token interno com `hasBearer`;
 erros com `problem()`. Rota interna nova: bloqueie o prefixo no `Caddyfile` e no Tunnel.

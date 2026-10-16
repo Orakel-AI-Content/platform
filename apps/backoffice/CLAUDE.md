@@ -28,6 +28,9 @@ Stack: Next.js 16 (App Router) + Drizzle/Postgres + Graphile Worker; contratos e
 - `process.env` só via `src/env.ts`.
 - `/api/export` e `/api/internal` só na rede interna; rota interna nova também é bloqueada
   no `infra/local/Caddyfile`.
+- Interface: o Ecme (`Orakel-AI-Content/design-reference`) é a referência de design e de
+  código. Antes de criar ou mudar uma tela, ache a peça equivalente no template e porte-a
+  pelas regras de `docs/migration/ecme.md` (ADR 0016).
 
 ## Documentação (leia sob demanda)
 
@@ -38,6 +41,7 @@ relevantes e leia-os primeiro.
 - `docs/architecture/code-design.md` – camadas e padrões do domínio
 - `docs/architecture/folder-structure.md` – como acrescentar módulo, tabela, tela, rota ou job
 - `docs/conventions/testing.md` – unitários, contrato com Postgres, E2E
-- `docs/design/design-system.md` – shadcn/ui, tokens, tabelas
-- `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog; 0008: task build; 0010: janela por site; 0011: sites.auto.tfvars.json; 0012: envio e ingestão de imagens; 0013: variantes e registro da mídia; 0014: reprocessamento; 0015: status mutável da versão)
+- `docs/migration/ecme.md` – Ecme: onde está, o que portar, regras de porte, testes, histórias
+- `docs/design/design-system.md` – padrões atuais (shadcn/ui, tokens, tabelas), em transição para o Ecme
+- `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog; 0008: task build; 0010: janela por site; 0011: sites.auto.tfvars.json; 0012: envio e ingestão de imagens; 0013: variantes e registro da mídia; 0014: reprocessamento; 0015: status mutável da versão; 0016: Ecme como design system)
 - `docs/project-spec.yaml` – decisões desta unidade (herda as da raiz)
