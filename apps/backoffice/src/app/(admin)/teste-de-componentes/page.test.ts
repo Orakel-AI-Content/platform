@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Vitrine de componentes (#205): desligada por padrão (404), só existe com a variável. A
-// página da Pagination em modo link vem de `?pagina=` (#214).
+// página da Pagination em modo link vem de `?pagina-link=` (#214, #215).
 
 const env = vi.hoisted(() => ({ E2E_ERROR_ROUTE: false }));
 vi.mock('@/env.ts', () => ({ getEnv: () => env }));
@@ -10,7 +10,7 @@ vi.mock('@/env.ts', () => ({ getEnv: () => env }));
 const { default: ComponentsShowcasePage } = await import('./page.tsx');
 
 const render = (pagina?: string | string[]) =>
-  ComponentsShowcasePage({ searchParams: Promise.resolve({ pagina }) });
+  ComponentsShowcasePage({ searchParams: Promise.resolve({ 'pagina-link': pagina }) });
 
 /** `linkPage` que a página passa à vitrine (segundo filho do contêiner). */
 async function linkPage(pagina?: string | string[]): Promise<unknown> {
@@ -33,7 +33,7 @@ describe('página /teste-de-componentes', () => {
     expect(await render()).toBeTruthy();
   });
 
-  it('passa a página de ?pagina= à vitrine; sem número válido, a 1', async () => {
+  it('passa a página de ?pagina-link= à vitrine; sem número válido, a 1', async () => {
     env.E2E_ERROR_ROUTE = true;
     expect(await linkPage('3')).toBe(3);
     expect(await linkPage()).toBe(1);

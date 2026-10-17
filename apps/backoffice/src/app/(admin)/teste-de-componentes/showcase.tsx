@@ -35,6 +35,8 @@ import { Tag } from '@/components/ui/Tag';
 import { toast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/Tooltip';
 
+import { DataTableShowcase } from './data-table-showcase.tsx';
+
 /** Imagem do Avatar sem rede: um quadrado na cor primária. */
 const AVATAR_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23006be3'/%3E%3C/svg%3E";
@@ -544,12 +546,14 @@ export function Showcase({ linkPage }: { linkPage: number }) {
               total={200}
               pageSize={10}
               currentPage={linkPage}
-              getPageHref={(n) => `/teste-de-componentes?pagina=${n}`}
+              getPageHref={(n) => `/teste-de-componentes?pagina-link=${n}`}
             />
             <p className="text-sm">Página na URL: {linkPage}.</p>
           </div>
         </Card>
       </section>
+
+      <DataTableShowcase />
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">
         <h2 id="vitrine-movimento" className="text-lg font-semibold">
