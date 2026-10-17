@@ -8,8 +8,9 @@
 //   `/sites/novo`, o segmento não é um dos sites, e as áreas não aparecem;
 // - sem `ScrollBar`: o conteúdo rola com `overflow-y-auto` nativo (`side-nav-content`);
 // - recolhida (#238), 80px: a marca vira "OB" (o nome fica em `sr-only`), os itens só com o
-//   ícone e a dica, sem o rótulo do grupo; o seletor de site fica escondido até a versão
-//   recolhida dele (#241). O estado vem do contexto da moldura (`useSideNav`).
+//   ícone e a dica, sem o rótulo do grupo; o seletor de site (#241) vira as iniciais do site,
+//   com o mesmo nome e a dica. O estado vem do contexto da moldura (`useSideNav`) e chega ao
+//   seletor por prop.
 'use client';
 
 import Link from 'next/link';
@@ -108,11 +109,9 @@ const SideNav = ({
         />
         {site && (
           <>
-            {!collapsed && (
-              <div className="px-4">
-                <SiteSwitcher current={site} sites={sites} />
-              </div>
-            )}
+            <div className={classNames('flex', collapsed ? 'justify-center' : 'px-4')}>
+              <SiteSwitcher current={site} sites={sites} collapsed={collapsed} />
+            </div>
             <VerticalMenuContent
               aria-label="Áreas do site"
               collapsed={collapsed}

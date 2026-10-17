@@ -10,6 +10,8 @@ const OPERATOR = 'operacao@orakel.local';
 const SITE = 'exemplo-a';
 const SITE_NAME = 'Exemplo A — Guias';
 
+const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
+
 const AREAS = ['Visão geral', 'Conteúdos', 'Revisão', 'Mídia', 'Autores', 'Taxonomias', 'Menus'];
 
 async function loginAs(page: Page, email: string): Promise<void> {
@@ -148,24 +150,25 @@ test('a barra é navegável só com teclado', async ({ page }) => {
 });
 
 const switcher = (page: Page) => page.getByRole('button', { name: `${SITE_NAME}, trocar de site` });
+const OTHER_SITE = 'Exemplo B — Receitas';
 
 test('o seletor troca de site em 2 cliques, na mesma área; item leva à lista', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
 
   await page.goto(`/sites/${SITE}/midia`);
   await switcher(page).click();
-  await page.getByRole('link', { name: 'Exemplo B — Receitas' }).click();
+  await page.getByRole('menu').getByRole('menuitem', { name: OTHER_SITE }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-b\/midia$/);
 
   await page.goto(`/sites/${SITE}/autores/novo`);
   await switcher(page).click();
-  await page.getByRole('link', { name: 'Exemplo B — Receitas' }).click();
+  await page.getByRole('menu').getByRole('menuitem', { name: OTHER_SITE }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-b\/autores$/);
 });
 
 test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
-  const list = page.locator('[popover]:popover-open');
+  const menu = page.getByRole('menu');
 
   // Outros arquivos do E2E rodam em paralelo e cadastram e removem sites (o sites-list.spec
   // grava 18 no beforeAll), então a lista pode mudar entre a leitura da tabela e a do seletor.
@@ -182,14 +185,14 @@ test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page
           .count();
         await page.goto(`/sites/${SITE}`);
         await switcher(page).click();
-        await expect(list).toBeVisible();
-        const listed = await list.getByRole('link').count();
+        await expect(menu).toBeVisible();
+        const listed = await menu.getByRole('menuitem').count();
         return listed === visible;
       },
       { timeout: 30_000, intervals: [500] },
     )
     .toBe(true);
-  await expect(list.locator('[aria-current="true"]')).toHaveText(SITE_NAME);
+  await expect(menu.locator('[aria-current="true"]')).toHaveText(SITE_NAME);
 });
 
 test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao botão', async ({
@@ -197,7 +200,9 @@ test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao bot
 }) => {
   await loginAs(page, OPERATOR);
   await page.goto(`/sites/${SITE}/taxonomias`);
+  await page.waitForLoadState('networkidle');
   const button = switcher(page);
+  const menu = page.getByRole('menu');
 
   for (let step = 0; step < 40; step += 1) {
     if (await button.evaluate((element) => element === document.activeElement)) break;
@@ -205,26 +210,51 @@ test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao bot
   }
   await expect(button).toBeFocused();
   await page.keyboard.press('Enter');
-  const list = page.locator('[popover]:popover-open');
-  await expect(list).toBeVisible();
+  await expect(menu).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(list).toHaveCount(0);
+  await expect(menu).toHaveCount(0);
   await expect(button).toBeFocused();
 
   await page.keyboard.press('Enter');
-  await expect(list).toBeVisible();
-  const other = page.getByRole('link', { name: 'Exemplo B — Receitas' });
-  // Um Tab por site da lista, no máximo: com outros arquivos do E2E cadastrando sites em
-  // paralelo, a lista pode ter mais de 20, e o Enter só vale com o foco no link certo.
-  const links = await list.getByRole('link').count();
-  for (let step = 0; step <= links; step += 1) {
+  await expect(menu).toBeVisible();
+  const other = menu.getByRole('menuitem', { name: OTHER_SITE });
+  // Uma seta por site do menu, no máximo: com outros arquivos do E2E cadastrando sites em
+  // paralelo, a lista pode ter mais de 20, e o Enter só vale com o foco no item certo.
+  const items = await menu.getByRole('menuitem').count();
+  for (let step = 0; step <= items; step += 1) {
     if (await other.evaluate((element) => element === document.activeElement)) break;
-    await page.keyboard.press('Tab');
+    await page.keyboard.press('ArrowDown');
   }
   await expect(other).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/sites\/exemplo-b\/taxonomias$/);
 });
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`o seletor aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${SITE}/autores`);
+    await page.waitForLoadState('networkidle');
+    // Pelo teclado, como na vitrine do Dropdown: o primeiro item recebe o foco (`tabindex=0`).
+    // Com mais sites do que cabem (outros arquivos do E2E cadastram em paralelo), o <ul> rola,
+    // e o `scrollable-region-focusable` do axe pede um item focável dentro dele.
+    await switcher(page).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menu').getByRole('menuitem').first()).toBeFocused();
+    // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
+    // opacidade sobe; o axe roda depois dela.
+    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('.side-nav')
+      .include('[role="menu"]')
+      .exclude('[data-floating-ui-focus-guard]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
 
 test('trilha nas telas de item: Sites › Site › Área › Item, sem link de volta solto', async ({
   page,
@@ -291,7 +321,6 @@ test('trilha nas telas de item: Sites › Site › Área › Item, sem link de v
 // só com o ícone, o nome no link e a dica no hover e no foco; o estado vale entre navegações
 // pelo cliente e volta expandido ao recarregar.
 
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 const sideNavToggle = (page: Page) => page.getByRole('button', { name: 'Navegação lateral' });
 const sideNavWidth = (page: Page) =>
   page.locator('#barra-lateral').evaluate((element) => element.getBoundingClientRect().width);
@@ -320,7 +349,14 @@ test('o toggle recolhe e expande a barra; recolhida, ícones com nome, dica e ar
     'href',
     '/sites',
   );
-  await expect(page.getByRole('button', { name: /trocar de site/ })).toHaveCount(0);
+  // O seletor vira as iniciais, com o mesmo nome e a dica com o nome do site.
+  await expect(switcher(page).locator('[aria-hidden="true"]')).toHaveText('EA');
+  await switcher(page).hover();
+  await expect(page.getByRole('tooltip', { name: SITE_NAME })).toBeVisible();
+  await switcher(page).click();
+  await expect(page.getByRole('menu').getByRole('menuitem', { name: OTHER_SITE })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
 
   await bar.getByRole('link', { name: 'Mídia' }).hover();
   await expect(page.getByRole('tooltip', { name: 'Mídia' })).toBeVisible();

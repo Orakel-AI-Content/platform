@@ -893,6 +893,36 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-900',
     minimum: 4.5,
   },
+  // Seletor de site (#241): o nome ou as iniciais do site no gatilho, sobre a barra lateral
+  // (`side-nav-bg`) e no hover. O site atual no menu é o "item ativo do menu".
+  {
+    name: 'seletor de site na barra',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'seletor de site no hover',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'seletor de site na barra',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'seletor de site no hover',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
