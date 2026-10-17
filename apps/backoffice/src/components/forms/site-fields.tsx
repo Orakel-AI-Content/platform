@@ -58,7 +58,9 @@ function LinesField({
     <Input
       textArea
       id={id}
-      ref={ref}
+      // O `ref` do Input do Ecme também admite um componente (`asElement`); o foco do erro só
+      // precisa do elemento do DOM.
+      ref={(element) => ref(element instanceof HTMLElement ? element : null)}
       rows={rows}
       readOnly={readOnly}
       aria-invalid={invalid}
