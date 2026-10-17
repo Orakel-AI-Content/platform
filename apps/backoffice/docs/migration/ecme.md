@@ -77,7 +77,19 @@ ThemeConfigurator completo.
   props aos componentes do Ecme. Server Actions e `can()` não mudam.
 - **Tema:** cookie lido no layout raiz, que põe a classe no `<html>`; a troca grava o cookie e a
   classe. Respeitar o sistema quando a pessoa não escolheu.
-- **Estilo:** só tokens do `@theme`, nenhuma cor solta; `dark:` como no Ecme.
+- **Estilo:** só tokens do `@theme`, nenhuma cor solta; `dark:` como no Ecme, exceto nos pares
+  que não chegam ao contraste AA, em que o port usa a classe substituta:
+
+  | Uso                                    | No Ecme                              | No port                          |
+  | -------------------------------------- | ------------------------------------ | -------------------------------- |
+  | Texto do body, claro                   | `text-gray-500` (4,35:1)             | `text-gray-600` (7,17:1)         |
+  | Placeholder do campo, claro            | `placeholder:text-gray-400` (2,31:1) | `placeholder:text-gray-600`      |
+  | Placeholder do campo, escuro           | `placeholder:text-gray-400` (4,11:1) | `dark:placeholder:text-gray-300` |
+  | `primary` como texto no cartão, escuro | `text-primary` (4,25:1)              | `dark:text-primary-mild`         |
+
+  Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS` do
+  `globals-contrast.test.ts` (#217), no tema em que aparece.
+
 - **Acessibilidade (não negociável):**
   - landmarks: `banner` com o e-mail e os papéis, `main#conteudo`, `nav "Principal"`,
     `nav "Áreas do site"`, `nav "Trilha de navegação"`, `nav "Paginação"`;
