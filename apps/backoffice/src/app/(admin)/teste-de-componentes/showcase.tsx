@@ -13,6 +13,9 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { FormContainer, FormItem } from '@/components/ui/Form';
+import { Input } from '@/components/ui/Input';
+import { InputGroup } from '@/components/ui/InputGroup';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Tag } from '@/components/ui/Tag';
@@ -24,6 +27,7 @@ const AVATAR_IMAGE =
 /** Seções da vitrine (#205, #206): cada componente portado nas variantes que as telas vão usar. */
 export function Showcase() {
   const [clicks, setClicks] = useState(0);
+  const [emailChecked, setEmailChecked] = useState(false);
   return (
     <>
       <section aria-labelledby="vitrine-button" className="space-y-3">
@@ -59,6 +63,72 @@ export function Showcase() {
           <Spinner size={24} />
           Carregando exemplo
         </div>
+      </section>
+
+      <section aria-labelledby="vitrine-input" className="space-y-3">
+        <h2 id="vitrine-input" className="text-lg font-semibold">
+          Input
+        </h2>
+        <FormContainer className="form-width">
+          <FormItem label="Título">
+            <Input placeholder="Título do artigo" />
+          </FormItem>
+          <FormItem label="Resumo">
+            <Input textArea placeholder="Duas ou três frases" />
+          </FormItem>
+          <FormItem label="Preço">
+            <Input prefix="R$" suffix=",00" inputMode="numeric" />
+          </FormItem>
+          <FormItem label="Somente leitura">
+            <Input readOnly value="slug-fixo" />
+          </FormItem>
+          <FormItem label="Desabilitado">
+            <Input disabled placeholder="Indisponível" />
+          </FormItem>
+        </FormContainer>
+      </section>
+
+      <section aria-labelledby="vitrine-input-group" className="space-y-3">
+        <h2 id="vitrine-input-group" className="text-lg font-semibold">
+          InputGroup
+        </h2>
+        <FormContainer className="form-width">
+          <FormItem label="Domínio">
+            <InputGroup>
+              <InputGroup.Addon>https://</InputGroup.Addon>
+              <Input placeholder="exemplo" />
+              <InputGroup.Addon>.com.br</InputGroup.Addon>
+            </InputGroup>
+          </FormItem>
+          <FormItem label="Busca">
+            <InputGroup size="sm">
+              <Input placeholder="Termo" />
+              <Button>Buscar</Button>
+            </InputGroup>
+          </FormItem>
+        </FormContainer>
+      </section>
+
+      <section aria-labelledby="vitrine-form" className="space-y-3">
+        <h2 id="vitrine-form" className="text-lg font-semibold">
+          Form
+        </h2>
+        <FormContainer className="form-width">
+          <FormItem label="Slug" asterisk invalid errorMessage="O slug já está em uso">
+            <Input required defaultValue="inicio" />
+          </FormItem>
+          <FormItem label="E-mail" invalid={emailChecked} errorMessage="Informe um e-mail válido">
+            <Input type="email" defaultValue="editor@" />
+          </FormItem>
+          <Button onClick={() => setEmailChecked((checked) => !checked)}>
+            {emailChecked ? 'Limpar validação' : 'Validar e-mail'}
+          </Button>
+        </FormContainer>
+        <FormContainer layout="horizontal" labelWidth={120} className="form-width">
+          <FormItem label="Autor">
+            <Input placeholder="Nome de quem assina" />
+          </FormItem>
+        </FormContainer>
       </section>
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">
