@@ -57,6 +57,19 @@ describe('tabela de mudanças pendentes', () => {
     expect(screen.getByText('9 mudanças pendentes')).toBeTruthy();
   });
 
+  it('cabeçalho de coluna em cada coluna e a contagem na legenda', () => {
+    renderTable([change(1, 'content', '42')]);
+
+    const headers = screen.getAllByRole('columnheader');
+    expect(headers.map((header) => header.textContent)).toEqual([
+      'Origem',
+      'Item',
+      'Registrada em',
+    ]);
+    expect(headers.every((header) => header.getAttribute('scope') === 'col')).toBe(true);
+    expect(screen.getByRole('table', { name: '1 mudança pendente' })).toBeTruthy();
+  });
+
   it('liga o item à tela dele quando a origem tem tela', () => {
     renderTable();
 

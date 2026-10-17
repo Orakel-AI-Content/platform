@@ -418,6 +418,28 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Mudanças pendentes na Table do Ecme (#249), nos dois temas. O cadastro registra a
+// configuração v1: o site novo já tem uma pendência.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`mudanças pendentes sem violação do axe (${colorScheme})`, async ({ page }) => {
+    const siteId = `e2e-pendencias-${colorScheme}-${Date.now()}`;
+    created.push(siteId);
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'operacao@orakel.local');
+    await newSite(page, siteId);
+    await page.goto(`/sites/${siteId}/pendencias`);
+    await expect(page.getByRole('heading', { name: 'Mudanças pendentes' })).toBeVisible();
+    const table = page.getByRole('table', { name: '1 mudança pendente' });
+    await expect(table.getByRole('columnheader')).toHaveText(['Origem', 'Item', 'Registrada em']);
+    await expect(table.getByRole('link', { name: 'Configuração v1' })).toHaveAttribute(
+      'href',
+      `/sites/${siteId}/configuracao`,
+    );
+
+    await expectNoViolations(page);
+  });
+}
+
 test('site inexistente responde 404', async ({ page }) => {
   await loginAs(page, 'operacao@orakel.local');
   expect((await page.goto('/sites/nao-existe'))?.status()).toBe(404);
