@@ -90,6 +90,20 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
     .check();
 });
 
+// Cabeçalho da tela de site (trilha, título e ação) no visual do Ecme (#247), nos dois temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`tela de site sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a/autores');
+    await expect(page.getByRole('heading', { level: 1, name: 'Autores' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Criar autor' }).first()).toBeVisible();
+    await page.waitForLoadState('networkidle');
+
+    await expectNoViolations(page);
+  });
+}
+
 test('editor edita um item do menu e o vê na lista', async ({ page }) => {
   const label = `Guias ${Date.now()}`;
   await loginAs(page, 'editor@orakel.local');
