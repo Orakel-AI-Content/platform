@@ -569,7 +569,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeFocused();
     await expect(page.locator('.dropdown-menu').last()).toHaveCSS('opacity', '1');
-    accessibility = await audit(page);
+    // Com o submenu aberto, o floating-ui põe um <span aria-owns> no menu pai para o leitor de
+    // tela tratar o submenu (em outro portal) como filho dele; o axe acusa
+    // `aria-required-children` no `role="menu"`. Só nesta auditoria a regra fica desligada
+    // (decisão no segundo escalonamento da #210); com o menu de topo aberto, ela vale.
+    accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .exclude('[data-floating-ui-focus-guard]')
+      .disableRules(['aria-required-children'])
+      .analyze();
     expect(accessibility.violations).toEqual([]);
   });
 }
