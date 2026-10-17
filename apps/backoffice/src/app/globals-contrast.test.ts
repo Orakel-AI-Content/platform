@@ -923,6 +923,52 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-700',
     minimum: 4.5,
   },
+  // PageHeader e EmptyState (#247), sobre o body: o título da tela (`.heading-text`), a
+  // mensagem do estado vazio e o botão `default` das ações no hover, que no escuro fica
+  // transparente (`dark:hover:bg-transparent`) e mostra o body.
+  {
+    name: 'título da tela',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'mensagem do estado vazio',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+    ecme: 'text-gray-500',
+  },
+  {
+    name: 'botão default no hover',
+    theme: 'claro',
+    text: 'hover:text-primary',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'título da tela',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'mensagem do estado vazio',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'botão default no hover',
+    theme: 'escuro',
+    text: 'dark:hover:text-white',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
