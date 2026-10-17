@@ -322,6 +322,52 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-700',
     minimum: 4.5,
   },
+  // Form e InputGroup (#207): mensagem de erro e asterisco do FormItem (`_form.css`) e o texto
+  // do complemento do InputGroup (`Addon.tsx`).
+  {
+    name: 'mensagem de erro no body',
+    theme: 'claro',
+    text: 'text-error',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'mensagem de erro no cartão',
+    theme: 'claro',
+    text: 'text-error',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'complemento do campo',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-200',
+    minimum: 4.5,
+  },
+  {
+    name: 'mensagem de erro no body',
+    theme: 'escuro',
+    text: 'dark:text-error',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'mensagem de erro no cartão',
+    theme: 'escuro',
+    text: 'dark:text-error',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    // O Ecme herdava a cor do texto do body.
+    name: 'complemento do campo',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-600',
+    minimum: 4.5,
+    ecme: 'dark:text-gray-400',
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
