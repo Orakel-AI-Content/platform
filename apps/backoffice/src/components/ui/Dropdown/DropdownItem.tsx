@@ -6,7 +6,10 @@
 // - `role="menuitem"` explícito e `aria-disabled` no desabilitado (que as setas pulam);
 // - Enter e Espaço escolhem o item focado (no Ecme, só o clique escolhia);
 // - divisor com `role="separator"` e cabeçalho com `role="presentation"`;
-// - o `isNil` do `es-toolkit/compat` virou `== null`; `submenu` sem `any`.
+// - o `isNil` do `es-toolkit/compat` virou `== null`; `submenu` sem `any`;
+// - item que é um link (`asElement="a"` com `href`, #239): Enter e Espaço repassam ao clique
+//   nativo (`click()`), que navega e passa pelo mesmo `onClick`; o `preventDefault` sozinho
+//   impedia a navegação pelo teclado.
 'use client';
 
 import { useContext, useCallback, isValidElement, cloneElement } from 'react';
@@ -36,6 +39,8 @@ export interface DropdownItemProps extends CommonProps {
   disabled?: boolean;
   submenu?: ReactElement;
   eventKey?: string;
+  /** Com `asElement="a"`: o item é um link de verdade (ex.: "Sair", para a rota do Access). */
+  href?: string;
   onSelect?: (eventKey: string, e: SyntheticEvent) => void;
   onFocus?: (e: SyntheticEvent) => void;
   onClick?: (e: SyntheticEvent) => void;
@@ -115,7 +120,8 @@ const DropdownItem = (props: DropdownItemProps) => {
       onKeyDown(event: KeyboardEvent<HTMLElement>) {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
-        handleClick(event);
+        if (event.currentTarget instanceof HTMLAnchorElement) event.currentTarget.click();
+        else handleClick(event);
       },
     }),
   };
