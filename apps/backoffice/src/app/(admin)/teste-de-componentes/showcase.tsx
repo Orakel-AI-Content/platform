@@ -27,6 +27,7 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Tag } from '@/components/ui/Tag';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 /** Imagem do Avatar sem rede: um quadrado na cor primária. */
 const AVATAR_IMAGE =
@@ -324,6 +325,23 @@ export function Showcase() {
         </p>
       </section>
 
+      <section aria-labelledby="vitrine-tooltip" className="space-y-3">
+        <h2 id="vitrine-tooltip" className="text-lg font-semibold">
+          Tooltip
+        </h2>
+        <div className="flex flex-wrap items-center gap-6">
+          <Tooltip title="Copia o endereço público do artigo">
+            <Button>Copiar link</Button>
+          </Tooltip>
+          <Tooltip title="Abre o artigo publicado" placement="bottom">
+            <Button variant="plain">Ver no site</Button>
+          </Tooltip>
+          <Tooltip title="Publicado há 2 dias" placement="right">
+            Publicado
+          </Tooltip>
+        </div>
+      </section>
+
       <section aria-labelledby="vitrine-movimento" className="space-y-3">
         <h2 id="vitrine-movimento" className="text-lg font-semibold">
           Movimento
@@ -383,6 +401,13 @@ export function Showcase() {
           </Avatar>
           <Avatar src={AVATAR_IMAGE} alt="Foto de Ana Souza" />
         </div>
+        <Avatar.Group chained maxCount={3} omittedAvatarTooltip>
+          <Avatar>AS</Avatar>
+          <Avatar>MR</Avatar>
+          <Avatar>JP</Avatar>
+          <Avatar>LC</Avatar>
+          <Avatar>TF</Avatar>
+        </Avatar.Group>
       </section>
 
       <section aria-labelledby="vitrine-carregamento" className="space-y-3">

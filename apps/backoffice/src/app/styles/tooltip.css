@@ -1,0 +1,6 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_tooltip.css */
+@layer components {
+  .tooltip {
+    @apply z-50 max-w-[250px] text-white rounded-lg py-2 px-4 relative;
+  }
+}

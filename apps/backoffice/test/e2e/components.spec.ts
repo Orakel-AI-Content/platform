@@ -109,6 +109,7 @@ test('a vitrine vem renderizada do servidor', async ({ page }) => {
     'https://',
     'O slug já está em uso',
     'Destaque na capa',
+    'Copiar link',
     'Escolha a categoria',
   ]) {
     expect(html).toContain(text);
@@ -750,3 +751,138 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     }
   });
 }
+
+// Tooltip (#211) sobre o floating-ui: abre no hover e no foco do teclado, descreve o gatilho por
+// aria-describedby, fecha com Esc, aceita o ponteiro sobre a dica (1.4.13) e não anima com
+// movimento reduzido.
+
+/** Põe o foco logo antes da seção do Tooltip, para o próximo Tab chegar ao primeiro gatilho. */
+async function focusBeforeTooltip(page: Page): Promise<void> {
+  await page.locator('#vitrine-tooltip').evaluate((heading) => {
+    heading.setAttribute('tabindex', '-1');
+    (heading as HTMLElement).focus();
+  });
+}
+
+test('Tooltip no hover: descreve o gatilho, aceita o ponteiro sobre a dica e fecha com Esc', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const trigger = page.getByRole('button', { name: 'Copiar link' });
+
+  await expect(trigger).not.toHaveAttribute('aria-describedby');
+  await trigger.hover();
+  const tooltip = page.getByRole('tooltip');
+  await expect(tooltip).toHaveText('Copia o endereço público do artigo');
+  await expect(trigger).toHaveAttribute('aria-describedby', (await tooltip.getAttribute('id'))!);
+  await expect(trigger).toHaveAccessibleDescription('Copia o endereço público do artigo');
+
+  // Do gatilho até a dica, a dica continua aberta.
+  await tooltip.hover();
+  await page.waitForTimeout(300);
+  await expect(tooltip).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toHaveCount(0);
+  await expect(trigger).not.toHaveAttribute('aria-describedby');
+});
+
+test('Tooltip no foco do teclado: Esc fecha e o foco fica no gatilho', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const trigger = page.getByRole('button', { name: 'Copiar link' });
+
+  await focusBeforeTooltip(page);
+  await page.keyboard.press('Tab');
+  await expect(trigger).toBeFocused();
+  const tooltip = page.getByRole('tooltip');
+  await expect(tooltip).toHaveText('Copia o endereço público do artigo');
+  await expect(trigger).toHaveAttribute('aria-describedby', (await tooltip.getAttribute('id'))!);
+
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(trigger).not.toHaveAttribute('aria-describedby');
+
+  // O próximo gatilho abre a dica dele.
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Ver no site' })).toBeFocused();
+  await expect(page.getByRole('tooltip')).toHaveText('Abre o artigo publicado');
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Tooltip visível sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    await page.getByRole('button', { name: 'Copiar link' }).hover();
+    const tooltip = page.getByRole('tooltip');
+    // A transição (150 ms) mistura a cor do texto com o fundo enquanto a opacidade sobe.
+    await expect(tooltip).toHaveCSS('opacity', '1');
+    const accessibility = await audit(page);
+    expect(accessibility.violations).toEqual([]);
+  });
+}
+
+for (const reducedMotion of ['reduce', 'no-preference'] as const) {
+  test(`Tooltip ${reducedMotion === 'reduce' ? 'aparece sem' : 'aparece com'} transição com reducedMotion ${reducedMotion}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    // A opacidade da dica a cada quadro, do momento em que ela entra no DOM até 400 ms depois
+    // (a transição do Ecme dura 150 ms). Valores intermediários são a animação.
+    const watch = page.evaluate(
+      () =>
+        new Promise<number[]>((resolve) => {
+          const values: number[] = [];
+          const observer = new MutationObserver(() => {
+            const tooltip = document.querySelector<HTMLElement>('[role="tooltip"]');
+            if (!tooltip) return;
+            observer.disconnect();
+            const start = performance.now();
+            const sample = () => {
+              values.push(Number(getComputedStyle(tooltip).opacity));
+              if (performance.now() - start < 400) requestAnimationFrame(sample);
+              else resolve(values);
+            };
+            requestAnimationFrame(sample);
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+        }),
+    );
+    await page.getByRole('button', { name: 'Copiar link' }).hover();
+    const samples = await watch;
+
+    const intermediate = samples.filter((value) => value > 0 && value < 1);
+    expect(samples.at(-1)).toBe(1);
+    if (reducedMotion === 'reduce') {
+      expect(samples[0]).toBe(1);
+      expect(intermediate).toEqual([]);
+    } else {
+      expect(intermediate.length).toBeGreaterThan(0);
+    }
+  });
+}
+
+test('Avatar.Group mostra "+N" e a dica "N a mais" no avatar omitido', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const group = section(page, 'Avatar').locator('.avatar-group');
+
+  await expect(group.locator('.avatar')).toHaveText(['AS', 'MR', 'JP', '+2']);
+  const omitted = group.locator('.avatar').last();
+  await omitted.hover();
+  const tooltip = page.getByRole('tooltip');
+  await expect(tooltip).toHaveText('2 a mais');
+  await expect(omitted).toHaveAttribute('aria-describedby', (await tooltip.getAttribute('id'))!);
+});
