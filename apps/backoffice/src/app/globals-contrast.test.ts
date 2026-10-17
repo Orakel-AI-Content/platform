@@ -517,13 +517,19 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-900',
     minimum: 4.5,
   },
-  // Tooltip (#211): texto branco sobre a dica (`_tooltip.css`). No escuro o fundo é `black`,
-  // fora dos tokens (21:1 com o `neutral`, que lá também é branco).
+  // Tooltip (#211): texto branco sobre a dica (`_tooltip.css`, `Tooltip.tsx`).
   {
     name: 'texto da dica',
     theme: 'claro',
     text: 'text-white',
     background: 'bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto da dica',
+    theme: 'escuro',
+    text: 'text-white',
+    background: 'dark:bg-gray-950',
     minimum: 4.5,
   },
 ];

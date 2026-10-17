@@ -6,6 +6,8 @@
 // - o `aria-describedby` que o `useRole('tooltip')` gera vai para o filho (o elemento focado),
 //   somado ao que ele já tiver; só fica no <span> quando o filho é texto;
 // - `safePolygon` no hover: o ponteiro pode ir do gatilho até a dica sem fechá-la (1.4.13);
+// - no escuro, o fundo é `gray-950` (#0a0a0a), e não o `black` do Ecme, que não é token e o
+//   globals-contrast.test.ts não resolve;
 // - com movimento reduzido, a dica aparece sem transição: ela anima `opacity`, que o
 //   `MotionConfig reducedMotion="user"` do layout não para.
 'use client';
@@ -57,8 +59,8 @@ const Tooltip = (props: TooltipProps) => {
   const reduceMotion = useReducedMotion();
 
   const tooltipColor = {
-    background: 'bg-gray-800 dark:bg-black',
-    arrow: 'text-gray-800 dark:text-black',
+    background: 'bg-gray-800 dark:bg-gray-950',
+    arrow: 'text-gray-800 dark:text-gray-950',
   };
 
   const defaultTooltipClass = `tooltip ${tooltipColor.background}`;
