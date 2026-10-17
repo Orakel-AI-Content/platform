@@ -805,6 +805,50 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-950',
     minimum: 4.5,
   },
+  // Moldura (#237): a marca na barra lateral (`side-nav-bg`) e o e-mail, os papéis e o "Sair" no
+  // header (`.header`), os dois brancos no claro e gray-800 no escuro.
+  {
+    name: 'marca na barra',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'e-mail e papéis no header',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: '"Sair" no header',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'marca na barra',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'e-mail e papéis no header',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: '"Sair" no header',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */

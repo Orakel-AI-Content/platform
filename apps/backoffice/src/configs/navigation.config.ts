@@ -8,7 +8,7 @@
 //   `collapse` (não há submenus, #235);
 // - as áreas do site levam o marcador `[site]` no caminho, trocado por `navigationPath`;
 // - o item ativo sai do pathname (`activeNavigationKey`), com as telas que só se alcançam pela
-//   Visão geral (`OVERVIEW_SEGMENTS`, da `site-nav.tsx`) marcando a Visão geral.
+//   Visão geral (`OVERVIEW_SEGMENTS`, da antiga `site-nav.tsx`) marcando a Visão geral.
 import { can, type Action, type Actor } from '../domain/access/rbac.ts';
 import type { NavigationIconKey } from './navigation-icon.config.tsx';
 

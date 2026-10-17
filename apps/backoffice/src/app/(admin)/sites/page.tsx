@@ -4,12 +4,12 @@ import { currentActor } from '@/auth/request-actor.ts';
 import { noRead } from '@/components/forbidden-screen';
 import { SitesTable } from '@/components/sites-table';
 import { buttonVariants } from '@/components/legacy-ui/button';
-import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
-import { listSites, TFVARS_FILENAME } from '@/domain/sites/sites.ts';
+import { TFVARS_FILENAME } from '@/domain/sites/sites.ts';
 
 import { PageHeader } from './[site]/editorial-page.tsx';
 import { publishNow } from './actions.ts';
+import { readVisibleSites } from '../visible-sites.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,8 +25,8 @@ export default async function SitesPage({ searchParams }: SearchParams) {
   const { cadastrado } = await searchParams;
   const actor = await currentActor();
   if (!actor.ok) return null;
-  const sites = await listSites(getDb().db, actor.value);
-  if (!sites.ok) {
+  const sites = await readVisibleSites();
+  if (!sites?.ok) {
     return noRead;
   }
   const canConfigure = can(actor.value, 'site.configure');

@@ -1,11 +1,17 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { currentActor } from '@/auth/request-actor.ts';
+import CollapsibleSide from '@/components/layouts/collapsible-side';
 import { NavigationIndicator } from '@/components/navigation-indicator';
+import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
+import navigationConfig, { filterNavigation } from '@/configs/navigation.config';
+
+import { readVisibleSites } from './visible-sites.ts';
 
 // Área autenticada: toda página daqui exige o JWT do Access e um usuário com papel. O
-// domínio confere de novo a permissão de cada ação (nunca só aqui nem no proxy).
+// domínio confere de novo a permissão de cada ação (nunca só aqui nem no proxy). A moldura é o
+// CollapsibleSide do Ecme (#237; workspace#46): a árvore de navegação filtrada pelo RBAC e os
+// sites visíveis saem daqui, do servidor, e a barra lateral marca o item pelo endereço.
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const actor = await currentActor();
   if (!actor.ok) {
@@ -18,6 +24,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </main>
     );
   }
+  const sites = await readVisibleSites();
+  const visible = sites?.ok ? sites.value.map((site) => ({ id: site.id, name: site.name })) : [];
   return (
     <div className="min-h-screen">
       {/* Primeira parada do Tab (WCAG 2.4.1): visível só com foco; leva o foco ao <main>. */}
@@ -28,37 +36,35 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         Pular para o conteúdo
       </a>
       <NavigationIndicator />
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
-          <nav aria-label="Principal" className="flex items-center gap-6">
-            <Link href="/sites" className="font-semibold underline-offset-4 hover:underline">
-              Orakel Backoffice
-            </Link>
-            <Link href="/sites" className="text-sm underline-offset-4 hover:underline">
-              Sites
-            </Link>
-          </nav>
-          <div className="flex items-center gap-4">
-            <p className="text-sm text-muted-foreground">
+      <CollapsibleSide
+        navigationTree={filterNavigation(navigationConfig, actor.value)}
+        sites={visible}
+        headerEnd={
+          <>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               {actor.value.email} · {actor.value.roles.join(', ')}
             </p>
             {/* Rota do Cloudflare Access, fora do app: <a>, não <Link> (sem prefetch nem navegação
                 pelo cliente). A regra do Next trata todo caminho "/" como página do app. */}
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a href="/cdn-cgi/access/logout" className="text-sm underline-offset-4 hover:underline">
+            <a
+              href="/cdn-cgi/access/logout"
+              className="header-action-item header-action-item-hoverable text-sm font-semibold text-gray-900 dark:text-gray-100"
+            >
               Sair
             </a>
-          </div>
-        </div>
-      </header>
-      {/* tabIndex -1: a âncora do skip link leva o foco até aqui, não só a rolagem. */}
-      <main
-        id="conteudo"
-        tabIndex={-1}
-        className="mx-auto max-w-6xl px-6 py-8 focus-visible:outline-none"
+          </>
+        }
       >
-        {children}
-      </main>
+        {/* tabIndex -1: a âncora do skip link leva o foco até aqui, não só a rolagem. */}
+        <main
+          id="conteudo"
+          tabIndex={-1}
+          className={`flex-auto bg-gray-100 dark:bg-gray-950 ${PAGE_CONTAINER_GUTTER_X} ${PAGE_CONTAINER_GUTTER_Y} focus-visible:outline-none`}
+        >
+          {children}
+        </main>
+      </CollapsibleSide>
     </div>
   );
 }

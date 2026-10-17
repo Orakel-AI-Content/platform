@@ -9,8 +9,11 @@ import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
 
-// Lista de sites legível de relance (#100): com 20 sites numa janela de 1280 px, a tabela
-// não rola na horizontal e nenhuma linha passa de duas linhas de texto. Os 18 sites além dos
+// Lista de sites legível de relance (#100): com 20 sites numa janela de 1440 px, a página
+// não rola na horizontal e nenhuma linha passa de duas linhas de texto. Com a barra lateral do
+// Ecme (290 px, #237), a tabela de hoje não cabe mais a 1280 px; a decisão do escalonamento da
+// #237 foi medir a 1440 px e aceitar que a tabela role dentro do próprio contêiner
+// (`overflow-x-auto` da Table), até a Story da tela de Sites refazer a tabela. Os 18 sites além dos
 // do seed são gravados pelo domínio (cadastrar 18 pela tela só tornaria o teste lento) e
 // removidos no fim. O pior caso de largura fica na própria rodada, sem depender do banco
 // (#153): um site pausado por falha permanente, com motivo longo, e um com último build
@@ -103,7 +106,7 @@ test.afterAll(async () => {
   await removeSites(created);
 });
 
-test.use({ viewport: { width: 1280, height: 800 } });
+test.use({ viewport: { width: 1440, height: 800 } });
 
 async function loginAsAdmin(page: Page): Promise<void> {
   await page.goto('/sites');
@@ -113,7 +116,7 @@ async function loginAsAdmin(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
 }
 
-test('com 20 sites em 1280 px, sem rolagem horizontal e linhas de até duas linhas', async ({
+test('com 20 sites em 1440 px, a página sem rolagem horizontal e linhas de até duas linhas', async ({
   page,
 }) => {
   await loginAsAdmin(page);
@@ -121,11 +124,15 @@ test('com 20 sites em 1280 px, sem rolagem horizontal e linhas de até duas linh
   const rows = table.locator('tbody tr');
   expect(await rows.count()).toBeGreaterThanOrEqual(20);
 
-  const container = await table.evaluate((element) => {
-    const box = element.parentElement!;
-    return { scrollWidth: box.scrollWidth, clientWidth: box.clientWidth };
-  });
-  expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth);
+  // A página não rola na horizontal; a tabela pode rolar dentro do contêiner dela (#237).
+  const viewport = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+  expect(
+    await table.evaluate((element) => getComputedStyle(element.parentElement!).overflowX),
+  ).toBe('auto');
 
   // Linhas de texto por célula, não altura em px (#117): um badge ou botão 1 px maior não
   // muda a contagem. Só nós de texto visíveis (a Range da célula inteira traria as caixas dos

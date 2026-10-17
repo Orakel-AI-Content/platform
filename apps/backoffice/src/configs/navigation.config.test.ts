@@ -11,7 +11,7 @@ import navigationConfig, {
 } from './navigation.config.ts';
 
 // Navegação do Backoffice (#236): árvore filtrada pelo RBAC, caminho por site e item ativo pelo
-// pathname, com as mesmas regras da barra de hoje (`sites/[site]/layout.tsx`, `site-nav.tsx`).
+// pathname, com as mesmas regras da barra de antes (`sites/[site]/layout.tsx`, `site-nav.tsx`).
 
 const actor = (role: Actor['roles'][number]): Actor => ({ email: `${role}@x`, roles: [role] });
 
@@ -78,7 +78,7 @@ describe('filterNavigation', () => {
 });
 
 describe('navigationPath', () => {
-  it('as áreas apontam para os mesmos endereços da SiteNav de hoje', () => {
+  it('as áreas apontam para os mesmos endereços da antiga SiteNav', () => {
     const areas = navigationConfig.find((nav) => nav.key === 'site')?.subMenu ?? [];
     expect(areas.map((nav) => navigationPath(nav, 'exemplo-a'))).toEqual([
       '/sites/exemplo-a',

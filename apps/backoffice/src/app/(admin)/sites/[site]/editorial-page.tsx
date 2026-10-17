@@ -10,7 +10,9 @@ import { can, type Actor } from '@/domain/access/rbac.ts';
 import { listAuthors } from '@/domain/content/authors.ts';
 import { listMenus } from '@/domain/content/menus.ts';
 import { listTaxonomies } from '@/domain/content/taxonomies.ts';
-import { listSites, type SiteSummary } from '@/domain/sites/sites.ts';
+import type { SiteSummary } from '@/domain/sites/sites.ts';
+
+import { readVisibleSites } from '../../visible-sites.ts';
 
 // Base das telas do site (#46, #78): sessão, site existente (404) e permissão de gravar
 // decidida no servidor; o domínio confere de novo.
@@ -42,8 +44,8 @@ export type SiteLookup =
 export const lookupSite = cache(async (siteId: string): Promise<SiteLookup> => {
   const actor = await currentActor();
   if (!actor.ok) return { kind: 'no-session' };
-  const sites = await listSites(getDb().db, actor.value);
-  if (!sites.ok) return { kind: 'forbidden', actor: actor.value };
+  const sites = await readVisibleSites();
+  if (!sites?.ok) return { kind: 'forbidden', actor: actor.value };
   const site = sites.value.find((summary) => summary.id === siteId);
   return site === undefined
     ? { kind: 'missing', actor: actor.value }
