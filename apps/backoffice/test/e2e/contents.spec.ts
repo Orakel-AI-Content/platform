@@ -9,6 +9,7 @@ import { createContent } from '../../src/domain/content/contents.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
+import { analyzeTables } from './statistics.ts';
 
 // Editor de conteúdo (#45) contra o ambiente local semeado: o editor cria um artigo com
 // texto, imagem e FAQ e o acha na lista; o revisor não grava nada. Lista com 2.000
@@ -231,6 +232,7 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
           })),
         );
       });
+      await analyzeTables(db, contents, contentVersions);
     } finally {
       await pool.end();
     }
@@ -532,6 +534,7 @@ test.describe('grade de imagens com 2.000 mídias (#182)', () => {
           })),
         );
       });
+      await analyzeTables(db, media, mediaVariants);
     } finally {
       await pool.end();
     }
