@@ -164,17 +164,30 @@ test('o seletor troca de site em 2 cliques, na mesma área; item leva à lista',
 
 test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
-  await page.goto('/sites');
-  const visible = await page
-    .getByRole('table')
-    .getByRole('row')
-    .filter({ has: page.getByRole('cell') })
-    .count();
-
-  await page.goto(`/sites/${SITE}`);
-  await switcher(page).click();
   const list = page.locator('[popover]:popover-open');
-  await expect(list.getByRole('link')).toHaveCount(visible);
+
+  // Outros arquivos do E2E rodam em paralelo e cadastram e removem sites (o sites-list.spec
+  // grava 18 no beforeAll), então a lista pode mudar entre a leitura da tabela e a do seletor.
+  // As duas são relidas até concordarem, o que acontece assim que a outra rodada termina a
+  // carga ou a limpeza.
+  await expect
+    .poll(
+      async () => {
+        await page.goto('/sites');
+        const visible = await page
+          .getByRole('table')
+          .getByRole('row')
+          .filter({ has: page.getByRole('cell') })
+          .count();
+        await page.goto(`/sites/${SITE}`);
+        await switcher(page).click();
+        await expect(list).toBeVisible();
+        const listed = await list.getByRole('link').count();
+        return listed === visible;
+      },
+      { timeout: 30_000, intervals: [500] },
+    )
+    .toBe(true);
   await expect(list.locator('[aria-current="true"]')).toHaveText(SITE_NAME);
 });
 
@@ -198,11 +211,16 @@ test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao bot
   await expect(button).toBeFocused();
 
   await page.keyboard.press('Enter');
+  await expect(list).toBeVisible();
   const other = page.getByRole('link', { name: 'Exemplo B — Receitas' });
-  for (let step = 0; step < 10; step += 1) {
+  // Um Tab por site da lista, no máximo: com outros arquivos do E2E cadastrando sites em
+  // paralelo, a lista pode ter mais de 20, e o Enter só vale com o foco no link certo.
+  const links = await list.getByRole('link').count();
+  for (let step = 0; step <= links; step += 1) {
     if (await other.evaluate((element) => element === document.activeElement)) break;
     await page.keyboard.press('Tab');
   }
+  await expect(other).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/sites\/exemplo-b\/taxonomias$/);
 });
