@@ -63,7 +63,11 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   editor de rich text. Componentes não repetem classes de foco (`focus-visible:outline-*`);
   uma tela só sobrescreve o contorno por motivo explícito. O E2E `focus.spec.ts` confere o
   contorno navegando com `Tab`.
-- **Temas:** claro e escuro pela preferência do sistema (`prefers-color-scheme`).
+- **Temas:** claro e escuro por classe no `<html>` (`light` ou `dark`), como no Ecme: os
+  tokens do escuro ficam em `.dark` e a variante `dark:` é por classe. A classe vem do cookie de
+  tema (`src/configs/theme.config.ts`), lido no layout raiz; sem cookie, vale a preferência do
+  sistema, aplicada por um script inline no `<head>` antes da primeira pintura. O E2E
+  `theme.spec.ts` confere que nenhum quadro sai no tema oposto.
 - **Tipografia:** pilha `system-ui`, sem fonte própria, numa escala de quatro tamanhos: título
   da página (`h1`) em `text-2xl font-semibold`; seção (`h2`) em `text-lg font-semibold`;
   corpo em `text-sm`, inclusive rótulos, dicas e erros de campo e mensagens de status de uma
