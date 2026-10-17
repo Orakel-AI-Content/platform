@@ -88,6 +88,7 @@ ThemeConfigurator completo.
   | `primary` como texto no cartão, escuro | `text-primary` (4,25:1)              | `dark:text-primary-mild`                   |
   | Texto do Badge, escuro                 | `text-white` (2,82:1)                | `text-neutral dark:text-gray-950` (7,02:1) |
   | Fundo das iniciais do Avatar, claro    | `bg-gray-400` (2,31:1)               | `bg-gray-600` (7,17:1)                     |
+  | Item ativo do Menu na barra, escuro    | `text-primary` (4,25:1)              | `dark:text-primary-mild`                   |
 
   Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS` do
   `globals-contrast.test.ts` (#217), no tema em que aparece.

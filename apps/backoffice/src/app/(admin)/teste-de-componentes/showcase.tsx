@@ -36,6 +36,7 @@ import { toast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 import { DataTableShowcase } from './data-table-showcase.tsx';
+import { MenuShowcase } from './menu-showcase.tsx';
 
 /** Imagem do Avatar sem rede: um quadrado na cor primária. */
 const AVATAR_IMAGE =
@@ -554,6 +555,8 @@ export function Showcase({ linkPage }: { linkPage: number }) {
       </section>
 
       <DataTableShowcase />
+
+      <MenuShowcase />
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">
         <h2 id="vitrine-movimento" className="text-lg font-semibold">
