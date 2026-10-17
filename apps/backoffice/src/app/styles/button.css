@@ -1,0 +1,12 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_button.css
+   Adaptado (#205): sem o `outline-none` do Ecme, que em @layer components venceria a regra
+   global de foco do @layer base (globals.css) e apagaria o contorno de 2px do teclado. */
+@layer components {
+  .button {
+    @apply font-bold whitespace-nowrap content-center;
+  }
+
+  .button-press-feedback {
+    @apply transition-transform active:scale-[0.98];
+  }
+}

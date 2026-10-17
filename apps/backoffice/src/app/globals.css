@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* Classes de componente do Ecme (src/assets/styles/components/ do template), uma folha por
+   componente portado, em @layer components (docs/migration/ecme.md). */
+@import './styles/button.css';
+
 /* Tema por classe no <html>, como no Ecme (#203): `dark` ou `light`, do cookie de tema ou, no
    modo sistema, do script inline do layout raiz (src/configs/theme.config.ts). */
 @custom-variant dark (&:is(.dark *));
