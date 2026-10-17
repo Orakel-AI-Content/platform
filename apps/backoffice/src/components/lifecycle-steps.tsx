@@ -12,7 +12,7 @@ type StepState = 'concluída' | 'atual' | 'pendente';
 const MARKER_CLASS: Record<StepState, string> = {
   concluída: 'border-primary bg-primary text-neutral dark:text-gray-950',
   atual:
-    'border-primary bg-white text-gray-900 ring-2 ring-primary ring-offset-2 ring-offset-white dark:bg-gray-800 dark:text-gray-100 dark:ring-offset-gray-800',
+    'border-primary bg-white text-gray-900 outline-2 outline-offset-2 outline-primary dark:bg-gray-800 dark:text-gray-100',
   pendente:
     'border-dashed border-gray-400 bg-white text-gray-600 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-400',
 };

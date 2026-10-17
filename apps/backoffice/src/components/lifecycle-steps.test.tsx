@@ -52,7 +52,7 @@ describe('etapas do ciclo de vida', () => {
 
     const marker = (index: number) => within(items()[index]!).getByText(String(index + 1));
     expect(marker(0).className).toContain('bg-primary');
-    expect(marker(1).className).toContain('ring-primary');
+    expect(marker(1).className).toContain('outline-primary');
     expect(marker(1).className).not.toContain('bg-primary');
     expect(marker(2).className).toContain('border-dashed');
   });
