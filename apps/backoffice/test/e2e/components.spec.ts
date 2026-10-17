@@ -301,3 +301,172 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     else expect(intermediate.length).toBeGreaterThan(0);
   });
 }
+
+// Dialog, Drawer e ConfirmDialog (#209) sobre o react-modal: foco preso, Esc fecha e o foco volta
+// ao botão que abriu; o título nomeia o diálogo; o contêiner da app fica inerte enquanto ele está
+// aberto, e nenhuma animação roda com movimento reduzido.
+
+const DIALOGS = [
+  { opener: 'Abrir Dialog', role: 'dialog', name: 'Editar autor' },
+  { opener: 'Abrir Drawer', role: 'dialog', name: 'Filtros' },
+  { opener: 'Abrir ConfirmDialog', role: 'alertdialog', name: 'Limpar os filtros?' },
+] as const;
+
+const appRoot = (page: Page) => page.locator('#app-root');
+
+/** Mensagens do react-modal sem o appElement registrado. */
+function appElementWarnings(page: Page): string[] {
+  const messages: string[] = [];
+  page.on('console', (message) => {
+    if (/App element is not defined/i.test(message.text())) messages.push(message.text());
+  });
+  return messages;
+}
+
+for (const { opener, role, name } of DIALOGS) {
+  test(`${name}: foco preso, página inerte, Esc fecha e o foco volta a "${opener}"`, async ({
+    page,
+  }) => {
+    await login(page);
+    const warnings = appElementWarnings(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    const button = section(page, 'Dialog').getByRole('button', { name: opener });
+    await button.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole(role, { name });
+    // O elemento do react-modal não tem caixa própria no Drawer (o conteúdo é absoluto dentro do
+    // overlay, como no Ecme): a visibilidade é a do título.
+    await expect(dialog.getByRole('heading', { name })).toBeVisible();
+    await expect(appRoot(page)).toHaveAttribute('inert', '');
+    await expect(appRoot(page)).toHaveAttribute('aria-hidden', 'true');
+
+    // Tab e Shift+Tab repetidos não saem do diálogo.
+    for (const key of ['Tab', 'Shift+Tab'] as const) {
+      for (let step = 0; step < 6; step += 1) {
+        await page.keyboard.press(key);
+        expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(
+          true,
+        );
+      }
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(button).toBeFocused();
+    await expect(appRoot(page)).not.toHaveAttribute('inert');
+    expect(warnings).toEqual([]);
+  });
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Dialog, Drawer e ConfirmDialog abertos sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    for (const { opener, role, name } of DIALOGS) {
+      await section(page, 'Dialog').getByRole('button', { name: opener }).click();
+      const dialog = page.getByRole(role, { name });
+      await expect(dialog.getByRole('heading', { name })).toBeVisible();
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations, name).toEqual([]);
+      // O primeiro Tab dentro do diálogo leva ao botão Fechar, com nome e contorno de 2px.
+      await page.keyboard.press('Tab');
+      const close = dialog.getByRole('button', { name: 'Fechar' });
+      await expect(close).toBeFocused();
+      expect(
+        await close.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return { style: style.outlineStyle, width: style.outlineWidth };
+        }),
+      ).toEqual({ style: 'solid', width: '2px' });
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+    }
+
+    expect(hydration).toEqual([]);
+  });
+}
+
+test('ConfirmDialog sobre o Drawer: fechar só a confirmação mantém a página inerte', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+
+  await section(page, 'Dialog').getByRole('button', { name: 'Abrir Drawer' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Filtros' });
+  const clear = drawer.getByRole('button', { name: 'Limpar filtros' });
+  await clear.click();
+  const confirm = page.getByRole('alertdialog', { name: 'Limpar os filtros?' });
+  await expect(confirm.getByRole('heading', { name: 'Limpar os filtros?' })).toBeVisible();
+  await expect(confirm).toHaveAccessibleDescription('A lista volta a mostrar todos os artigos.');
+
+  await page.keyboard.press('Escape');
+  await expect(confirm).toHaveCount(0);
+  await expect(drawer.getByRole('heading', { name: 'Filtros' })).toBeVisible();
+  await expect(clear).toBeFocused();
+  await expect(appRoot(page)).toHaveAttribute('inert', '');
+
+  await page.keyboard.press('Escape');
+  await expect(drawer).toHaveCount(0);
+  await expect(appRoot(page)).not.toHaveAttribute('inert');
+});
+
+for (const reducedMotion of ['reduce', 'no-preference'] as const) {
+  test(`Drawer ${reducedMotion === 'reduce' ? 'abre sem' : 'abre com'} transição com reducedMotion ${reducedMotion}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    // A posição `right` da gaveta a cada quadro, do momento em que ela entra no DOM até 500 ms
+    // depois (a transição padrão do motion leva cerca de 300 ms), e a transição do overlay.
+    const { positions, overlayTransition } = await page.evaluate(
+      () =>
+        new Promise<{ positions: number[]; overlayTransition: string }>((resolve) => {
+          const values: number[] = [];
+          const observer = new MutationObserver(() => {
+            const content = document.querySelector<HTMLElement>('.drawer-content');
+            if (!content) return;
+            observer.disconnect();
+            const start = performance.now();
+            const sample = () => {
+              values.push(parseFloat(getComputedStyle(content).right));
+              if (performance.now() - start < 500) requestAnimationFrame(sample);
+              else
+                resolve({
+                  positions: values,
+                  overlayTransition: getComputedStyle(document.querySelector('.drawer-overlay')!)
+                    .transitionDuration,
+                });
+            };
+            requestAnimationFrame(sample);
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+          [...document.querySelectorAll('button')]
+            .find((button) => button.textContent === 'Abrir Drawer')!
+            .click();
+        }),
+    );
+
+    expect(positions.at(-1)).toBe(0);
+    const intermediate = positions.filter((value) => value < 0 && value > -400);
+    if (reducedMotion === 'reduce') {
+      expect(positions[0]).toBe(0);
+      expect(intermediate).toEqual([]);
+      expect(overlayTransition).toBe('0s');
+    } else {
+      expect(intermediate.length).toBeGreaterThan(0);
+    }
+  });
+}

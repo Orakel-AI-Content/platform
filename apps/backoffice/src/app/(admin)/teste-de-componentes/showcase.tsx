@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { HiOutlinePlus } from 'react-icons/hi';
 
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
+import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import Loading from '@/components/shared/Loading';
 import MediaSkeleton from '@/components/shared/loaders/MediaSkeleton';
 import TextBlockSkeleton from '@/components/shared/loaders/TextBlockSkeleton';
@@ -13,6 +14,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Dialog } from '@/components/ui/Dialog';
+import { Drawer } from '@/components/ui/Drawer';
 import { FormContainer, FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
@@ -28,6 +31,10 @@ const AVATAR_IMAGE =
 export function Showcase() {
   const [clicks, setClicks] = useState(0);
   const [emailChecked, setEmailChecked] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [lastAction, setLastAction] = useState('Nenhuma ação.');
   return (
     <>
       <section aria-labelledby="vitrine-button" className="space-y-3">
@@ -129,6 +136,63 @@ export function Showcase() {
             <Input placeholder="Nome de quem assina" />
           </FormItem>
         </FormContainer>
+      </section>
+
+      <section aria-labelledby="vitrine-dialog" className="space-y-3">
+        <h2 id="vitrine-dialog" className="text-lg font-semibold">
+          Dialog
+        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => setDialogOpen(true)}>Abrir Dialog</Button>
+          <Button onClick={() => setDrawerOpen(true)}>Abrir Drawer</Button>
+          <Button onClick={() => setConfirmOpen(true)}>Abrir ConfirmDialog</Button>
+        </div>
+        <p role="status" className="text-sm">
+          {lastAction}
+        </p>
+        <Dialog isOpen={dialogOpen} title="Editar autor" onClose={() => setDialogOpen(false)}>
+          <p className="mb-6">O nome aparece na assinatura dos artigos.</p>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              variant="solid"
+              onClick={() => {
+                setLastAction('Autor salvo.');
+                setDialogOpen(false);
+              }}
+            >
+              Salvar
+            </Button>
+          </div>
+        </Dialog>
+        <Drawer
+          isOpen={drawerOpen}
+          title="Filtros"
+          onClose={() => setDrawerOpen(false)}
+          footer={
+            <Button size="sm" variant="solid" onClick={() => setConfirmOpen(true)}>
+              Limpar filtros
+            </Button>
+          }
+        >
+          <p>Os filtros valem para a lista de artigos.</p>
+        </Drawer>
+        <ConfirmDialog
+          isOpen={confirmOpen}
+          type="danger"
+          title="Limpar os filtros?"
+          confirmText="Limpar"
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setLastAction('Filtros limpos.');
+            setConfirmOpen(false);
+          }}
+        >
+          <p>A lista volta a mostrar todos os artigos.</p>
+        </ConfirmDialog>
       </section>
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">

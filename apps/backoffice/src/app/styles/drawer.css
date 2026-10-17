@@ -33,7 +33,7 @@
 
   .drawer-overlay {
     transition: all 0.3s ease-in-out;
-    @apply bg-black/80 inset-0 fixed z-40 motion-reduce:transition-none;
+    @apply bg-black/80 inset-0 fixed z-40 motion-reduce:transition-none motion-reduce:duration-0;
   }
 
   .drawer-overlay-after-open {
