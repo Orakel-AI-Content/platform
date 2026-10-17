@@ -79,6 +79,11 @@ async function loginAs(page: Page, email: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
 }
 
+async function expectNoViolations(page: Page): Promise<void> {
+  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(accessibility.violations).toEqual([]);
+}
+
 /** Leva o foco até o controle só com Tab (no máximo 80 passos). */
 async function tabTo(page: Page, target: Locator): Promise<void> {
   for (let step = 0; step < 80; step += 1) {
@@ -393,6 +398,25 @@ test('editor vê a página do site sem as ações', async ({ page }) => {
   }
   await expect(page.getByRole('link', { name: 'Editar configuração' })).toHaveCount(0);
 });
+
+// Visão geral do site em Card e nos campos do Ecme (#246), com as ações da operação, nos dois
+// temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`página do site sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'operacao@orakel.local');
+    await page.goto('/sites/exemplo-a');
+    for (const name of ['Ciclo de vida', 'Publicação', 'G1 (indexação)', 'Janela de agrupamento']) {
+      await expect(
+        page.getByRole('region', { name }).getByRole('heading', { level: 2, name }),
+      ).toBeVisible();
+    }
+    await expect(page.getByLabel('Janela própria (segundos)')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+
+    await expectNoViolations(page);
+  });
+}
 
 test('site inexistente responde 404', async ({ page }) => {
   await loginAs(page, 'operacao@orakel.local');

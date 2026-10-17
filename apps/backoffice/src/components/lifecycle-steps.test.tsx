@@ -47,6 +47,16 @@ describe('etapas do ciclo de vida', () => {
     ]);
   });
 
+  it('pinta o marcador de cada etapa com a cor do estado, nos tokens do Ecme', () => {
+    render(<LifecycleSteps current="infra_aplicada" />);
+
+    const marker = (index: number) => within(items()[index]!).getByText(String(index + 1));
+    expect(marker(0).className).toContain('bg-primary');
+    expect(marker(1).className).toContain('outline-primary');
+    expect(marker(1).className).not.toContain('bg-primary');
+    expect(marker(2).className).toContain('border-dashed');
+  });
+
   it.each([
     ['cadastrado', 1, 'Marcar infra aplicada'],
     ['infra_aplicada', 2, 'Marcar zona ativa'],

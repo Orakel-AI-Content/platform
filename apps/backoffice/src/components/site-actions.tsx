@@ -10,10 +10,10 @@ import {
   type ReactNode,
 } from 'react';
 
-import { Button } from '@/components/legacy-ui/button';
-import { Input } from '@/components/legacy-ui/input';
-import { Label } from '@/components/legacy-ui/label';
-import { Textarea } from '@/components/legacy-ui/textarea';
+import { Button } from '@/components/ui/Button';
+import { FormItem } from '@/components/ui/Form';
+import Input from '@/components/ui/Input';
+import classNames from '@/components/ui/utils/classNames';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Ações da página do site, no padrão do "Publicar agora": a Server Action delega ao domínio
@@ -33,9 +33,10 @@ function Status({ status }: { status: ActionState | null }) {
   return (
     <p
       role="status"
-      className={
-        status?.ok === false ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
-      }
+      className={classNames(
+        'text-sm',
+        status?.ok === false ? 'text-error' : 'text-gray-600 dark:text-gray-400',
+      )}
     >
       {status?.message}
     </p>
@@ -83,7 +84,7 @@ export function LifecycleAction({
   const next = NEXT_STEP[lifecycle];
   return (
     <Button
-      variant="outline"
+      type="button"
       size="sm"
       disabled={scope.pending}
       onClick={() => scope.run(() => action(next.step))}
@@ -104,16 +105,16 @@ export function RegisterG1Form({ action }: { action: (note: string) => Promise<A
   };
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label htmlFor={`${id}-note`}>Observação do G1</Label>
-        <Textarea
+      <FormItem htmlFor={`${id}-note`} label="Observação do G1" className="mb-0">
+        <Input
           id={`${id}-note`}
+          textArea
           rows={2}
           value={note}
           onChange={(event) => setNote(event.target.value)}
         />
-      </div>
-      <Button type="submit" disabled={pending}>
+      </FormItem>
+      <Button type="submit" variant="solid" disabled={pending}>
         {pending ? 'Registrando…' : 'Registrar G1'}
       </Button>
       <Status status={status} />
@@ -143,8 +144,11 @@ export function BuildWindowForm({
   };
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="max-w-xs space-y-1.5">
-        <Label htmlFor={`${id}-seconds`}>Janela própria (segundos)</Label>
+      <FormItem
+        htmlFor={`${id}-seconds`}
+        label="Janela própria (segundos)"
+        className="mb-0 max-w-xs"
+      >
         <Input
           id={`${id}-seconds`}
           type="number"
@@ -154,13 +158,13 @@ export function BuildWindowForm({
           value={value}
           onChange={(event) => setValue(event.target.value)}
         />
-      </div>
+      </FormItem>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" variant="solid" disabled={pending}>
           Salvar janela
         </Button>
         <Button
-          variant="outline"
+          type="button"
           disabled={pending}
           onClick={() => {
             setValue('');
