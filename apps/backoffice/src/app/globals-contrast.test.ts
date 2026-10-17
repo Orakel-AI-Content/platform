@@ -577,6 +577,68 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-700',
     minimum: 4.5,
   },
+  // Table e Tabs (#213): cabeçalho da tabela, aba e aba ativa (sublinhado e pílula). O
+  // cabeçalho no claro é medido sobre o body, o fundo mais escuro em que aparece; o resto, sobre
+  // o cartão, onde as telas os põem.
+  {
+    name: 'cabeçalho da tabela',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+    ecme: 'text-gray-500',
+  },
+  {
+    name: 'aba',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'aba ativa',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'aba ativa em pílula',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'bg-primary',
+    minimum: 4.5,
+  },
+  {
+    name: 'cabeçalho da tabela',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'aba',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'aba ativa',
+    theme: 'escuro',
+    text: 'dark:text-primary-mild',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+    ecme: 'text-primary',
+  },
+  {
+    name: 'aba ativa em pílula',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-primary',
+    minimum: 4.5,
+    ecme: 'text-neutral',
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
