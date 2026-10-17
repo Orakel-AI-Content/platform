@@ -323,7 +323,7 @@ test('o toggle recolhe e expande a barra; recolhida, ícones com nome, dica e ar
   await expect(page.getByRole('button', { name: /trocar de site/ })).toHaveCount(0);
 
   await bar.getByRole('link', { name: 'Mídia' }).hover();
-  await expect(page.getByRole('tooltip')).toHaveText('Mídia');
+  await expect(page.getByRole('tooltip', { name: 'Mídia' })).toBeVisible();
   await page.mouse.move(800, 400);
   await expect(page.getByRole('tooltip')).toHaveCount(0);
 
@@ -335,7 +335,9 @@ test('o toggle recolhe e expande a barra; recolhida, ícones com nome, dica e ar
     await page.keyboard.press('Tab');
   }
   await expect(taxonomias).toBeFocused();
-  await expect(page.getByRole('tooltip')).toHaveText('Taxonomias');
+  // As dicas dos itens que o Tab deixou fecham com o blur; sob carga, ainda podem estar saindo.
+  await expect(page.getByRole('tooltip', { name: 'Taxonomias' })).toBeVisible();
+  await expect(page.getByRole('tooltip')).toHaveCount(1);
 
   await toggle.focus();
   await page.keyboard.press('Space');
