@@ -7,6 +7,9 @@
 @import './styles/button.css';
 @import './styles/card.css';
 @import './styles/checkbox.css';
+@import './styles/close-button.css';
+@import './styles/dialog.css';
+@import './styles/drawer.css';
 @import './styles/dropdown.css';
 @import './styles/form.css';
 @import './styles/input-group.css';
