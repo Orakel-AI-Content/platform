@@ -5,7 +5,9 @@
 // - `loading` anuncia o estado (`aria-busy` e `aria-disabled`) e continua bloqueando o clique,
 //   sem tirar o foco do botão;
 // - o `solid` usa `dark:text-gray-950`: o texto branco sobre o `primary` do escuro dá 3,56:1
-//   (par em ECME_PAIRS do globals-contrast.test.ts).
+//   (par em ECME_PAIRS do globals-contrast.test.ts);
+// - `href` e `download` tipados (#247), para o link com cara de botão (`asElement={Link}` ou
+//   `asElement="a"`), como o `href` do Dropdown.Item (#239).
 'use client';
 
 import classNames from '../utils/classNames';
@@ -19,6 +21,10 @@ import type { ReactNode, ComponentPropsWithRef, MouseEvent, ElementType } from '
 
 export interface ButtonProps extends CommonProps, Omit<ComponentPropsWithRef<'button'>, 'onClick'> {
   asElement?: ElementType;
+  /** Com `asElement` de link (`Link`, `"a"`): o destino. */
+  href?: string;
+  /** Com `asElement="a"`: baixa o destino com este nome (rota de download). */
+  download?: string;
   active?: boolean;
   block?: boolean;
   clickFeedback?: boolean;
