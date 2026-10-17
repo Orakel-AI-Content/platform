@@ -1,9 +1,8 @@
-import Link from 'next/link';
-
 import { currentActor } from '@/auth/request-actor.ts';
 import { noRead } from '@/components/forbidden-screen';
 import { SitesTable } from '@/components/sites-table';
-import { buttonVariants } from '@/components/legacy-ui/button';
+import { Button } from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { can } from '@/domain/access/rbac.ts';
 import { TFVARS_FILENAME } from '@/domain/sites/sites.ts';
 
@@ -31,9 +30,9 @@ export default async function SitesPage({ searchParams }: SearchParams) {
   }
   const canConfigure = can(actor.value, 'site.configure');
   const register = canConfigure ? (
-    <Link href="/sites/novo" className={buttonVariants({ size: 'sm' })}>
+    <ButtonLink href="/sites/novo" variant="solid" size="sm">
       Cadastrar site
-    </Link>
+    </ButtonLink>
   ) : undefined;
   return (
     <section aria-labelledby="sites-title" className="list-width space-y-4">
@@ -45,13 +44,9 @@ export default async function SitesPage({ searchParams }: SearchParams) {
             <>
               {register}
               {/* Rota de download (ADR 0011), não navegação: <a> com download, não <Link>. */}
-              <a
-                href="/sites/tfvars"
-                download={TFVARS_FILENAME}
-                className={buttonVariants({ variant: 'outline', size: 'sm' })}
-              >
+              <Button asElement="a" href="/sites/tfvars" download={TFVARS_FILENAME} size="sm">
                 Baixar {TFVARS_FILENAME}
-              </a>
+              </Button>
             </>
           ) : undefined
         }

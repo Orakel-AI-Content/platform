@@ -1,10 +1,8 @@
-import Link from 'next/link';
-
 import { EntityTable } from '@/components/entity-table';
 import { TAXONOMY_KIND_LABEL } from '@/components/site-labels.ts';
 import { listTaxonomies } from '@/domain/content/taxonomies.ts';
 import { noRead } from '@/components/forbidden-screen';
-import { buttonVariants } from '@/components/legacy-ui/button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
@@ -25,9 +23,9 @@ export default async function TaxonomiesPage({ params }: { params: Promise<{ sit
   if (!taxonomies.ok) return noRead;
 
   const create = canWrite ? (
-    <Link href={`/sites/${site.id}/taxonomias/novo`} className={buttonVariants({ size: 'sm' })}>
+    <ButtonLink href={`/sites/${site.id}/taxonomias/novo`} variant="solid" size="sm">
       Criar taxonomia
-    </Link>
+    </ButtonLink>
   ) : undefined;
 
   return (

@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import { LifecycleSteps } from '@/components/lifecycle-steps';
 import {
   BuildWindowForm,
@@ -15,7 +13,7 @@ import {
 } from '@/components/site-labels.ts';
 import { LastBuildSummary, PendingCount, PublishNowPanel } from '@/components/site-status';
 import { Badge } from '@/components/legacy-ui/badge';
-import { buttonVariants } from '@/components/legacy-ui/button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
 
@@ -53,12 +51,9 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         title={site.name}
         action={
           canConfigure ? (
-            <Link
-              href={`/sites/${site.id}/configuracao`}
-              className={buttonVariants({ variant: 'outline', size: 'sm' })}
-            >
+            <ButtonLink href={`/sites/${site.id}/configuracao`} size="sm">
               Editar configuração
-            </Link>
+            </ButtonLink>
           ) : undefined
         }
       />

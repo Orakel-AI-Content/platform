@@ -1,9 +1,7 @@
-import Link from 'next/link';
-
 import { EntityTable } from '@/components/entity-table';
 import { listMenus } from '@/domain/content/menus.ts';
 import { noRead } from '@/components/forbidden-screen';
-import { buttonVariants } from '@/components/legacy-ui/button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
@@ -21,9 +19,9 @@ export default async function MenusPage({ params }: { params: Promise<{ site: st
   if (!menus.ok) return noRead;
 
   const create = canWrite ? (
-    <Link href={`/sites/${site.id}/menus/novo`} className={buttonVariants({ size: 'sm' })}>
+    <ButtonLink href={`/sites/${site.id}/menus/novo`} variant="solid" size="sm">
       Criar menu
-    </Link>
+    </ButtonLink>
   ) : undefined;
 
   return (

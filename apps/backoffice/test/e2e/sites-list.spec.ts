@@ -193,6 +193,20 @@ test('com 20 sites em 1440 px, a página sem rolagem horizontal e linhas de até
   expect(accessibility.violations).toEqual([]);
 });
 
+// Cabeçalho (título e ações) no visual do Ecme (#247), nos dois temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`a lista de sites sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAsAdmin(page);
+    await expect(page.getByRole('link', { name: 'Cadastrar site' })).toBeVisible();
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
+
 test('o menu Mais ações abre e fecha pelo mouse e pelo teclado; Esc devolve o foco', async ({
   page,
 }) => {

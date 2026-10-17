@@ -155,7 +155,9 @@ function Trail({ items }: { items: readonly TrailItem[] }) {
 
 /**
  * Cabeçalho da tela (#87): trilha (#173, #174), título à esquerda e a ação principal à
- * direita. A página só passa `action` quando quem pede tem permissão para ela.
+ * direita. A página só passa `action` quando quem pede tem permissão para ela. O Ecme não tem
+ * cabeçalho de página (#247): o título usa o do template (h3 `text-2xl` e `.heading-text`), e
+ * as ações, o `ui/Button`.
  */
 export function PageHeader({
   id,
@@ -171,7 +173,7 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   const heading = (
-    <h1 id={id} className="text-2xl font-semibold">
+    <h1 id={id} className="text-2xl font-bold text-gray-900 dark:text-gray-100">
       {title}
     </h1>
   );

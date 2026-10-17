@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import Link from 'next/link';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Button } from './index.tsx';
@@ -82,6 +83,26 @@ describe('Button', () => {
     expect(screen.getByText('Sites').closest('.button')?.getAttribute('aria-disabled')).toBe(
       'true',
     );
+  });
+
+  it('link com cara de botão (asElement): href e download chegam ao elemento (#247)', () => {
+    render(
+      <>
+        <Button asElement={Link} href="/sites/novo" variant="solid" size="sm">
+          Cadastrar site
+        </Button>
+        <Button asElement="a" href="/sites/tfvars" download="sites.auto.tfvars.json" size="sm">
+          Baixar
+        </Button>
+      </>,
+    );
+
+    const link = screen.getByRole('link', { name: 'Cadastrar site' });
+    expect(link.getAttribute('href')).toBe('/sites/novo');
+    expect(link.className).toContain('bg-primary');
+    const download = screen.getByRole('link', { name: 'Baixar' });
+    expect(download.getAttribute('href')).toBe('/sites/tfvars');
+    expect(download.getAttribute('download')).toBe('sites.auto.tfvars.json');
   });
 
   it('loading: aria-busy e aria-disabled, Spinner oculto, clique bloqueado e foco mantido', async () => {
