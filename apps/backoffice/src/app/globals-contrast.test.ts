@@ -26,10 +26,7 @@ function block(pattern: RegExp): string {
 
 /** O tema escuro herda do claro o que não redefine. */
 const light = variables(block(/^:root\s*\{([^}]*)\}/m));
-const dark = new Map([
-  ...light,
-  ...variables(block(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)),
-]);
+const dark = new Map([...light, ...variables(block(/^\.dark\s*\{([^}]*)\}/m))]);
 const THEMES = { claro: light, escuro: dark };
 
 /** Valor final da variável no tema, seguindo `var(--outra)` (os apelidos apontam para o Ecme). */

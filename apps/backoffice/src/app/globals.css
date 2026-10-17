@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* Tema por classe no <html>, como no Ecme (#203): `dark` ou `light`, do cookie de tema ou, no
+   modo sistema, do script inline do layout raiz (src/configs/theme.config.ts). */
+@custom-variant dark (&:is(.dark *));
+
 /* Paleta do Ecme (#202; docs/migration/ecme.md), portada de src/assets/styles/tailwind/index.css
    do design-reference (e5f9a1d). Os temas dos sites são do @orakel/tokens; este é só da
    ferramenta interna. Contraste AA nos pares de texto e 3:1 no foco, conferidos por
@@ -54,26 +58,24 @@
   --radius: 0.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --primary: #2a85ff;
-    --primary-deep: #0069f6;
-    --primary-mild: #4996ff;
-    --error: #ff6a55;
-    --success: #10b981;
-    --info: #2a85ff;
-    --warning: #f59e0b;
+.dark {
+  --primary: #2a85ff;
+  --primary-deep: #0069f6;
+  --primary-mild: #4996ff;
+  --error: #ff6a55;
+  --success: #10b981;
+  --info: #2a85ff;
+  --warning: #f59e0b;
 
-    --background: var(--gray-950);
-    --foreground: var(--gray-100);
-    --muted: var(--gray-800);
-    --muted-foreground: var(--gray-400);
-    --border: var(--gray-700);
-    --primary-foreground: var(--gray-950);
-    --destructive-foreground: var(--gray-950);
-    --success-foreground: var(--gray-950);
-    --info-foreground: var(--gray-950);
-  }
+  --background: var(--gray-950);
+  --foreground: var(--gray-100);
+  --muted: var(--gray-800);
+  --muted-foreground: var(--gray-400);
+  --border: var(--gray-700);
+  --primary-foreground: var(--gray-950);
+  --destructive-foreground: var(--gray-950);
+  --success-foreground: var(--gray-950);
+  --info-foreground: var(--gray-950);
 }
 
 @theme inline {
