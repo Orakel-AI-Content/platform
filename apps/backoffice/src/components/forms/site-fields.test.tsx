@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
 import { SchemaForm, type SchemaFormIssue } from './schema-form.tsx';
@@ -9,6 +10,14 @@ import { choiceField, flagsField, linesField, themeField } from './site-fields.t
 
 // Campos da configuração do site no gerador (#47): linhas ↔ lista, flags ↔ registro e
 // escolha entre as opções recebidas.
+
+// A mensagem de erro do FormItem (#245) anima com o motion, que o happy-dom cancela no `cleanup`.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 
 afterEach(cleanup);
 

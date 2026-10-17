@@ -3,7 +3,8 @@ import { RESOURCES, SiteConfigSchema, type SiteConfig } from '@orakel/content-mo
 import { THEME_IDS, THEME_SUMMARIES } from '@orakel/tokens';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { editValues } from './site-config-form-values.ts';
 import type { SiteFormResult } from './site-config-form-values.ts';
@@ -14,6 +15,14 @@ import { SITE_CONFIG_HIDDEN, SITE_CONFIG_SECTIONS, SiteConfigForm } from './site
 
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
+
+// A mensagem de erro do FormItem (#245) anima com o motion, que o happy-dom cancela no `cleanup`.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 
 afterEach(() => {
   cleanup();

@@ -9,12 +9,21 @@ import {
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm, type FieldValues } from 'react-hook-form';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
 import { SchemaFields, SchemaForm, type FieldProps } from './schema-form.tsx';
 
 // Gerador de formulários (#42): campos por tipo, listas, registro, erros e teclado.
+
+// A mensagem de erro do FormItem (#245) anima com o motion, que o happy-dom cancela no `cleanup`.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 
 afterEach(cleanup);
 

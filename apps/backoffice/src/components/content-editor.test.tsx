@@ -2,7 +2,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FieldValues } from 'react-hook-form';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
@@ -16,6 +17,14 @@ vi.mock('next/navigation', () => ({
   useRouter: () => router,
   usePathname: () => '/sites/exemplo-a/conteudos/7/editar',
 }));
+
+// A mensagem de erro do FormItem (#245) anima com o motion, que o happy-dom cancela no `cleanup`.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 
 afterEach(() => {
   cleanup();

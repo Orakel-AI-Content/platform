@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
 import type { MediaItem } from '../media-library.tsx';
@@ -10,6 +11,14 @@ import { SchemaForm } from './schema-form.tsx';
 
 // Seletores de mídia e de entidades no gerador (#45): só o que existe no site, por teclado. A
 // mídia é escolhida pela grade de miniaturas (#182), com a miniatura do valor atual por ID.
+
+// A mensagem de erro do FormItem (#245) anima com o motion, que o happy-dom cancela no `cleanup`.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 
 afterEach(cleanup);
 
