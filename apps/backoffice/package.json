@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
+    "@floating-ui/react": "catalog:",
     "@hookform/resolvers": "catalog:",
     "@next/env": "catalog:",
     "@orakel/build-contract": "workspace:*",
