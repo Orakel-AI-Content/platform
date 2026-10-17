@@ -304,111 +304,171 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
   });
 }
 
-// Checkbox e Select (#208): estado do Checkbox para o leitor de tela e o Select do react-select
-// operado só pelo teclado, com o rótulo do FormItem.
+// Dialog, Drawer e ConfirmDialog (#209) sobre o react-modal: foco preso, Esc fecha e o foco volta
+// ao botão que abriu; o título nomeia o diálogo; o contêiner da app fica inerte enquanto ele está
+// aberto, e nenhuma animação roda com movimento reduzido.
 
-test('Checkbox e Checkbox.Group alternam com Espaço e expõem o estado', async ({ page }) => {
-  await login(page);
-  await page.goto(SHOWCASE);
-  await page.waitForLoadState('networkidle');
-  const checkboxes = section(page, 'Checkbox');
+const DIALOGS = [
+  { opener: 'Abrir Dialog', role: 'dialog', name: 'Editar autor' },
+  { opener: 'Abrir Drawer', role: 'dialog', name: 'Filtros' },
+  { opener: 'Abrir ConfirmDialog', role: 'alertdialog', name: 'Limpar os filtros?' },
+] as const;
 
-  const destaque = checkboxes.getByRole('checkbox', { name: 'Destaque na capa' });
-  await expect(destaque).not.toBeChecked();
-  await destaque.focus();
-  await page.keyboard.press('Space');
-  await expect(destaque).toBeChecked();
-  await page.keyboard.press('Space');
-  await expect(destaque).not.toBeChecked();
+const appRoot = (page: Page) => page.locator('#app-root');
 
-  await expect(checkboxes.getByRole('checkbox', { name: 'Publicado' })).toBeChecked();
-  // `indeterminate` nativo: o leitor de tela anuncia "misto".
-  await expect(checkboxes.getByRole('checkbox', { name: 'Todas as seções' })).toBeChecked({
-    indeterminate: true,
+/** Mensagens do react-modal sem o appElement registrado. */
+function appElementWarnings(page: Page): string[] {
+  const messages: string[] = [];
+  page.on('console', (message) => {
+    if (/App element is not defined/i.test(message.text())) messages.push(message.text());
   });
-  await expect(checkboxes.getByRole('checkbox', { name: 'Arquivado' })).toBeDisabled();
+  return messages;
+}
 
-  const formatos = checkboxes.getByRole('group', { name: 'Formatos' });
-  const status = checkboxes.getByRole('status');
-  await expect(status).toHaveText('Formatos escolhidos: texto.');
-  await formatos.getByRole('checkbox', { name: 'Vídeo' }).focus();
-  await page.keyboard.press('Space');
-  await expect(formatos.getByRole('checkbox', { name: 'Vídeo' })).toBeChecked();
-  await expect(status).toHaveText('Formatos escolhidos: texto, video.');
-  await page.keyboard.press('Shift+Tab');
-  await expect(formatos.getByRole('checkbox', { name: 'Texto' })).toBeFocused();
-  await page.keyboard.press('Space');
-  await expect(status).toHaveText('Formatos escolhidos: video.');
-});
-
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`Select pelo teclado: rótulo, setas, Enter e Esc, sem violação do axe com o menu aberto (${colorScheme})`, async ({
+for (const { opener, role, name } of DIALOGS) {
+  test(`${name}: foco preso, página inerte, Esc fecha e o foco volta a "${opener}"`, async ({
     page,
   }) => {
-    await page.emulateMedia({ colorScheme });
+    await login(page);
+    const warnings = appElementWarnings(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    const button = section(page, 'Dialog').getByRole('button', { name: opener });
+    await button.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole(role, { name });
+    // O elemento do react-modal não tem caixa própria no Drawer (o conteúdo é absoluto dentro do
+    // overlay, como no Ecme): a visibilidade é a do título.
+    await expect(dialog.getByRole('heading', { name })).toBeVisible();
+    await expect(appRoot(page)).toHaveAttribute('inert', '');
+    await expect(appRoot(page)).toHaveAttribute('aria-hidden', 'true');
+
+    // Tab e Shift+Tab repetidos não saem do diálogo.
+    for (const key of ['Tab', 'Shift+Tab'] as const) {
+      for (let step = 0; step < 6; step += 1) {
+        await page.keyboard.press(key);
+        expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(
+          true,
+        );
+      }
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(button).toBeFocused();
+    await expect(appRoot(page)).not.toHaveAttribute('inert');
+    expect(warnings).toEqual([]);
+  });
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Dialog, Drawer e ConfirmDialog abertos sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await login(page);
     const hydration = hydrationMessages(page);
     await page.goto(SHOWCASE);
     await page.waitForLoadState('networkidle');
-    const selects = section(page, 'Select');
 
-    const categoria = selects.getByLabel('Categoria', { exact: true });
-    await expect(categoria).toHaveAttribute('role', 'combobox');
-    await categoria.focus();
-    await page.keyboard.press('ArrowDown');
-    await expect(categoria).toHaveAttribute('aria-expanded', 'true');
-    await page.keyboard.press('ArrowDown');
-
-    // A opção em foco tem fundo próprio, diferente das outras.
-    const options = selects.locator('.select-option');
-    await expect(options).toHaveCount(4);
-    const focused = selects.locator('.select-option-focused');
-    await expect(focused).toHaveText('Guias');
-    const background = (locator: Locator) =>
-      locator.evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(await background(focused)).not.toBe(await background(options.first()));
-
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
-
-    await page.keyboard.press('Enter');
-    await expect(selects.locator('.select-single-value').first()).toHaveText('Guias');
-    await expect(categoria).toBeFocused();
-
-    await page.keyboard.press('ArrowDown');
-    await expect(categoria).toHaveAttribute('aria-expanded', 'true');
-    await page.keyboard.press('Escape');
-    await expect(categoria).toHaveAttribute('aria-expanded', 'false');
-    await expect(selects.locator('.select-menu')).toHaveCount(0);
+    for (const { opener, role, name } of DIALOGS) {
+      await section(page, 'Dialog').getByRole('button', { name: opener }).click();
+      const dialog = page.getByRole(role, { name });
+      await expect(dialog.getByRole('heading', { name })).toBeVisible();
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations, name).toEqual([]);
+      // O primeiro Tab dentro do diálogo leva ao botão Fechar, com nome e contorno de 2px.
+      await page.keyboard.press('Tab');
+      const close = dialog.getByRole('button', { name: 'Fechar' });
+      await expect(close).toBeFocused();
+      expect(
+        await close.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return { style: style.outlineStyle, width: style.outlineWidth };
+        }),
+      ).toEqual({ style: 'solid', width: '2px' });
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+    }
 
     expect(hydration).toEqual([]);
   });
 }
 
-test('Select em FormItem inválido, async e creatable', async ({ page }) => {
+test('ConfirmDialog sobre o Drawer: fechar só a confirmação mantém a página inerte', async ({
+  page,
+}) => {
   await login(page);
   await page.goto(SHOWCASE);
   await page.waitForLoadState('networkidle');
-  const selects = section(page, 'Select');
 
-  const secao = selects.getByLabel('Seção');
-  await expect(secao).toHaveAttribute('aria-invalid', 'true');
-  const errorId = await secao.getAttribute('aria-errormessage');
-  await expect(page.locator(`[id="${errorId}"]`)).toHaveText('Escolha uma seção');
+  await section(page, 'Dialog').getByRole('button', { name: 'Abrir Drawer' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Filtros' });
+  const clear = drawer.getByRole('button', { name: 'Limpar filtros' });
+  await clear.click();
+  const confirm = page.getByRole('alertdialog', { name: 'Limpar os filtros?' });
+  await expect(confirm.getByRole('heading', { name: 'Limpar os filtros?' })).toBeVisible();
+  await expect(confirm).toHaveAccessibleDescription('A lista volta a mostrar todos os artigos.');
 
-  const site = selects.getByLabel('Site');
-  await site.focus();
-  await page.keyboard.type('rece');
-  await expect(selects.locator('.select-option')).toHaveText(['Receitas da casa']);
-  await page.keyboard.press('Enter');
-  await expect(
-    selects.locator('.select-single-value', { hasText: 'Receitas da casa' }),
-  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(confirm).toHaveCount(0);
+  await expect(drawer.getByRole('heading', { name: 'Filtros' })).toBeVisible();
+  await expect(clear).toBeFocused();
+  await expect(appRoot(page)).toHaveAttribute('inert', '');
 
-  const palavra = selects.getByLabel('Palavra-chave');
-  await palavra.focus();
-  await page.keyboard.type('Podcasts');
-  await expect(selects.locator('.select-option-focused')).toHaveText('Criar "Podcasts"');
-  await page.keyboard.press('Enter');
-  await expect(selects.locator('.select-single-value', { hasText: 'Podcasts' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(drawer).toHaveCount(0);
+  await expect(appRoot(page)).not.toHaveAttribute('inert');
 });
+
+for (const reducedMotion of ['reduce', 'no-preference'] as const) {
+  test(`Drawer ${reducedMotion === 'reduce' ? 'abre sem' : 'abre com'} transição com reducedMotion ${reducedMotion}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    // A posição `right` da gaveta a cada quadro, do momento em que ela entra no DOM até 500 ms
+    // depois (a transição padrão do motion leva cerca de 300 ms), e a transição do overlay.
+    const { positions, overlayTransition } = await page.evaluate(
+      () =>
+        new Promise<{ positions: number[]; overlayTransition: string }>((resolve) => {
+          const values: number[] = [];
+          const observer = new MutationObserver(() => {
+            const content = document.querySelector<HTMLElement>('.drawer-content');
+            if (!content) return;
+            observer.disconnect();
+            const start = performance.now();
+            const sample = () => {
+              values.push(parseFloat(getComputedStyle(content).right));
+              if (performance.now() - start < 500) requestAnimationFrame(sample);
+              else
+                resolve({
+                  positions: values,
+                  overlayTransition: getComputedStyle(document.querySelector('.drawer-overlay')!)
+                    .transitionDuration,
+                });
+            };
+            requestAnimationFrame(sample);
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+          [...document.querySelectorAll('button')]
+            .find((button) => button.textContent === 'Abrir Drawer')!
+            .click();
+        }),
+    );
+
+    expect(positions.at(-1)).toBe(0);
+    const intermediate = positions.filter((value) => value < 0 && value > -400);
+    if (reducedMotion === 'reduce') {
+      expect(positions[0]).toBe(0);
+      expect(intermediate).toEqual([]);
+      expect(overlayTransition).toBe('0s');
+    } else {
+      expect(intermediate.length).toBeGreaterThan(0);
+    }
+  });
+}

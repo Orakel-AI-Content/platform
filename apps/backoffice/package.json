@@ -59,7 +59,7 @@
     "react-dom": "catalog:",
     "react-hook-form": "catalog:",
     "react-icons": "catalog:",
-    "react-select": "catalog:",
+    "react-modal": "catalog:",
     "sharp": "catalog:",
     "tailwind-merge": "catalog:",
     "zod": "catalog:"
@@ -79,6 +79,7 @@
     "@types/pg": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/react-modal": "catalog:",
     "drizzle-kit": "catalog:",
     "eslint": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",
