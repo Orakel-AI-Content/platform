@@ -127,6 +127,8 @@ type EcmePair = {
   background: string;
   minimum: number;
   ecme?: string;
+  /** Fundo original do Ecme, quando a substituição é no fundo (#206, Avatar). */
+  ecmeBackground?: string;
 };
 
 const ECME_PAIRS: readonly EcmePair[] = [
@@ -322,51 +324,50 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-700',
     minimum: 4.5,
   },
-  // Form e InputGroup (#207): mensagem de erro e asterisco do FormItem (`_form.css`) e o texto
-  // do complemento do InputGroup (`Addon.tsx`).
+  // Badge, Tag e Avatar (#206).
   {
-    name: 'mensagem de erro no body',
+    name: 'badge',
     theme: 'claro',
-    text: 'text-error',
+    text: 'text-neutral',
+    background: 'bg-error',
+    minimum: 4.5,
+  },
+  {
+    name: 'tag',
+    theme: 'claro',
+    text: 'text-gray-900',
     background: 'bg-gray-100',
     minimum: 4.5,
   },
   {
-    name: 'mensagem de erro no cartão',
+    name: 'iniciais do avatar',
     theme: 'claro',
-    text: 'text-error',
-    background: 'bg-white',
+    text: 'text-gray-100',
+    background: 'bg-gray-600',
     minimum: 4.5,
+    ecmeBackground: 'bg-gray-400',
   },
   {
-    name: 'complemento do campo',
-    theme: 'claro',
-    text: 'text-gray-600',
-    background: 'bg-gray-200',
-    minimum: 4.5,
-  },
-  {
-    name: 'mensagem de erro no body',
+    name: 'badge',
     theme: 'escuro',
-    text: 'dark:text-error',
-    background: 'dark:bg-gray-950',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-error',
+    minimum: 4.5,
+    ecme: 'text-white',
+  },
+  {
+    name: 'tag',
+    theme: 'escuro',
+    text: 'dark:text-gray-50',
+    background: 'dark:bg-gray-700',
     minimum: 4.5,
   },
   {
-    name: 'mensagem de erro no cartão',
+    name: 'iniciais do avatar',
     theme: 'escuro',
-    text: 'dark:text-error',
-    background: 'dark:bg-gray-800',
-    minimum: 4.5,
-  },
-  {
-    // O Ecme herdava a cor do texto do body.
-    name: 'complemento do campo',
-    theme: 'escuro',
-    text: 'dark:text-gray-100',
+    text: 'text-gray-100',
     background: 'dark:bg-gray-600',
     minimum: 4.5,
-    ecme: 'dark:text-gray-400',
   },
 ];
 
@@ -377,12 +378,16 @@ function token(className: string): string {
 }
 
 /** Contraste de um par no tema dele; um token que falta é erro com o nome do par. */
-function pairContrast(pair: EcmePair, text: string = pair.text): number {
+function pairContrast(
+  pair: EcmePair,
+  text: string = pair.text,
+  background: string = pair.background,
+): number {
   const theme = THEMES[pair.theme];
   const fg = resolve(theme, token(text));
-  const bg = resolve(theme, token(pair.background));
+  const bg = resolve(theme, token(background));
   if (fg === undefined || bg === undefined)
-    throw new Error(`${pair.name} (${pair.theme}): token ausente em ${text} ou ${pair.background}`);
+    throw new Error(`${pair.name} (${pair.theme}): token ausente em ${text} ou ${background}`);
   return contrast(fg, bg);
 }
 
@@ -432,10 +437,14 @@ describe('pares do Ecme como o tema os combina', () => {
   );
 
   it('cada substituição troca uma classe do Ecme que não chega ao mínimo', () => {
-    for (const pair of ECME_PAIRS.filter((p) => p.ecme !== undefined)) {
-      expect(pairContrast(pair, pair.ecme), `${pair.name} (${pair.theme})`).toBeLessThan(
-        pair.minimum,
-      );
+    const substituted = ECME_PAIRS.filter(
+      (p) => p.ecme !== undefined || p.ecmeBackground !== undefined,
+    );
+    for (const pair of substituted) {
+      expect(
+        pairContrast(pair, pair.ecme, pair.ecmeBackground),
+        `${pair.name} (${pair.theme})`,
+      ).toBeLessThan(pair.minimum);
     }
   });
 
