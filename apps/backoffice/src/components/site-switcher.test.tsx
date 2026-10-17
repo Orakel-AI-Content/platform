@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { sameAreaIn, SiteSwitcher, siteInitials } from './site-switcher.tsx';
 
@@ -13,6 +14,13 @@ const pathname = vi.hoisted(() => ({ value: '/sites/exemplo-a' }));
 vi.mock('next/navigation', () => ({ usePathname: () => pathname.value }));
 
 afterEach(cleanup);
+// A dica (recolhida) anima com o motion, que o happy-dom cancela no `cleanup`.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 
 const current = { id: 'exemplo-a', name: 'Exemplo A — Guias' };
 const sites = [current, { id: 'exemplo-b', name: 'Exemplo B — Receitas' }];
