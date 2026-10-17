@@ -13,6 +13,7 @@ import {
   sortFns,
   tableFeatures,
   type ColumnFiltersState,
+  type ColumnSort,
   type PaginationState,
   type Row,
   type RowData,
@@ -23,9 +24,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { listStateQuery, parseListState, type ListConfig, type ListPatch } from './list-query.ts';
-
-/** Itens por página de toda lista filtrada (sem seletor: decisão da #35). */
-export const PAGE_SIZE = 25;
 
 /** Texto para comparar na busca: sem acentos (NFD sem as marcas) e em minúsculas. */
 export function normalizeText(value: string): string {
@@ -61,6 +59,7 @@ export const listFeatures = tableFeatures({
 // também lê `q` e `pagina` (Mídia, #186), e o Next não deixa o servidor chamar função cliente.
 export {
   listStateQuery,
+  PAGE_SIZE,
   parseListState,
   type ListConfig,
   type ListFilterConfig,
@@ -101,7 +100,7 @@ export function useListState(config: ListConfig) {
     value,
   }));
   const sorting: SortingState = state.sort ? [state.sort] : [];
-  const pagination: PaginationState = { pageIndex: state.page - 1, pageSize: PAGE_SIZE };
+  const pagination: PaginationState = { pageIndex: state.page - 1, pageSize: state.pageSize };
 
   return {
     state,
@@ -115,6 +114,8 @@ export function useListState(config: ListConfig) {
         filters: Object.fromEntries(config.filters.map((filter) => [filter.column, undefined])),
       }),
     setPage: (page: number) => update({ page }),
+    setSort: (sort: ColumnSort) => update({ sort }),
+    setPageSize: (pageSize: number) => update({ pageSize }),
     table: {
       state: { globalFilter: state.search, columnFilters, sorting, pagination },
       onGlobalFilterChange: (updater: Updater<unknown>) => {

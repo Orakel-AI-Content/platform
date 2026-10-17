@@ -1,8 +1,13 @@
 import type { ColumnSort } from '@tanstack/react-table';
 
-// Estado das listas na URL (`q`, `ordem`, `pagina` e os filtros), sem React nem `'use client'`:
+// Estado das listas na URL (`q`, `ordem`, `pagina`, `por-pagina` e os filtros), sem React nem
+// `'use client'`:
 // a leitura serve ao servidor (a página Mídia pagina no servidor, #186) e ao cliente
 // (`useListState`, em `list-state.ts`).
+
+/** Itens por página de toda lista sem `pageSizes` (decisão da #35; com o seletor do DataTable
+ * do Ecme, a lista que optar por ele escolhe entre os seus tamanhos, #215). */
+export const PAGE_SIZE = 25;
 
 /** Filtro de uma coluna: o parâmetro da URL e os valores aceitos (o resto é ignorado). */
 export type ListFilterConfig = { column: string; param: string; values: readonly string[] };
@@ -13,6 +18,11 @@ export type ListConfig = {
   sortable: readonly string[];
   /** Sem ordem padrão (e sem `sortable`), a tabela fica na ordem dos dados. */
   defaultSort?: ColumnSort;
+  /**
+   * Tamanhos aceitos em `por-pagina` (o seletor do DataTable). Sem a lista, o tamanho fica em
+   * `PAGE_SIZE` e o parâmetro é ignorado; com ela, `PAGE_SIZE` continua o padrão.
+   */
+  pageSizes?: readonly number[];
 };
 
 export type ListState = {
@@ -23,6 +33,8 @@ export type ListState = {
   sort: ColumnSort | undefined;
   /** Página a partir de 1. */
   page: number;
+  /** Itens por página: `PAGE_SIZE` ou um dos `pageSizes`. */
+  pageSize: number;
 };
 
 export type ListPatch = {
@@ -31,11 +43,14 @@ export type ListPatch = {
   filters?: Record<string, string | undefined>;
   sort?: ColumnSort;
   page?: number;
+  /** Fora dos `pageSizes`, volta ao padrão; mudar o tamanho volta à página 1. */
+  pageSize?: number;
 };
 
 const SEARCH = 'q';
 const SORT = 'ordem';
 const PAGE = 'pagina';
+const PAGE_SIZE_PARAM = 'por-pagina';
 
 /** Estado da lista a partir dos `searchParams`; parâmetro inválido cai no padrão. */
 export function parseListState(params: URLSearchParams, config: ListConfig): ListState {
@@ -51,17 +66,19 @@ export function parseListState(params: URLSearchParams, config: ListConfig): Lis
     ? { id: sortColumn, desc }
     : config.defaultSort && { ...config.defaultSort };
   const page = Number(params.get(PAGE));
+  const pageSize = Number(params.get(PAGE_SIZE_PARAM));
   return {
     search: params.get(SEARCH) ?? '',
     filters,
     sort,
     page: Number.isInteger(page) && page > 1 ? page : 1,
+    pageSize: config.pageSizes?.includes(pageSize) ? pageSize : PAGE_SIZE,
   };
 }
 
 /**
  * Query string com a mudança aplicada; os demais parâmetros da URL ficam. Valor padrão sai
- * do endereço, e mudar a busca ou um filtro volta à página 1.
+ * do endereço, e mudar a busca, um filtro ou o tamanho volta à página 1.
  */
 export function listStateQuery(params: URLSearchParams, config: ListConfig, patch: ListPatch) {
   const next = new URLSearchParams(params);
@@ -80,7 +97,16 @@ export function listStateQuery(params: URLSearchParams, config: ListConfig, patc
     const isDefault = id === config.defaultSort?.id && desc === config.defaultSort.desc;
     set(SORT, isDefault ? undefined : `${desc ? '-' : ''}${id}`);
   }
+  if (patch.pageSize !== undefined) {
+    const valid = patch.pageSize !== PAGE_SIZE && config.pageSizes?.includes(patch.pageSize);
+    set(PAGE_SIZE_PARAM, valid ? String(patch.pageSize) : undefined);
+  }
   if (patch.page !== undefined) set(PAGE, patch.page > 1 ? String(patch.page) : undefined);
-  else if (patch.search !== undefined || patch.filters !== undefined) next.delete(PAGE);
+  else if (
+    patch.search !== undefined ||
+    patch.filters !== undefined ||
+    patch.pageSize !== undefined
+  )
+    next.delete(PAGE);
   return next.toString();
 }
