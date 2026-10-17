@@ -67,6 +67,7 @@ describe('FormItem', () => {
     expect(hint).toBe('dica');
     expect(document.getElementById(errorId!)?.textContent).toBe('Informe um e-mail válido');
     expect(screen.getByText('Informe um e-mail válido').className).toContain('form-explain');
+    expect(screen.getByText('Informe um e-mail válido').getAttribute('aria-live')).toBe('polite');
   });
 
   it('válido: sem aria-invalid, sem mensagem e sem o id dela no aria-describedby', () => {
