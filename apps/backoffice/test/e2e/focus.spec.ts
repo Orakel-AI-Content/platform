@@ -50,7 +50,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     const targets = [
       page.getByRole('link', { name: 'Pular para o conteúdo' }),
-      main.getByRole('link').first(),
+      // Link da trilha (#243), com as classes do Ecme.
+      main.getByRole('navigation', { name: 'Trilha de navegação' }).getByRole('link').first(),
       main.getByLabel('Nome', { exact: true }),
       main.getByRole('button', { name: 'Criar', exact: true }),
     ];
