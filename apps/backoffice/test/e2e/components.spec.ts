@@ -34,9 +34,9 @@ function hydrationMessages(page: Page): string[] {
   return messages;
 }
 
-/** Leva o foco até o controle só com Tab (no máximo 60 passos). */
+/** Leva o foco até o controle só com Tab (no máximo 150 passos: a vitrine cresce a cada Task). */
 async function tabTo(page: Page, target: Locator): Promise<void> {
-  for (let step = 0; step < 60; step += 1) {
+  for (let step = 0; step < 150; step += 1) {
     if (await target.evaluate((element) => element === document.activeElement)) return;
     await page.keyboard.press('Tab');
   }
@@ -1145,6 +1145,110 @@ for (const colorScheme of ['light', 'dark'] as const) {
       .withTags(WCAG)
       .include('[aria-labelledby="vitrine-table"]')
       .include('[aria-labelledby="vitrine-tabs"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
+
+// Pagination (#214): nav "Paginação" com página atual em aria-current, pontas indisponíveis,
+// alvos de 24 px e teclado; no modo link (getPageHref), a página vem de ?pagina= e os links
+// funcionam renderizados no servidor.
+
+const paginations = (page: Page) =>
+  section(page, 'Pagination').getByRole('navigation', { name: 'Paginação' });
+
+test('Pagination com botões: aria-current, pontas indisponíveis, teclado e alvos de 24 px', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const nav = paginations(page).first();
+  const status = section(page, 'Pagination').getByRole('status');
+
+  await expect(nav.getByText('Total de 100 itens')).toBeVisible();
+  await expect(nav.getByRole('button', { name: 'Página 1', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(nav.getByRole('button', { name: 'Página anterior' })).toBeDisabled();
+
+  for (const control of await nav.getByRole('button').all()) {
+    const box = await control.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(24);
+    expect(box?.height).toBeGreaterThanOrEqual(24);
+  }
+
+  const next = nav.getByRole('button', { name: 'Próxima página' });
+  await tabTo(page, next);
+  await page.keyboard.press('Enter');
+  await expect(status).toHaveText('Página escolhida: 2.');
+  await expect(nav.getByRole('button', { name: 'Página 2' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  const last = nav.getByRole('button', { name: 'Página 10' });
+  await tabTo(page, last);
+  await page.keyboard.press('Space');
+  await expect(status).toHaveText('Página escolhida: 10.');
+  await expect(next).toBeDisabled();
+});
+
+test('Pagination com links: ?pagina= no servidor, ponta sem href e Enter navega', async ({
+  page,
+}) => {
+  await login(page);
+  const response = await page.request.get(`${SHOWCASE}?pagina=7`);
+  const html = await response.text();
+  expect(html).toContain('href="/teste-de-componentes?pagina=8"');
+  expect(html).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/teste-de-componentes\?pagina=7"/);
+
+  await page.goto(`${SHOWCASE}?pagina=20`);
+  await page.waitForLoadState('networkidle');
+  const nav = paginations(page).last();
+
+  await expect(nav.getByRole('link', { name: 'Página 20' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  const next = nav.getByRole('link', { name: 'Próxima página' });
+  await expect(next).toHaveAttribute('aria-disabled', 'true');
+  await expect(next).not.toHaveAttribute('href');
+  await expect(nav.getByRole('link', { name: 'Voltar 5 páginas' })).toHaveAttribute(
+    'href',
+    '/teste-de-componentes?pagina=15',
+  );
+
+  for (const control of await nav.getByRole('link').all()) {
+    const box = await control.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(24);
+    expect(box?.height).toBeGreaterThanOrEqual(24);
+  }
+
+  const prev = nav.getByRole('link', { name: 'Página anterior' });
+  await tabTo(page, prev);
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\?pagina=19$/);
+  await expect(paginations(page).last().getByRole('link', { name: 'Página 19' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Pagination nos dois modos, com ponta indisponível, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.goto(`${SHOWCASE}?pagina=20`);
+    await page.waitForLoadState('networkidle');
+    await paginations(page).first().getByRole('button', { name: 'Página 2' }).click();
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-pagination"]')
       .analyze();
     expect(accessibility.violations).toEqual([]);
   });

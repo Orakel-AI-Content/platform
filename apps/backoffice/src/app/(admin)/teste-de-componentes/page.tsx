@@ -13,12 +13,18 @@ export const metadata: Metadata = { title: 'Teste de componentes' };
 // portado com axe e teclado, nos dois temas. Mesmo gate do teste-de-erro: só com
 // E2E_ERROR_ROUTE (compose local); sem a variável, que é o padrão, a página não existe. Cada
 // Task de componente acrescenta a sua seção; a remoção fica para a limpeza do épico (#52).
-export default function ComponentsShowcasePage() {
+type SearchParams = { searchParams: Promise<{ pagina?: string | string[] }> };
+
+export default async function ComponentsShowcasePage({ searchParams }: SearchParams) {
   if (!getEnv().E2E_ERROR_ROUTE) notFound();
+  // Página da Pagination em modo link (#214): vem da URL, para o E2E conferir a navegação sem
+  // estado no cliente.
+  const { pagina } = await searchParams;
+  const linkPage = Number.parseInt(typeof pagina === 'string' ? pagina : '', 10);
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold">Teste de componentes</h1>
-      <Showcase />
+      <Showcase linkPage={Number.isNaN(linkPage) ? 1 : linkPage} />
     </div>
   );
 }
