@@ -277,6 +277,51 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-800',
     minimum: 3,
   },
+  // Button (#205): solid (normal e hover) e default.
+  {
+    name: 'botão solid',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'bg-primary',
+    minimum: 4.5,
+  },
+  {
+    name: 'botão solid no hover',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'hover:bg-primary-mild',
+    minimum: 4.5,
+  },
+  {
+    name: 'botão default',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'botão solid',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-primary',
+    minimum: 4.5,
+    ecme: 'text-neutral',
+  },
+  {
+    name: 'botão solid no hover',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:hover:bg-primary-mild',
+    minimum: 4.5,
+    ecme: 'text-neutral',
+  },
+  {
+    name: 'botão default',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
