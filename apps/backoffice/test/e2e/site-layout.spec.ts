@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 // Layout do site (#78, workspace#32) contra o ambiente local: título da aba com a área e o
@@ -285,3 +286,99 @@ test('trilha nas telas de item: Sites › Site › Área › Item, sem link de v
   await page.goto(`${versionsPath}/versoes/1`);
   await expectTrail(['Sites', SITE_NAME, 'Conteúdos', title, 'Versão 1']);
 });
+
+// Recolher a barra (#238): o toggle do header alterna 290px ↔ 80px; recolhida, os itens ficam
+// só com o ícone, o nome no link e a dica no hover e no foco; o estado vale entre navegações
+// pelo cliente e volta expandido ao recarregar.
+
+const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
+const sideNavToggle = (page: Page) => page.getByRole('button', { name: 'Navegação lateral' });
+const sideNavWidth = (page: Page) =>
+  page.locator('#barra-lateral').evaluate((element) => element.getBoundingClientRect().width);
+
+test('o toggle recolhe e expande a barra; recolhida, ícones com nome, dica e aria-current', async ({
+  page,
+}) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto(`/sites/${SITE}/autores`);
+  await page.waitForLoadState('networkidle');
+  const toggle = sideNavToggle(page);
+  const bar = page.getByRole('navigation', { name: 'Áreas do site' });
+
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toHaveAttribute('aria-controls', 'barra-lateral');
+  expect(await sideNavWidth(page)).toBe(290);
+
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect.poll(() => sideNavWidth(page)).toBe(80);
+
+  await expect(bar.getByRole('link')).toHaveText([...AREAS, 'Textos institucionais']);
+  await expect(bar.getByRole('link', { name: 'Autores' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: 'Orakel Backoffice' })).toHaveAttribute(
+    'href',
+    '/sites',
+  );
+  await expect(page.getByRole('button', { name: /trocar de site/ })).toHaveCount(0);
+
+  await bar.getByRole('link', { name: 'Mídia' }).hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Mídia');
+  await page.mouse.move(800, 400);
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+
+  // A barra vem antes do header no DOM: o Tab parte da marca, o primeiro link dela.
+  const taxonomias = bar.getByRole('link', { name: 'Taxonomias' });
+  await page.getByRole('link', { name: 'Orakel Backoffice' }).focus();
+  for (let step = 0; step < 40; step += 1) {
+    if (await taxonomias.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(taxonomias).toBeFocused();
+  await expect(page.getByRole('tooltip')).toHaveText('Taxonomias');
+
+  await toggle.focus();
+  await page.keyboard.press('Space');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(() => sideNavWidth(page)).toBe(290);
+});
+
+test('recolhida, a barra continua assim entre áreas e volta expandida ao recarregar', async ({
+  page,
+}) => {
+  await loginAs(page, OPERATOR);
+  await page.goto(`/sites/${SITE}`);
+  await page.waitForLoadState('networkidle');
+  await sideNavToggle(page).click();
+  await expect.poll(() => sideNavWidth(page)).toBe(80);
+
+  await page
+    .getByRole('navigation', { name: 'Áreas do site' })
+    .getByRole('link', { name: 'Mídia' })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/sites/${SITE}/midia$`));
+  await expect(sideNavToggle(page)).toHaveAttribute('aria-expanded', 'false');
+  expect(await sideNavWidth(page)).toBe(80);
+
+  await page.reload();
+  await expect(sideNavToggle(page)).toHaveAttribute('aria-expanded', 'true');
+  expect(await sideNavWidth(page)).toBe(290);
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`a barra recolhida sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${SITE}/autores`);
+    await page.waitForLoadState('networkidle');
+    await sideNavToggle(page).click();
+    await expect.poll(() => sideNavWidth(page)).toBe(80);
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('.side-nav')
+      .include('.header')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
