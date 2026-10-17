@@ -127,6 +127,8 @@ type EcmePair = {
   background: string;
   minimum: number;
   ecme?: string;
+  /** Fundo original do Ecme, quando a substituição é no fundo (#206, Avatar). */
+  ecmeBackground?: string;
 };
 
 const ECME_PAIRS: readonly EcmePair[] = [
@@ -322,6 +324,51 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-700',
     minimum: 4.5,
   },
+  // Badge, Tag e Avatar (#206).
+  {
+    name: 'badge',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'bg-error',
+    minimum: 4.5,
+  },
+  {
+    name: 'tag',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'iniciais do avatar',
+    theme: 'claro',
+    text: 'text-gray-100',
+    background: 'bg-gray-600',
+    minimum: 4.5,
+    ecmeBackground: 'bg-gray-400',
+  },
+  {
+    name: 'badge',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-error',
+    minimum: 4.5,
+    ecme: 'text-white',
+  },
+  {
+    name: 'tag',
+    theme: 'escuro',
+    text: 'dark:text-gray-50',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
+  {
+    name: 'iniciais do avatar',
+    theme: 'escuro',
+    text: 'text-gray-100',
+    background: 'dark:bg-gray-600',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
@@ -331,12 +378,16 @@ function token(className: string): string {
 }
 
 /** Contraste de um par no tema dele; um token que falta é erro com o nome do par. */
-function pairContrast(pair: EcmePair, text: string = pair.text): number {
+function pairContrast(
+  pair: EcmePair,
+  text: string = pair.text,
+  background: string = pair.background,
+): number {
   const theme = THEMES[pair.theme];
   const fg = resolve(theme, token(text));
-  const bg = resolve(theme, token(pair.background));
+  const bg = resolve(theme, token(background));
   if (fg === undefined || bg === undefined)
-    throw new Error(`${pair.name} (${pair.theme}): token ausente em ${text} ou ${pair.background}`);
+    throw new Error(`${pair.name} (${pair.theme}): token ausente em ${text} ou ${background}`);
   return contrast(fg, bg);
 }
 
@@ -386,10 +437,14 @@ describe('pares do Ecme como o tema os combina', () => {
   );
 
   it('cada substituição troca uma classe do Ecme que não chega ao mínimo', () => {
-    for (const pair of ECME_PAIRS.filter((p) => p.ecme !== undefined)) {
-      expect(pairContrast(pair, pair.ecme), `${pair.name} (${pair.theme})`).toBeLessThan(
-        pair.minimum,
-      );
+    const substituted = ECME_PAIRS.filter(
+      (p) => p.ecme !== undefined || p.ecmeBackground !== undefined,
+    );
+    for (const pair of substituted) {
+      expect(
+        pairContrast(pair, pair.ecme, pair.ecmeBackground),
+        `${pair.name} (${pair.theme})`,
+      ).toBeLessThan(pair.minimum);
     }
   });
 
