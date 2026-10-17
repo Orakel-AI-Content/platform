@@ -1,21 +1,26 @@
 import type { ReactNode } from 'react';
 
 import { LIFECYCLE_LABEL, LIFECYCLE_ORDER } from '@/components/site-labels.ts';
-import { cn } from '@/lib/utils';
+import classNames from '@/components/ui/utils/classNames';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 type StepState = 'concluída' | 'atual' | 'pendente';
 
+// Tokens do Ecme no cartão, com os pares do globals-contrast.test.ts: o número da concluída
+// como o texto do botão solid, o da atual como título no cartão e o da pendente como texto
+// no cartão.
 const MARKER_CLASS: Record<StepState, string> = {
-  concluída: 'border-primary bg-primary text-primary-foreground',
-  atual: 'border-primary bg-background text-foreground ring-2 ring-ring ring-offset-2',
-  pendente: 'border-dashed border-muted-foreground bg-background text-muted-foreground',
+  concluída: 'border-primary bg-primary text-neutral dark:text-gray-950',
+  atual:
+    'border-primary bg-white text-gray-900 ring-2 ring-primary ring-offset-2 ring-offset-white dark:bg-gray-800 dark:text-gray-100 dark:ring-offset-gray-800',
+  pendente:
+    'border-dashed border-gray-400 bg-white text-gray-600 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-400',
 };
 
 const LABEL_CLASS: Record<StepState, string> = {
-  concluída: 'text-foreground',
-  atual: 'font-semibold text-foreground',
-  pendente: 'text-muted-foreground',
+  concluída: 'text-gray-900 dark:text-gray-100',
+  atual: 'font-semibold text-gray-900 dark:text-gray-100',
+  pendente: 'text-gray-600 dark:text-gray-400',
 };
 
 /**
@@ -44,7 +49,7 @@ export function LifecycleSteps({
           >
             <span
               aria-hidden="true"
-              className={cn(
+              className={classNames(
                 'flex size-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold',
                 MARKER_CLASS[state],
               )}
@@ -54,7 +59,9 @@ export function LifecycleSteps({
             <div className="space-y-2 pt-0.5">
               <p className={LABEL_CLASS[state]}>
                 {LIFECYCLE_LABEL[step]}{' '}
-                <span className="text-sm font-normal text-muted-foreground">({state})</span>
+                <span className="text-sm font-normal text-gray-600 dark:text-gray-400">
+                  ({state})
+                </span>
               </p>
               {index === currentIndex + 1 && action}
             </div>
