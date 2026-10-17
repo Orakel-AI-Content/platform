@@ -864,6 +864,35 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-800',
     minimum: 3,
   },
+  // Menu de perfil (#239): o cabeçalho do menu (e-mail e papéis) sobre o `dropdown-menu`.
+  {
+    name: 'e-mail no menu de perfil',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'papéis no menu de perfil',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'e-mail no menu de perfil',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'papéis no menu de perfil',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
