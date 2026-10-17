@@ -254,3 +254,42 @@ test('acionar um item do menu Mais ações fecha a lista e devolve o foco; um li
   await page.getByRole('link', { name: 'Conteúdos exemplo-a' }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos$/);
 });
+
+test('com 20 sites, a lista do seletor de site cabe na janela, rola e alcança o último site', async ({
+  page,
+}) => {
+  // Seletor de site (#221): sem altura máxima, a lista passava da borda inferior e os últimos
+  // sites ficavam fora de alcance, sem rolagem (a lista é um popover na top layer).
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await loginAsAdmin(page);
+  await page.goto('/sites/exemplo-a');
+  await page.waitForLoadState('networkidle');
+  const button = page.getByRole('button', { name: 'Exemplo A — Guias, trocar de site' });
+  const list = page.locator(`[id="${await button.getAttribute('popovertarget')}"]`);
+
+  await button.click();
+  await expect(list).toBeVisible();
+  const box = await list.evaluate((element) => {
+    const anchor = document.querySelector(`[popovertarget="${element.id}"]`)!;
+    const rect = element.getBoundingClientRect();
+    return {
+      items: element.querySelectorAll('a').length,
+      height: rect.height,
+      bottom: rect.bottom,
+      below: window.innerHeight - anchor.getBoundingClientRect().bottom,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    };
+  });
+  expect(box.items).toBeGreaterThanOrEqual(20);
+  expect(box.bottom).toBeLessThanOrEqual(720);
+  expect(box.height).toBeLessThanOrEqual(box.below);
+  expect(box.scrollHeight).toBeGreaterThan(box.clientHeight);
+
+  // O último site: o clique rola a lista até ele e leva à mesma área do outro site.
+  const last = list.getByRole('link').last();
+  const href = await last.getAttribute('href');
+  expect(href).toMatch(/^\/sites\/[\w-]+$/);
+  await last.click();
+  await expect(page).toHaveURL(new RegExp(`${href}$`));
+});

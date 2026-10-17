@@ -70,14 +70,17 @@ export function ActionsMenu({
           {text ? text.visible : 'Mais ações'}
         </button>
       )}
-      {/* Sem anchor positioning, a lista fica no posicionamento padrão do popover (centro). */}
+      {/* Sem anchor positioning, a lista fica no posicionamento padrão do popover (centro). Com
+          ele, a altura máxima é a da área do position-area menos a margem (stretch; 100% passaria
+          o mt-1), e a lista rola por dentro quando os itens não cabem (#221). Os itens não
+          encolhem para caber: quem rola é a lista. */}
       <div
         id={id}
         popover="auto"
         style={{ positionAnchor: anchor }}
         onClick={closeOnItem}
         className={cn(
-          'min-w-40 flex-col items-stretch gap-1 rounded-md border border-border bg-background p-1 text-foreground shadow-md open:flex supports-[position-anchor:--a]:inset-auto supports-[position-anchor:--a]:m-0 supports-[position-anchor:--a]:mt-1 supports-[position-anchor:--a]:[position-try-fallbacks:flip-block]',
+          'min-w-40 flex-col items-stretch gap-1 overflow-y-auto rounded-md border border-border bg-background p-1 text-foreground shadow-md open:flex *:shrink-0 supports-[position-anchor:--a]:inset-auto supports-[position-anchor:--a]:m-0 supports-[position-anchor:--a]:mt-1 supports-[position-anchor:--a]:max-h-[stretch] supports-[position-anchor:--a]:[position-try-fallbacks:flip-block]',
           align === 'start'
             ? 'supports-[position-anchor:--a]:[position-area:bottom_span-right]'
             : 'supports-[position-anchor:--a]:[position-area:bottom_span-left]',
