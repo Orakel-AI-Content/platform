@@ -1,6 +1,6 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/toast/toast.tsx
-// Adaptado (#212): o toast é um store do módulo, e não mais uma raiz React própria. O Ecme
-// criava, no primeiro `push`, um `createRoot` em `document.body` (ToastWrapper.getInstance):
+// Adaptado (#212): o toast é um store do módulo. O Ecme criava, no primeiro `push`, uma raiz
+// React própria em `document.body` (`react-dom/client`, no ToastWrapper.getInstance):
 // um segundo React fora da página, sem o contexto, o tema nem o `MotionConfig` do layout. Aqui o
 // `push` só enfileira a mensagem, e o ToastProvider, montado uma vez no layout raiz, a mostra
 // (`useSyncExternalStore`). A API para quem usa é a mesma (`toast.push`, `toast.remove`,

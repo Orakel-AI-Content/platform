@@ -6,8 +6,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { Notification } from '../Notification/index.tsx';
 import { toast, ToastProvider } from './index.ts';
 
-// toast do Ecme (#212) sem `createRoot`: o `push` enfileira no store do módulo e o ToastProvider
-// mostra as mensagens, numa região viva por placement.
+// toast do Ecme (#212) sem raiz React própria: o `push` enfileira no store do módulo e o
+// ToastProvider mostra as mensagens, numa região viva por placement.
 
 beforeAll(() => {
   MotionGlobalConfig.skipAnimations = true;

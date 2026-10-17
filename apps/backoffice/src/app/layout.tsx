@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { ModalAppElement } from '@/components/ui/ModalAppElement';
 import { MotionProvider } from '@/components/ui/MotionProvider';
+import { ToastProvider } from '@/components/ui/toast';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 import { parseThemeMode, THEME_COOKIE, THEME_SCRIPT } from '@/configs/theme.config';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <MotionProvider>
           <ModalAppElement />
           <div id={APP_ELEMENT_ID}>{children}</div>
+          {/* Toasts (#212): fora do contêiner da app, para continuarem anunciados quando um
+              diálogo o deixa `inert`/`aria-hidden`. */}
+          <ToastProvider />
         </MotionProvider>
       </body>
     </html>

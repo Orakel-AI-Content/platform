@@ -1,11 +1,11 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/toast/ToastWrapper.tsx
 // Adaptado (#212):
-// - sem o `ToastWrapper.getInstance`, que montava uma raiz React própria com `createRoot`: o
-//   ToastProvider, no layout raiz, renderiza um ToastWrapper por placement a partir do store do
-//   toast (toast.tsx);
+// - sem o `ToastWrapper.getInstance`, que montava uma raiz React própria (`react-dom/client`):
+//   o ToastProvider, no layout raiz, renderiza um ToastWrapper por placement a partir do store
+//   do toast (toast.tsx);
 // - região viva: o contêiner é `role="status"`, e a mensagem `type="danger"` vai num item
-//   `role="alert"`. O da placement padrão (`top-end`) já nasce montado e vazio, porque uma região
-//   viva só é anunciada de forma confiável se existir antes do conteúdo;
+//   `role="alert"`. O da placement padrão (`top-end`) já nasce montado e vazio, porque uma
+//   região viva só é anunciada de forma confiável se existir antes do conteúdo;
 // - com movimento reduzido, a entrada e a saída não animam;
 // - `block` usa a transição da placement dada (o `castPlacment` do Ecme testava `\top`, um
 //   tab, e nunca encontrava a placement);
