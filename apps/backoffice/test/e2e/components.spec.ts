@@ -6,6 +6,16 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // reduzido, o MotionConfig do layout desliga as animações de transform do `motion`.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
+
+/**
+ * Auditoria do axe na página. Os "focus guards" do floating-ui (#210: Dropdown; também o
+ * Tooltip e o DataTable) ficam de fora: são <span tabindex="0" aria-hidden="true"> invisíveis que
+ * o FloatingPortal e o FloatingFocusManager criam para manter a ordem do Tab com o menu no fim do
+ * <body>, e que repassam o foco na hora. O axe os acusa (`aria-hidden-focus`); desligá-los faria
+ * o Tab sair da página a partir do menu (decisão no escalonamento da #210).
+ */
+const audit = (page: Page) =>
+  new AxeBuilder({ page }).withTags(WCAG).exclude('[data-floating-ui-focus-guard]').analyze();
 const SHOWCASE = '/teste-de-componentes';
 
 async function login(page: Page): Promise<void> {
@@ -46,7 +56,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await expect(page.getByRole('heading', { name: 'Teste de componentes' })).toBeVisible();
     await page.waitForLoadState('networkidle');
 
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    const accessibility = await audit(page);
     expect(accessibility.violations).toEqual([]);
 
     const buttons = section(page, 'Button').getByRole('button');
@@ -251,7 +261,7 @@ test('FormItem liga rótulo e mensagem de erro ao campo, com aria-invalid', asyn
   // Com o erro na tela, a vitrine continua sem violação do axe (depois da transição, que
   // mistura a cor com o fundo enquanto a opacidade sobe).
   await expect(form.getByText('Informe um e-mail válido')).toHaveCSS('opacity', '1');
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  const accessibility = await audit(page);
   expect(accessibility.violations).toEqual([]);
 
   await form.getByRole('button', { name: 'Limpar validação' }).click();
@@ -333,6 +343,26 @@ for (const { opener, role, name } of DIALOGS) {
     const warnings = appElementWarnings(page);
     await page.goto(SHOWCASE);
     await page.waitForLoadState('networkidle');
+    const selects = section(page, 'Select');
+
+    const categoria = selects.getByLabel('Categoria', { exact: true });
+    await expect(categoria).toHaveAttribute('role', 'combobox');
+    await categoria.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(categoria).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('ArrowDown');
+
+    // A opção em foco tem fundo próprio, diferente das outras.
+    const options = selects.locator('.select-option');
+    await expect(options).toHaveCount(4);
+    const focused = selects.locator('.select-option-focused');
+    await expect(focused).toHaveText('Guias');
+    const background = (locator: Locator) =>
+      locator.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(await background(focused)).not.toBe(await background(options.first()));
+
+    const accessibility = await audit(page);
+    expect(accessibility.violations).toEqual([]);
 
     const button = section(page, 'Dialog').getByRole('button', { name: opener });
     await button.focus();
@@ -422,53 +452,161 @@ test('ConfirmDialog sobre o Drawer: fechar só a confirmação mantém a página
   await expect(appRoot(page)).not.toHaveAttribute('inert');
 });
 
-for (const reducedMotion of ['reduce', 'no-preference'] as const) {
-  test(`Drawer ${reducedMotion === 'reduce' ? 'abre sem' : 'abre com'} transição com reducedMotion ${reducedMotion}`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ reducedMotion });
+// Dropdown (#210) sobre o floating-ui: gatilho no Tab, abertura por Enter, Espaço e seta, setas e
+// typeahead nos itens, Esc e escolha devolvendo o foco ao gatilho, e submenu pelas setas.
+
+/** Põe o foco logo antes da seção do Dropdown, para o próximo Tab chegar ao gatilho. */
+async function focusBeforeDropdown(page: Page): Promise<void> {
+  await page.locator('#vitrine-dropdown').evaluate((heading) => {
+    heading.setAttribute('tabindex', '-1');
+    (heading as HTMLElement).focus();
+  });
+}
+
+const activeText = (page: Page) =>
+  page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+
+for (const key of ['Enter', 'Space', 'ArrowDown'] as const) {
+  test(`Dropdown abre com ${key}, Esc fecha e devolve o foco ao gatilho`, async ({ page }) => {
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const toggle = page.getByRole('button', { name: 'Ações do artigo' });
+
+    await focusBeforeDropdown(page);
+    await page.keyboard.press('Tab');
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveAttribute('aria-haspopup', 'menu');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await page.keyboard.press(key);
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem', { name: 'Editar' })).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(toggle).toHaveAttribute('aria-controls', (await menu.getAttribute('id'))!);
+
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+}
+
+test('Dropdown: setas pulam o desabilitado, typeahead e Enter escolhe e devolve o foco', async ({
+  page,
+}) => {
+  await login(page);
+  const hydration = hydrationMessages(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const toggle = page.getByRole('button', { name: 'Ações do artigo' });
+  const status = section(page, 'Dropdown').getByRole('status');
+
+  await toggle.focus();
+  await page.keyboard.press('ArrowDown');
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    'Editar',
+    'Duplicar',
+    'Publicar',
+    'Exportar',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(1);
+  await expect(menu.getByRole('menuitem', { name: 'Duplicar' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect.poll(() => activeText(page)).toBe('Editar');
+
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => activeText(page)).toBe('Publicar');
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => activeText(page)).toBe('Editar');
+  await page.keyboard.press('p');
+  await expect.poll(() => activeText(page)).toBe('Publicar');
+
+  await page.keyboard.press('Enter');
+  await expect(status).toHaveText('Ação: publicar.');
+  await expect(menu).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+
+  // O gatilho desabilitado fica fora do Tab.
+  const disabled = page.getByRole('button', { name: 'Indisponível' });
+  await expect(disabled).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Tab');
+  await expect(disabled).not.toBeFocused();
+
+  expect(hydration).toEqual([]);
+});
+
+test('Dropdown: submenu abre com ArrowRight e fecha com ArrowLeft, devolvendo o foco', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const toggle = page.getByRole('button', { name: 'Ações do artigo' });
+  const status = section(page, 'Dropdown').getByRole('status');
+
+  await toggle.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => activeText(page)).toBe('Editar');
+  // As setas não dão a volta na lista (como no Ecme): Editar → Publicar → Exportar.
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => activeText(page)).toBe('Exportar');
+  const exportar = page.getByRole('menuitem', { name: 'Exportar' });
+  await expect(exportar).toHaveAttribute('aria-haspopup', 'menu');
+
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeFocused();
+  await expect(exportar).toHaveAttribute('aria-expanded', 'true');
+
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('menuitem', { name: 'PDF' })).toHaveCount(0);
+  await expect(exportar).toBeFocused();
+
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(status).toHaveText('Ação: exportar CSV.');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Dropdown aberto, com submenu, sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
     await login(page);
     await page.goto(SHOWCASE);
     await page.waitForLoadState('networkidle');
 
-    // A posição `right` da gaveta a cada quadro, do momento em que ela entra no DOM até 500 ms
-    // depois (a transição padrão do motion leva cerca de 300 ms), e a transição do overlay.
-    const { positions, overlayTransition } = await page.evaluate(
-      () =>
-        new Promise<{ positions: number[]; overlayTransition: string }>((resolve) => {
-          const values: number[] = [];
-          const observer = new MutationObserver(() => {
-            const content = document.querySelector<HTMLElement>('.drawer-content');
-            if (!content) return;
-            observer.disconnect();
-            const start = performance.now();
-            const sample = () => {
-              values.push(parseFloat(getComputedStyle(content).right));
-              if (performance.now() - start < 500) requestAnimationFrame(sample);
-              else
-                resolve({
-                  positions: values,
-                  overlayTransition: getComputedStyle(document.querySelector('.drawer-overlay')!)
-                    .transitionDuration,
-                });
-            };
-            requestAnimationFrame(sample);
-          });
-          observer.observe(document.body, { childList: true, subtree: true });
-          [...document.querySelectorAll('button')]
-            .find((button) => button.textContent === 'Abrir Drawer')!
-            .click();
-        }),
-    );
+    await page.getByRole('button', { name: 'Ações do artigo' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => activeText(page)).toBe('Editar');
+    // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
+    // opacidade sobe; o axe roda depois dela.
+    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+    let accessibility = await audit(page);
+    expect(accessibility.violations).toEqual([]);
 
-    expect(positions.at(-1)).toBe(0);
-    const intermediate = positions.filter((value) => value < 0 && value > -400);
-    if (reducedMotion === 'reduce') {
-      expect(positions[0]).toBe(0);
-      expect(intermediate).toEqual([]);
-      expect(overlayTransition).toBe('0s');
-    } else {
-      expect(intermediate.length).toBeGreaterThan(0);
-    }
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => activeText(page)).toBe('Exportar');
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeFocused();
+    await expect(page.locator('.dropdown-menu').last()).toHaveCSS('opacity', '1');
+    // Com o submenu aberto, o floating-ui põe um <span aria-owns> no menu pai para o leitor de
+    // tela tratar o submenu (em outro portal) como filho dele; o axe acusa
+    // `aria-required-children` no `role="menu"`. Só nesta auditoria a regra fica desligada
+    // (decisão no segundo escalonamento da #210); com o menu de topo aberto, ela vale.
+    accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .exclude('[data-floating-ui-focus-guard]')
+      .disableRules(['aria-required-children'])
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
   });
 }

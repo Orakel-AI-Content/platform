@@ -16,8 +16,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Dialog } from '@/components/ui/Dialog';
-import { Drawer } from '@/components/ui/Drawer';
+import { Checkbox, type CheckboxGroupValue } from '@/components/ui/Checkbox';
+import { Dropdown } from '@/components/ui/Dropdown';
 import { FormContainer, FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
@@ -55,10 +55,8 @@ function buscarSites(termo: string): Promise<Opcao[]> {
 export function Showcase() {
   const [clicks, setClicks] = useState(0);
   const [emailChecked, setEmailChecked] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [lastAction, setLastAction] = useState('Nenhuma ação.');
+  const [formatos, setFormatos] = useState<CheckboxGroupValue>(['texto']);
+  const [acao, setAcao] = useState('Nenhuma ação escolhida.');
   return (
     <>
       <section aria-labelledby="vitrine-button" className="space-y-3">
@@ -217,6 +215,41 @@ export function Showcase() {
         >
           <p>A lista volta a mostrar todos os artigos.</p>
         </ConfirmDialog>
+      </section>
+
+      <section aria-labelledby="vitrine-dropdown" className="space-y-3">
+        <h2 id="vitrine-dropdown" className="text-lg font-semibold">
+          Dropdown
+        </h2>
+        <div className="flex flex-wrap items-center gap-4">
+          <Dropdown title="Ações do artigo" activeKey="editar">
+            <Dropdown.Item variant="header">Artigo</Dropdown.Item>
+            <Dropdown.Item eventKey="editar" onSelect={() => setAcao('Ação: editar.')}>
+              Editar
+            </Dropdown.Item>
+            <Dropdown.Item eventKey="duplicar" disabled>
+              Duplicar
+            </Dropdown.Item>
+            <Dropdown.Item eventKey="publicar" onSelect={() => setAcao('Ação: publicar.')}>
+              Publicar
+            </Dropdown.Item>
+            <Dropdown.Item variant="divider" />
+            <Dropdown.Menu title="Exportar">
+              <Dropdown.Item eventKey="pdf" onSelect={() => setAcao('Ação: exportar PDF.')}>
+                PDF
+              </Dropdown.Item>
+              <Dropdown.Item eventKey="csv" onSelect={() => setAcao('Ação: exportar CSV.')}>
+                CSV
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+          <Dropdown title="Indisponível" disabled>
+            <Dropdown.Item eventKey="nada">Nada</Dropdown.Item>
+          </Dropdown>
+        </div>
+        <p role="status" className="text-sm">
+          {acao}
+        </p>
       </section>
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">
