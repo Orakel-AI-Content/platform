@@ -886,3 +886,156 @@ test('Avatar.Group mostra "+N" e a dica "N a mais" no avatar omitido', async ({ 
   await expect(tooltip).toHaveText('2 a mais');
   await expect(omitted).toHaveAttribute('aria-describedby', (await tooltip.getAttribute('id'))!);
 });
+
+// Alert, Notification e toast (#212): o toast sem raiz React própria, mostrado pelo ToastProvider
+// do layout numa região viva que já existe antes da mensagem, fora do contêiner da app.
+
+const toastRegion = (page: Page) => page.locator('[data-toast-placement="top-end"]');
+
+test('toast de sucesso aparece na região viva já montada e sai depois do duration', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+
+  // A região da placement padrão existe, vazia, antes do primeiro toast.
+  await expect(toastRegion(page)).toHaveAttribute('role', 'status');
+  await expect(toastRegion(page)).toHaveText('');
+
+  await page.getByRole('button', { name: 'Mostrar toast de sucesso' }).click();
+  const message = toastRegion(page).getByText('Rascunho salvo');
+  await expect(message).toBeVisible();
+  const shownAt = Date.now();
+  await expect(message).toHaveCount(0, { timeout: 5000 });
+  // duration de 2 s: não sai antes, e sai logo depois.
+  const elapsed = Date.now() - shownAt;
+  expect(elapsed).toBeGreaterThan(1500);
+  expect(elapsed).toBeLessThan(3500);
+});
+
+test('toast de erro vai num role="alert"; Fechar pelo teclado tira o de sucesso', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+
+  await page.getByRole('button', { name: 'Mostrar toast de erro' }).click();
+  await expect(toastRegion(page).getByRole('alert')).toContainText('Falha ao publicar');
+
+  await page.getByRole('button', { name: 'Mostrar toast de sucesso' }).click();
+  const close = toastRegion(page)
+    .locator('.notification', { hasText: 'Rascunho salvo' })
+    .getByRole('button', { name: 'Fechar' });
+  await close.focus();
+  await page.keyboard.press('Enter');
+  await expect(toastRegion(page).getByText('Rascunho salvo')).toHaveCount(0);
+});
+
+test('toast disparado de dentro do Dialog fica fora do #app-root inerte', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+
+  await section(page, 'Dialog').getByRole('button', { name: 'Abrir Dialog' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar autor' });
+  await dialog.getByRole('button', { name: 'Mostrar aviso' }).click();
+  await expect(page.locator('#app-root')).toHaveAttribute('inert', '');
+
+  const message = toastRegion(page).getByText('Aviso de dentro do diálogo');
+  await expect(message).toBeVisible();
+  expect(
+    await message.evaluate((element) => ({
+      insideApp: element.closest('#app-root') !== null,
+      inert: element.closest('[inert]') !== null,
+      hidden: element.closest('[aria-hidden="true"]') !== null,
+    })),
+  ).toEqual({ insideApp: false, inert: false, hidden: false });
+});
+
+test('Alert closable: Fechar com contorno de 2px e pelo teclado', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const alerts = section(page, 'Alert');
+  const close = alerts.getByRole('button', { name: 'Fechar' });
+
+  await page.locator('#vitrine-alert').evaluate((heading) => {
+    heading.setAttribute('tabindex', '-1');
+    (heading as HTMLElement).focus();
+  });
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  expect(
+    await close.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { style: style.outlineStyle, width: style.outlineWidth };
+    }),
+  ).toEqual({ style: 'solid', width: '2px' });
+
+  await page.keyboard.press('Enter');
+  await expect(alerts.getByText('Aviso que pode ser fechado.')).toHaveCount(0);
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Alert nos quatro tipos e toast visível sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    await expect(section(page, 'Alert').locator('.alert')).toHaveCount(5);
+    await page.getByRole('button', { name: 'Mostrar toast de sucesso' }).click();
+    await page.getByRole('button', { name: 'Mostrar toast de erro' }).click();
+    await expect(toastRegion(page).locator('.notification')).toHaveCount(2);
+    const accessibility = await audit(page);
+    expect(accessibility.violations).toEqual([]);
+  });
+}
+
+for (const reducedMotion of ['reduce', 'no-preference'] as const) {
+  test(`toast ${reducedMotion === 'reduce' ? 'aparece sem' : 'aparece com'} transição com reducedMotion ${reducedMotion}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    // A opacidade do item a cada quadro, do momento em que ele entra no DOM até 400 ms depois
+    // (a transição do Ecme dura 150 ms). Valores intermediários são a animação.
+    const watch = page.evaluate(
+      () =>
+        new Promise<number[]>((resolve) => {
+          const values: number[] = [];
+          const observer = new MutationObserver(() => {
+            const item = document.querySelector<HTMLElement>('.toast-wrapper');
+            if (!item) return;
+            observer.disconnect();
+            const start = performance.now();
+            const sample = () => {
+              values.push(Number(getComputedStyle(item).opacity));
+              if (performance.now() - start < 400) requestAnimationFrame(sample);
+              else resolve(values);
+            };
+            requestAnimationFrame(sample);
+          });
+          observer.observe(document.body, { childList: true, subtree: true });
+        }),
+    );
+    await page.getByRole('button', { name: 'Mostrar toast de sucesso' }).click();
+    const samples = await watch;
+
+    const intermediate = samples.filter((value) => value > 0 && value < 1);
+    expect(samples.at(-1)).toBe(1);
+    if (reducedMotion === 'reduce') {
+      expect(samples[0]).toBe(1);
+      expect(intermediate).toEqual([]);
+    } else {
+      expect(intermediate.length).toBeGreaterThan(0);
+    }
+  });
+}

@@ -12,6 +12,7 @@ import Loading from '@/components/shared/Loading';
 import MediaSkeleton from '@/components/shared/loaders/MediaSkeleton';
 import TextBlockSkeleton from '@/components/shared/loaders/TextBlockSkeleton';
 import StickyFooter from '@/components/shared/StickyFooter';
+import { Alert } from '@/components/ui/Alert';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -23,10 +24,12 @@ import { Dropdown } from '@/components/ui/Dropdown';
 import { FormContainer, FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
+import { Notification } from '@/components/ui/Notification';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Tag } from '@/components/ui/Tag';
+import { toast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 /** Imagem do Avatar sem rede: um quadrado na cor primária. */
@@ -247,6 +250,16 @@ export function Showcase() {
         </p>
         <Dialog isOpen={dialogOpen} title="Editar autor" onClose={() => setDialogOpen(false)}>
           <p className="mb-6">O nome aparece na assinatura dos artigos.</p>
+          {/* Toast de dentro do diálogo (#212): continua anunciado com a página inerte. */}
+          <Button
+            size="sm"
+            className="mb-6"
+            onClick={() =>
+              toast.push(<Notification type="info" title="Aviso de dentro do diálogo" />)
+            }
+          >
+            Mostrar aviso
+          </Button>
           <div className="flex justify-end gap-2">
             <Button size="sm" onClick={() => setDialogOpen(false)}>
               Cancelar
@@ -339,6 +352,59 @@ export function Showcase() {
           <Tooltip title="Publicado há 2 dias" placement="right">
             Publicado
           </Tooltip>
+        </div>
+      </section>
+
+      <section aria-labelledby="vitrine-alert" className="space-y-3">
+        <h2 id="vitrine-alert" className="text-lg font-semibold">
+          Alert
+        </h2>
+        <div className="space-y-3">
+          <Alert type="info" showIcon duration={0}>
+            A revisão do artigo começa amanhã.
+          </Alert>
+          <Alert type="success" showIcon duration={0} title="Artigo publicado">
+            Ele já aparece no site.
+          </Alert>
+          <Alert type="warning" showIcon duration={0}>
+            O site tem alterações pendentes de publicação.
+          </Alert>
+          <Alert type="danger" showIcon duration={0}>
+            A última publicação falhou.
+          </Alert>
+          <Alert type="info" closable duration={0}>
+            Aviso que pode ser fechado.
+          </Alert>
+        </div>
+      </section>
+
+      <section aria-labelledby="vitrine-toast" className="space-y-3">
+        <h2 id="vitrine-toast" className="text-lg font-semibold">
+          Toast
+        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            onClick={() =>
+              toast.push(
+                <Notification type="success" title="Rascunho salvo" closable duration={2000}>
+                  As alterações ficaram guardadas.
+                </Notification>,
+              )
+            }
+          >
+            Mostrar toast de sucesso
+          </Button>
+          <Button
+            onClick={() =>
+              toast.push(
+                <Notification type="danger" title="Falha ao publicar" duration={2000}>
+                  Tente de novo em instantes.
+                </Notification>,
+              )
+            }
+          >
+            Mostrar toast de erro
+          </Button>
         </div>
       </section>
 
