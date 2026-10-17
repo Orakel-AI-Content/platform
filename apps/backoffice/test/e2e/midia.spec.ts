@@ -19,6 +19,7 @@ import { createSite, currentConfig } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { createS3Client, s3ObjectStore } from '../../src/lib/s3.ts';
 import { removeSites } from './cleanup.ts';
+import { analyzeTables } from './statistics.ts';
 
 // Mídia de ponta a ponta no ambiente local (#53, workspace#18): a foto de 4.000 px com GPS
 // enviada pela tela vira original ≤ 2.560 px e variantes sem EXIF em media.<site>.localhost,
@@ -216,6 +217,7 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
         })),
       );
     });
+    await analyzeTables(db, media, mediaVariants, mediaUploads);
   });
 
   test.afterAll(async () => {
