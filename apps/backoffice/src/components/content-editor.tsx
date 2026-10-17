@@ -27,9 +27,9 @@ import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form
 import { zonedDateTimeField } from '@/components/forms/zoned-datetime-field';
 import { BLOCK_TYPE_LABEL } from '@/components/site-labels.ts';
 import { blockSummary, blockText } from '@/components/block-summary.ts';
-import { ActionsMenu } from '@/components/ui/actions-menu';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { IconButton } from '@/components/ui/icon-button';
+import { ActionsMenu } from '@/components/legacy-ui/actions-menu';
+import { Button, buttonVariants } from '@/components/legacy-ui/button';
+import { IconButton } from '@/components/legacy-ui/icon-button';
 import { useLeaveGuard } from '@/components/use-leave-guard.ts';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 import { cn } from '@/lib/utils';

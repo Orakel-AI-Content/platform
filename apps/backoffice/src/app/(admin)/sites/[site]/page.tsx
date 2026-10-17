@@ -14,8 +14,8 @@ import {
   SITE_STATE_VARIANT,
 } from '@/components/site-labels.ts';
 import { LastBuildSummary, PendingCount, PublishNowPanel } from '@/components/site-status';
-import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/legacy-ui/badge';
+import { buttonVariants } from '@/components/legacy-ui/button';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
 

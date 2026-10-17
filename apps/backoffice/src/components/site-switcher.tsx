@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { ActionsMenu } from '@/components/ui/actions-menu';
-import { buttonVariants } from '@/components/ui/button';
+import { ActionsMenu } from '@/components/legacy-ui/actions-menu';
+import { buttonVariants } from '@/components/legacy-ui/button';
 import { cn } from '@/lib/utils';
 
 export type SwitcherSite = { id: string; name: string };

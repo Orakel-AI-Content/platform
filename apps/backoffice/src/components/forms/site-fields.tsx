@@ -3,10 +3,10 @@
 import type { ThemeSummary } from '@orakel/tokens';
 import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/legacy-ui/button';
+import { Checkbox } from '@/components/legacy-ui/checkbox';
+import { Input } from '@/components/legacy-ui/input';
+import { Textarea } from '@/components/legacy-ui/textarea';
 
 import type { FieldProps, FieldRenderer } from './schema-form.tsx';
 

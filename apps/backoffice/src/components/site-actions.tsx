@@ -10,10 +10,10 @@ import {
   type ReactNode,
 } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/legacy-ui/button';
+import { Input } from '@/components/legacy-ui/input';
+import { Label } from '@/components/legacy-ui/label';
+import { Textarea } from '@/components/legacy-ui/textarea';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Ações da página do site, no padrão do "Publicar agora": a Server Action delega ao domínio

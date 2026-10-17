@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/legacy-ui/table';
 import type { PendingChange } from '@/domain/pending-changes/list.ts';
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).

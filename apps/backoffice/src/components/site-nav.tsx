@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/legacy-ui/button';
 import { cn } from '@/lib/utils';
 
 /** Área da barra: `segment` é o primeiro segmento depois de `/sites/<site>/` ('' = Visão geral). */

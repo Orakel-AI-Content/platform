@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { StatusScreen } from '@/components/status-screen';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/legacy-ui/button';
 import type { Role } from '@/db/schema/index.ts';
 import { PERMISSIONS, type Action } from '@/domain/access/rbac.ts';
 

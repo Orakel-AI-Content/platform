@@ -13,9 +13,9 @@ import {
 } from '@/components/upload-queue';
 import { useListState, type ListConfig } from '@/components/list-state.ts';
 import type { MediaPickerPage } from '@/components/media-picker';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/legacy-ui/button';
+import { Input } from '@/components/legacy-ui/input';
+import { Label } from '@/components/legacy-ui/label';
 import { cn } from '@/lib/utils';
 
 // Biblioteca de mídia do site (#52, #186, #188): envio de várias imagens pela fila (escolher

@@ -1,6 +1,6 @@
 import type { Block } from '@orakel/content-model/v1';
 
-import type { BadgeVariant } from '@/components/ui/badge';
+import type { BadgeVariant } from '@/components/legacy-ui/badge';
 import type { LastBuild } from '@/domain/builds/builds.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { PendingOrigin } from '@/domain/pending-changes/record.ts';

@@ -4,7 +4,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/legacy-ui/table';
 
 import { ListPagination, ListToolbar, SortableHead } from './list-controls.tsx';
 import { listFeatures, useListState, type ListConfig } from './list-state.ts';

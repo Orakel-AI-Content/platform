@@ -16,10 +16,10 @@ import {
 } from 'react-hook-form';
 import * as z from 'zod';
 
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/legacy-ui/button';
+import { Checkbox } from '@/components/legacy-ui/checkbox';
+import { Input } from '@/components/legacy-ui/input';
+import { Label } from '@/components/legacy-ui/label';
 import { cn } from '@/lib/utils';
 
 import { clean, describe, emptyValue, pattern, type FieldNode } from './schema-walk.ts';

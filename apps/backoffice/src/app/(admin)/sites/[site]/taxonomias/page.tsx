@@ -4,7 +4,7 @@ import { EntityTable } from '@/components/entity-table';
 import { TAXONOMY_KIND_LABEL } from '@/components/site-labels.ts';
 import { listTaxonomies } from '@/domain/content/taxonomies.ts';
 import { noRead } from '@/components/forbidden-screen';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/legacy-ui/button';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 

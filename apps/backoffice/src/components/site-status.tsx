@@ -8,8 +8,8 @@ import {
   BUILD_STATUS_VARIANT,
   formatDateTime,
 } from '@/components/site-labels.ts';
-import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/legacy-ui/badge';
+import { buttonVariants } from '@/components/legacy-ui/button';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Estado de publicação de um site, igual na lista de sites e na página do site (#149).

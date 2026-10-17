@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { EntityTable } from '@/components/entity-table';
 import { listMenus } from '@/domain/content/menus.ts';
 import { noRead } from '@/components/forbidden-screen';
-import { buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/legacy-ui/button';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 

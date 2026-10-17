@@ -2,10 +2,10 @@
 
 import { useId, useRef, useState, type ComponentProps } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { TableHead } from '@/components/ui/table';
+import { Button } from '@/components/legacy-ui/button';
+import { Input } from '@/components/legacy-ui/input';
+import { Label } from '@/components/legacy-ui/label';
+import { TableHead } from '@/components/legacy-ui/table';
 
 // Controles das listas filtradas no cliente (#106): busca e filtros, cabeçalho ordenável e
 // paginação. O estado é de `useListState` (URL); aqui só a interface.

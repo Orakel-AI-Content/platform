@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media-library';
 import { MediaPicker, type MediaPickerPage } from '@/components/media-picker';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/legacy-ui/button';
+import { Checkbox } from '@/components/legacy-ui/checkbox';
 
 import type { FieldProps, FieldRenderer } from './schema-form.tsx';
 
