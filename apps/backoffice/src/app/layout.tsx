@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 
+import { MotionProvider } from '@/components/ui/MotionProvider';
 import { parseThemeMode, THEME_COOKIE, THEME_SCRIPT } from '@/configs/theme.config';
 import { cn } from '@/lib/utils';
 
@@ -37,7 +38,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         </head>
       )}
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <MotionProvider>{children}</MotionProvider>
+      </body>
     </html>
   );
 }

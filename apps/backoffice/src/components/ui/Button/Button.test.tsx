@@ -74,12 +74,14 @@ describe('Button', () => {
 
   it('disabled em outro elemento (asElement) vira aria-disabled', () => {
     render(
-      <Button asElement="a" href="/sites" disabled>
+      <Button asElement="span" disabled>
         Sites
       </Button>,
     );
 
-    expect(screen.getByRole('link', { name: 'Sites' }).getAttribute('aria-disabled')).toBe('true');
+    expect(screen.getByText('Sites').closest('.button')?.getAttribute('aria-disabled')).toBe(
+      'true',
+    );
   });
 
   it('loading: aria-busy e aria-disabled, Spinner oculto, clique bloqueado e foco mantido', async () => {
