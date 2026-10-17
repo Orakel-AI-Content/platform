@@ -55,6 +55,7 @@ describe('parseListState', () => {
       filters: {},
       sort: { id: 'updatedAt', desc: true },
       page: 1,
+      pageSize: PAGE_SIZE,
     });
   });
 
@@ -66,6 +67,7 @@ describe('parseListState', () => {
       filters: { kind: 'page', status: 'rascunho' },
       sort: { id: 'title', desc: true },
       page: 3,
+      pageSize: PAGE_SIZE,
     });
     expect(parseListState(params('ordem=title'), config).sort).toEqual({
       id: 'title',
@@ -113,6 +115,30 @@ describe('listStateQuery', () => {
   });
 });
 
+describe('tamanho de página (por-pagina, #215)', () => {
+  const sized: ListConfig = { ...config, pageSizes: [10, 25, 50] };
+
+  it('aceita só os pageSizes da lista; ausente ou inválido fica em PAGE_SIZE', () => {
+    expect(parseListState(params('por-pagina=50'), sized).pageSize).toBe(50);
+    expect(parseListState(params(''), sized).pageSize).toBe(PAGE_SIZE);
+    expect(parseListState(params('por-pagina=30'), sized).pageSize).toBe(PAGE_SIZE);
+    expect(parseListState(params('por-pagina=abc'), sized).pageSize).toBe(PAGE_SIZE);
+  });
+
+  it('lista sem pageSizes ignora o parâmetro (as listas atuais, #35)', () => {
+    expect(parseListState(params('por-pagina=50'), config).pageSize).toBe(PAGE_SIZE);
+    expect(listStateQuery(params(''), config, { pageSize: 50 })).toBe('');
+  });
+
+  it('grava o tamanho, omite o padrão e volta à página 1', () => {
+    expect(listStateQuery(params('pagina=3&ordem=title'), sized, { pageSize: 50 })).toBe(
+      'ordem=title&por-pagina=50',
+    );
+    expect(listStateQuery(params('por-pagina=50'), sized, { pageSize: PAGE_SIZE })).toBe('');
+    expect(listStateQuery(params('por-pagina=50'), sized, { pageSize: 30 })).toBe('');
+  });
+});
+
 describe('useListState', () => {
   it('lê o estado da URL e entrega o formato do TanStack', () => {
     navigation.search = 'q=guia&tipo=page&ordem=title&pagina=2';
@@ -124,6 +150,18 @@ describe('useListState', () => {
       sorting: [{ id: 'title', desc: false }],
       pagination: { pageIndex: 1, pageSize: PAGE_SIZE },
     });
+  });
+
+  it('setSort e setPageSize gravam ordem e tamanho na URL', () => {
+    const { result } = renderHook(() => useListState({ ...config, pageSizes: [10, 25] }));
+
+    act(() => result.current.setSort({ id: 'title', desc: false }));
+    act(() => result.current.setPageSize(10));
+
+    expect(navigation.replace).toHaveBeenLastCalledWith(
+      '/sites/exemplo-a/conteudos?ordem=title&por-pagina=10',
+      { scroll: false },
+    );
   });
 
   it('grava com router.replace, sem rolar, e nunca com push', () => {
