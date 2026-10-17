@@ -474,6 +474,49 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-800',
     minimum: 4.5,
   },
+  // Dropdown (#210): item do menu (`_menu-item.css`) sobre o `dropdown-menu` (`_dropdown.css`).
+  {
+    name: 'item do menu',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'item do menu no hover',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'item ativo do menu',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'item do menu',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'item do menu no hover',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
+  {
+    name: 'item ativo do menu',
+    theme: 'escuro',
+    text: 'dark:text-primary',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
