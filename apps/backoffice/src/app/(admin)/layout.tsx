@@ -4,6 +4,7 @@ import { currentActor } from '@/auth/request-actor.ts';
 import CollapsibleSide from '@/components/layouts/collapsible-side';
 import { NavigationIndicator } from '@/components/navigation-indicator';
 import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
+import UserProfileDropdown from '@/components/template/UserProfileDropdown';
 import navigationConfig, { filterNavigation } from '@/configs/navigation.config';
 
 import { readVisibleSites } from './visible-sites.ts';
@@ -39,22 +40,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       <CollapsibleSide
         navigationTree={filterNavigation(navigationConfig, actor.value)}
         sites={visible}
-        headerEnd={
-          <>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {actor.value.email} · {actor.value.roles.join(', ')}
-            </p>
-            {/* Rota do Cloudflare Access, fora do app: <a>, não <Link> (sem prefetch nem navegação
-                pelo cliente). A regra do Next trata todo caminho "/" como página do app. */}
-            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-            <a
-              href="/cdn-cgi/access/logout"
-              className="header-action-item header-action-item-hoverable text-sm font-semibold text-gray-900 dark:text-gray-100"
-            >
-              Sair
-            </a>
-          </>
-        }
+        headerEnd={<UserProfileDropdown email={actor.value.email} roles={actor.value.roles} />}
       >
         {/* tabIndex -1: a âncora do skip link leva o foco até aqui, não só a rolagem. */}
         <main
