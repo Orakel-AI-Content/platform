@@ -2,6 +2,8 @@
 
 /* Classes de componente do Ecme (src/assets/styles/components/ do template), uma folha por
    componente portado, em @layer components (docs/migration/ecme.md). */
+@import './styles/avatar.css';
+@import './styles/badge.css';
 @import './styles/button.css';
 @import './styles/card.css';
 @import './styles/skeleton.css';
