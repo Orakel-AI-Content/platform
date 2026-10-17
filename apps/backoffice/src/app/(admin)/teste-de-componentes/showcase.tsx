@@ -28,6 +28,8 @@ import { Notification } from '@/components/ui/Notification';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
+import { Table, type ThSort } from '@/components/ui/Table';
+import { Tabs } from '@/components/ui/Tabs';
 import { Tag } from '@/components/ui/Tag';
 import { toast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -57,6 +59,15 @@ function buscarSites(termo: string): Promise<Opcao[]> {
   return Promise.resolve(SITES.filter((site) => site.label.toLowerCase().includes(normalizado)));
 }
 
+const ARTIGOS = [
+  { titulo: 'Guia de jardinagem', status: 'Publicado' },
+  { titulo: 'Análise do mercado', status: 'Rascunho' },
+  { titulo: 'Receita de pão', status: 'Em revisão' },
+];
+
+/** Próxima ordenação do cabeçalho: sem ordem → ascendente → descendente → ascendente. */
+const NEXT_SORT: Record<ThSort, ThSort> = { none: 'asc', asc: 'desc', desc: 'asc' };
+
 /** Seções da vitrine (#205, #206): cada componente portado nas variantes que as telas vão usar. */
 export function Showcase() {
   const [clicks, setClicks] = useState(0);
@@ -67,6 +78,7 @@ export function Showcase() {
   const [lastAction, setLastAction] = useState('Nenhuma ação.');
   const [formatos, setFormatos] = useState<CheckboxGroupValue>(['texto']);
   const [acao, setAcao] = useState('Nenhuma ação escolhida.');
+  const [ordem, setOrdem] = useState<ThSort>('none');
   return (
     <>
       <section aria-labelledby="vitrine-button" className="space-y-3">
@@ -406,6 +418,110 @@ export function Showcase() {
             Mostrar toast de erro
           </Button>
         </div>
+      </section>
+
+      <section aria-labelledby="vitrine-table" className="space-y-3">
+        <h2 id="vitrine-table" className="text-lg font-semibold">
+          Table
+        </h2>
+        <Card>
+          <Table aria-label="Artigos">
+            <Table.THead>
+              <Table.Tr>
+                <Table.Th sort={ordem}>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-6 items-center gap-1 uppercase"
+                    onClick={() => setOrdem(NEXT_SORT[ordem])}
+                  >
+                    Título
+                    <Table.Sorter sort={ordem === 'none' ? true : ordem} />
+                  </button>
+                </Table.Th>
+                <Table.Th>Status</Table.Th>
+              </Table.Tr>
+            </Table.THead>
+            <Table.TBody>
+              {[...ARTIGOS]
+                .sort((a, b) =>
+                  ordem === 'none'
+                    ? 0
+                    : (ordem === 'asc' ? 1 : -1) * a.titulo.localeCompare(b.titulo, 'pt-BR'),
+                )
+                .map((artigo) => (
+                  <Table.Tr key={artigo.titulo}>
+                    <Table.Td>{artigo.titulo}</Table.Td>
+                    <Table.Td>{artigo.status}</Table.Td>
+                  </Table.Tr>
+                ))}
+            </Table.TBody>
+            <Table.TFoot>
+              <Table.Tr>
+                <Table.Td colSpan={2}>3 artigos</Table.Td>
+              </Table.Tr>
+            </Table.TFoot>
+          </Table>
+        </Card>
+        <Card>
+          <Table aria-label="Sites compactos" compact cellBorder hoverable={false}>
+            <Table.THead>
+              <Table.Tr>
+                <Table.Th>Site</Table.Th>
+                <Table.Th>Artigos</Table.Th>
+              </Table.Tr>
+            </Table.THead>
+            <Table.TBody>
+              <Table.Tr>
+                <Table.Th scope="row">Exemplo A</Table.Th>
+                <Table.Td>12</Table.Td>
+              </Table.Tr>
+              <Table.Tr>
+                <Table.Th scope="row">Receitas da casa</Table.Th>
+                <Table.Td>48</Table.Td>
+              </Table.Tr>
+            </Table.TBody>
+          </Table>
+        </Card>
+      </section>
+
+      <section aria-labelledby="vitrine-tabs" className="space-y-3">
+        <h2 id="vitrine-tabs" className="text-lg font-semibold">
+          Tabs
+        </h2>
+        <Card>
+          <Tabs defaultValue="geral">
+            <Tabs.TabList aria-label="Configuração do site">
+              <Tabs.TabNav value="geral">Geral</Tabs.TabNav>
+              <Tabs.TabNav value="seo" disabled>
+                SEO
+              </Tabs.TabNav>
+              <Tabs.TabNav value="tema">Tema</Tabs.TabNav>
+            </Tabs.TabList>
+            <Tabs.TabContent value="geral" className="pt-4">
+              Nome, domínio e idioma do site.
+            </Tabs.TabContent>
+            <Tabs.TabContent value="seo" className="pt-4">
+              Título e descrição padrão.
+            </Tabs.TabContent>
+            <Tabs.TabContent value="tema" className="pt-4">
+              Cores e fontes do site.
+            </Tabs.TabContent>
+          </Tabs>
+        </Card>
+        <Card>
+          <Tabs defaultValue="rascunhos" variant="pill">
+            <Tabs.TabList aria-label="Filtro de artigos">
+              <Tabs.TabNav value="rascunhos">Rascunhos</Tabs.TabNav>
+              <Tabs.TabNav value="publicados">Publicados</Tabs.TabNav>
+            </Tabs.TabList>
+            <Tabs.TabContent value="rascunhos" className="pt-4">
+              2 rascunhos.
+            </Tabs.TabContent>
+            <Tabs.TabContent value="publicados" className="pt-4">
+              10 publicados.
+            </Tabs.TabContent>
+          </Tabs>
+        </Card>
       </section>
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">

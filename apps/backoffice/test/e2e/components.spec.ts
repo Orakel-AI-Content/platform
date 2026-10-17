@@ -111,6 +111,8 @@ test('a vitrine vem renderizada do servidor', async ({ page }) => {
     'Destaque na capa',
     'Copiar link',
     'Escolha a categoria',
+    'Guia de jardinagem',
+    'Nome, domínio e idioma do site.',
   ]) {
     expect(html).toContain(text);
   }
@@ -1037,5 +1039,113 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     } else {
       expect(intermediate.length).toBeGreaterThan(0);
     }
+  });
+}
+
+// Table e Tabs (#213): cabeçalho ordenável com aria-sort no <th>, e abas no padrão do APG (só a
+// ativa no Tab, setas e Home/End movem e ativam pulando a desabilitada, painel ligado à aba).
+
+test('Table: cabeçalho com scope e aria-sort que alterna pelo teclado', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const table = page.getByRole('table', { name: 'Artigos' });
+  const header = table.getByRole('columnheader', { name: 'Título' });
+  const firstCell = table.getByRole('row').nth(1).getByRole('cell').first();
+
+  await expect(header).toHaveAttribute('scope', 'col');
+  await expect(header).toHaveAttribute('aria-sort', 'none');
+  await expect(table.getByRole('columnheader', { name: 'Status' })).not.toHaveAttribute(
+    'aria-sort',
+  );
+  await expect(
+    page
+      .getByRole('table', { name: 'Sites compactos' })
+      .getByRole('rowheader', { name: 'Exemplo A' }),
+  ).toHaveAttribute('scope', 'row');
+
+  const sortButton = header.getByRole('button', { name: 'Título' });
+  await tabTo(page, sortButton);
+  await page.keyboard.press('Enter');
+  await expect(header).toHaveAttribute('aria-sort', 'ascending');
+  await expect(firstCell).toHaveText('Análise do mercado');
+
+  await page.keyboard.press('Space');
+  await expect(header).toHaveAttribute('aria-sort', 'descending');
+  await expect(firstCell).toHaveText('Receita de pão');
+  await expect(sortButton).toBeFocused();
+});
+
+test('Tabs: só a aba ativa no Tab; setas pulam a desabilitada, Home e End; Tab vai ao painel', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const list = page.getByRole('tablist', { name: 'Configuração do site' });
+  const tab = (name: string) => list.getByRole('tab', { name });
+  const panel = section(page, 'Tabs').getByRole('tabpanel').first();
+
+  await tabTo(page, tab('Geral'));
+  await expect(tab('Geral')).toHaveAttribute('aria-selected', 'true');
+  await expect(tab('SEO')).toBeDisabled();
+  await expect(panel).toHaveText('Nome, domínio e idioma do site.');
+  await expect(panel).toHaveAttribute('aria-labelledby', (await tab('Geral').getAttribute('id'))!);
+
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('Tema')).toBeFocused();
+  await expect(tab('Tema')).toHaveAttribute('aria-selected', 'true');
+  await expect(tab('Geral')).toHaveAttribute('aria-selected', 'false');
+  await expect(panel).toHaveText('Cores e fontes do site.');
+
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('Geral')).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(tab('Tema')).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(tab('Geral')).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(tab('Tema')).toBeFocused();
+
+  // Foco de 2px na aba, como no resto da vitrine.
+  expect(
+    await tab('Tema').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { style: style.outlineStyle, width: style.outlineWidth };
+    }),
+  ).toEqual({ style: 'solid', width: '2px' });
+
+  await page.keyboard.press('Tab');
+  await expect(panel).toBeFocused();
+  await expect(panel).toHaveAttribute('aria-labelledby', (await tab('Tema').getAttribute('id'))!);
+  await page.keyboard.press('Shift+Tab');
+  await expect(tab('Tema')).toBeFocused();
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Table ordenada e Tabs com outra aba ativa sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    // Sem a transição de cor da aba (motion-reduce:transition-none), o axe mede a cor final, não
+    // a intermediária da troca de aba.
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    await page.getByRole('button', { name: 'Título' }).click();
+    await page.getByRole('tab', { name: 'Tema' }).click();
+    await page.getByRole('tab', { name: 'Publicados' }).click();
+    await expect(page.getByRole('tab', { name: 'Publicados' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-table"]')
+      .include('[aria-labelledby="vitrine-tabs"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
   });
 }
