@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Checkbox, type CheckboxGroupValue } from '@/components/ui/Checkbox';
+import { Dropdown } from '@/components/ui/Dropdown';
 import { FormContainer, FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
@@ -54,6 +55,7 @@ export function Showcase() {
   const [clicks, setClicks] = useState(0);
   const [emailChecked, setEmailChecked] = useState(false);
   const [formatos, setFormatos] = useState<CheckboxGroupValue>(['texto']);
+  const [acao, setAcao] = useState('Nenhuma ação escolhida.');
   return (
     <>
       <section aria-labelledby="vitrine-button" className="space-y-3">
@@ -221,6 +223,41 @@ export function Showcase() {
             />
           </FormItem>
         </FormContainer>
+      </section>
+
+      <section aria-labelledby="vitrine-dropdown" className="space-y-3">
+        <h2 id="vitrine-dropdown" className="text-lg font-semibold">
+          Dropdown
+        </h2>
+        <div className="flex flex-wrap items-center gap-4">
+          <Dropdown title="Ações do artigo" activeKey="editar">
+            <Dropdown.Item variant="header">Artigo</Dropdown.Item>
+            <Dropdown.Item eventKey="editar" onSelect={() => setAcao('Ação: editar.')}>
+              Editar
+            </Dropdown.Item>
+            <Dropdown.Item eventKey="duplicar" disabled>
+              Duplicar
+            </Dropdown.Item>
+            <Dropdown.Item eventKey="publicar" onSelect={() => setAcao('Ação: publicar.')}>
+              Publicar
+            </Dropdown.Item>
+            <Dropdown.Item variant="divider" />
+            <Dropdown.Menu title="Exportar">
+              <Dropdown.Item eventKey="pdf" onSelect={() => setAcao('Ação: exportar PDF.')}>
+                PDF
+              </Dropdown.Item>
+              <Dropdown.Item eventKey="csv" onSelect={() => setAcao('Ação: exportar CSV.')}>
+                CSV
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown>
+          <Dropdown title="Indisponível" disabled>
+            <Dropdown.Item eventKey="nada">Nada</Dropdown.Item>
+          </Dropdown>
+        </div>
+        <p role="status" className="text-sm">
+          {acao}
+        </p>
       </section>
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">

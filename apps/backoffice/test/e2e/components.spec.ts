@@ -412,3 +412,150 @@ test('Select em FormItem inválido, async e creatable', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(selects.locator('.select-single-value', { hasText: 'Podcasts' })).toBeVisible();
 });
+
+// Dropdown (#210) sobre o floating-ui: gatilho no Tab, abertura por Enter, Espaço e seta, setas e
+// typeahead nos itens, Esc e escolha devolvendo o foco ao gatilho, e submenu pelas setas.
+
+/** Põe o foco logo antes da seção do Dropdown, para o próximo Tab chegar ao gatilho. */
+async function focusBeforeDropdown(page: Page): Promise<void> {
+  await page.locator('#vitrine-dropdown').evaluate((heading) => {
+    heading.setAttribute('tabindex', '-1');
+    (heading as HTMLElement).focus();
+  });
+}
+
+const activeText = (page: Page) =>
+  page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+
+for (const key of ['Enter', 'Space', 'ArrowDown'] as const) {
+  test(`Dropdown abre com ${key}, Esc fecha e devolve o foco ao gatilho`, async ({ page }) => {
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const toggle = page.getByRole('button', { name: 'Ações do artigo' });
+
+    await focusBeforeDropdown(page);
+    await page.keyboard.press('Tab');
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveAttribute('aria-haspopup', 'menu');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await page.keyboard.press(key);
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem', { name: 'Editar' })).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(toggle).toHaveAttribute('aria-controls', (await menu.getAttribute('id'))!);
+
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+}
+
+test('Dropdown: setas pulam o desabilitado, typeahead e Enter escolhe e devolve o foco', async ({
+  page,
+}) => {
+  await login(page);
+  const hydration = hydrationMessages(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const toggle = page.getByRole('button', { name: 'Ações do artigo' });
+  const status = section(page, 'Dropdown').getByRole('status');
+
+  await toggle.focus();
+  await page.keyboard.press('ArrowDown');
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem')).toHaveText([
+    'Editar',
+    'Duplicar',
+    'Publicar',
+    'Exportar',
+  ]);
+  await expect(menu.getByRole('separator')).toHaveCount(1);
+  await expect(menu.getByRole('menuitem', { name: 'Duplicar' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect.poll(() => activeText(page)).toBe('Editar');
+
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => activeText(page)).toBe('Publicar');
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => activeText(page)).toBe('Editar');
+  await page.keyboard.press('p');
+  await expect.poll(() => activeText(page)).toBe('Publicar');
+
+  await page.keyboard.press('Enter');
+  await expect(status).toHaveText('Ação: publicar.');
+  await expect(menu).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+
+  // O gatilho desabilitado fica fora do Tab.
+  const disabled = page.getByRole('button', { name: 'Indisponível' });
+  await expect(disabled).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Tab');
+  await expect(disabled).not.toBeFocused();
+
+  expect(hydration).toEqual([]);
+});
+
+test('Dropdown: submenu abre com ArrowRight e fecha com ArrowLeft, devolvendo o foco', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const toggle = page.getByRole('button', { name: 'Ações do artigo' });
+  const status = section(page, 'Dropdown').getByRole('status');
+
+  await toggle.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(() => activeText(page)).toBe('Editar');
+  await page.keyboard.press('ArrowUp');
+  await expect.poll(() => activeText(page)).toBe('Exportar');
+  const exportar = page.getByRole('menuitem', { name: 'Exportar' });
+  await expect(exportar).toHaveAttribute('aria-haspopup', 'menu');
+
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeFocused();
+  await expect(exportar).toHaveAttribute('aria-expanded', 'true');
+
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('menuitem', { name: 'PDF' })).toHaveCount(0);
+  await expect(exportar).toBeFocused();
+
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(status).toHaveText('Ação: exportar CSV.');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Dropdown aberto, com submenu, sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    await page.getByRole('button', { name: 'Ações do artigo' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => activeText(page)).toBe('Editar');
+    // A transição de abertura (200 ms) mistura a cor do texto com o fundo enquanto a opacidade
+    // sobe; o axe roda depois dela.
+    await expect(page.getByRole('menu')).toHaveCSS('opacity', '1');
+    let accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
+
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeFocused();
+    await expect(page.getByRole('menu').last()).toHaveCSS('opacity', '1');
+    accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
