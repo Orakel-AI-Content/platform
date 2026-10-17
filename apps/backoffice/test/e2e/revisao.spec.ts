@@ -148,7 +148,10 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
     await reviewer.keyboard.press('Space');
   }
   await reviewer.getByRole('button', { name: 'Aprovar' }).click();
-  await expect(reviewer.getByRole('main').getByRole('status')).toHaveText('Versão 1 aprovada.');
+  // A tela tem dois status (o do formulário do checklist e o do painel): o do resultado.
+  await expect(
+    reviewer.getByRole('main').getByRole('status').filter({ hasText: 'Versão 1 aprovada.' }),
+  ).toBeVisible();
   await expect(reviewer.getByRole('button', { name: 'Aprovar' })).toHaveCount(0);
 
   await reviewer.goto('/sites/exemplo-a/revisao');
