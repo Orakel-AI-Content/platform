@@ -64,11 +64,18 @@ export const SITE_STATE_LABEL: Record<SiteSummary['state'], string> = {
   pausado: 'Pausado',
 };
 
-/** Variante do badge de cada estado de site. */
-export const SITE_STATE_VARIANT: Record<SiteSummary['state'], BadgeVariant> = {
-  ativo: 'success',
-  promovendo: 'info',
-  pausado: 'warning',
+/**
+ * Cor do ponto da `Tag` de cada estado (o `prefixClass` da Tag do Ecme, demo `Tag/Affix`). O
+ * texto fica no cinza da Tag: o `text-<cor>` sobre o `bg-<cor>-subtle` das tabelas do Ecme não
+ * chega a 4,5:1 no claro.
+ */
+export type StateTagColor = 'bg-success' | 'bg-info' | 'bg-warning' | 'bg-error';
+
+/** Cor da tag de cada estado de site. */
+export const SITE_STATE_VARIANT: Record<SiteSummary['state'], StateTagColor> = {
+  ativo: 'bg-success',
+  promovendo: 'bg-info',
+  pausado: 'bg-warning',
 };
 
 /** Resultado do último build de um site (lista de sites). */
@@ -77,10 +84,10 @@ export const BUILD_STATUS_LABEL: Record<LastBuild['status'], string> = {
   failed: 'Falhou',
 };
 
-/** Variante do badge de cada resultado de build. */
-export const BUILD_STATUS_VARIANT: Record<LastBuild['status'], BadgeVariant> = {
-  ok: 'success',
-  failed: 'destructive',
+/** Cor da tag de cada resultado de build. */
+export const BUILD_STATUS_VARIANT: Record<LastBuild['status'], StateTagColor> = {
+  ok: 'bg-success',
+  failed: 'bg-error',
 };
 
 const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
