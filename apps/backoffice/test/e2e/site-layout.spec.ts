@@ -238,6 +238,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.waitForLoadState('networkidle');
     await switcher(page).click();
     await expect(page.getByRole('menu')).toBeVisible();
+    // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
+    // opacidade sobe; o axe roda depois dela.
+    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
 
     const accessibility = await new AxeBuilder({ page })
       .withTags(WCAG)
