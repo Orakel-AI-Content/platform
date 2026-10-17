@@ -109,16 +109,18 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   uma coluna legível. `list-width` (largura cheia do `main`) para as listas e tabelas: sites,
   conteúdos, versões, autores, taxonomias, menus e mídia. O componente de formulário não
   define largura; quem define é a página.
-- **Barra lateral do site:** o layout `sites/[site]/layout.tsx` põe as telas de um site num
-  grid barra (12rem) + conteúdo, uma coluna só abaixo de `md`; `list-width` é a largura da
-  coluna de conteúdo. `SiteNav` (`src/components/site-nav.tsx`, `nav` "Áreas do site")
-  recebe os itens prontos do servidor (Textos institucionais só com `content.write`) e marca
-  a área atual pelo primeiro segmento depois do site, com `aria-current="page"` e
-  `bg-muted`, também nas telas de item; Configuração e Pendências marcam a Visão geral. No
-  topo da barra, `SiteSwitcher` (`src/components/site-switcher.tsx`): `ActionsMenu` com o
-  nome do site, listando os sites de `listSites` (vindos do `lookupSite`), cada um levando à
-  mesma área (`sameAreaIn`: item, criar e editar caem na lista); o atual com
-  `aria-current="true"`.
+- **Moldura e barra lateral:** o `(admin)/layout.tsx` usa o `CollapsibleSide` do Ecme
+  (`src/components/layouts/collapsible-side.tsx`, #237): `SideNav` à esquerda (290px) com a
+  marca "Orakel Backoffice", `nav` "Principal" com os itens globais e, dentro de um site que a
+  pessoa vê, o seletor de site e `nav` "Áreas do site"; `Header` (`banner`) com e-mail, papéis
+  e "Sair"; o `main` com o fundo do body do Ecme (`bg-gray-100 dark:bg-gray-950`). Os itens
+  vêm de `src/configs/navigation.config.ts`, filtrados no servidor pelo RBAC
+  (`filterNavigation`; Textos institucionais só com `content.write`), e a barra marca o item
+  pelo endereço (`activeNavigationKey`), com `aria-current="page"`, também nas telas de item;
+  Configuração e Pendências marcam a Visão geral. O seletor (`SiteSwitcher`,
+  `src/components/site-switcher.tsx`): `ActionsMenu` com o nome do site, listando os sites
+  visíveis (`readVisibleSites`, uma leitura por requisição), cada um levando à mesma área
+  (`sameAreaIn`: item, criar e editar caem na lista); o atual com `aria-current="true"`.
 - **Estados:** badge com o texto do estado e uma variante própria dentro do grupo, sem ícone
   (o texto distingue os estados em tons de cinza). O mapa fica ao lado dos rótulos, em
   `src/components/site-labels.ts` (`CONTENT_STATUS_VARIANT`, `SITE_STATE_VARIANT`,
