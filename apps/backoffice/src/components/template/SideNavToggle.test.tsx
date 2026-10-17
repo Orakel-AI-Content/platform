@@ -103,7 +103,7 @@ describe('SideNav recolhida', () => {
     expect(midia.getAttribute('aria-describedby')).toContain(tooltip.id);
   });
 
-  it('a marca continua "Orakel Backoffice"; o seletor e o rótulo do grupo somem e voltam', async () => {
+  it('a marca continua "Orakel Backoffice"; o seletor vira as iniciais; o rótulo do grupo some e volta', async () => {
     const user = userEvent.setup();
     const { toggle } = renderFrame();
     expect(screen.getByRole('button', { name: /trocar de site/ })).toBeTruthy();
@@ -112,7 +112,8 @@ describe('SideNav recolhida', () => {
     await user.click(toggle);
     const brand = screen.getByRole('link', { name: 'Orakel Backoffice' });
     expect(brand.getAttribute('href')).toBe('/sites');
-    expect(screen.queryByRole('button', { name: /trocar de site/ })).toBeNull();
+    const switcher = screen.getByRole('button', { name: /trocar de site/ });
+    expect(switcher.querySelector('[aria-hidden="true"]')?.textContent).toBe('EA');
     expect(screen.queryByText('Áreas do site', { selector: '.menu-title' })).toBeNull();
 
     await user.click(toggle);
