@@ -48,6 +48,27 @@ describe('trilha do PageHeader', () => {
     expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe(site.name);
   });
 
+  it('classes do Ecme, sem as do shadcn: links como título, atual e separador como o body (#243)', () => {
+    render(<PageHeader id="t" trail={siteTrail(site, 'Mídia')} title="Mídia" />);
+
+    const nav = screen.getByRole('navigation', { name: 'Trilha de navegação' });
+    const classes = [...nav.querySelectorAll('*')].map(
+      (element) => element.getAttribute('class') ?? '',
+    );
+    for (const shadcn of ['text-muted-foreground', 'bg-muted', 'text-foreground']) {
+      expect(classes.some((value) => value.split(' ').includes(shadcn))).toBe(false);
+    }
+    for (const link of within(nav).getAllByRole('link')) {
+      expect(link.className).toContain('text-gray-900');
+      expect(link.className).toContain('dark:text-gray-100');
+    }
+    const body = 'text-gray-600 dark:text-gray-400';
+    expect(nav.querySelector('[aria-current="page"]')?.className).toBe(body);
+    for (const separator of nav.querySelectorAll('[aria-hidden="true"]')) {
+      expect(separator.className).toBe(body);
+    }
+  });
+
   it('a trilha vem antes do título; sem trilha, só o título', () => {
     render(<PageHeader id="t" trail={siteTrail(site, 'Menus')} title="Menus" />);
     const nav = screen.getByRole('navigation');

@@ -116,7 +116,11 @@ export function siteTrail(
   ];
 }
 
-/** Trilha de navegação acima do título: links até a tela atual, que leva `aria-current`. */
+/**
+ * Trilha de navegação acima do título: links até a tela atual, que leva `aria-current`. O Ecme
+ * não tem breadcrumb (#243): os links usam a cor dos títulos do template (`.heading-text`), e o
+ * item atual e o separador, a do texto do body (com a substituição do docs/migration/ecme.md).
+ */
 function Trail({ items }: { items: readonly TrailItem[] }) {
   return (
     <nav aria-label="Trilha de navegação">
@@ -124,14 +128,19 @@ function Trail({ items }: { items: readonly TrailItem[] }) {
         {items.map((item, index) => (
           <li key={`${index}-${item.label}`} className="flex items-center gap-2">
             {index > 0 && (
-              <span aria-hidden="true" className="text-muted-foreground">
+              <span aria-hidden="true" className="text-gray-600 dark:text-gray-400">
                 ›
               </span>
             )}
             {item.href === undefined ? (
-              <span aria-current="page">{item.label}</span>
+              <span aria-current="page" className="text-gray-600 dark:text-gray-400">
+                {item.label}
+              </span>
             ) : (
-              <Link href={item.href} className="underline underline-offset-4">
+              <Link
+                href={item.href}
+                className="font-semibold text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
+              >
                 {item.label}
               </Link>
             )}
