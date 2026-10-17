@@ -434,6 +434,55 @@ describe('SchemaForm: foco, dica do boolean e só leitura', () => {
     expect(preset.getAttribute('aria-invalid')).toBe('true');
   });
 
+  it('a mensagem de erro do FormItem chega ao campo registrado, junto da dica', async () => {
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ siteId: 'a', preset: 'padrao', indexavel: false }}
+        labels={{ preset: 'Preset' }}
+        hints={{ preset: 'Vem da release.' }}
+        fields={{ preset: Choice }}
+        submitLabel="Salvar"
+        onSubmit={() => [{ path: ['preset'], message: 'Preset não suportado' }]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    const preset = screen.getByLabelText('Preset');
+    await waitFor(() => expect(preset.getAttribute('aria-invalid')).toBe('true'));
+    const described = (preset.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toEqual(['Vem da release.', 'Preset não suportado']);
+  });
+
+  it('erro no boolean: a caixa fica inválida, com a mensagem ligada', async () => {
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ siteId: 'a', preset: 'padrao', indexavel: false }}
+        labels={{ indexavel: 'Indexável' }}
+        fields={{ preset: Choice }}
+        submitLabel="Salvar"
+        onSubmit={() => [{ path: ['indexavel'], message: 'Exige o G1 registrado' }]}
+      />,
+    );
+
+    const indexavel = screen.getByRole('checkbox', { name: 'Indexável' });
+    await user.click(indexavel);
+    expect(indexavel).toHaveProperty('checked', true);
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(indexavel.getAttribute('aria-invalid')).toBe('true'));
+    expect(document.activeElement).toBe(indexavel);
+    expect(
+      document.getElementById(indexavel.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe('Exige o G1 registrado');
+  });
+
   it('a dica do boolean fica ligada por aria-describedby; só leitura vira readonly', () => {
     render(
       <SchemaForm
