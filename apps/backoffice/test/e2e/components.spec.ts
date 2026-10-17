@@ -98,6 +98,8 @@ test('a vitrine vem renderizada do servidor', async ({ page }) => {
     'Resumo',
     'https://',
     'O slug já está em uso',
+    'Destaque na capa',
+    'Escolha a categoria',
   ]) {
     expect(html).toContain(text);
   }
@@ -301,3 +303,112 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     else expect(intermediate.length).toBeGreaterThan(0);
   });
 }
+
+// Checkbox e Select (#208): estado do Checkbox para o leitor de tela e o Select do react-select
+// operado só pelo teclado, com o rótulo do FormItem.
+
+test('Checkbox e Checkbox.Group alternam com Espaço e expõem o estado', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const checkboxes = section(page, 'Checkbox');
+
+  const destaque = checkboxes.getByRole('checkbox', { name: 'Destaque na capa' });
+  await expect(destaque).not.toBeChecked();
+  await destaque.focus();
+  await page.keyboard.press('Space');
+  await expect(destaque).toBeChecked();
+  await page.keyboard.press('Space');
+  await expect(destaque).not.toBeChecked();
+
+  await expect(checkboxes.getByRole('checkbox', { name: 'Publicado' })).toBeChecked();
+  // `indeterminate` nativo: o leitor de tela anuncia "misto".
+  await expect(checkboxes.getByRole('checkbox', { name: 'Todas as seções' })).toBeChecked({
+    indeterminate: true,
+  });
+  await expect(checkboxes.getByRole('checkbox', { name: 'Arquivado' })).toBeDisabled();
+
+  const formatos = checkboxes.getByRole('group', { name: 'Formatos' });
+  const status = checkboxes.getByRole('status');
+  await expect(status).toHaveText('Formatos escolhidos: texto.');
+  await formatos.getByRole('checkbox', { name: 'Vídeo' }).focus();
+  await page.keyboard.press('Space');
+  await expect(formatos.getByRole('checkbox', { name: 'Vídeo' })).toBeChecked();
+  await expect(status).toHaveText('Formatos escolhidos: texto, video.');
+  await page.keyboard.press('Shift+Tab');
+  await expect(formatos.getByRole('checkbox', { name: 'Texto' })).toBeFocused();
+  await page.keyboard.press('Space');
+  await expect(status).toHaveText('Formatos escolhidos: video.');
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Select pelo teclado: rótulo, setas, Enter e Esc, sem violação do axe com o menu aberto (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const selects = section(page, 'Select');
+
+    const categoria = selects.getByLabel('Categoria', { exact: true });
+    await expect(categoria).toHaveAttribute('role', 'combobox');
+    await categoria.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(categoria).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('ArrowDown');
+
+    // A opção em foco tem fundo próprio, diferente das outras.
+    const options = selects.locator('.select-option');
+    await expect(options).toHaveCount(4);
+    const focused = selects.locator('.select-option-focused');
+    await expect(focused).toHaveText('Guias');
+    const background = (locator: Locator) =>
+      locator.evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(await background(focused)).not.toBe(await background(options.first()));
+
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
+
+    await page.keyboard.press('Enter');
+    await expect(selects.locator('.select-single-value').first()).toHaveText('Guias');
+    await expect(categoria).toBeFocused();
+
+    await page.keyboard.press('ArrowDown');
+    await expect(categoria).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    await expect(categoria).toHaveAttribute('aria-expanded', 'false');
+    await expect(selects.locator('.select-menu')).toHaveCount(0);
+
+    expect(hydration).toEqual([]);
+  });
+}
+
+test('Select em FormItem inválido, async e creatable', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const selects = section(page, 'Select');
+
+  const secao = selects.getByLabel('Seção');
+  await expect(secao).toHaveAttribute('aria-invalid', 'true');
+  const errorId = await secao.getAttribute('aria-errormessage');
+  await expect(page.locator(`[id="${errorId}"]`)).toHaveText('Escolha uma seção');
+
+  const site = selects.getByLabel('Site');
+  await site.focus();
+  await page.keyboard.type('rece');
+  await expect(selects.locator('.select-option')).toHaveText(['Receitas da casa']);
+  await page.keyboard.press('Enter');
+  await expect(
+    selects.locator('.select-single-value', { hasText: 'Receitas da casa' }),
+  ).toBeVisible();
+
+  const palavra = selects.getByLabel('Palavra-chave');
+  await palavra.focus();
+  await page.keyboard.type('Podcasts');
+  await expect(selects.locator('.select-option-focused')).toHaveText('Criar "Podcasts"');
+  await page.keyboard.press('Enter');
+  await expect(selects.locator('.select-single-value', { hasText: 'Podcasts' })).toBeVisible();
+});

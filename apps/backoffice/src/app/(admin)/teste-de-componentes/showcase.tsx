@@ -3,6 +3,8 @@
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { HiOutlinePlus } from 'react-icons/hi';
+import AsyncSelect from 'react-select/async';
+import CreatableSelect from 'react-select/creatable';
 
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import Loading from '@/components/shared/Loading';
@@ -13,9 +15,11 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Checkbox, type CheckboxGroupValue } from '@/components/ui/Checkbox';
 import { FormContainer, FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
+import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Tag } from '@/components/ui/Tag';
@@ -24,10 +28,32 @@ import { Tag } from '@/components/ui/Tag';
 const AVATAR_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23006be3'/%3E%3C/svg%3E";
 
+type Opcao = { value: string; label: string };
+
+const CATEGORIAS: Opcao[] = [
+  { value: 'noticias', label: 'Notícias' },
+  { value: 'guias', label: 'Guias' },
+  { value: 'resenhas', label: 'Resenhas' },
+  { value: 'entrevistas', label: 'Entrevistas' },
+];
+
+const SITES: Opcao[] = [
+  { value: 'exemplo-a', label: 'Exemplo A' },
+  { value: 'exemplo-b', label: 'Exemplo B' },
+  { value: 'receitas', label: 'Receitas da casa' },
+];
+
+/** Busca do Select async sem rede: filtra a lista local. */
+function buscarSites(termo: string): Promise<Opcao[]> {
+  const normalizado = termo.toLowerCase();
+  return Promise.resolve(SITES.filter((site) => site.label.toLowerCase().includes(normalizado)));
+}
+
 /** Seções da vitrine (#205, #206): cada componente portado nas variantes que as telas vão usar. */
 export function Showcase() {
   const [clicks, setClicks] = useState(0);
   const [emailChecked, setEmailChecked] = useState(false);
+  const [formatos, setFormatos] = useState<CheckboxGroupValue>(['texto']);
   return (
     <>
       <section aria-labelledby="vitrine-button" className="space-y-3">
@@ -127,6 +153,72 @@ export function Showcase() {
         <FormContainer layout="horizontal" labelWidth={120} className="form-width">
           <FormItem label="Autor">
             <Input placeholder="Nome de quem assina" />
+          </FormItem>
+        </FormContainer>
+      </section>
+
+      <section aria-labelledby="vitrine-checkbox" className="space-y-3">
+        <h2 id="vitrine-checkbox" className="text-lg font-semibold">
+          Checkbox
+        </h2>
+        <div className="flex flex-wrap items-center gap-4">
+          <Checkbox>Destaque na capa</Checkbox>
+          <Checkbox defaultChecked>Publicado</Checkbox>
+          <Checkbox checked indeterminate>
+            Todas as seções
+          </Checkbox>
+          <Checkbox disabled>Arquivado</Checkbox>
+        </div>
+        <p id="vitrine-formatos" className="text-sm font-semibold">
+          Formatos
+        </p>
+        <Checkbox.Group
+          aria-labelledby="vitrine-formatos"
+          value={formatos}
+          onChange={(value) => setFormatos(value)}
+        >
+          <Checkbox value="texto">Texto</Checkbox>
+          <Checkbox value="video">Vídeo</Checkbox>
+          <Checkbox value="audio">Áudio</Checkbox>
+        </Checkbox.Group>
+        <p role="status" className="text-sm">
+          Formatos escolhidos: {formatos.length === 0 ? 'nenhum' : formatos.join(', ')}.
+        </p>
+      </section>
+
+      <section aria-labelledby="vitrine-select" className="space-y-3">
+        <h2 id="vitrine-select" className="text-lg font-semibold">
+          Select
+        </h2>
+        <FormContainer className="form-width">
+          <FormItem label="Categoria">
+            <Select<Opcao> options={CATEGORIAS} placeholder="Escolha a categoria" />
+          </FormItem>
+          <FormItem label="Categorias secundárias">
+            <Select<Opcao, true>
+              isMulti
+              options={CATEGORIAS}
+              defaultValue={[CATEGORIAS[1]!, CATEGORIAS[2]!]}
+            />
+          </FormItem>
+          <FormItem label="Seção" invalid errorMessage="Escolha uma seção">
+            <Select<Opcao> options={CATEGORIAS} placeholder="Nenhuma seção" />
+          </FormItem>
+          <FormItem label="Site">
+            <Select<Opcao>
+              componentAs={AsyncSelect}
+              loadOptions={buscarSites}
+              defaultOptions
+              placeholder="Busque pelo nome"
+            />
+          </FormItem>
+          <FormItem label="Palavra-chave">
+            <Select<Opcao>
+              componentAs={CreatableSelect}
+              options={CATEGORIAS}
+              placeholder="Escolha ou crie"
+              formatCreateLabel={(valor) => `Criar "${valor}"`}
+            />
           </FormItem>
         </FormContainer>
       </section>

@@ -59,6 +59,7 @@
     "react-dom": "catalog:",
     "react-hook-form": "catalog:",
     "react-icons": "catalog:",
+    "react-select": "catalog:",
     "sharp": "catalog:",
     "tailwind-merge": "catalog:",
     "zod": "catalog:"
