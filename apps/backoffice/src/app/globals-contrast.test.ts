@@ -385,6 +385,14 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'bg-white',
     minimum: 4.5,
   },
+  // SchemaForm (#245): aviso de campo sem editor, dentro da seção em Card.
+  {
+    name: 'aviso no cartão',
+    theme: 'claro',
+    text: 'text-warning',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
   {
     name: 'complemento do campo',
     theme: 'claro',
@@ -403,6 +411,13 @@ const ECME_PAIRS: readonly EcmePair[] = [
     name: 'mensagem de erro no cartão',
     theme: 'escuro',
     text: 'dark:text-error',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'aviso no cartão',
+    theme: 'escuro',
+    text: 'dark:text-warning',
     background: 'dark:bg-gray-800',
     minimum: 4.5,
   },
