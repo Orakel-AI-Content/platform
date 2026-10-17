@@ -5,20 +5,13 @@ import Link from 'next/link';
 
 import { EmptyState } from '@/components/empty-state';
 import { formatDateTime, PENDING_ORIGIN_LABEL, pendingItem } from '@/components/site-labels.ts';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/legacy-ui/table';
+import Table from '@/components/ui/Table';
 import type { PendingChange } from '@/domain/pending-changes/list.ts';
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, PendingChange>();
+const { THead, TBody, Tr, Th, Td } = Table;
 
 function columnsFor(siteId: string, timeZone: string) {
   return column.columns([
@@ -31,7 +24,10 @@ function columnsFor(siteId: string, timeZone: string) {
       cell: (info) => {
         const item = pendingItem(siteId, info.row.original.origin, info.getValue());
         return item.href ? (
-          <Link href={item.href} className="underline underline-offset-4">
+          <Link
+            href={item.href}
+            className="text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
+          >
             {item.text}
           </Link>
         ) : (
@@ -65,32 +61,32 @@ export function PendingChangesTable({
     return <EmptyState>Nenhuma mudança pendente: o site publicado está em dia.</EmptyState>;
   }
   return (
-    <Table>
-      <TableCaption>
+    <Table compact>
+      <caption className="mt-4 caption-bottom text-sm">
         {rows.length === 1 ? '1 mudança pendente' : `${rows.length} mudanças pendentes`}
-      </TableCaption>
-      <TableHeader>
+      </caption>
+      <THead>
         {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id}>
+          <Tr key={group.id}>
             {group.headers.map((header) => (
-              <TableHead key={header.id} scope="col">
+              <Th key={header.id}>
                 <table.FlexRender header={header} />
-              </TableHead>
+              </Th>
             ))}
-          </TableRow>
+          </Tr>
         ))}
-      </TableHeader>
-      <TableBody>
+      </THead>
+      <TBody>
         {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
+          <Tr key={row.id}>
             {row.getAllCells().map((cell) => (
-              <TableCell key={cell.id}>
+              <Td key={cell.id}>
                 <table.FlexRender cell={cell} />
-              </TableCell>
+              </Td>
             ))}
-          </TableRow>
+          </Tr>
         ))}
-      </TableBody>
+      </TBody>
     </Table>
   );
 }
