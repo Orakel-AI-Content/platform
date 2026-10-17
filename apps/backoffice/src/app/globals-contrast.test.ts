@@ -701,6 +701,52 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-800',
     minimum: 4.5,
   },
+  // Menu (#235): item, item ativo (`_menu-item.css`) e rótulo do grupo (`_menu.css`) sobre a
+  // barra lateral (`side-nav-bg` do Ecme: branco no claro, gray-800 no escuro). O rótulo sem
+  // variante herda o texto do body; no escuro, o item ativo usa a substituta do `menu.css`.
+  {
+    name: 'item do menu na barra',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'item ativo do menu na barra',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'rótulo do grupo do menu',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'item do menu na barra',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'item ativo do menu na barra',
+    theme: 'escuro',
+    text: 'dark:text-primary-mild',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+    ecme: 'dark:text-primary',
+  },
+  {
+    name: 'rótulo do grupo do menu',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
