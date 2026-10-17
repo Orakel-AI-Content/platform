@@ -25,6 +25,7 @@ import { FormContainer, FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
 import { Notification } from '@/components/ui/Notification';
+import { Pagination } from '@/components/ui/Pagination';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
@@ -69,7 +70,7 @@ const ARTIGOS = [
 const NEXT_SORT: Record<ThSort, ThSort> = { none: 'asc', asc: 'desc', desc: 'asc' };
 
 /** Seções da vitrine (#205, #206): cada componente portado nas variantes que as telas vão usar. */
-export function Showcase() {
+export function Showcase({ linkPage }: { linkPage: number }) {
   const [clicks, setClicks] = useState(0);
   const [emailChecked, setEmailChecked] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -78,6 +79,7 @@ export function Showcase() {
   const [lastAction, setLastAction] = useState('Nenhuma ação.');
   const [formatos, setFormatos] = useState<CheckboxGroupValue>(['texto']);
   const [acao, setAcao] = useState('Nenhuma ação escolhida.');
+  const [pagina, setPagina] = useState(1);
   const [ordem, setOrdem] = useState<ThSort>('none');
   return (
     <>
@@ -521,6 +523,31 @@ export function Showcase() {
               10 publicados.
             </Tabs.TabContent>
           </Tabs>
+        </Card>
+      </section>
+
+      <section aria-labelledby="vitrine-pagination" className="space-y-3">
+        <h2 id="vitrine-pagination" className="text-lg font-semibold">
+          Pagination
+        </h2>
+        <Card>
+          <div className="space-y-4">
+            <Pagination total={100} pageSize={10} displayTotal onChange={setPagina} />
+            <p role="status" className="text-sm">
+              Página escolhida: {pagina}.
+            </p>
+          </div>
+        </Card>
+        <Card>
+          <div className="space-y-4">
+            <Pagination
+              total={200}
+              pageSize={10}
+              currentPage={linkPage}
+              getPageHref={(n) => `/teste-de-componentes?pagina=${n}`}
+            />
+            <p className="text-sm">Página na URL: {linkPage}.</p>
+          </div>
         </Card>
       </section>
 

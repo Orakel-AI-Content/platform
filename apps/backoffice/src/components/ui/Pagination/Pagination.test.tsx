@@ -126,7 +126,9 @@ describe('Pagination', () => {
       />,
     );
 
-    const links = within(nav()).getAllByRole('link');
+    const links = within(nav())
+      .getAllByRole('link')
+      .filter((link) => link.tagName === 'A');
     expect(
       links.map((link) => [link.getAttribute('aria-label'), link.getAttribute('href')]),
     ).toEqual([
@@ -147,6 +149,7 @@ describe('Pagination', () => {
 
     const next = within(nav()).getByLabelText('Próxima página');
     expect(next.tagName).toBe('SPAN');
+    expect(next.getAttribute('role')).toBe('link');
     expect(next.getAttribute('aria-disabled')).toBe('true');
     expect(next.hasAttribute('href')).toBe(false);
   });
