@@ -104,13 +104,14 @@ describe('Select', () => {
     expect(document.querySelector('.select-single-value')?.textContent).toBe('Guias');
   });
 
-  it('opção escolhida em primary, com o ícone oculto do leitor de tela', async () => {
+  it('opção escolhida em primary-deep/primary-mild, com o ícone oculto do leitor de tela', async () => {
     render(<Select options={OPCOES} aria-label="Categoria" defaultValue={OPCOES[0]} />);
 
     screen.getByRole('combobox', { name: 'Categoria' }).focus();
     await userEvent.keyboard('{ArrowDown}');
     const option = document.querySelectorAll('.select-option')[0]!;
-    expect(option.className).toContain('text-primary');
+    expect(option.className).toContain('text-primary-deep');
+    expect(option.className).toContain('dark:text-primary-mild');
     expect(option.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 

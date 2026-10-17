@@ -1,7 +1,11 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/Select/Option.tsx
-// Adaptado (#208): a opção em foco pelo teclado (`isFocused`) ganha `select-option-focused`; no
-// Ecme, navegar por setas não mudava nada na tela. O ícone de escolhida fica `aria-hidden`: o
-// estado vem do `aria-selected` do `react-select`.
+// Adaptado (#208):
+// - a opção em foco pelo teclado (`isFocused`) ganha `select-option-focused`; no Ecme, navegar
+//   por setas não mudava nada na tela;
+// - a escolhida usa `text-primary-deep dark:text-primary-mild`: o `text-primary` do Ecme sobre o
+//   `primary-subtle` (10% de primary sobre o menu) dá 4,44:1 no claro (pares "opção escolhida"
+//   do globals-contrast.test.ts);
+// - o ícone de escolhida fica `aria-hidden`: o estado vem do `aria-selected` do `react-select`.
 'use client';
 
 import classNames from '../utils/classNames';
@@ -24,7 +28,7 @@ const Option = <T, IsMulti extends boolean = boolean, Group extends GroupBase<T>
         'select-option',
         isFocused && !isDisabled && 'select-option-focused',
         !isDisabled && !isSelected && 'hover:text-gray-800 dark:hover:text-gray-100',
-        isSelected && 'text-primary bg-primary-subtle',
+        isSelected && 'text-primary-deep dark:text-primary-mild bg-primary-subtle',
         isDisabled && 'opacity-50 cursor-not-allowed',
       )}
       {...innerProps}
