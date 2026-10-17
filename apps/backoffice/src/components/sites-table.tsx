@@ -57,7 +57,7 @@ function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; t
     <LastBuildSummary
       build={build}
       timeZone={timeZone}
-      details={(text) => <Truncated text={text} className="max-w-40" />}
+      details={(text) => <Truncated text={text} className="max-w-32" />}
     />
   );
 }
@@ -69,12 +69,12 @@ const columns = column.columns([
       const site = info.row.original;
       return (
         <TwoLines
-          secondary={<Truncated text={`${site.id} · ${site.domain}`} className="max-w-48" />}
+          secondary={<Truncated text={`${site.id} · ${site.domain}`} className="max-w-40" />}
         >
           <Link
             href={`/sites/${site.id}`}
             title={site.name}
-            className="block max-w-48 truncate font-semibold text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
+            className="block max-w-40 truncate font-semibold text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
           >
             {site.name}
           </Link>
@@ -99,7 +99,7 @@ const columns = column.columns([
       const site = info.row.original;
       const reason = site.state === 'pausado' ? site.pausedReason : null;
       return (
-        <TwoLines secondary={reason ? <Truncated text={reason} className="max-w-32" /> : undefined}>
+        <TwoLines secondary={reason ? <Truncated text={reason} className="max-w-28" /> : undefined}>
           <StateTag color={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</StateTag>
         </TwoLines>
       );
@@ -186,7 +186,8 @@ export function SitesTable({
                   </Td>
                 ))}
                 <Td>
-                  <span className="flex items-center gap-2">
+                  {/* Um botão sob o outro: lado a lado, a coluna não cabe a 1280 px (#248). */}
+                  <span className="flex flex-col items-end gap-1">
                     {publishNow && row.original.state !== 'pausado' && (
                       <PublishNowButton
                         siteId={siteId}
