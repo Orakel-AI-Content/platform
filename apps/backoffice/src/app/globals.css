@@ -2,6 +2,7 @@
 
 /* Classes de componente do Ecme (src/assets/styles/components/ do template), uma folha por
    componente portado, em @layer components (docs/migration/ecme.md). */
+@import './styles/alert.css';
 @import './styles/avatar.css';
 @import './styles/badge.css';
 @import './styles/button.css';
@@ -15,9 +16,11 @@
 @import './styles/input-group.css';
 @import './styles/input.css';
 @import './styles/menu-item.css';
+@import './styles/notification.css';
 @import './styles/select.css';
 @import './styles/skeleton.css';
 @import './styles/tag.css';
+@import './styles/toast.css';
 @import './styles/tooltip.css';
 
 /* Tema por classe no <html>, como no Ecme (#203): `dark` ou `light`, do cookie de tema ou, no

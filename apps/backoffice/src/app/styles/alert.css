@@ -1,0 +1,6 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_alert.css */
+@layer components {
+  .alert {
+    @apply p-4 relative flex;
+  }
+}
