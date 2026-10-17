@@ -1,9 +1,7 @@
-import Link from 'next/link';
-
 import { ContentsTable } from '@/components/contents-table';
 import { listContents } from '@/domain/content/contents.ts';
 import { noRead } from '@/components/forbidden-screen';
-import { Button } from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
@@ -24,9 +22,9 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
   if (!contents.ok) return noRead;
 
   const create = canWrite ? (
-    <Button asElement={Link} href={`/sites/${site.id}/conteudos/novo`} variant="solid" size="sm">
+    <ButtonLink href={`/sites/${site.id}/conteudos/novo`} variant="solid" size="sm">
       Criar conteúdo
-    </Button>
+    </ButtonLink>
   ) : undefined;
 
   return (

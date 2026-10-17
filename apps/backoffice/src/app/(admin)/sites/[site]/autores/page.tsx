@@ -1,9 +1,7 @@
-import Link from 'next/link';
-
 import { EntityTable } from '@/components/entity-table';
 import { listAuthors } from '@/domain/content/authors.ts';
 import { noRead } from '@/components/forbidden-screen';
-import { Button } from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
@@ -24,9 +22,9 @@ export default async function AuthorsPage({ params }: { params: Promise<{ site: 
   if (!authors.ok) return noRead;
 
   const create = canWrite ? (
-    <Button asElement={Link} href={`/sites/${site.id}/autores/novo`} variant="solid" size="sm">
+    <ButtonLink href={`/sites/${site.id}/autores/novo`} variant="solid" size="sm">
       Criar autor
-    </Button>
+    </ButtonLink>
   ) : undefined;
 
   return (
