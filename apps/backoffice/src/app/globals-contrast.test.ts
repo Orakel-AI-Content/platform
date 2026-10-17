@@ -532,6 +532,51 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-950',
     minimum: 4.5,
   },
+  // Alert e Notification (#212). O fundo do alerta é o `-subtle` do tipo (10 a 27% da cor sobre
+  // a página, alfa que este teste ignora): o par é contra a página, com folga para o tingido. O
+  // texto da notificação herda o do body.
+  {
+    name: 'texto do alerta',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'título da notificação',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto da notificação',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto do alerta',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'título da notificação',
+    theme: 'escuro',
+    text: 'dark:text-white',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto da notificação',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
