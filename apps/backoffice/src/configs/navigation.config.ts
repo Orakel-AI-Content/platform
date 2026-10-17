@@ -133,7 +133,7 @@ export function activeNavigationKey(
   const parts = pathname.split('/');
   if (parts[1] !== 'sites') return undefined;
   const site = parts[2];
-  // `/sites/novo` é a tela de criar site (nenhum site tem o id `novo`).
+  // `/sites/novo` é a tela de criar site: a rota estática vence o `[site]` no Next.
   if (site === undefined || site === '' || site === 'novo') return 'sites';
   const segment = parts[3] ?? '';
   const target = OVERVIEW_SEGMENTS.has(segment) ? '' : segment;
