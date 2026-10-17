@@ -57,7 +57,11 @@ for (const colorScheme of ['light', 'dark'] as const) {
     ];
     for (const target of targets) {
       await tabTo(page, target);
-      expect(await outline(target)).toEqual({ color: ring, style: 'solid', width: '2px' });
+      // O Input do Ecme (#245) tem `transition`, que no Tailwind 4 inclui `outline-color`: a cor
+      // chega ao --ring depois da transição.
+      await expect
+        .poll(() => outline(target))
+        .toEqual({ color: ring, style: 'solid', width: '2px' });
     }
   });
 }

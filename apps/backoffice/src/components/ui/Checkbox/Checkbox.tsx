@@ -3,7 +3,8 @@
 // - `indeterminate` liga também a propriedade nativa do <input> (só existe no DOM, por isso em
 //   efeito), e o leitor de tela anuncia "misto"; o Ecme só trocava o ícone;
 // - o ícone fica `aria-hidden`: o estado vem do próprio <input type="checkbox">;
-// - aceita `aria-label`, `aria-labelledby` e `aria-describedby`, para o caso sem texto.
+// - aceita `aria-label`, `aria-labelledby` e `aria-describedby`, para o caso sem texto, e
+//   `aria-invalid` (#245), para o campo booleano com erro no formulário.
 'use client';
 
 import { useContext, useCallback, useEffect, useRef, useState } from 'react';
@@ -19,7 +20,7 @@ export interface CheckboxProps
     CommonProps,
     Pick<
       InputHTMLAttributes<HTMLInputElement>,
-      'aria-label' | 'aria-labelledby' | 'aria-describedby'
+      'aria-label' | 'aria-labelledby' | 'aria-describedby' | 'aria-invalid'
     > {
   checked?: boolean;
   checkboxClass?: string;

@@ -16,11 +16,13 @@ import {
 } from 'react-hook-form';
 import * as z from 'zod';
 
-import { Button } from '@/components/legacy-ui/button';
-import { Checkbox } from '@/components/legacy-ui/checkbox';
-import { Input } from '@/components/legacy-ui/input';
-import { Label } from '@/components/legacy-ui/label';
-import { cn } from '@/lib/utils';
+import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import Checkbox from '@/components/ui/Checkbox';
+import { FormItem } from '@/components/ui/Form';
+import { useFormItem } from '@/components/ui/Form/context';
+import Input from '@/components/ui/Input';
+import classNames from '@/components/ui/utils/classNames';
 
 import { clean, describe, emptyValue, pattern, type FieldNode } from './schema-walk.ts';
 
@@ -28,6 +30,10 @@ import { clean, describe, emptyValue, pattern, type FieldNode } from './schema-w
 // docs/design/design-system.md). Desenha texto, número, booleano, enum, objeto e lista de
 // objetos; o resto (rich text, seletores de mídia e de entidade) entra pelo registro de
 // campos, por caminho com `*` no lugar dos índices. A validação é só a do schema.
+// Visual do Ecme (#245): cada campo num `FormItem` (rótulo e mensagem de erro ligados ao
+// controle), texto e número no `Input`, booleano no `Checkbox`, botões no `Button` e as seções em
+// `Card`, como os formulários do template (ProductForm). O enum continua `<select>` nativo, com
+// as classes do `Input`.
 
 /** Props de um campo registrado: valor e mudança vêm do react-hook-form (Controller). */
 export type FieldProps = {
@@ -98,8 +104,23 @@ type Ctx = {
   fields: Record<string, FieldRenderer>;
 };
 
-const selectClass =
-  'flex min-h-9 w-full rounded-md border border-border bg-background px-3 py-1 text-sm aria-invalid:border-destructive';
+/** `<select>` nativo com a aparência do `Input` do Ecme (tamanho `md`). */
+const selectClass = (invalid: boolean) =>
+  classNames(
+    'input input-md h-12',
+    invalid
+      ? 'input-invalid'
+      : 'focus:ring-primary focus-within:ring-primary focus-within:border-primary focus:border-primary',
+  );
+
+/** Texto de apoio do campo (dica), com o par "texto no cartão" do contraste. */
+const hintClass = 'mt-1 text-sm text-gray-600 dark:text-gray-400';
+
+/** Borda dos grupos (objeto, lista e item de lista). */
+const groupClass = 'rounded-xl border border-gray-200 dark:border-gray-700';
+
+/** Aviso de campo sem editor. */
+const warningClass = 'mb-7 rounded-xl border border-warning p-2 text-sm text-warning';
 
 /** Primeira mensagem de erro num nó da árvore de erros (pode estar num item interno). */
 function firstMessage(node: unknown): string | undefined {
@@ -191,7 +212,29 @@ function summaryLabel(labels: Record<string, string>, path: string): string {
 
 const labelOf = (ctx: Ctx, path: string, key: string) => ctx.labels[pattern(path)] ?? key;
 
-/** Rótulo, controle, dica e erro ligados por id e aria-describedby. */
+/** O que o controle de um campo recebe para se ligar ao rótulo, à dica e ao erro. */
+type ControlProps = {
+  id: string;
+  invalid: boolean;
+  /** Dica e erro: para controles que não leem o `FormItem` (registrados e `<select>`). */
+  describedBy: string | undefined;
+  /** Só a dica: o `Input` do Ecme soma o erro do `FormItem` sozinho. */
+  hintId: string | undefined;
+};
+
+/** Lê o id da mensagem de erro do `FormItem` (só existe enquanto o campo está inválido). */
+function FieldControl({
+  id,
+  invalid,
+  hintId,
+  children,
+}: Omit<ControlProps, 'describedBy'> & { children: (props: ControlProps) => ReactNode }) {
+  const errorId = useFormItem()?.errorId;
+  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+  return <>{children({ id, invalid, describedBy, hintId })}</>;
+}
+
+/** Rótulo, controle, dica e erro ligados por id e aria-describedby, num `FormItem`. */
 function Field({
   ctx,
   path,
@@ -201,29 +244,28 @@ function Field({
   ctx: Ctx;
   path: string;
   label: string;
-  children: (props: { id: string; invalid: boolean; describedBy: string | undefined }) => ReactNode;
+  children: (props: ControlProps) => ReactNode;
 }) {
   const fieldId = `${ctx.id}-${path}`;
   const hint = ctx.hints[pattern(path)];
   const message = messageAt(ctx.errors, path);
-  const describedBy =
-    [hint ? `${fieldId}-hint` : '', message ? `${fieldId}-error` : ''].filter(Boolean).join(' ') ||
-    undefined;
+  const hintId = hint ? `${fieldId}-hint` : undefined;
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={fieldId}>{label}</Label>
-      {children({ id: fieldId, invalid: message !== undefined, describedBy })}
+    <FormItem
+      htmlFor={fieldId}
+      label={label}
+      invalid={message !== undefined}
+      errorMessage={message}
+    >
+      <FieldControl id={fieldId} invalid={message !== undefined} hintId={hintId}>
+        {children}
+      </FieldControl>
       {hint && (
-        <p id={`${fieldId}-hint`} className="text-sm text-muted-foreground">
+        <p id={hintId} className={hintClass}>
           {hint}
         </p>
       )}
-      {message && (
-        <p id={`${fieldId}-error`} className="text-sm text-destructive">
-          {message}
-        </p>
-      )}
-    </div>
+    </FormItem>
   );
 }
 
@@ -271,21 +313,18 @@ function Node({
   }
 
   const { node } = describe(schema);
-  const aria = (invalid: boolean, describedBy: string | undefined) => ({
-    'aria-invalid': invalid,
-    'aria-describedby': describedBy,
-  });
   switch (node.kind) {
     case 'literal':
       return null;
     case 'string':
       return (
         <Field ctx={ctx} path={path} label={label}>
-          {({ id, invalid, describedBy }) => (
+          {({ id, invalid, hintId }) => (
             <Input
               id={id}
               readOnly={ctx.readOnly.has(pattern(path))}
-              {...aria(invalid, describedBy)}
+              aria-invalid={invalid}
+              aria-describedby={hintId}
               {...ctx.register(path)}
             />
           )}
@@ -294,12 +333,13 @@ function Node({
     case 'number':
       return (
         <Field ctx={ctx} path={path} label={label}>
-          {({ id, invalid, describedBy }) => (
+          {({ id, invalid, hintId }) => (
             <Input
               id={id}
               type="number"
               inputMode="numeric"
-              {...aria(invalid, describedBy)}
+              aria-invalid={invalid}
+              aria-describedby={hintId}
               {...ctx.register(path, { valueAsNumber: true })}
             />
           )}
@@ -311,8 +351,9 @@ function Node({
           {({ id, invalid, describedBy }) => (
             <select
               id={id}
-              className={selectClass}
-              {...aria(invalid, describedBy)}
+              className={selectClass(invalid)}
+              aria-invalid={invalid}
+              aria-describedby={describedBy}
               {...ctx.register(path)}
             >
               {node.options.map((option) => (
@@ -325,6 +366,7 @@ function Node({
         </Field>
       );
     case 'boolean': {
+      // Sem `FormItem`: o rótulo é o do próprio `Checkbox` (o texto ao lado da caixa).
       const fieldId = `${ctx.id}-${path}`;
       const message = messageAt(ctx.errors, path);
       const hint = ctx.hints[pattern(path)];
@@ -333,22 +375,30 @@ function Node({
           .filter(Boolean)
           .join(' ') || undefined;
       return (
-        <div className="space-y-1.5">
-          <label htmlFor={fieldId} className="flex min-h-6 items-center gap-2 text-sm">
-            <Checkbox
-              id={fieldId}
-              {...aria(message !== undefined, describedBy)}
-              {...ctx.register(path)}
-            />
-            {label}
-          </label>
+        <div className="form-item vertical">
+          <Controller
+            control={ctx.control}
+            name={path}
+            render={({ field }) => (
+              <Checkbox
+                ref={field.ref}
+                name={field.name}
+                checked={field.value === true}
+                aria-invalid={message !== undefined}
+                aria-describedby={describedBy}
+                onChange={(checked) => field.onChange(checked)}
+              >
+                {label}
+              </Checkbox>
+            )}
+          />
           {hint && (
-            <p id={`${fieldId}-hint`} className="text-sm text-muted-foreground">
+            <p id={`${fieldId}-hint`} className={hintClass}>
               {hint}
             </p>
           )}
           {message && (
-            <p id={`${fieldId}-error`} className="text-sm text-destructive">
+            <p id={`${fieldId}-error`} className="mt-1 text-sm font-semibold text-error">
               {message}
             </p>
           )}
@@ -357,8 +407,8 @@ function Node({
     }
     case 'object':
       return (
-        <fieldset className="space-y-4 rounded-md border border-border p-4">
-          <legend className="px-1 text-sm font-semibold">{label}</legend>
+        <fieldset className={classNames(groupClass, 'mb-7 p-4')}>
+          <legend className="px-1 font-semibold text-gray-900 dark:text-gray-100">{label}</legend>
           <Children ctx={ctx} shape={node.shape} prefix={path} />
         </fieldset>
       );
@@ -367,7 +417,7 @@ function Node({
     default:
       // Sem desenho padrão e sem campo registrado: aviso visível, nunca omissão silenciosa.
       return (
-        <p className="rounded-md border border-warning p-2 text-sm text-warning">
+        <p className={warningClass}>
           {label}: sem editor para este campo (registre um campo para {pattern(path)}).
         </p>
       );
@@ -413,25 +463,25 @@ function ArrayField({
   const message = arrayError?.root?.message ?? arrayError?.message;
   if (itemNode.kind !== 'object') {
     return (
-      <p className="rounded-md border border-warning p-2 text-sm text-warning">
+      <p className={warningClass}>
         {label}: sem editor para este campo (registre um campo para {pattern(path)}).
       </p>
     );
   }
   return (
-    <fieldset className="space-y-3 rounded-md border border-border p-4">
-      <legend className="px-1 text-sm font-semibold">{label}</legend>
+    <fieldset className={classNames(groupClass, 'mb-7 space-y-4 p-4')}>
+      <legend className="px-1 font-semibold text-gray-900 dark:text-gray-100">{label}</legend>
       {fields.map((item, index) => (
-        <fieldset key={item.id} className="space-y-3 rounded-md border border-border p-3">
-          <legend className="px-1 text-sm">{`${itemLabel} ${index + 1}`}</legend>
+        <fieldset key={item.id} className={classNames(groupClass, 'p-4')}>
+          <legend className="px-1 text-sm font-semibold">{`${itemLabel} ${index + 1}`}</legend>
           <Children ctx={ctx} shape={itemNode.shape} prefix={`${path}.${index}`} />
-          <Button variant="ghost" size="sm" onClick={() => remove(index)}>
+          <Button type="button" variant="plain" size="sm" onClick={() => remove(index)}>
             {`Remover ${itemLabel} ${index + 1}`}
           </Button>
         </fieldset>
       ))}
-      {typeof message === 'string' && <p className="text-sm text-destructive">{message}</p>}
-      <Button variant="outline" size="sm" onClick={() => append(emptyValue(element))}>
+      {typeof message === 'string' && <p className="text-sm font-semibold text-error">{message}</p>}
+      <Button type="button" size="sm" onClick={() => append(emptyValue(element))}>
         {`Adicionar ${itemLabel}`}
       </Button>
     </fieldset>
@@ -497,15 +547,16 @@ export function SchemaFields({
   return (
     <>
       {sections.map((section) => (
-        <section
-          key={section.id}
-          aria-labelledby={`secao-${section.id}`}
-          className="space-y-4 pt-2"
-        >
-          <h2 id={`secao-${section.id}`} className="text-lg font-semibold">
-            {section.title}
-          </h2>
-          <Children ctx={ctx} shape={pick(section.paths)} prefix="" />
+        <section key={section.id} aria-labelledby={`secao-${section.id}`}>
+          <Card>
+            <h2
+              id={`secao-${section.id}`}
+              className="mb-6 text-lg font-semibold text-gray-900 dark:text-gray-100"
+            >
+              {section.title}
+            </h2>
+            <Children ctx={ctx} shape={pick(section.paths)} prefix="" />
+          </Card>
         </section>
       ))}
       {/* Chave de topo fora de todas as seções: depois delas, nunca omitida. */}
@@ -606,8 +657,9 @@ export function SchemaForm<T>({
         )}
         <div
           role="alert"
-          className={cn(
-            (general.length > 0 || items.length > 0) && 'space-y-1 text-sm text-destructive',
+          className={classNames(
+            (general.length > 0 || items.length > 0) &&
+              'space-y-1 text-sm font-semibold text-error',
           )}
         >
           {general.map((line) => (
@@ -651,6 +703,7 @@ export function SchemaForm<T>({
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="submit"
+            variant="solid"
             disabled={submitDisabled || isSubmitting}
             aria-describedby={submitDescribedBy}
           >

@@ -9,12 +9,21 @@ import {
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm, type FieldValues } from 'react-hook-form';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
 import { SchemaFields, SchemaForm, type FieldProps } from './schema-form.tsx';
 
 // Gerador de formulários (#42): campos por tipo, listas, registro, erros e teclado.
+
+// A mensagem de erro do FormItem (#245) anima com o motion, que o happy-dom cancela no `cleanup`.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 
 afterEach(cleanup);
 
@@ -423,6 +432,55 @@ describe('SchemaForm: foco, dica do boolean e só leitura', () => {
     const preset = screen.getByLabelText('Preset');
     await waitFor(() => expect(document.activeElement).toBe(preset));
     expect(preset.getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('a mensagem de erro do FormItem chega ao campo registrado, junto da dica', async () => {
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ siteId: 'a', preset: 'padrao', indexavel: false }}
+        labels={{ preset: 'Preset' }}
+        hints={{ preset: 'Vem da release.' }}
+        fields={{ preset: Choice }}
+        submitLabel="Salvar"
+        onSubmit={() => [{ path: ['preset'], message: 'Preset não suportado' }]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    const preset = screen.getByLabelText('Preset');
+    await waitFor(() => expect(preset.getAttribute('aria-invalid')).toBe('true'));
+    const described = (preset.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toEqual(['Vem da release.', 'Preset não suportado']);
+  });
+
+  it('erro no boolean: a caixa fica inválida, com a mensagem ligada', async () => {
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ siteId: 'a', preset: 'padrao', indexavel: false }}
+        labels={{ indexavel: 'Indexável' }}
+        fields={{ preset: Choice }}
+        submitLabel="Salvar"
+        onSubmit={() => [{ path: ['indexavel'], message: 'Exige o G1 registrado' }]}
+      />,
+    );
+
+    const indexavel = screen.getByRole('checkbox', { name: 'Indexável' });
+    await user.click(indexavel);
+    expect(indexavel).toHaveProperty('checked', true);
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(indexavel.getAttribute('aria-invalid')).toBe('true'));
+    expect(document.activeElement).toBe(indexavel);
+    expect(
+      document.getElementById(indexavel.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe('Exige o G1 registrado');
   });
 
   it('a dica do boolean fica ligada por aria-describedby; só leitura vira readonly', () => {
