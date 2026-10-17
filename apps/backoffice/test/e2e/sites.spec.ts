@@ -185,8 +185,31 @@ test('preset fora dos recursos é recusado com a mensagem do domínio', async ({
   await expect(
     page.getByRole('alert').filter({ hasText: 'Não foi possível salvar' }),
   ).toBeVisible();
+  // A mensagem do FormItem (#245) entra com transição de opacidade, que mistura a cor do texto
+  // com o fundo; o axe roda depois dela.
+  await expect(page.locator('.form-explain')).toHaveCSS('opacity', '1');
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 });
+
+// Formulário no visual do Ecme (#245): cadastro e configuração sem violação do axe nos dois
+// temas, com as seções em Card e os campos do FormItem.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`cadastro e configuração sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'operacao@orakel.local');
+
+    for (const [path, heading] of [
+      ['/sites/novo', 'Cadastrar site'],
+      ['/sites/exemplo-a/configuracao', 'Identidade'],
+    ] as const) {
+      await page.goto(path);
+      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+      expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations, path).toEqual(
+        [],
+      );
+    }
+  });
+}
 
 test('editor não cadastra nem edita a configuração', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
