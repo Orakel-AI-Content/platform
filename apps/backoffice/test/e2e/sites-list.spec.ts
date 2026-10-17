@@ -254,9 +254,10 @@ test('acionar um item do menu Mais ações fecha a lista e navega, pelo teclado 
   const button = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
   const menu = page.getByRole('menu');
 
-  // Teclado: Enter no item focado.
+  // Teclado: Enter no item focado. O foco entra no menu depois que ele abre.
   await button.focus();
   await page.keyboard.press('Enter');
+  await expect(menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' })).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(menu.getByRole('menuitem', { name: 'Mídia exemplo-a' })).toBeFocused();
   await page.keyboard.press('Enter');
