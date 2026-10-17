@@ -1,4 +1,6 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/Form/context.ts
+// Adaptado (#207): o contexto do FormItem leva também `controlId` (o id do campo, para o
+// rótulo) e `errorId` (o id da mensagem de erro, para o `aria-describedby`), que o Input lê.
 'use client';
 
 import { createContext, useContext } from 'react';
@@ -22,6 +24,8 @@ export function useForm() {
 
 export type FormItemContextProps = {
   invalid?: boolean;
+  controlId?: string;
+  errorId?: string;
 };
 
 const FormItemContext = createContext<FormItemContextProps | null>(null);
