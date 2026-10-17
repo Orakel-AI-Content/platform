@@ -93,8 +93,10 @@ text-muted-foreground` (ex.: nome com `id · domínio` embaixo); texto longo é 
   por filtro com "Todos", e "Limpar filtros" só com algo ativo); `SortableHead` no lugar do
   `TableHead` de coluna ordenável (`aria-sort` no `th` e o sentido no nome do botão); e
   `ListPagination` abaixo, com a contagem em `role="status"` ("N resultados") e
-  Anterior/Próxima desabilitados nas pontas. Página de 25 itens fixos (`PAGE_SIZE`), sem
-  seletor.
+  Anterior/Próxima desabilitados nas pontas. Nas listas atuais, a página tem 25 itens fixos
+  (`PAGE_SIZE`), sem seletor. O DataTable do Ecme (`src/components/shared/DataTable.tsx`,
+  #215) traz o seletor de tamanho: a lista que declara `pageSizes` na `ListConfig` grava o
+  tamanho em `por-pagina` (padrão 25, fora da URL), e mudar o tamanho volta à página 1.
 - **Datas:** `formatDateTime(data, fuso)` de `src/components/site-labels.ts`, sempre com o fuso
   do site (`SiteSummary.timeZone`, da configuração corrente), nunca o do navegador nem um fixo:
   "01/10/2026, 09:00 BRT" (dia, mês, ano, hora e minuto, com a sigla ou o deslocamento, como
