@@ -1,4 +1,7 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/Dropdown/context/menuContext.ts
+// Adaptado (#241): fora de um menu, o `getItemProps` padrão devolve as props que recebe; no Ecme
+// devolvia `{}`, e o gatilho de topo perdia as do `Dropdown` (ex.: o `aria-describedby` de uma
+// `Tooltip` em volta dele).
 'use client';
 
 import { createContext } from 'react';
@@ -13,7 +16,7 @@ export type MenuContextProps = {
 };
 
 const MenuContext = createContext<MenuContextProps>({
-  getItemProps: () => ({}),
+  getItemProps: (userProps) => ({ ...userProps }),
   activeIndex: null,
   setActiveIndex: () => {},
   setHasFocusInside: () => {},
