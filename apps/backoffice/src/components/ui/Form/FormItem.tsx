@@ -7,8 +7,8 @@
 // - a mensagem entra e sai sem transição com movimento reduzido: ela anima `opacity` e
 //   margens, que o `MotionConfig reducedMotion="user"` do layout não para (ele só para
 //   transform e layout);
-// - o asterisco usa `text-error` (o Ecme usava `text-red-500`, fora do `@theme`) e fica oculto
-//   do leitor de tela, que já anuncia o `required` do campo.
+// - o asterisco usa `text-error` (o Ecme usava o vermelho padrão do Tailwind, fora do
+//   `@theme`) e fica oculto do leitor de tela, que já anuncia o `required` do campo.
 'use client';
 
 import classNames from '../utils/classNames';
