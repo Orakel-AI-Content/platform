@@ -9,7 +9,9 @@
 // - o `isNil` do `es-toolkit/compat` virou `== null`; `submenu` sem `any`;
 // - item que é um link (`asElement="a"` com `href`, #239): Enter e Espaço repassam ao clique
 //   nativo (`click()`), que navega e passa pelo mesmo `onClick`; o `preventDefault` sozinho
-//   impedia a navegação pelo teclado.
+//   impedia a navegação pelo teclado;
+// - item de escolha única (#240): `role="menuitemradio"` com `aria-checked`, para o item atual
+//   ser anunciado como marcado (o `active` do Ecme só muda a cor).
 'use client';
 
 import { useContext, useCallback, isValidElement, cloneElement } from 'react';
@@ -41,6 +43,10 @@ export interface DropdownItemProps extends CommonProps {
   eventKey?: string;
   /** Com `asElement="a"`: o item é um link de verdade (ex.: "Sair", para a rota do Access). */
   href?: string;
+  /** `menuitemradio` para um grupo de escolha única (ex.: tema); o padrão é `menuitem`. */
+  role?: 'menuitem' | 'menuitemradio';
+  /** Com `role="menuitemradio"`: se o item é a escolha atual. */
+  'aria-checked'?: boolean;
   onSelect?: (eventKey: string, e: SyntheticEvent) => void;
   onFocus?: (e: SyntheticEvent) => void;
   onClick?: (e: SyntheticEvent) => void;
@@ -63,6 +69,7 @@ const DropdownItem = (props: DropdownItemProps) => {
     onClick,
     onFocus,
     ref = null,
+    role = 'menuitem',
     variant = DEFAULT,
     ...rest
   } = props;
@@ -127,7 +134,7 @@ const DropdownItem = (props: DropdownItemProps) => {
   };
 
   const navigationProps = {
-    role: 'menuitem',
+    role,
     tabIndex: menu.activeIndex === item.index ? 0 : -1,
     'aria-disabled': disabled || undefined,
   };

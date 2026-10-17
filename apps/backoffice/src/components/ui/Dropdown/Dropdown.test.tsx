@@ -164,6 +164,38 @@ describe('Dropdown', () => {
     );
   });
 
+  it('menuitemradio: o item atual é anunciado como marcado e segue nas setas', async () => {
+    const user = userEvent.setup();
+    render(
+      <Dropdown title="Ordem" activeKey="data">
+        {['titulo', 'data'].map((key) => (
+          <Dropdown.Item
+            key={key}
+            eventKey={key}
+            role="menuitemradio"
+            aria-checked={key === 'data'}
+          >
+            {key === 'data' ? 'Data' : 'Título'}
+          </Dropdown.Item>
+        ))}
+      </Dropdown>,
+    );
+    screen.getByRole('button', { name: 'Ordem' }).focus();
+    await user.keyboard('{Enter}');
+
+    const data = await screen.findByRole('menuitemradio', { name: 'Data' });
+    const titulo = screen.getByRole('menuitemradio', { name: 'Título' });
+    expect(data.getAttribute('aria-checked')).toBe('true');
+    expect(titulo.getAttribute('aria-checked')).toBe('false');
+    expect(screen.queryByRole('menuitem')).toBeNull();
+
+    // As setas percorrem os itens, como os menuitem.
+    await user.keyboard('{ArrowDown}');
+    await waitFor(() => expect(document.activeElement).toBe(data));
+    await user.keyboard('{ArrowUp}');
+    await waitFor(() => expect(document.activeElement).toBe(titulo));
+  });
+
   it('submenu: o item que o abre é menuitem com aria-haspopup', async () => {
     render(
       <Dropdown title="Exportar">
