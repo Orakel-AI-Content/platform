@@ -1,0 +1,48 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_menu-item.css
+   Adaptado (#210):
+   - só as classes do item (`menu-item-*`); as do `menu-collapse-*` são do Menu da barra
+     lateral, que não entra aqui;
+   - sem o `a { outline-0 }` dentro do item, que apagava o contorno de 2px do teclado num link. */
+@layer components {
+  .menu-item {
+    @apply cursor-pointer font-semibold px-3 rounded-lg flex items-center w-full whitespace-nowrap gap-x-2 transition-colors duration-150 text-gray-600 dark:text-gray-400;
+
+    &.menu-item-hoverable {
+      @apply hover:text-gray-900 hover:bg-gray-100 dark:hover:text-gray-100 dark:hover:bg-gray-700;
+    }
+
+    &.menu-item-active {
+      @apply text-primary hover:text-primary;
+    }
+  }
+
+  .menu-item-divider {
+    @apply border-b border-gray-200 dark:border-gray-700 my-2;
+  }
+
+  .menu-item-disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  .menu-item-link {
+    @apply flex w-full h-full items-center;
+  }
+
+  .contrast-dark {
+    .menu-item {
+      @apply text-gray-400;
+
+      &.menu-item-hoverable {
+        @apply hover:text-gray-100 hover:bg-gray-700;
+      }
+
+      &.menu-item-active {
+        @apply text-primary hover:text-primary;
+      }
+    }
+
+    .menu-item-divider {
+      @apply border-gray-700;
+    }
+  }
+}
