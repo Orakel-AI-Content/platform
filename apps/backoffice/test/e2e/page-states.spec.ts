@@ -102,5 +102,6 @@ test('a navegação mostra o carregamento, anunciado, em até 100 ms', async ({ 
   });
   expect(elapsed).toBeLessThan(100);
 
-  await expect(page.getByRole('heading', { name: /exemplo-a/ })).toBeVisible();
+  // O h1 da tela do site é o nome dele (trilha única, #178).
+  await expect(page.getByRole('heading', { level: 1, name: 'Exemplo A — Guias' })).toBeVisible();
 });
