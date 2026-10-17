@@ -639,6 +639,68 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 4.5,
     ecme: 'text-neutral',
   },
+  // Pagination (#214): página, página no hover, página atual e total. A página e o total no
+  // claro são medidos sobre o body, o fundo mais escuro em que aparecem; no escuro, sobre o
+  // cartão.
+  {
+    name: 'página da paginação',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+    ecme: 'text-gray-500',
+  },
+  {
+    name: 'página da paginação no hover',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'hover:bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'página atual da paginação',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'total da paginação',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+    ecme: 'text-gray-500',
+  },
+  {
+    name: 'página da paginação',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'página da paginação no hover',
+    theme: 'escuro',
+    text: 'dark:hover:text-gray-100',
+    background: 'dark:hover:bg-gray-600',
+    minimum: 4.5,
+  },
+  {
+    name: 'página atual da paginação',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-primary',
+    minimum: 4.5,
+    ecme: 'text-neutral',
+  },
+  {
+    name: 'total da paginação',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
