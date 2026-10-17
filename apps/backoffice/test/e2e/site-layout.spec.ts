@@ -420,3 +420,124 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(accessibility.violations).toEqual([]);
   });
 }
+
+// Navegação do celular (#242): abaixo de `lg`, a barra fixa some e o botão do header abre o
+// Drawer "Navegação" com o mesmo conteúdo da barra expandida; Esc, uma área ou a troca de site
+// fecham, e o foco volta ao botão. A 1280px, o botão não aparece.
+
+const mobileToggle = (page: Page) => page.getByRole('button', { name: 'Menu de navegação' });
+const drawer = (page: Page) => page.getByRole('dialog', { name: 'Navegação' });
+// O elemento do react-modal não tem caixa própria no Drawer (o conteúdo é absoluto dentro do
+// overlay): a visibilidade é a do título, como em components.spec.ts.
+const drawerTitle = (page: Page) => drawer(page).getByRole('heading', { name: 'Navegação' });
+
+test.describe('a 375px', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test('sem a barra fixa; o botão abre o Drawer com o seletor e as áreas, sem rolagem horizontal', async ({
+    page,
+  }) => {
+    await loginAs(page, OPERATOR);
+    await page.goto(`/sites/${SITE}/autores`);
+
+    await expect(page.locator('#barra-lateral')).toBeHidden();
+    await expect(sideNavToggle(page)).toBeHidden();
+    const viewport = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+
+    await expect(mobileToggle(page)).toHaveAttribute('aria-expanded', 'false');
+    await mobileToggle(page).click();
+    await expect(drawerTitle(page)).toBeVisible();
+    await expect(
+      drawer(page).getByRole('button', { name: `${SITE_NAME}, trocar de site` }),
+    ).toBeVisible();
+    const areas = drawer(page).getByRole('navigation', { name: 'Áreas do site' });
+    await expect(areas.getByRole('link')).toHaveText(AREAS);
+    await expect(areas.locator('[aria-current="page"]')).toHaveText('Autores');
+  });
+
+  test('o foco fica preso no Drawer; Esc fecha e devolve o foco ao botão', async ({ page }) => {
+    await loginAs(page, OPERATOR);
+    await page.goto(`/sites/${SITE}`);
+    await page.waitForLoadState('networkidle');
+
+    await mobileToggle(page).focus();
+    await page.keyboard.press('Enter');
+    await expect(drawerTitle(page)).toBeVisible();
+    // Aberto, o resto da página (o botão também) fica com aria-hidden e inert.
+    await expect(
+      page.getByRole('button', { name: 'Menu de navegação', includeHidden: true }),
+    ).toHaveAttribute('aria-expanded', 'true');
+    // Uma volta inteira de Tab: o foco nunca sai do Drawer.
+    const stops = await drawer(page).locator('a, button').count();
+    for (let step = 0; step <= stops; step += 1) {
+      await page.keyboard.press('Tab');
+      expect(
+        await drawer(page).evaluate((element) => element.contains(document.activeElement)),
+      ).toBe(true);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(drawer(page)).toHaveCount(0);
+    await expect(mobileToggle(page)).toBeFocused();
+    await expect(mobileToggle(page)).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('clicar numa área navega e fecha o Drawer', async ({ page }) => {
+    await loginAs(page, OPERATOR);
+    await page.goto(`/sites/${SITE}`);
+
+    await mobileToggle(page).click();
+    await drawer(page)
+      .getByRole('navigation', { name: 'Áreas do site' })
+      .getByRole('link', { name: 'Mídia' })
+      .click();
+
+    await expect(page).toHaveURL(new RegExp(`/sites/${SITE}/midia$`));
+    await expect(drawer(page)).toHaveCount(0);
+  });
+
+  test('trocar de site pelo seletor no Drawer leva à mesma área e fecha o Drawer', async ({
+    page,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${SITE}/autores`);
+    await page.waitForLoadState('networkidle');
+
+    await mobileToggle(page).click();
+    await drawer(page)
+      .getByRole('button', { name: `${SITE_NAME}, trocar de site` })
+      .click();
+    await page.getByRole('menu').getByRole('menuitem', { name: OTHER_SITE }).click();
+
+    await expect(page).toHaveURL(/\/sites\/exemplo-b\/autores$/);
+    await expect(drawer(page)).toHaveCount(0);
+  });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`o Drawer aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await loginAs(page, 'editor@orakel.local');
+      await page.goto(`/sites/${SITE}/autores`);
+      await page.waitForLoadState('networkidle');
+      await mobileToggle(page).click();
+      await expect(drawerTitle(page)).toBeVisible();
+
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+    });
+  }
+});
+
+test('a 1280px, a barra fixa aparece e o botão do celular não', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await loginAs(page, OPERATOR);
+  await page.goto(`/sites/${SITE}`);
+
+  await expect(page.locator('#barra-lateral')).toBeVisible();
+  await expect(sideNavToggle(page)).toBeVisible();
+  await expect(mobileToggle(page)).toBeHidden();
+});
