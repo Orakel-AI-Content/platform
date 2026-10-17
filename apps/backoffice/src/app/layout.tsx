@@ -3,7 +3,9 @@ import localFont from 'next/font/local';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 
+import { ModalAppElement } from '@/components/ui/ModalAppElement';
 import { MotionProvider } from '@/components/ui/MotionProvider';
+import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 import { parseThemeMode, THEME_COOKIE, THEME_SCRIPT } from '@/configs/theme.config';
 import { cn } from '@/lib/utils';
 
@@ -39,7 +41,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         </head>
       )}
       <body className="min-h-screen antialiased">
-        <MotionProvider>{children}</MotionProvider>
+        {/* Contêiner da app (#209): `appElement` do react-modal e `inert` enquanto há diálogo
+            aberto; o portal dos diálogos fica no <body>, fora dele. */}
+        <MotionProvider>
+          <ModalAppElement />
+          <div id={APP_ELEMENT_ID}>{children}</div>
+        </MotionProvider>
       </body>
     </html>
   );
