@@ -2,7 +2,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // Cabeçalho da área autenticada (#170): "Pular para o conteúdo" como primeira parada do Tab,
-// a marca levando a /sites e "Sair" encerrando a sessão do Access, tudo só com o teclado.
+// a marca levando a /sites e "Sair", no menu de perfil (#239), encerrando a sessão do Access,
+// tudo só com o teclado.
 
 async function loginAs(page: Page, email: string): Promise<void> {
   await page.goto('/sites');
@@ -52,12 +53,22 @@ test('a marca "Orakel Backoffice" leva à lista de sites', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: 'Sites' })).toBeVisible();
 });
 
-test('"Sair" encerra a sessão do Access: o próximo acesso pede login', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
-  const logout = page.getByRole('link', { name: 'Sair' });
-  await expect(logout).toHaveAttribute('href', '/cdn-cgi/access/logout');
+const profile = (page: Page) => page.getByRole('button', { name: /^Perfil de / });
 
-  await tabTo(page, logout);
+test('"Sair", no menu de perfil, encerra a sessão do Access só com o teclado', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('banner')).toContainText('editor@orakel.local · editor');
+  await expect(page.getByRole('link', { name: 'Sair' })).toHaveCount(0);
+
+  await tabTo(page, profile(page));
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('menu');
+  await expect(menu).toContainText('editor@orakel.local');
+  const logout = menu.getByRole('menuitem', { name: 'Sair' });
+  await expect(logout).toHaveAttribute('href', '/cdn-cgi/access/logout');
+  await page.keyboard.press('ArrowDown');
+  await expect(logout).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/cdn-cgi\/access\/login/);
 
@@ -65,6 +76,43 @@ test('"Sair" encerra a sessão do Access: o próximo acesso pede login', async (
   await expect(page).toHaveURL(/\/cdn-cgi\/access\/login/);
   await expect(page.getByRole('link', { name: 'editor@orakel.local' })).toBeVisible();
 });
+
+test('o menu de perfil abre com Espaço e fecha com Esc, devolvendo o foco ao avatar', async ({
+  page,
+}) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.waitForLoadState('networkidle');
+  const button = profile(page);
+
+  await tabTo(page, button);
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('menu')).toBeVisible();
+  await expect(button).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(button).toBeFocused();
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`o menu de perfil aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.waitForLoadState('networkidle');
+    await profile(page).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    // A transição de abertura do menu (opacidade) mistura o texto com o fundo; o axe roda
+    // depois dela, como no Dropdown da vitrine (#210).
+    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+      .include('.header')
+      .include('[role="menu"]')
+      .exclude('[data-floating-ui-focus-guard]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
 
 // Moldura CollapsibleSide (#237): SideNav e Header em /sites, numa tela de site e no 404; as
 // áreas do site já no HTML do servidor; sem áreas no 404 de site nem em /sites/novo; e sem
