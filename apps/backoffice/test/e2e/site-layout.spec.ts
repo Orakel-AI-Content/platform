@@ -236,8 +236,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await loginAs(page, 'editor@orakel.local');
     await page.goto(`/sites/${SITE}/autores`);
     await page.waitForLoadState('networkidle');
-    await switcher(page).click();
-    await expect(page.getByRole('menu')).toBeVisible();
+    // Pelo teclado, como na vitrine do Dropdown: o primeiro item recebe o foco (`tabindex=0`).
+    // Com mais sites do que cabem (outros arquivos do E2E cadastram em paralelo), o <ul> rola,
+    // e o `scrollable-region-focusable` do axe pede um item focável dentro dele.
+    await switcher(page).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menu').getByRole('menuitem').first()).toBeFocused();
     // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
     // opacidade sobe; o axe roda depois dela.
     await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
