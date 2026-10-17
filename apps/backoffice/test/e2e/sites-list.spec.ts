@@ -265,27 +265,29 @@ test('acionar um item do menu Mais ações fecha a lista e devolve o foco; um li
 test('com 20 sites, a lista do seletor de site cabe na janela, rola e alcança o último site', async ({
   page,
 }) => {
-  // Seletor de site (#221): sem altura máxima, a lista passava da borda inferior e os últimos
-  // sites ficavam fora de alcance, sem rolagem (a lista é um popover na top layer).
+  // Seletor de site (#221, #241): sem altura máxima, a lista passava da borda inferior e os
+  // últimos sites ficavam fora de alcance, sem rolagem. O menu do Dropdown rola por dentro
+  // (o <ul>), e as setas levam o foco até o último.
   await page.setViewportSize({ width: 1280, height: 720 });
   await loginAsAdmin(page);
   await page.goto('/sites/exemplo-a');
   await page.waitForLoadState('networkidle');
   const button = page.getByRole('button', { name: 'Exemplo A — Guias, trocar de site' });
-  const list = page.locator(`[id="${await button.getAttribute('popovertarget')}"]`);
+  const menu = page.getByRole('menu');
 
-  await button.click();
-  await expect(list).toBeVisible();
-  const box = await list.evaluate((element) => {
-    const anchor = document.querySelector(`[popovertarget="${element.id}"]`)!;
-    const rect = element.getBoundingClientRect();
+  await button.focus();
+  await page.keyboard.press('Enter');
+  await expect(menu).toBeVisible();
+  const box = await button.evaluate((anchor) => {
+    const list = document.querySelector('[role="menu"] ul')!;
+    const rect = list.getBoundingClientRect();
     return {
-      items: element.querySelectorAll('a').length,
+      items: list.querySelectorAll('[role="menuitem"]').length,
       height: rect.height,
       bottom: rect.bottom,
       below: window.innerHeight - anchor.getBoundingClientRect().bottom,
-      scrollHeight: element.scrollHeight,
-      clientHeight: element.clientHeight,
+      scrollHeight: list.scrollHeight,
+      clientHeight: list.clientHeight,
     };
   });
   expect(box.items).toBeGreaterThanOrEqual(20);
@@ -293,10 +295,15 @@ test('com 20 sites, a lista do seletor de site cabe na janela, rola e alcança o
   expect(box.height).toBeLessThanOrEqual(box.below);
   expect(box.scrollHeight).toBeGreaterThan(box.clientHeight);
 
-  // O último site: o clique rola a lista até ele e leva à mesma área do outro site.
-  const last = list.getByRole('link').last();
+  // O último site: as setas chegam a ele (e o rolam para a vista), e o Enter leva à mesma
+  // área do outro site.
+  const last = menu.getByRole('menuitem').last();
+  await expect(menu.getByRole('menuitem').first()).toBeFocused();
+  for (let step = 1; step < box.items; step += 1) await page.keyboard.press('ArrowDown');
+  await expect(last).toBeFocused();
+  await expect(last).toBeInViewport();
   const href = await last.getAttribute('href');
   expect(href).toMatch(/^\/sites\/[\w-]+$/);
-  await last.click();
+  await page.keyboard.press('Enter');
   await expect(page).toHaveURL(new RegExp(`${href}$`));
 });
