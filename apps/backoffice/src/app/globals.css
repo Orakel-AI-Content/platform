@@ -13,6 +13,7 @@
 @import './styles/drawer.css';
 @import './styles/dropdown.css';
 @import './styles/form.css';
+@import './styles/header.css';
 @import './styles/input-group.css';
 @import './styles/input.css';
 @import './styles/menu-item.css';
@@ -20,6 +21,7 @@
 @import './styles/notification.css';
 @import './styles/pagination.css';
 @import './styles/select.css';
+@import './styles/side-nav.css';
 @import './styles/skeleton.css';
 @import './styles/table.css';
 @import './styles/tabs.css';

@@ -1,0 +1,25 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/template/_side-nav.css
+   Adaptado (#237): `theme('spacing.16')` vira `--spacing(16)` (Tailwind 4) e a borda fica só à
+   direita (sem `ltr:`/`rtl:`: o Backoffice é só pt-BR). */
+@layer components {
+  .side-nav {
+    @apply flex-col flex-auto flex-shrink-0 z-20 transition-all ease-in-out duration-200 print:hidden sticky top-0 h-screen;
+  }
+
+  .side-nav-content {
+    height: calc(100vh - --spacing(16));
+    @apply overflow-y-auto;
+  }
+
+  .side-nav-light {
+    @apply bg-white border-r border-gray-200;
+  }
+
+  .side-nav-dark {
+    @apply bg-gray-800 border-r border-gray-600;
+  }
+
+  .side-nav-bg {
+    @apply border-r bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700;
+  }
+}
