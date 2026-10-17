@@ -138,3 +138,45 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
     else expect(offset).toBeLessThan(0);
   });
 }
+
+test('Loading anuncia o carregamento e o Skeleton fica fora da árvore acessível', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  const loading = section(page, 'Carregamento');
+
+  // Default e cover: os dois anunciam "Carregando…" em role="status".
+  await expect(loading.getByRole('status')).toHaveText(['Carregando…', 'Carregando…']);
+  await expect(loading.locator('[aria-busy="true"]')).toContainText(
+    'Lista por baixo da sobreposição.',
+  );
+
+  const skeletons = page.locator('[data-vitrine-skeletons] .skeleton');
+  expect(await skeletons.count()).toBeGreaterThanOrEqual(6);
+  for (const skeleton of await skeletons.all()) {
+    await expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+  }
+  const tree = await page.locator('[data-vitrine-skeletons]').ariaSnapshot();
+  expect(tree.trim()).toBe('');
+});
+
+test('StickyFooter fica visível ao rolar a vitrine', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const save = section(page, 'Rodapé fixo').getByRole('button', { name: 'Salvar' });
+
+  // No meio da área longa, o fim da seção está abaixo da janela: o rodapé gruda embaixo.
+  await page.locator('[data-vitrine-rolagem]').evaluate((element) => {
+    element.scrollIntoView({ block: 'center' });
+  });
+  await expect(save).toBeInViewport();
+  const viewport = page.viewportSize()!;
+  const box = await save.boundingBox();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+  // A página continua onde a pessoa deixou: o rodapé não a rola sozinho até o fim.
+  const scrolled = await page.evaluate(() => window.scrollY);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+});
