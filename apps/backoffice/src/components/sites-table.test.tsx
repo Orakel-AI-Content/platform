@@ -33,22 +33,35 @@ const site: SiteSummary = {
   timeZone: 'America/Sao_Paulo',
 };
 
-describe('tabela de sites', () => {
-  it('tem o link para os conteúdos de cada site, mesmo sem outras ações', () => {
-    render(<SitesTable rows={[site]} />);
+/** Abre o "Mais ações" (Dropdown do Ecme): os itens só existem com a lista aberta. */
+async function openMenu(siteId: string) {
+  await userEvent.click(screen.getByRole('button', { name: `Mais ações: ${siteId}` }));
+  await screen.findByRole('menu');
+}
 
-    const link = screen.getByRole('link', { name: 'Conteúdos exemplo-a' });
+/** Cor do ponto da Tag do Ecme com o texto dado. */
+function tagColor(element: HTMLElement): string | undefined {
+  return element.closest('.tag')?.querySelector('.tag-prefix')?.className;
+}
+
+describe('tabela de sites', () => {
+  it('tem o link para os conteúdos de cada site, mesmo sem outras ações', async () => {
+    render(<SitesTable rows={[site]} />);
+    await openMenu('exemplo-a');
+
+    const link = screen.getByRole('menuitem', { name: 'Conteúdos exemplo-a' });
     expect(link.getAttribute('href')).toBe('/sites/exemplo-a/conteudos');
   });
 
-  it('tem o link para a biblioteca de mídia de cada site (#52)', () => {
+  it('tem o link para a biblioteca de mídia de cada site (#52)', async () => {
     render(<SitesTable rows={[site]} />);
+    await openMenu('exemplo-a');
 
-    const link = screen.getByRole('link', { name: 'Mídia exemplo-a' });
+    const link = screen.getByRole('menuitem', { name: 'Mídia exemplo-a' });
     expect(link.getAttribute('href')).toBe('/sites/exemplo-a/midia');
   });
 
-  it('dá a cada estado de site o badge da sua variante, com o texto do estado (#86)', () => {
+  it('dá a cada estado de site a tag da sua cor, com o texto do estado (#86)', () => {
     render(
       <SitesTable
         rows={[
@@ -59,14 +72,14 @@ describe('tabela de sites', () => {
       />,
     );
 
-    expect(screen.getByText('Ativo').className).toContain('text-success');
-    expect(screen.getByText('Promovendo').className).toContain('text-info');
-    expect(screen.getByText('Pausado').className).toContain('text-warning');
-    // O motivo fica sob o badge, cortado se for longo, com o texto inteiro em `title` (#100).
+    expect(tagColor(screen.getByText('Ativo'))).toContain('bg-success');
+    expect(tagColor(screen.getByText('Promovendo'))).toContain('bg-info');
+    expect(tagColor(screen.getByText('Pausado'))).toContain('bg-warning');
+    // O motivo fica sob a tag, cortado se for longo, com o texto inteiro em `title` (#100).
     expect(screen.getByText('cota').getAttribute('title')).toBe('cota');
   });
 
-  it('dá a cada resultado de build o badge da sua variante (#86)', () => {
+  it('dá a cada resultado de build a tag da sua cor (#86)', () => {
     const finishedAt = new Date('2026-10-01T12:00:00Z');
     render(
       <SitesTable
@@ -81,12 +94,12 @@ describe('tabela de sites', () => {
       />,
     );
 
-    // A etapa do ciclo de vida também se chama "Publicado"; o badge é o do último build.
+    // A etapa do ciclo de vida também se chama "Publicado"; a tag é a do último build.
     const [build] = screen
       .getAllByText('Publicado')
-      .filter((element) => element.className.includes('text-success'));
+      .filter((element) => tagColor(element)?.includes('bg-success'));
     expect(build).toBeTruthy();
-    expect(screen.getByText('Falhou').className).toContain('bg-destructive');
+    expect(tagColor(screen.getByText('Falhou'))).toContain('bg-error');
   });
 
   it('não mostra "SITE_ID" em nenhum cabeçalho; o ID fica sob o nome (#100)', () => {
@@ -120,21 +133,23 @@ describe('tabela de sites', () => {
 
     const link = screen.getByRole('link', { name: '3 mudanças pendentes em exemplo-a' });
     expect(link.getAttribute('href')).toBe('/sites/exemplo-a/pendencias');
-    expect(link.firstElementChild?.className).toContain('text-warning');
+    expect(link.querySelector('.tag-prefix')?.className).toContain('bg-warning');
     expect(screen.queryByRole('link', { name: /pendentes em exemplo-b/ })).toBeNull();
   });
 
-  it('põe Conteúdos, Mídia e, com site.configure, Editar configuração no menu Mais ações', () => {
-    const { rerender } = render(<SitesTable rows={[site]} />);
-    const menu = () => {
-      const button = screen.getByRole('button', { name: 'Mais ações: exemplo-a' });
-      const list = document.getElementById(button.getAttribute('popovertarget') ?? '');
-      return [...(list?.querySelectorAll('a') ?? [])].map((link) => link.textContent);
+  it('põe Conteúdos, Mídia e, com site.configure, Editar configuração no menu Mais ações', async () => {
+    const menu = async () => {
+      await openMenu('exemplo-a');
+      const items = screen.getAllByRole('menuitem').map((item) => item.textContent);
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+      return items;
     };
-    expect(menu()).toEqual(['Conteúdos exemplo-a', 'Mídia exemplo-a']);
+    const { rerender } = render(<SitesTable rows={[site]} />);
+    expect(await menu()).toEqual(['Conteúdos exemplo-a', 'Mídia exemplo-a']);
 
     rerender(<SitesTable rows={[site]} canConfigure />);
-    expect(menu()).toEqual([
+    expect(await menu()).toEqual([
       'Conteúdos exemplo-a',
       'Mídia exemplo-a',
       'Editar configuração exemplo-a',

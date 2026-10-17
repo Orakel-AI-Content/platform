@@ -9,11 +9,9 @@ import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
 
-// Lista de sites legível de relance (#100): com 20 sites numa janela de 1440 px, a página
-// não rola na horizontal e nenhuma linha passa de duas linhas de texto. Com a barra lateral do
-// Ecme (290 px, #237), a tabela de hoje não cabe mais a 1280 px; a decisão do escalonamento da
-// #237 foi medir a 1440 px e aceitar que a tabela role dentro do próprio contêiner
-// (`overflow-x-auto` da Table), até a Story da tela de Sites refazer a tabela. Os 18 sites além dos
+// Lista de sites legível de relance (#100): com 20 sites numa janela de 1280 px, ao lado da
+// barra lateral do Ecme (290 px, #237), nem a página nem a tabela rolam na horizontal e nenhuma
+// célula passa de duas linhas de texto (Table do Ecme, #248). Os 18 sites além dos
 // do seed são gravados pelo domínio (cadastrar 18 pela tela só tornaria o teste lento) e
 // removidos no fim. O pior caso de largura fica na própria rodada, sem depender do banco
 // (#153): um site pausado por falha permanente, com motivo longo, e um com último build
@@ -106,7 +104,7 @@ test.afterAll(async () => {
   await removeSites(created);
 });
 
-test.use({ viewport: { width: 1440, height: 800 } });
+test.use({ viewport: { width: 1280, height: 800 } });
 
 async function loginAsAdmin(page: Page): Promise<void> {
   await page.goto('/sites');
@@ -116,7 +114,7 @@ async function loginAsAdmin(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
 }
 
-test('com 20 sites em 1440 px, a página sem rolagem horizontal e linhas de até duas linhas', async ({
+test('com 20 sites em 1280 px, página e tabela sem rolagem horizontal e linhas de até duas linhas', async ({
   page,
 }) => {
   await loginAsAdmin(page);
@@ -124,15 +122,17 @@ test('com 20 sites em 1440 px, a página sem rolagem horizontal e linhas de até
   const rows = table.locator('tbody tr');
   expect(await rows.count()).toBeGreaterThanOrEqual(20);
 
-  // A página não rola na horizontal; a tabela pode rolar dentro do contêiner dela (#237).
+  // Nem a página nem o contêiner da tabela (`overflow-x-auto` da Table) rolam na horizontal.
   const viewport = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,
   }));
   expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
-  expect(
-    await table.evaluate((element) => getComputedStyle(element.parentElement!).overflowX),
-  ).toBe('auto');
+  const container = await table.evaluate((element) => ({
+    scrollWidth: element.parentElement!.scrollWidth,
+    clientWidth: element.parentElement!.clientWidth,
+  }));
+  expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth);
 
   // Linhas de texto por célula, não altura em px (#117): um badge ou botão 1 px maior não
   // muda a contagem. Só nós de texto visíveis (a Range da célula inteira traria as caixas dos
@@ -207,73 +207,70 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// "Mais ações" no Dropdown do Ecme (#248): `menu` com `menuitem`, aberto pelo mouse ou pelo
+// teclado; ao abrir, o foco vai ao primeiro item e as setas o levam aos outros.
 test('o menu Mais ações abre e fecha pelo mouse e pelo teclado; Esc devolve o foco', async ({
   page,
 }) => {
   await loginAsAdmin(page);
   const button = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
-  const item = page.getByRole('link', { name: 'Editar configuração exemplo-a' });
+  const menu = page.getByRole('menu');
+  const first = menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' });
+  const item = menu.getByRole('menuitem', { name: 'Editar configuração exemplo-a' });
 
   // Mouse: abre no clique e fecha no clique fora.
   await button.click();
   await expect(item).toBeVisible();
   await page.getByRole('heading', { name: 'Sites' }).click();
-  await expect(item).toBeHidden();
+  await expect(menu).toHaveCount(0);
 
-  // Teclado: Enter abre, Espaço fecha e abre de novo.
+  // Teclado: Enter abre com o foco no primeiro item; as setas percorrem; Esc fecha e devolve o
+  // foco ao botão.
   await button.focus();
   await page.keyboard.press('Enter');
-  await expect(item).toBeVisible();
-  await page.keyboard.press('Space');
-  await expect(item).toBeHidden();
-  await page.keyboard.press('Space');
-  await expect(item).toBeVisible();
-
-  // Esc fecha com o foco dentro da lista e o devolve ao botão.
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Conteúdos exemplo-a' })).toBeFocused();
+  await expect(first).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Mídia exemplo-a' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(item).toBeFocused();
   await page.keyboard.press('Escape');
-  await expect(item).toBeHidden();
+  await expect(menu).toHaveCount(0);
   await expect(button).toBeFocused();
+
+  // Espaço e seta para baixo no botão também abrem.
+  for (const key of ['Space', 'ArrowDown']) {
+    await page.keyboard.press(key);
+    await expect(first).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(button).toBeFocused();
+  }
 });
 
-test('acionar um item do menu Mais ações fecha a lista e devolve o foco; um link navega', async ({
+test('acionar um item do menu Mais ações fecha a lista e navega, pelo teclado e pelo mouse', async ({
   page,
 }) => {
   await loginAsAdmin(page);
   const button = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
-  const list = page.locator(`[id="${await button.getAttribute('popovertarget')}"]`);
+  const menu = page.getByRole('menu');
 
-  // Nenhuma tela tem item botão ainda (#115): o teste põe um na lista. O clique sobe até o
-  // contêiner, onde o React trata o evento, como num item vindo de `children`.
-  await list.evaluate((element) => {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.textContent = 'Ação de teste';
-    element.append(item);
-  });
-  const item = list.getByRole('button', { name: 'Ação de teste' });
+  // Teclado: Enter no item focado. O foco entra no menu depois que ele abre.
+  await button.focus();
+  await page.keyboard.press('Enter');
+  await expect(menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Mídia exemplo-a' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/sites\/exemplo-a\/midia$/);
+  await expect(menu).toHaveCount(0);
 
   // Mouse.
+  await page.goBack();
+  await page.waitForLoadState('networkidle');
   await button.click();
-  await item.click();
-  await expect(item).toBeHidden();
-  await expect(button).toBeFocused();
-
-  // Teclado: Enter e Espaço no item.
-  for (const key of ['Enter', 'Space']) {
-    await page.keyboard.press('Enter');
-    await expect(item).toBeVisible();
-    await item.focus();
-    await page.keyboard.press(key);
-    await expect(item).toBeHidden();
-    await expect(button).toBeFocused();
-  }
-
-  // Um item link continua navegando.
-  await button.click();
-  await page.getByRole('link', { name: 'Conteúdos exemplo-a' }).click();
+  await menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos$/);
+  await expect(menu).toHaveCount(0);
 });
 
 test('com 20 sites, a lista do seletor de site cabe na janela, rola e alcança o último site', async ({

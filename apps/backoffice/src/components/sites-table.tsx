@@ -11,37 +11,33 @@ import {
   PendingCount,
   PublishNowButton,
   PublishStatusRegion,
+  StateTag,
   type PublishNow,
   type PublishStatus,
 } from '@/components/site-status';
 import { EmptyState } from '@/components/empty-state';
-import { ActionsMenu } from '@/components/legacy-ui/actions-menu';
-import { Badge } from '@/components/legacy-ui/badge';
-import { buttonVariants } from '@/components/legacy-ui/button';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/legacy-ui/table';
+import Dropdown from '@/components/ui/Dropdown';
+import Table from '@/components/ui/Table';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
-import { cn } from '@/lib/utils';
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, SiteSummary>();
+const { THead, TBody, Tr, Th, Td } = Table;
+
+/**
+ * Gatilho do "Mais ações" com a aparência do `Button` default `xs` do Ecme (`Button.tsx`): o
+ * Dropdown desenha o próprio <button>, que não é o do Button.
+ */
+const ACTIONS_TOGGLE_CLASS =
+  'button h-8 rounded-lg px-3 py-1 text-xs bg-white border border-gray-300 text-gray-600 dark:bg-gray-700 dark:border-gray-700 dark:text-gray-100 ring-primary dark:ring-white hover:border-primary dark:hover:border-white hover:ring-1 hover:text-primary dark:hover:text-white dark:hover:bg-transparent';
 
 /** Duas linhas numa célula: a principal e a secundária, menor; nenhuma quebra além delas. */
 function TwoLines({ children, secondary }: { children: ReactNode; secondary?: ReactNode }) {
   return (
     <span className="flex flex-col items-start gap-0.5">
       <span>{children}</span>
-      {secondary !== undefined && (
-        <span className="text-xs text-muted-foreground">{secondary}</span>
-      )}
+      {secondary !== undefined && <span className="text-xs">{secondary}</span>}
     </span>
   );
 }
@@ -61,7 +57,7 @@ function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; t
     <LastBuildSummary
       build={build}
       timeZone={timeZone}
-      details={(text) => <Truncated text={text} className="max-w-40" />}
+      details={(text) => <Truncated text={text} className="max-w-32" />}
     />
   );
 }
@@ -73,12 +69,12 @@ const columns = column.columns([
       const site = info.row.original;
       return (
         <TwoLines
-          secondary={<Truncated text={`${site.id} · ${site.domain}`} className="max-w-48" />}
+          secondary={<Truncated text={`${site.id} · ${site.domain}`} className="max-w-40" />}
         >
           <Link
             href={`/sites/${site.id}`}
             title={site.name}
-            className="block max-w-48 truncate font-medium underline underline-offset-4"
+            className="block max-w-40 truncate font-semibold text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
           >
             {site.name}
           </Link>
@@ -103,8 +99,8 @@ const columns = column.columns([
       const site = info.row.original;
       const reason = site.state === 'pausado' ? site.pausedReason : null;
       return (
-        <TwoLines secondary={reason ? <Truncated text={reason} className="max-w-32" /> : undefined}>
-          <Badge variant={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</Badge>
+        <TwoLines secondary={reason ? <Truncated text={reason} className="max-w-28" /> : undefined}>
+          <StateTag color={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</StateTag>
         </TwoLines>
       );
     },
@@ -123,7 +119,7 @@ const columns = column.columns([
   }),
 ]);
 
-/** Registro de instâncias em tabela (TanStack Table + tabela do shadcn/ui). */
+/** Registro de instâncias em tabela (TanStack Table + Table do Ecme, `compact`). */
 export function SitesTable({
   rows,
   publishNow,
@@ -157,61 +153,73 @@ export function SitesTable({
   if (rows.length === 0) {
     return <EmptyState action={emptyAction}>Nenhum site cadastrado.</EmptyState>;
   }
-  const item = cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'justify-start');
   return (
     <div className="space-y-2">
       {/* Uma região para a tabela inteira: o retorno de "Publicar agora" não cresce a linha. */}
       <PublishStatusRegion status={status} />
-      <Table>
-        <TableCaption>{rows.length === 1 ? '1 site' : `${rows.length} sites`}</TableCaption>
-        <TableHeader>
+      <Table compact>
+        <caption className="mt-4 caption-bottom text-sm">
+          {rows.length === 1 ? '1 site' : `${rows.length} sites`}
+        </caption>
+        <THead>
           {table.getHeaderGroups().map((group) => (
-            <TableRow key={group.id}>
+            <Tr key={group.id}>
               {group.headers.map((header) => (
-                <TableHead key={header.id} scope="col">
+                <Th key={header.id}>
                   <table.FlexRender header={header} />
-                </TableHead>
+                </Th>
               ))}
-              <TableHead scope="col">
+              <Th>
                 <span className="sr-only">Ações</span>
-              </TableHead>
-            </TableRow>
+              </Th>
+            </Tr>
           ))}
-        </TableHeader>
-        <TableBody>
+        </THead>
+        <TBody>
           {table.getRowModel().rows.map((row) => {
             const siteId = row.original.id;
             return (
-              <TableRow key={row.id}>
+              <Tr key={row.id}>
                 {row.getAllCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <Td key={cell.id}>
                     <table.FlexRender cell={cell} />
-                  </TableCell>
+                  </Td>
                 ))}
-                <TableCell>
-                  <span className="flex items-center gap-2">
+                <Td>
+                  {/* Um botão sob o outro: lado a lado, a coluna não cabe a 1280 px (#248). */}
+                  <span className="flex flex-col items-end gap-1">
                     {publishNow && row.original.state !== 'pausado' && (
-                      <PublishNowButton siteId={siteId} action={publishNow} onResult={setStatus} />
+                      <PublishNowButton
+                        siteId={siteId}
+                        action={publishNow}
+                        onResult={setStatus}
+                        size="xs"
+                      />
                     )}
-                    <ActionsMenu label={siteId}>
-                      <Link href={`/sites/${siteId}/conteudos`} className={item}>
+                    <Dropdown
+                      title="Mais ações"
+                      aria-label={`Mais ações: ${siteId}`}
+                      placement="bottom-end"
+                      toggleClassName={ACTIONS_TOGGLE_CLASS}
+                    >
+                      <Dropdown.Item asElement={Link} href={`/sites/${siteId}/conteudos`}>
                         Conteúdos<span className="sr-only"> {siteId}</span>
-                      </Link>
-                      <Link href={`/sites/${siteId}/midia`} className={item}>
+                      </Dropdown.Item>
+                      <Dropdown.Item asElement={Link} href={`/sites/${siteId}/midia`}>
                         Mídia<span className="sr-only"> {siteId}</span>
-                      </Link>
+                      </Dropdown.Item>
                       {canConfigure && (
-                        <Link href={`/sites/${siteId}/configuracao`} className={item}>
+                        <Dropdown.Item asElement={Link} href={`/sites/${siteId}/configuracao`}>
                           Editar configuração<span className="sr-only"> {siteId}</span>
-                        </Link>
+                        </Dropdown.Item>
                       )}
-                    </ActionsMenu>
+                    </Dropdown>
                   </span>
-                </TableCell>
-              </TableRow>
+                </Td>
+              </Tr>
             );
           })}
-        </TableBody>
+        </TBody>
       </Table>
     </div>
   );
