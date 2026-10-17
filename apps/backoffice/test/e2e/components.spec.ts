@@ -6,6 +6,16 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // reduzido, o MotionConfig do layout desliga as animações de transform do `motion`.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
+
+/**
+ * Auditoria do axe na página. Os "focus guards" do floating-ui (#210: Dropdown; também o
+ * Tooltip e o DataTable) ficam de fora: são <span tabindex="0" aria-hidden="true"> invisíveis que
+ * o FloatingPortal e o FloatingFocusManager criam para manter a ordem do Tab com o menu no fim do
+ * <body>, e que repassam o foco na hora. O axe os acusa (`aria-hidden-focus`); desligá-los faria
+ * o Tab sair da página a partir do menu (decisão no escalonamento da #210).
+ */
+const audit = (page: Page) =>
+  new AxeBuilder({ page }).withTags(WCAG).exclude('[data-floating-ui-focus-guard]').analyze();
 const SHOWCASE = '/teste-de-componentes';
 
 async function login(page: Page): Promise<void> {
@@ -46,7 +56,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await expect(page.getByRole('heading', { name: 'Teste de componentes' })).toBeVisible();
     await page.waitForLoadState('networkidle');
 
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    const accessibility = await audit(page);
     expect(accessibility.violations).toEqual([]);
 
     const buttons = section(page, 'Button').getByRole('button');
@@ -251,7 +261,7 @@ test('FormItem liga rótulo e mensagem de erro ao campo, com aria-invalid', asyn
   // Com o erro na tela, a vitrine continua sem violação do axe (depois da transição, que
   // mistura a cor com o fundo enquanto a opacidade sobe).
   await expect(form.getByText('Informe um e-mail válido')).toHaveCSS('opacity', '1');
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  const accessibility = await audit(page);
   expect(accessibility.violations).toEqual([]);
 
   await form.getByRole('button', { name: 'Limpar validação' }).click();
@@ -368,7 +378,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       locator.evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(await background(focused)).not.toBe(await background(options.first()));
 
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    const accessibility = await audit(page);
     expect(accessibility.violations).toEqual([]);
 
     await page.keyboard.press('Enter');
@@ -512,7 +522,9 @@ test('Dropdown: submenu abre com ArrowRight e fecha com ArrowLeft, devolvendo o 
   await toggle.focus();
   await page.keyboard.press('ArrowDown');
   await expect.poll(() => activeText(page)).toBe('Editar');
-  await page.keyboard.press('ArrowUp');
+  // As setas não dão a volta na lista (como no Ecme): Editar → Publicar → Exportar.
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
   await expect.poll(() => activeText(page)).toBe('Exportar');
   const exportar = page.getByRole('menuitem', { name: 'Exportar' });
   await expect(exportar).toHaveAttribute('aria-haspopup', 'menu');
@@ -545,17 +557,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Ações do artigo' }).focus();
     await page.keyboard.press('ArrowDown');
     await expect.poll(() => activeText(page)).toBe('Editar');
-    // A transição de abertura (200 ms) mistura a cor do texto com o fundo enquanto a opacidade
-    // sobe; o axe roda depois dela.
-    await expect(page.getByRole('menu')).toHaveCSS('opacity', '1');
-    let accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
+    // opacidade sobe; o axe roda depois dela.
+    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+    let accessibility = await audit(page);
     expect(accessibility.violations).toEqual([]);
 
-    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => activeText(page)).toBe('Exportar');
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('menuitem', { name: 'PDF' })).toBeFocused();
-    await expect(page.getByRole('menu').last()).toHaveCSS('opacity', '1');
-    accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    await expect(page.locator('.dropdown-menu').last()).toHaveCSS('opacity', '1');
+    accessibility = await audit(page);
     expect(accessibility.violations).toEqual([]);
   });
 }
