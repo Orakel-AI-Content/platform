@@ -4,6 +4,8 @@
 //   o id do campo (`controlId`), e a mensagem de erro ganha um id (`errorId`) que o Input soma
 //   ao `aria-describedby` enquanto o item está inválido; no Ecme só o `htmlFor` manual ligava
 //   o rótulo, e a mensagem não era ligada;
+// - a mensagem é região viva (`aria-live="polite"`), anunciada quando aparece; é o que o
+//   `aria-errormessage` do Select (#208) exige do alvo;
 // - a mensagem entra e sai sem transição com movimento reduzido: ela anima `opacity` e
 //   margens, que o `MotionConfig reducedMotion="user"` do layout não para (ele só para
 //   transform e layout);
@@ -128,6 +130,7 @@ const FormItem = (props: FormItemProps) => {
             {invalid && (
               <motion.div
                 id={errorId}
+                aria-live="polite"
                 className="form-explain"
                 initial={initialStyle}
                 animate={enterStyle}

@@ -3,6 +3,8 @@
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { HiOutlinePlus } from 'react-icons/hi';
+import AsyncSelect from 'react-select/async';
+import CreatableSelect from 'react-select/creatable';
 
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
@@ -19,6 +21,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { FormContainer, FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
+import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Tag } from '@/components/ui/Tag';
@@ -26,6 +29,27 @@ import { Tag } from '@/components/ui/Tag';
 /** Imagem do Avatar sem rede: um quadrado na cor primária. */
 const AVATAR_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' fill='%23006be3'/%3E%3C/svg%3E";
+
+type Opcao = { value: string; label: string };
+
+const CATEGORIAS: Opcao[] = [
+  { value: 'noticias', label: 'Notícias' },
+  { value: 'guias', label: 'Guias' },
+  { value: 'resenhas', label: 'Resenhas' },
+  { value: 'entrevistas', label: 'Entrevistas' },
+];
+
+const SITES: Opcao[] = [
+  { value: 'exemplo-a', label: 'Exemplo A' },
+  { value: 'exemplo-b', label: 'Exemplo B' },
+  { value: 'receitas', label: 'Receitas da casa' },
+];
+
+/** Busca do Select async sem rede: filtra a lista local. */
+function buscarSites(termo: string): Promise<Opcao[]> {
+  const normalizado = termo.toLowerCase();
+  return Promise.resolve(SITES.filter((site) => site.label.toLowerCase().includes(normalizado)));
+}
 
 /** Seções da vitrine (#205, #206): cada componente portado nas variantes que as telas vão usar. */
 export function Showcase() {

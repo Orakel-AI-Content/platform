@@ -415,6 +415,65 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 4.5,
     ecme: 'dark:text-gray-400',
   },
+  // Select (#208): opções do menu (`_select.css`, `Option.tsx`) e o valor múltiplo. A opção
+  // escolhida tem fundo `primary-subtle` (10% de primary sobre o menu); o par é contra o menu, e
+  // a substituta tem folga para o tingido (6,0:1 no claro e 5,4:1 no escuro, compostos).
+  {
+    name: 'opção do menu',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'opção em foco',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'opção escolhida',
+    theme: 'claro',
+    text: 'text-primary-deep',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'valor múltiplo',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'bg-gray-50',
+    minimum: 4.5,
+  },
+  {
+    name: 'opção do menu',
+    theme: 'escuro',
+    text: 'dark:text-gray-300',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'opção em foco',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'opção escolhida',
+    theme: 'escuro',
+    text: 'dark:text-primary-mild',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'valor múltiplo',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */

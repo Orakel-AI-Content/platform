@@ -98,6 +98,8 @@ test('a vitrine vem renderizada do servidor', async ({ page }) => {
     'Resumo',
     'https://',
     'O slug já está em uso',
+    'Destaque na capa',
+    'Escolha a categoria',
   ]) {
     expect(html).toContain(text);
   }
