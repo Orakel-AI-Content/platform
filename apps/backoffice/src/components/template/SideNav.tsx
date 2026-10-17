@@ -4,8 +4,8 @@
 //   props, e a rota sai do `usePathname()`;
 // - a marca é o texto "Orakel Backoffice" (link para `/sites`), sem o `Logo` em imagem;
 // - dois landmarks: `nav "Principal"` com os itens globais e, dentro de um site que a pessoa vê,
-//   o seletor de site e `nav "Áreas do site"` com os grupos da árvore. No 404 de site e em
-//   `/sites/novo`, o segmento não é um dos sites, e as áreas não aparecem;
+//   o seletor de site e `nav "Áreas do site"` com os grupos da árvore (`SideNavContent`, o mesmo
+//   do Drawer do celular, #242);
 // - sem `ScrollBar`: o conteúdo rola com `overflow-y-auto` nativo (`side-nav-content`);
 // - recolhida (#238), 80px: a marca vira "OB" (o nome fica em `sr-only`), os itens só com o
 //   ícone e a dica, sem o rótulo do grupo; o seletor de site (#241) vira as iniciais do site,
@@ -14,15 +14,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import classNames from '@/components/ui/utils/classNames';
-import VerticalMenuContent from '@/components/template/VerticalMenuContent';
-import { SiteSwitcher, type SwitcherSite } from '@/components/site-switcher';
-import {
-  activeNavigationKey,
-  NAV_ITEM_TYPE_TITLE,
-  type NavigationTree,
-} from '@/configs/navigation.config';
+import type { SwitcherSite } from '@/components/site-switcher';
+import type { NavigationTree } from '@/configs/navigation.config';
+import SideNavContent from './SideNavContent';
 import {
   HEADER_HEIGHT,
   LOGO_X_GUTTER,
@@ -52,12 +47,6 @@ const sideNavCollapseStyle = {
   minWidth: SIDE_NAV_COLLAPSED_WIDTH,
 };
 
-/** O site do endereço (`/sites/<site>/…`), se for um dos que a pessoa vê. */
-function currentSite(pathname: string, sites: readonly SwitcherSite[]): SwitcherSite | undefined {
-  const [, root, siteId] = pathname.split('/');
-  return root === 'sites' ? sites.find((site) => site.id === siteId) : undefined;
-}
-
 const SideNav = ({
   navigationTree,
   sites,
@@ -65,12 +54,7 @@ const SideNav = ({
   className,
   contentClass,
 }: SideNavProps) => {
-  const pathname = usePathname();
   const { collapsed } = useSideNav();
-  const site = currentSite(pathname, sites);
-  const activeKey = activeNavigationKey(pathname, navigationTree);
-  const globalItems = navigationTree.filter((nav) => nav.type !== NAV_ITEM_TYPE_TITLE);
-  const siteGroups = navigationTree.filter((nav) => nav.type === NAV_ITEM_TYPE_TITLE);
 
   return (
     <div
@@ -101,26 +85,7 @@ const SideNav = ({
         )}
       </Link>
       <div className={classNames('side-nav-content', contentClass)}>
-        <VerticalMenuContent
-          aria-label="Principal"
-          collapsed={collapsed}
-          activeKey={activeKey}
-          navigationTree={globalItems}
-        />
-        {site && (
-          <>
-            <div className={classNames('flex', collapsed ? 'justify-center' : 'px-4')}>
-              <SiteSwitcher current={site} sites={sites} collapsed={collapsed} />
-            </div>
-            <VerticalMenuContent
-              aria-label="Áreas do site"
-              collapsed={collapsed}
-              activeKey={activeKey}
-              navigationTree={siteGroups}
-              siteId={site.id}
-            />
-          </>
-        )}
+        <SideNavContent navigationTree={navigationTree} sites={sites} collapsed={collapsed} />
       </div>
     </div>
   );
