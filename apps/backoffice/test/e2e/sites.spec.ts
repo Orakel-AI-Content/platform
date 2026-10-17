@@ -125,6 +125,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   // chegam ao de editar.
   await tabTo(page, row.getByRole('button', { name: `Mais ações: ${siteId}` }));
   await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu').getByRole('menuitem').first()).toBeFocused();
   const edit = page
     .getByRole('menu')
     .getByRole('menuitem', { name: `Editar configuração ${siteId}` });
