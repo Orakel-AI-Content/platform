@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 import { THEME_COOKIE } from '../../src/configs/theme.config.ts';
@@ -5,6 +6,7 @@ import { THEME_COOKIE } from '../../src/configs/theme.config.ts';
 // Tema por classe no <html> (#203): com cookie, a classe vem no HTML do servidor; sem cookie,
 // o script do <head> aplica a preferência do sistema antes da primeira pintura. Nenhum quadro
 // sai no tema oposto, e a hidratação não reclama da classe posta pelo script.
+// A troca pelo header (#240) está no fim do arquivo.
 
 const SCHEMES = ['light', 'dark'] as const;
 type Scheme = (typeof SCHEMES)[number];
@@ -155,3 +157,123 @@ test('cookie com valor desconhecido vale como modo sistema', async ({ page, cont
   await expect(page.locator('html')).toHaveClass(/\bdark\b/);
   expect(await darkUtilityDisplay(page)).toBe('none');
 });
+
+// Troca pelo header (#240): Claro e Escuro gravam o cookie e trocam a classe na hora; Sistema
+// apaga o cookie. Ao recarregar, nenhum quadro sai no tema oposto e a hidratação não reclama.
+
+const LABEL: Record<Scheme, string> = { light: 'Claro', dark: 'Escuro' };
+
+const themeButton = (page: Page) => page.getByRole('button', { name: /^Tema: / });
+
+async function choose(page: Page, label: string): Promise<void> {
+  await themeButton(page).click();
+  await page.getByRole('menuitemradio', { name: label }).click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(themeButton(page)).toHaveAccessibleName(`Tema: ${label}`);
+}
+
+async function themeCookieValue(context: BrowserContext): Promise<string | undefined> {
+  return (await context.cookies()).find((cookie) => cookie.name === THEME_COOKIE)?.value;
+}
+
+/** Recarrega gravando os quadros: todos no tema dado, sem aviso de hidratação. */
+async function expectReloadIn(page: Page, scheme: Scheme): Promise<void> {
+  const hydration = hydrationMessages(page);
+  await recordFrames(page);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+  const recorded = await frames(page);
+  expect(recorded[0]?.theme).toBe(scheme);
+  for (const frame of recorded) {
+    expect(frame.theme).toBe(scheme);
+    if (frame.background !== null) expect(frame.background).toBe(BACKGROUND[scheme]);
+  }
+  await page.waitForLoadState('networkidle');
+  expect(hydration).toEqual([]);
+}
+
+for (const scheme of SCHEMES) {
+  const chosen = opposite(scheme);
+
+  test(`com o sistema ${scheme}, escolher ${LABEL[chosen]} no header muda na hora e persiste`, async ({
+    page,
+    context,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await login(page);
+    await page.waitForLoadState('networkidle');
+    await expect(themeButton(page)).toHaveAccessibleName('Tema: Sistema');
+
+    await choose(page, LABEL[chosen]);
+    await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${chosen}\\b`));
+    await expect(page.locator('html')).not.toHaveClass(new RegExp(`\\b${scheme}\\b`));
+    expect(await darkUtilityDisplay(page)).toBe(EXPECTED_DISPLAY[chosen]);
+    expect(await themeCookieValue(context)).toBe(chosen);
+
+    // O atual é anunciado como marcado.
+    await themeButton(page).click();
+    await expect(page.getByRole('menuitemradio', { name: LABEL[chosen] })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(page.getByRole('menuitemradio', { name: 'Sistema' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    await page.keyboard.press('Escape');
+
+    // Persiste: o HTML do servidor já traz a classe, e a recarga não pisca.
+    const tag = await serverHtmlTag(page);
+    expect(tag).toMatch(new RegExp(`class="[^"]*\\b${chosen}\\b`));
+    await expectReloadIn(page, chosen);
+    await expect(themeButton(page)).toHaveAccessibleName(`Tema: ${LABEL[chosen]}`);
+
+    // Vale nas outras telas.
+    await page.goto('/sites/exemplo-a/conteudos');
+    await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${chosen}\\b`));
+    expect(await darkUtilityDisplay(page)).toBe(EXPECTED_DISPLAY[chosen]);
+  });
+}
+
+test('escolher Sistema no header apaga o cookie e volta à preferência do sistema', async ({
+  page,
+  context,
+}) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await login(page);
+  await setThemeCookie(context, 'light');
+  await page.goto('/sites');
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('html')).toHaveClass(/\blight\b/);
+  await expect(themeButton(page)).toHaveAccessibleName('Tema: Claro');
+
+  await choose(page, 'Sistema');
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+  await expect(page.locator('html')).not.toHaveClass(/\blight\b/);
+  expect(await themeCookieValue(context)).toBeUndefined();
+
+  const tag = await serverHtmlTag(page);
+  expect(tag).not.toMatch(/\b(dark|light)\b/);
+  await expectReloadIn(page, 'dark');
+  await expect(themeButton(page)).toHaveAccessibleName('Tema: Sistema');
+});
+
+for (const colorScheme of SCHEMES) {
+  test(`o menu de tema aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.waitForLoadState('networkidle');
+    await themeButton(page).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    // Depois da transição de abertura (opacidade), como no menu de perfil (#239).
+    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+      .include('.header')
+      .include('[role="menu"]')
+      .exclude('[data-floating-ui-focus-guard]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
