@@ -747,6 +747,64 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-800',
     minimum: 4.5,
   },
+  // Trilha de navegação (#243): o Ecme não tem breadcrumb. Os links usam a cor do `.heading-text`,
+  // e o item atual e o separador usam a do texto do body, sobre o fundo do body do Ecme.
+  {
+    name: 'link da trilha',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'link da trilha no hover',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'item atual da trilha',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'separador da trilha',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'link da trilha',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'link da trilha no hover',
+    theme: 'escuro',
+    text: 'dark:text-primary',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'item atual da trilha',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'separador da trilha',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
