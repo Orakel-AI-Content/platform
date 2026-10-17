@@ -1365,3 +1365,90 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(accessibility.violations).toEqual([]);
   });
 }
+
+// Menu e NavToggle (#235): nav nomeado com o grupo como lista nomeada pelo rótulo, link do
+// item ativo com aria-current, foco de 2px no --ring nos links e no botão do NavToggle, que
+// recolhe o menu (aria-expanded, rótulo do grupo escondido) pelo Enter.
+
+/** Contorno de foco do elemento: cor, estilo e largura. */
+const outline = (target: Locator) =>
+  target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { color: style.outlineColor, style: style.outlineStyle, width: style.outlineWidth };
+  });
+
+const ringColor = (page: Page) =>
+  page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--ring)';
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+
+test('Menu: nav nomeado, grupo em lista com rótulo e item ativo com aria-current', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+
+  const nav = section(page, 'Menu').getByRole('navigation', { name: 'Menu de exemplo' });
+  const list = nav.getByRole('list', { name: 'Áreas do site' });
+  await expect(list.getByRole('listitem')).toHaveCount(3);
+  await expect(nav.getByRole('link', { name: 'Conteúdos' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(nav.getByRole('link', { name: 'Mídia' })).not.toHaveAttribute('aria-current');
+  await expect(nav.locator('.menu-item-active')).toHaveText('Conteúdos');
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Menu e NavToggle com foco de 2px, recolher por Enter e sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const ring = await ringColor(page);
+    const menu = section(page, 'Menu');
+    const toggle = menu.getByRole('button', { name: 'Alternar o menu de exemplo' });
+    const link = menu.getByRole('link', { name: 'Visão geral' });
+
+    await tabTo(page, toggle);
+    expect(await outline(toggle)).toEqual({ color: ring, style: 'solid', width: '2px' });
+    const box = await toggle.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(24);
+    expect(box?.height).toBeGreaterThanOrEqual(24);
+
+    await tabTo(page, link);
+    expect(await outline(link)).toEqual({ color: ring, style: 'solid', width: '2px' });
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-menu"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const icon = await toggle.locator('svg').innerHTML();
+    await tabTo(page, toggle);
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(await toggle.locator('svg').innerHTML()).not.toBe(icon);
+    await expect(menu.getByText('Áreas do site', { exact: true })).toHaveCount(0);
+    await expect(menu.getByRole('link', { name: 'Conteúdos' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+
+    const collapsed = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-menu"]')
+      .analyze();
+    expect(collapsed.violations).toEqual([]);
+  });
+}
