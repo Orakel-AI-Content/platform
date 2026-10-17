@@ -40,6 +40,16 @@ export function applyThemeClass(classList: DOMTokenList, mode: ThemeMode): void 
 }
 
 /**
+ * Aplica a escolha do cabeçalho no navegador: grava (ou apaga) o cookie para o servidor e troca
+ * a classe do <html> na hora. Só em handler de evento, nunca no render.
+ */
+export function applyThemeChoice(choice: ThemeChoice, doc: Document = document): void {
+  doc.cookie = themeCookie(choice);
+  const prefersDark = doc.defaultView?.matchMedia('(prefers-color-scheme: dark)').matches ?? false;
+  applyThemeClass(doc.documentElement.classList, resolveTheme(choice, prefersDark));
+}
+
+/**
  * Script inline e bloqueante do <head>, só no modo sistema: põe `dark` ou `light` no <html>
  * pela preferência do sistema antes da primeira pintura. Se uma CSP entrar no Backoffice, ele
  * vai precisar de nonce ou hash.

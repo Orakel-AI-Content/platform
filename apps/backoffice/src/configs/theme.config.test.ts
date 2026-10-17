@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { applyThemeClass, parseThemeMode, resolveTheme, themeCookie } from './theme.config';
+import {
+  applyThemeChoice,
+  applyThemeClass,
+  parseThemeMode,
+  resolveTheme,
+  themeCookie,
+} from './theme.config';
 
 describe('parseThemeMode', () => {
   it('aceita light e dark', () => {
@@ -51,4 +57,44 @@ describe('applyThemeClass', () => {
     applyThemeClass(root.classList, 'light');
     expect(root.className).toBe('font-var light');
   });
+});
+
+describe('applyThemeChoice', () => {
+  // O happy-dom não apaga cookie com Max-Age=0: confere-se o que é gravado (a remoção de
+  // verdade fica com o theme.spec.ts).
+  function record(): string[] {
+    const writes: string[] = [];
+    vi.spyOn(document, 'cookie', 'set').mockImplementation((value: string) => {
+      writes.push(value);
+    });
+    return writes;
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.documentElement.className = '';
+  });
+
+  it('modo fixo: grava o cookie e põe a classe, ignorando o sistema', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList);
+    const writes = record();
+    applyThemeChoice('light');
+    expect(writes).toEqual([themeCookie('light')]);
+    expect(document.documentElement.className).toBe('light');
+  });
+
+  it.each([
+    [true, 'dark'],
+    [false, 'light'],
+  ] as const)(
+    'sistema: apaga o cookie e põe a classe da preferência (escuro: %s)',
+    (dark, mode) => {
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: dark } as MediaQueryList);
+      document.documentElement.className = dark ? 'light' : 'dark';
+      const writes = record();
+      applyThemeChoice('system');
+      expect(writes).toEqual([themeCookie('system')]);
+      expect(document.documentElement.className).toBe(mode);
+    },
+  );
 });
