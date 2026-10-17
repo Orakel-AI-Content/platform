@@ -144,6 +144,11 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await page.keyboard.press('Enter');
   await expect(page.getByRole('group', { name: 'Bloco 3: FAQ' })).toBeVisible();
 
+  // A mensagem do FormItem (#245) volta a entrar, com transição de opacidade, quando o bloco é
+  // remontado na troca de posição; o axe roda depois dela.
+  await expect(page.locator('.form-explain')).toHaveCSS('opacity', '1');
+  // O ponteiro ficou sobre "Criar conteúdo" desde o clique; o axe audita o rodapé em repouso.
+  await page.mouse.move(0, 0);
   const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   expect(accessibility.violations).toEqual([]);
 
