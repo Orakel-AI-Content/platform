@@ -111,6 +111,190 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ['ring', 'muted', 3],
 ];
 
+type ThemeName = keyof typeof THEMES;
+
+/**
+ * Pares do Ecme (#217) como o tema os combina: no Ecme o tema escuro não troca tokens, troca o
+ * degrau da escala pelas variantes `dark:`. As classes são as do template (body do
+ * `tailwind/index.css`, `_card.css` e `_input.css` do design-reference), ou a substituta que o
+ * port usa quando a do Ecme não chega ao mínimo (`ecme`, a original, e docs/migration/ecme.md).
+ * Par novo com `dark:` num componente portado entra aqui.
+ */
+type EcmePair = {
+  name: string;
+  theme: ThemeName;
+  text: string;
+  background: string;
+  minimum: number;
+  ecme?: string;
+};
+
+const ECME_PAIRS: readonly EcmePair[] = [
+  // Claro.
+  {
+    name: 'texto do body',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+    ecme: 'text-gray-500',
+  },
+  {
+    name: 'título no body',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    // O cartão não define cor de texto: herda a do body, já substituída.
+    name: 'texto no cartão',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'título no cartão',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto do campo',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'placeholder do campo',
+    theme: 'claro',
+    text: 'placeholder:text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+    ecme: 'placeholder:text-gray-400',
+  },
+  {
+    name: 'link no body',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'link no cartão',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'foco no body',
+    theme: 'claro',
+    text: 'outline-ring',
+    background: 'bg-gray-100',
+    minimum: 3,
+  },
+  {
+    name: 'foco no cartão',
+    theme: 'claro',
+    text: 'outline-ring',
+    background: 'bg-white',
+    minimum: 3,
+  },
+  // Escuro.
+  {
+    name: 'texto do body',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'título no body',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto no cartão',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'título no cartão',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto do campo',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
+  {
+    name: 'placeholder do campo',
+    theme: 'escuro',
+    text: 'dark:placeholder:text-gray-300',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+    ecme: 'placeholder:text-gray-400',
+  },
+  {
+    name: 'link no body',
+    theme: 'escuro',
+    text: 'dark:text-primary',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'link no cartão',
+    theme: 'escuro',
+    text: 'dark:text-primary-mild',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+    ecme: 'text-primary',
+  },
+  {
+    name: 'foco no body',
+    theme: 'escuro',
+    text: 'outline-ring',
+    background: 'dark:bg-gray-950',
+    minimum: 3,
+  },
+  {
+    name: 'foco no cartão',
+    theme: 'escuro',
+    text: 'outline-ring',
+    background: 'dark:bg-gray-800',
+    minimum: 3,
+  },
+];
+
+/** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
+function token(className: string): string {
+  const name = className.replace(/^(?:[\w-]+:)*(?:text|bg|outline)-/, '');
+  return name === 'white' ? 'neutral' : name;
+}
+
+/** Contraste de um par no tema dele; um token que falta é erro com o nome do par. */
+function pairContrast(pair: EcmePair, text: string = pair.text): number {
+  const theme = THEMES[pair.theme];
+  const fg = resolve(theme, token(text));
+  const bg = resolve(theme, token(pair.background));
+  if (fg === undefined || bg === undefined)
+    throw new Error(`${pair.name} (${pair.theme}): token ausente em ${text} ou ${pair.background}`);
+  return contrast(fg, bg);
+}
+
 describe('conversão hex', () => {
   it('lê #rrggbb e ignora o alfa de #rrggbbaa', () => {
     expect(hexToSrgb('#ff0000')).toEqual([1, 0, 0]);
@@ -141,5 +325,32 @@ describe.each(Object.entries(THEMES))('tokens do tema %s', (_, theme) => {
     expect(fg, `--${foreground}`).toBeDefined();
     expect(bg, `--${background}`).toBeDefined();
     expect(contrast(fg!, bg!)).toBeGreaterThanOrEqual(minimum);
+  });
+});
+
+describe('pares do Ecme como o tema os combina', () => {
+  it.each(ECME_PAIRS.map((pair) => [`${pair.name} (${pair.theme})`, pair] as const))(
+    '%s',
+    (label, pair) => {
+      const ratio = pairContrast(pair);
+      expect(
+        ratio,
+        `${label}: ${pair.text} sobre ${pair.background} dá ${ratio.toFixed(2)}:1, abaixo de ${pair.minimum}:1`,
+      ).toBeGreaterThanOrEqual(pair.minimum);
+    },
+  );
+
+  it('cada substituição troca uma classe do Ecme que não chega ao mínimo', () => {
+    for (const pair of ECME_PAIRS.filter((p) => p.ecme !== undefined)) {
+      expect(pairContrast(pair, pair.ecme), `${pair.name} (${pair.theme})`).toBeLessThan(
+        pair.minimum,
+      );
+    }
+  });
+
+  it('cobre os dois temas com os mesmos usos', () => {
+    const uses = (theme: ThemeName) =>
+      ECME_PAIRS.filter((pair) => pair.theme === theme).map((pair) => pair.name);
+    expect(uses('escuro')).toEqual(uses('claro'));
   });
 });
