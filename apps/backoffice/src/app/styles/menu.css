@@ -1,0 +1,32 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_menu.css
+   Adaptado (#235): `menu-title-light` em gray-600; o gray-500 do Ecme dá 4,35:1 sobre o
+   branco da barra (docs/migration/ecme.md, "Texto do body, claro"). */
+@layer components {
+  .menu-title {
+    @apply uppercase font-semibold px-3 mt-4 mb-2;
+
+    &.menu-title-light {
+      @apply text-gray-600;
+    }
+
+    &.menu-title-dark {
+      @apply text-gray-300;
+    }
+
+    &.menu-title-themed {
+      @apply text-gray-100/50;
+    }
+  }
+
+  .menu-light {
+    @apply bg-white;
+  }
+
+  .menu-dark {
+    @apply bg-gray-800;
+  }
+
+  .menu-transparent {
+    @apply bg-transparent;
+  }
+}
