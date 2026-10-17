@@ -1151,8 +1151,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
 }
 
 // Pagination (#214): nav "Paginação" com página atual em aria-current, pontas indisponíveis,
-// alvos de 24 px e teclado; no modo link (getPageHref), a página vem de ?pagina= e os links
-// funcionam renderizados no servidor.
+// alvos de 24 px e teclado; no modo link (getPageHref), a página vem de ?pagina-link= (o
+// ?pagina= é do DataTable, #215) e os links funcionam renderizados no servidor.
 
 const paginations = (page: Page) =>
   section(page, 'Pagination').getByRole('navigation', { name: 'Paginação' });
@@ -1195,16 +1195,18 @@ test('Pagination com botões: aria-current, pontas indisponíveis, teclado e alv
   await expect(next).toBeDisabled();
 });
 
-test('Pagination com links: ?pagina= no servidor, ponta sem href e Enter navega', async ({
+test('Pagination com links: ?pagina-link= no servidor, ponta sem href e Enter navega', async ({
   page,
 }) => {
   await login(page);
-  const response = await page.request.get(`${SHOWCASE}?pagina=7`);
+  const response = await page.request.get(`${SHOWCASE}?pagina-link=7`);
   const html = await response.text();
-  expect(html).toContain('href="/teste-de-componentes?pagina=8"');
-  expect(html).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/teste-de-componentes\?pagina=7"/);
+  expect(html).toContain('href="/teste-de-componentes?pagina-link=8"');
+  expect(html).toMatch(
+    /<a[^>]*aria-current="page"[^>]*href="\/teste-de-componentes\?pagina-link=7"/,
+  );
 
-  await page.goto(`${SHOWCASE}?pagina=20`);
+  await page.goto(`${SHOWCASE}?pagina-link=20`);
   await page.waitForLoadState('networkidle');
   const nav = paginations(page).last();
 
@@ -1217,7 +1219,7 @@ test('Pagination com links: ?pagina= no servidor, ponta sem href e Enter navega'
   await expect(next).not.toHaveAttribute('href');
   await expect(nav.getByRole('link', { name: 'Voltar 5 páginas' })).toHaveAttribute(
     'href',
-    '/teste-de-componentes?pagina=15',
+    '/teste-de-componentes?pagina-link=15',
   );
 
   for (const control of await nav.getByRole('link').all()) {
@@ -1229,7 +1231,7 @@ test('Pagination com links: ?pagina= no servidor, ponta sem href e Enter navega'
   const prev = nav.getByRole('link', { name: 'Página anterior' });
   await tabTo(page, prev);
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\?pagina=19$/);
+  await expect(page).toHaveURL(/\?pagina-link=19$/);
   await expect(paginations(page).last().getByRole('link', { name: 'Página 19' })).toHaveAttribute(
     'aria-current',
     'page',
@@ -1242,13 +1244,123 @@ for (const colorScheme of ['light', 'dark'] as const) {
   }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await login(page);
-    await page.goto(`${SHOWCASE}?pagina=20`);
+    await page.goto(`${SHOWCASE}?pagina-link=20`);
     await page.waitForLoadState('networkidle');
     await paginations(page).first().getByRole('button', { name: 'Página 2' }).click();
 
     const accessibility = await new AxeBuilder({ page })
       .withTags(WCAG)
       .include('[aria-labelledby="vitrine-pagination"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
+
+// DataTable (#215): dados fixos paginados e ordenados pela vitrine (manual, como no Ecme), com
+// página, ordem e tamanho na URL; recarregar mantém a mesma visão. Carregando, o esqueleto;
+// vazio, a mensagem.
+
+const dataTable = (page: Page, name: string) =>
+  section(page, 'DataTable').getByRole('table', { name });
+
+/** Texto da primeira célula de cada linha do corpo. */
+async function firstCells(table: Locator): Promise<string[]> {
+  return table
+    .locator('tbody tr')
+    .evaluateAll((rows) => rows.map((row) => row.querySelector('td')?.textContent ?? ''));
+}
+
+test('DataTable pagina e ordena pela URL, por teclado, e recarregar mantém a visão', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const table = dataTable(page, 'Matérias paginadas');
+  const nav = section(page, 'DataTable').getByRole('navigation', { name: 'Paginação' }).first();
+  const manchete = table.getByRole('columnheader', { name: 'Manchete' });
+
+  // Sem parâmetros: 25 por página, na ordem padrão (título crescente).
+  expect(await firstCells(table)).toHaveLength(25);
+  expect((await firstCells(table))[0]).toBe('Matéria 01');
+  await expect(manchete).toHaveAttribute('aria-sort', 'ascending');
+  await expect(table.getByRole('columnheader', { name: 'Situação' })).not.toHaveAttribute(
+    'aria-sort',
+  );
+
+  await nav.getByRole('button', { name: 'Página 2' }).click();
+  await expect(page).toHaveURL(/\?pagina=2$/);
+  await expect
+    .poll(() => firstCells(table))
+    .toEqual([...Array(7).keys()].map((i) => `Matéria ${26 + i}`));
+
+  const sortButton = manchete.getByRole('button', { name: 'Manchete' });
+  await tabTo(page, sortButton);
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\?pagina=2&ordem=-titulo$/);
+  await expect(manchete).toHaveAttribute('aria-sort', 'descending');
+  await expect.poll(async () => (await firstCells(table))[0]).toBe('Matéria 07');
+
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await expect(manchete).toHaveAttribute('aria-sort', 'descending');
+  await expect(nav.getByRole('button', { name: 'Página 2' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  expect((await firstCells(table))[0]).toBe('Matéria 07');
+});
+
+test('DataTable: o seletor grava ?por-pagina=, volta à página 1 e sobrevive ao recarregar', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(`${SHOWCASE}?pagina=2`);
+  await page.waitForLoadState('networkidle');
+  const table = dataTable(page, 'Matérias paginadas');
+  const select = section(page, 'DataTable')
+    .getByRole('combobox', { name: 'Itens por página' })
+    .first();
+
+  await select.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.getByRole('option', { name: '10 / página' }).click();
+  await expect(page).toHaveURL(/\?por-pagina=10$/);
+  await expect.poll(() => firstCells(table)).toHaveLength(10);
+  expect((await firstCells(table))[0]).toBe('Matéria 01');
+
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  expect(await firstCells(table)).toHaveLength(10);
+  await expect(section(page, 'DataTable').getByText('10 / página').first()).toBeVisible();
+});
+
+test('DataTable carregando mostra o esqueleto com aria-busy; vazio mostra a mensagem', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+
+  const loading = dataTable(page, 'Matérias carregando');
+  await expect(loading).toHaveAttribute('aria-busy', 'true');
+  await expect(loading.locator('tbody tr')).toHaveCount(10);
+  await expect(loading.locator('tbody .skeleton').first()).toBeVisible();
+
+  const empty = dataTable(page, 'Matérias vazias');
+  await expect(empty.getByText('Nenhum dado encontrado!')).toBeVisible();
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`DataTable sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.goto(`${SHOWCASE}?pagina=2&ordem=-visitas`);
+    await page.waitForLoadState('networkidle');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-data-table"]')
       .analyze();
     expect(accessibility.violations).toEqual([]);
   });
