@@ -11,8 +11,12 @@ import {
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
 } from '@/components/site-labels.ts';
-import { LastBuildSummary, PendingCount, PublishNowPanel } from '@/components/site-status';
-import { Badge } from '@/components/legacy-ui/badge';
+import {
+  LastBuildSummary,
+  PendingCount,
+  PublishNowPanel,
+  StateTag,
+} from '@/components/site-status';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
@@ -89,7 +93,9 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
           <dt className="text-muted-foreground">Estado</dt>
           <dd className="space-y-1">
-            <Badge variant={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</Badge>
+            <StateTag color={SITE_STATE_VARIANT[site.state]}>
+              {SITE_STATE_LABEL[site.state]}
+            </StateTag>
             {site.state === 'pausado' && site.pausedReason && (
               <p className="text-sm">{site.pausedReason}</p>
             )}

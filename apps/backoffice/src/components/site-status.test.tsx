@@ -22,6 +22,7 @@ describe('pendências', () => {
 
     const link = screen.getByRole('link', { name: '1 mudança pendente em exemplo-a' });
     expect(link.getAttribute('href')).toBe('/sites/exemplo-a/pendencias');
+    expect(link.querySelector('.tag-prefix')?.className).toContain('bg-warning');
   });
 });
 
@@ -35,7 +36,10 @@ describe('último build', () => {
       />,
     );
 
-    expect(screen.getByText('Publicado').className).toContain('text-success');
+    // Tag do Ecme: o ponto na cor do resultado.
+    expect(screen.getByText('Publicado').querySelector('.tag-prefix')?.className).toContain(
+      'bg-success',
+    );
     expect(screen.getByText('01/10/2026, 09:00 BRT · v1')).toBeTruthy();
   });
 
@@ -59,7 +63,7 @@ describe('Publicar agora de um site', () => {
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('Site pausado: não publica.'),
     );
-    expect(screen.getByRole('status').className).toContain('text-destructive');
+    expect(screen.getByRole('status').className).toContain('text-error');
     expect(publishNow).toHaveBeenCalledWith('exemplo-a');
   });
 });

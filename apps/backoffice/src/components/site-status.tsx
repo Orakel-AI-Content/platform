@@ -7,15 +7,37 @@ import {
   BUILD_STATUS_LABEL,
   BUILD_STATUS_VARIANT,
   formatDateTime,
+  type StateTagColor,
 } from '@/components/site-labels.ts';
-import { Badge } from '@/components/legacy-ui/badge';
-import { buttonVariants } from '@/components/legacy-ui/button';
+import { Button } from '@/components/ui/Button';
+import { Tag } from '@/components/ui/Tag';
+import classNames from '@/components/ui/utils/classNames';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Estado de publicação de um site, igual na lista de sites e na página do site (#149).
 
 export type PublishStatus = { ok: boolean; message: string };
 export type PublishNow = (siteId: string) => Promise<PublishStatus>;
+
+/**
+ * Estado de site ou de build na `Tag` do Ecme: o ponto na cor do estado (`prefixClass`) e o
+ * texto no cinza da Tag, que é o que distingue os estados sem cor (#86).
+ */
+export function StateTag({
+  color,
+  className,
+  children,
+}: {
+  color: StateTagColor;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tag prefix prefixClass={color} className={className}>
+      {children}
+    </Tag>
+  );
+}
 
 /**
  * Último build no fuso do próprio site, com a sigla (#90): o resultado e, abaixo, data e versão.
@@ -30,32 +52,30 @@ export function LastBuildSummary({
   timeZone: string;
   details?: (text: string) => ReactNode;
 }) {
-  if (build === null) return <span className="text-muted-foreground">—</span>;
+  if (build === null) return <span>—</span>;
   const when = `${formatDateTime(new Date(build.finishedAt), timeZone)}${build.versionId ? ` · ${build.versionId}` : ''}`;
   return (
     <span className="flex flex-col items-start gap-0.5">
-      <span>
-        <Badge variant={BUILD_STATUS_VARIANT[build.status]}>
-          {BUILD_STATUS_LABEL[build.status]}
-        </Badge>
-      </span>
-      <span className="text-xs text-muted-foreground">{details(when)}</span>
+      <StateTag color={BUILD_STATUS_VARIANT[build.status]}>
+        {BUILD_STATUS_LABEL[build.status]}
+      </StateTag>
+      <span className="text-xs">{details(when)}</span>
     </span>
   );
 }
 
 /** Pendências maiores que 0 se destacam e levam à tela de pendências do site (#99). */
 export function PendingCount({ siteId, count }: { siteId: string; count: number }) {
-  if (count === 0) return <span className="text-muted-foreground">0</span>;
+  if (count === 0) return <span>0</span>;
   return (
-    <Link href={`/sites/${siteId}/pendencias`} className="inline-flex rounded-md">
-      <Badge variant="warning" className="underline underline-offset-4">
+    <Link href={`/sites/${siteId}/pendencias`} className="inline-flex rounded-lg">
+      <StateTag color="bg-warning" className="underline underline-offset-4">
         {count}
         <span className="sr-only">
           {' '}
           {count === 1 ? 'mudança pendente' : 'mudanças pendentes'} em {siteId}
         </span>
-      </Badge>
+      </StateTag>
     </Link>
   );
 }
@@ -65,34 +85,32 @@ export function PublishNowButton({
   siteId,
   action,
   onResult,
+  size = 'sm',
 }: {
   siteId: string;
   action: PublishNow;
   onResult: (status: PublishStatus) => void;
+  /** `xs` na lista, onde a linha tem pouca largura; `sm` na página do site. */
+  size?: 'xs' | 'sm';
 }) {
   const [pending, startTransition] = useTransition();
   return (
-    <button
+    <Button
       type="button"
+      size={size}
       disabled={pending}
       onClick={() => startTransition(async () => onResult(await action(siteId)))}
-      className={buttonVariants({ variant: 'outline', size: 'sm' })}
     >
       {pending ? 'Enfileirando…' : 'Publicar agora'}
       <span className="sr-only"> {siteId}</span>
-    </button>
+    </Button>
   );
 }
 
 /** Região `role="status"` do retorno de "Publicar agora". */
 export function PublishStatusRegion({ status }: { status: PublishStatus | null }) {
   return (
-    <p
-      role="status"
-      className={
-        status?.ok === false ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
-      }
-    >
+    <p role="status" className={classNames('text-sm', status?.ok === false && 'text-error')}>
       {status?.message}
     </p>
   );
