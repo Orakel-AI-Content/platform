@@ -188,3 +188,116 @@ test('StickyFooter fica visível ao rolar a vitrine', async ({ page }) => {
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
 });
+
+// Input, InputGroup e Form (#207): rótulo e mensagem de erro ligados ao campo pelo FormItem.
+
+/** Contorno de foco de um campo: o --ring de 2px da regra global, como no Button. */
+async function focusOutline(target: Locator) {
+  return target.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { style: style.outlineStyle, width: style.outlineWidth };
+  });
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Input, textarea e InputGroup na vitrine, focáveis por Tab com contorno de 2px (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    const inputs = page.getByRole('region', { name: 'Input', exact: true });
+    await expect(inputs.getByLabel('Título')).toHaveAttribute('type', 'text');
+    await expect(inputs.getByLabel('Resumo')).toHaveJSProperty('tagName', 'TEXTAREA');
+    await expect(inputs.getByLabel('Desabilitado')).toBeDisabled();
+
+    const group = section(page, 'InputGroup');
+    await expect(group.locator('.input-group').first()).toHaveText('https://.com.br');
+    await expect(group.getByLabel('Domínio')).toBeVisible();
+
+    for (const field of [
+      inputs.getByLabel('Título'),
+      inputs.getByLabel('Resumo'),
+      group.getByLabel('Domínio'),
+    ]) {
+      await tabTo(page, field);
+      expect(await focusOutline(field)).toEqual({ style: 'solid', width: '2px' });
+    }
+  });
+}
+
+test('FormItem liga rótulo e mensagem de erro ao campo, com aria-invalid', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const form = section(page, 'Form');
+
+  const slug = form.getByLabel('Slug');
+  await expect(slug).toHaveAttribute('aria-invalid', 'true');
+  await expect(slug).toHaveAccessibleDescription('O slug já está em uso');
+
+  const email = form.getByLabel('E-mail');
+  await expect(email).not.toHaveAttribute('aria-invalid');
+  await expect(email).toHaveAccessibleDescription('');
+
+  await form.getByRole('button', { name: 'Validar e-mail' }).click();
+  await expect(email).toHaveAttribute('aria-invalid', 'true');
+  await expect(email).toHaveAccessibleDescription('Informe um e-mail válido');
+
+  // Com o erro na tela, a vitrine continua sem violação do axe (depois da transição, que
+  // mistura a cor com o fundo enquanto a opacidade sobe).
+  await expect(form.getByText('Informe um e-mail válido')).toHaveCSS('opacity', '1');
+  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(accessibility.violations).toEqual([]);
+
+  await form.getByRole('button', { name: 'Limpar validação' }).click();
+  await expect(email).not.toHaveAttribute('aria-invalid');
+  await expect(form.getByText('Informe um e-mail válido')).toHaveCount(0);
+});
+
+for (const reducedMotion of ['reduce', 'no-preference'] as const) {
+  test(`mensagem de erro do FormItem ${reducedMotion === 'reduce' ? 'aparece sem' : 'aparece com'} transição com reducedMotion ${reducedMotion}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    // A opacidade da mensagem a cada quadro, do momento em que ela entra no DOM até 400 ms
+    // depois (a transição do Ecme dura 150 ms). Valores intermediários são a animação.
+    const samples = await page.evaluate(
+      () =>
+        new Promise<number[]>((resolve) => {
+          const region = document.querySelector('[aria-labelledby="vitrine-form"]')!;
+          const values: number[] = [];
+          const observer = new MutationObserver(() => {
+            const message = [...region.querySelectorAll('.form-explain')].find(
+              (element) => element.textContent === 'Informe um e-mail válido',
+            );
+            if (!message) return;
+            observer.disconnect();
+            const start = performance.now();
+            const sample = () => {
+              values.push(Number(getComputedStyle(message).opacity));
+              if (performance.now() - start < 400) requestAnimationFrame(sample);
+              else resolve(values);
+            };
+            sample();
+          });
+          observer.observe(region, { childList: true, subtree: true });
+          const toggle = [...region.querySelectorAll('button')].find(
+            (button) => button.textContent === 'Validar e-mail',
+          )!;
+          toggle.click();
+        }),
+    );
+
+    const intermediate = samples.filter((value) => value > 0 && value < 1);
+    expect(samples.at(-1)).toBe(1);
+    if (reducedMotion === 'reduce') expect(intermediate).toEqual([]);
+    else expect(intermediate.length).toBeGreaterThan(0);
+  });
+}
