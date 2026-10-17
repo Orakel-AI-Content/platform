@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { EntityTable } from '@/components/entity-table';
 import { listAuthors } from '@/domain/content/authors.ts';
 import { noRead } from '@/components/forbidden-screen';
-import { buttonVariants } from '@/components/legacy-ui/button';
+import { Button } from '@/components/ui/Button';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
 
@@ -24,9 +24,9 @@ export default async function AuthorsPage({ params }: { params: Promise<{ site: 
   if (!authors.ok) return noRead;
 
   const create = canWrite ? (
-    <Link href={`/sites/${site.id}/autores/novo`} className={buttonVariants({ size: 'sm' })}>
+    <Button asElement={Link} href={`/sites/${site.id}/autores/novo`} variant="solid" size="sm">
       Criar autor
-    </Link>
+    </Button>
   ) : undefined;
 
   return (
