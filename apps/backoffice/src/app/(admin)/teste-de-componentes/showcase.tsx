@@ -17,6 +17,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Checkbox, type CheckboxGroupValue } from '@/components/ui/Checkbox';
+import { Dialog } from '@/components/ui/Dialog';
+import { Drawer } from '@/components/ui/Drawer';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { FormContainer, FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
@@ -55,6 +57,10 @@ function buscarSites(termo: string): Promise<Opcao[]> {
 export function Showcase() {
   const [clicks, setClicks] = useState(0);
   const [emailChecked, setEmailChecked] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [lastAction, setLastAction] = useState('Nenhuma ação.');
   const [formatos, setFormatos] = useState<CheckboxGroupValue>(['texto']);
   const [acao, setAcao] = useState('Nenhuma ação escolhida.');
   return (
@@ -156,6 +162,72 @@ export function Showcase() {
         <FormContainer layout="horizontal" labelWidth={120} className="form-width">
           <FormItem label="Autor">
             <Input placeholder="Nome de quem assina" />
+          </FormItem>
+        </FormContainer>
+      </section>
+
+      <section aria-labelledby="vitrine-checkbox" className="space-y-3">
+        <h2 id="vitrine-checkbox" className="text-lg font-semibold">
+          Checkbox
+        </h2>
+        <div className="flex flex-wrap items-center gap-4">
+          <Checkbox>Destaque na capa</Checkbox>
+          <Checkbox defaultChecked>Publicado</Checkbox>
+          <Checkbox checked indeterminate>
+            Todas as seções
+          </Checkbox>
+          <Checkbox disabled>Arquivado</Checkbox>
+        </div>
+        <p id="vitrine-formatos" className="text-sm font-semibold">
+          Formatos
+        </p>
+        <Checkbox.Group
+          aria-labelledby="vitrine-formatos"
+          value={formatos}
+          onChange={(value) => setFormatos(value)}
+        >
+          <Checkbox value="texto">Texto</Checkbox>
+          <Checkbox value="video">Vídeo</Checkbox>
+          <Checkbox value="audio">Áudio</Checkbox>
+        </Checkbox.Group>
+        <p role="status" className="text-sm">
+          Formatos escolhidos: {formatos.length === 0 ? 'nenhum' : formatos.join(', ')}.
+        </p>
+      </section>
+
+      <section aria-labelledby="vitrine-select" className="space-y-3">
+        <h2 id="vitrine-select" className="text-lg font-semibold">
+          Select
+        </h2>
+        <FormContainer className="form-width">
+          <FormItem label="Categoria">
+            <Select<Opcao> options={CATEGORIAS} placeholder="Escolha a categoria" />
+          </FormItem>
+          <FormItem label="Categorias secundárias">
+            <Select<Opcao, true>
+              isMulti
+              options={CATEGORIAS}
+              defaultValue={[CATEGORIAS[1]!, CATEGORIAS[2]!]}
+            />
+          </FormItem>
+          <FormItem label="Seção" invalid errorMessage="Escolha uma seção">
+            <Select<Opcao> options={CATEGORIAS} placeholder="Nenhuma seção" />
+          </FormItem>
+          <FormItem label="Site">
+            <Select<Opcao>
+              componentAs={AsyncSelect}
+              loadOptions={buscarSites}
+              defaultOptions
+              placeholder="Busque pelo nome"
+            />
+          </FormItem>
+          <FormItem label="Palavra-chave">
+            <Select<Opcao>
+              componentAs={CreatableSelect}
+              options={CATEGORIAS}
+              placeholder="Escolha ou crie"
+              formatCreateLabel={(valor) => `Criar "${valor}"`}
+            />
           </FormItem>
         </FormContainer>
       </section>
