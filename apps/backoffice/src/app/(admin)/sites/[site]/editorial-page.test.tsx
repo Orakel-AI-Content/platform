@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, within } from '@testing-library/react';
+import Link from 'next/link';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { PageHeader, siteTrail } from './editorial-page.tsx';
@@ -67,6 +68,31 @@ describe('trilha do PageHeader', () => {
     for (const separator of nav.querySelectorAll('[aria-hidden="true"]')) {
       expect(separator.className).toBe(body);
     }
+  });
+
+  it('título do Ecme, sem as classes do shadcn; a ação fica ao lado (#247)', () => {
+    render(
+      <PageHeader
+        id="authors-title"
+        trail={siteTrail(site, 'Autores')}
+        title="Autores"
+        action={<Link href="/sites/exemplo-a/autores/novo">Criar autor</Link>}
+      />,
+    );
+
+    const heading = screen.getByRole('heading', { level: 1, name: 'Autores' });
+    expect(heading.id).toBe('authors-title');
+    expect(heading.className).toContain('text-gray-900');
+    expect(heading.className).toContain('dark:text-gray-100');
+    const classes = [...document.body.querySelectorAll('*')].flatMap((element) =>
+      (element.getAttribute('class') ?? '').split(' '),
+    );
+    for (const shadcn of ['text-muted-foreground', 'text-foreground', 'border-border']) {
+      expect(classes).not.toContain(shadcn);
+    }
+    expect(screen.getByRole('link', { name: 'Criar autor' }).getAttribute('href')).toBe(
+      '/sites/exemplo-a/autores/novo',
+    );
   });
 
   it('a trilha vem antes do título; sem trilha, só o título', () => {
