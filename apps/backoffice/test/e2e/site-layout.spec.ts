@@ -252,7 +252,10 @@ test('trilha nas telas de item: Sites › Site › Área › Item, sem link de v
     .getByRole('link', { name: /\(versões\)/ })
     .first()
     .click();
-  const heading = (await page.getByRole('heading', { level: 1 }).textContent()) ?? '';
+  // Espera a tela de versões: lido antes, o h1 ainda seria o da lista de conteúdos.
+  const versionsHeading = page.getByRole('heading', { level: 1, name: /^Versões de “.+”$/ });
+  await expect(versionsHeading).toBeVisible();
+  const heading = (await versionsHeading.textContent()) ?? '';
   const title = /“(.+)”/.exec(heading)?.[1] ?? '';
   await expectTrail(['Sites', SITE_NAME, 'Conteúdos', title]);
   const versionsPath = new URL(page.url()).pathname;

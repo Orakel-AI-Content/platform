@@ -105,7 +105,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
 
   await typeInto(page, page.getByLabel('ID', { exact: true }), siteId);
   await typeInto(page, page.getByLabel('Nome', { exact: true }), 'Site do E2E');
-  await typeInto(page, page.getByLabel('Domínios'), `${siteId}.example.com`);
+  await typeInto(page, page.getByRole('textbox', { name: 'Domínios' }), `${siteId}.example.com`);
   // Tema (#163): escolhido no grupo, pelo nome legível, só com o teclado.
   await tabTo(page, page.getByRole('radio', { name: /Editorial claro/ }));
   await page.keyboard.press('Space');
@@ -140,8 +140,12 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#secao-dominios$/);
   await page.keyboard.press('Tab');
-  await expect(page.getByLabel('Domínios')).toBeFocused();
-  await typeInto(page, page.getByLabel('Domínios'), `novo.${siteId}.example.com`);
+  await expect(page.getByRole('textbox', { name: 'Domínios' })).toBeFocused();
+  await typeInto(
+    page,
+    page.getByRole('textbox', { name: 'Domínios' }),
+    `novo.${siteId}.example.com`,
+  );
   await tabTo(page, page.getByRole('button', { name: 'Salvar configuração' }));
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status').filter({ hasText: 'versão 2' })).toBeVisible();
@@ -162,7 +166,7 @@ test('preset fora dos recursos é recusado com a mensagem do domínio', async ({
   await page.goto('/sites/novo');
   await page.getByLabel('ID', { exact: true }).fill(siteId);
   await page.getByLabel('Nome', { exact: true }).fill('Preset forçado');
-  await page.getByLabel('Domínios').fill(`${siteId}.example.com`);
+  await page.getByRole('textbox', { name: 'Domínios' }).fill(`${siteId}.example.com`);
   await page.getByRole('radio', { name: /Editorial claro/ }).check();
   // Valor forçado: uma opção que RESOURCES não lista.
   const home = page.getByLabel('Preset da página Home');
@@ -172,7 +176,10 @@ test('preset fora dos recursos é recusado com a mensagem do domínio', async ({
   await home.selectOption('inexistente');
   await page.getByRole('button', { name: 'Cadastrar site' }).click();
 
-  await expect(page.getByText('Preset "inexistente" de home não é suportado')).toBeVisible();
+  // O erro fica no campo (descrição acessível), além do resumo de erros do formulário.
+  await expect(page.getByLabel('Preset da página Home')).toHaveAccessibleDescription(
+    /Preset "inexistente" de home não é suportado/,
+  );
   await expect(home).toHaveAttribute('aria-invalid', 'true');
   await expect(home).toBeFocused();
   await expect(
@@ -202,7 +209,7 @@ async function newSite(page: Page, siteId: string): Promise<void> {
   await page.goto('/sites/novo');
   await page.getByLabel('ID', { exact: true }).fill(siteId);
   await page.getByLabel('Nome', { exact: true }).fill(`Site ${siteId}`);
-  await page.getByLabel('Domínios').fill(`${siteId}.example.com`);
+  await page.getByRole('textbox', { name: 'Domínios' }).fill(`${siteId}.example.com`);
   await page.getByRole('radio', { name: /Editorial claro/ }).check();
   await page.getByRole('button', { name: 'Cadastrar site' }).click();
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
@@ -244,7 +251,9 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
     await page.getByRole('button', { name: 'Salvar configuração' }).click();
   };
   await indexar();
-  await expect(page.getByText('só pode ficar indexável depois do G1 registrado')).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Indexável' })).toHaveAccessibleDescription(
+    /só pode ficar indexável depois do G1 registrado/,
+  );
   await page.goto(`/sites/${siteId}`);
   await page.getByLabel('Observação do G1').fill('Políticas publicadas');
   await page.getByRole('button', { name: 'Registrar G1' }).click();
