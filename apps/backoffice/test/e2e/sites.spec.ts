@@ -121,9 +121,16 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
 
   // Edição pelo menu "Mais ações" (#100), só com o teclado: versão nova, e a lista mostra o
   // domínio principal novo.
+  // O menu é o Dropdown do Ecme (#248): Enter abre com o foco no primeiro item; as setas
+  // chegam ao de editar.
   await tabTo(page, row.getByRole('button', { name: `Mais ações: ${siteId}` }));
   await page.keyboard.press('Enter');
-  await tabTo(page, row.getByRole('link', { name: `Editar configuração ${siteId}` }));
+  const edit = page
+    .getByRole('menu')
+    .getByRole('menuitem', { name: `Editar configuração ${siteId}` });
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(edit).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByLabel('ID', { exact: true })).toHaveAttribute('readonly', '');
   // Seções com índice (#161): o item do índice leva à seção, e o Tab seguinte entra nela.
