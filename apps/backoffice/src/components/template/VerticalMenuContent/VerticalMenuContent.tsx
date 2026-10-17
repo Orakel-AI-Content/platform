@@ -5,7 +5,9 @@
 // - o item ativo vem pronto (`activeKey`, de `activeNavigationKey` pelo pathname) no lugar do
 //   `useMenuActive` com a chave da rota;
 // - `siteId` resolve o `[site]` dos caminhos (`navigationPath`);
-// - `aria-label` no <nav> do Menu: a barra tem dois landmarks, "Principal" e "Áreas do site".
+// - `aria-label` no <nav> do Menu: a barra tem dois landmarks, "Principal" e "Áreas do site";
+// - `collapsed` (#238) passa ao Menu (`sideCollapsed`: sem o rótulo do grupo) e aos itens
+//   (só o ícone, com a dica).
 'use client';
 
 import { Fragment } from 'react';
@@ -21,6 +23,7 @@ import {
 export interface VerticalMenuContentProps {
   'aria-label': string;
   activeKey?: string;
+  collapsed?: boolean;
   navigationTree?: NavigationTree[];
   onMenuItemClick?: () => void;
   siteId?: string;
@@ -32,6 +35,7 @@ const VerticalMenuContent = (props: VerticalMenuContentProps) => {
   const {
     'aria-label': ariaLabel,
     activeKey,
+    collapsed = false,
     navigationTree = [],
     onMenuItemClick,
     siteId = '',
@@ -46,6 +50,7 @@ const VerticalMenuContent = (props: VerticalMenuContentProps) => {
               nav={nav}
               path={navigationPath(nav, siteId)}
               isActive={nav.key === activeKey}
+              sideCollapsed={collapsed}
               showIcon={cascade <= 1}
               onLinkClick={() => onMenuItemClick?.()}
             />
@@ -62,6 +67,7 @@ const VerticalMenuContent = (props: VerticalMenuContentProps) => {
     <Menu
       aria-label={ariaLabel}
       className="px-4 pb-4"
+      sideCollapsed={collapsed}
       defaultActiveKeys={activeKey ? [activeKey] : []}
     >
       {renderNavigation(navigationTree)}

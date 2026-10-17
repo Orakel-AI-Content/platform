@@ -7,7 +7,9 @@
 //   o seletor de site e `nav "Áreas do site"` com os grupos da árvore. No 404 de site e em
 //   `/sites/novo`, o segmento não é um dos sites, e as áreas não aparecem;
 // - sem `ScrollBar`: o conteúdo rola com `overflow-y-auto` nativo (`side-nav-content`);
-// - sem o recolher (#238): a barra fica sempre com a largura cheia.
+// - recolhida (#238), 80px: a marca vira "OB" (o nome fica em `sr-only`), os itens só com o
+//   ícone e a dica, sem o rótulo do grupo; o seletor de site fica escondido até a versão
+//   recolhida dele (#241). O estado vem do contexto da moldura (`useSideNav`).
 'use client';
 
 import Link from 'next/link';
@@ -20,7 +22,14 @@ import {
   NAV_ITEM_TYPE_TITLE,
   type NavigationTree,
 } from '@/configs/navigation.config';
-import { HEADER_HEIGHT, LOGO_X_GUTTER, SIDE_NAV_WIDTH } from './constants';
+import {
+  HEADER_HEIGHT,
+  LOGO_X_GUTTER,
+  SIDE_NAV_COLLAPSED_WIDTH,
+  SIDE_NAV_CONTENT_GUTTER,
+  SIDE_NAV_WIDTH,
+} from './constants';
+import { SIDE_NAV_ID, useSideNav } from './side-nav-context';
 
 type SideNavProps = {
   /** Árvore de navegação já filtrada para quem pede (`filterNavigation`). */
@@ -37,6 +46,11 @@ const sideNavStyle = {
   minWidth: SIDE_NAV_WIDTH,
 };
 
+const sideNavCollapseStyle = {
+  width: SIDE_NAV_COLLAPSED_WIDTH,
+  minWidth: SIDE_NAV_COLLAPSED_WIDTH,
+};
+
 /** O site do endereço (`/sites/<site>/…`), se for um dos que a pessoa vê. */
 function currentSite(pathname: string, sites: readonly SwitcherSite[]): SwitcherSite | undefined {
   const [, root, siteId] = pathname.split('/');
@@ -51,6 +65,7 @@ const SideNav = ({
   contentClass,
 }: SideNavProps) => {
   const pathname = usePathname();
+  const { collapsed } = useSideNav();
   const site = currentSite(pathname, sites);
   const activeKey = activeNavigationKey(pathname, navigationTree);
   const globalItems = navigationTree.filter((nav) => nav.type !== NAV_ITEM_TYPE_TITLE);
@@ -58,9 +73,11 @@ const SideNav = ({
 
   return (
     <div
-      style={sideNavStyle}
+      id={SIDE_NAV_ID}
+      style={collapsed ? sideNavCollapseStyle : sideNavStyle}
       className={classNames(
-        'side-nav side-nav-expand flex',
+        'side-nav flex',
+        !collapsed && 'side-nav-expand',
         background && 'side-nav-bg',
         className,
       )}
@@ -69,25 +86,36 @@ const SideNav = ({
         href="/sites"
         className={classNames(
           'side-nav-header flex flex-col justify-center text-xl font-bold text-gray-900 dark:text-gray-100',
-          LOGO_X_GUTTER,
+          collapsed ? `${SIDE_NAV_CONTENT_GUTTER} items-center` : LOGO_X_GUTTER,
         )}
         style={{ height: HEADER_HEIGHT }}
       >
-        Orakel Backoffice
+        {collapsed ? (
+          <>
+            <span aria-hidden="true">OB</span>
+            <span className="sr-only">Orakel Backoffice</span>
+          </>
+        ) : (
+          'Orakel Backoffice'
+        )}
       </Link>
       <div className={classNames('side-nav-content', contentClass)}>
         <VerticalMenuContent
           aria-label="Principal"
+          collapsed={collapsed}
           activeKey={activeKey}
           navigationTree={globalItems}
         />
         {site && (
           <>
-            <div className="px-4">
-              <SiteSwitcher current={site} sites={sites} />
-            </div>
+            {!collapsed && (
+              <div className="px-4">
+                <SiteSwitcher current={site} sites={sites} />
+              </div>
+            )}
             <VerticalMenuContent
               aria-label="Áreas do site"
+              collapsed={collapsed}
               activeKey={activeKey}
               navigationTree={siteGroups}
               siteId={site.id}

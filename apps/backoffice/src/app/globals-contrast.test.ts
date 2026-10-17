@@ -849,6 +849,21 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-800',
     minimum: 4.5,
   },
+  // Toggle da barra lateral (#238): o ícone (componente de interface, 3:1) sobre o header.
+  {
+    name: 'ícone do toggle da barra no header',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 3,
+  },
+  {
+    name: 'ícone do toggle da barra no header',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 3,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
