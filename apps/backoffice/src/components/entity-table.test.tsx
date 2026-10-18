@@ -68,7 +68,8 @@ describe('tabela de entidades', () => {
       'Itens',
     ]);
     expect(screen.getAllByRole('row')[1]?.textContent).toBe('principalInício (/) · Guias (/guias)');
-    expect(screen.getByText('2 menus')).toBeTruthy();
+    // A contagem é a <caption>: dá nome à tabela.
+    expect(screen.getByRole('table', { name: '2 menus' })).toBeTruthy();
   });
 
   it('sem content.write não há links de criar nem de editar', () => {
