@@ -1,8 +1,8 @@
 # Migração da interface para o Ecme
 
-Contexto do épico que reconstrói o layout do Backoffice com o template Ecme (decisão: ADR 0016).
-Serve para quem refina as histórias e para quem porta uma tela. Enquanto o épico não termina,
-tela ainda não migrada segue `docs/design/design-system.md`.
+Registro do porte do Backoffice para o template Ecme (decisão: ADR 0016): onde está o template,
+o que foi avaliado, mapeado e decidido, e as regras de porte de uma peça nova. O padrão vigente de
+toda tela é `docs/design/design-system.md`.
 
 ## Onde está o template
 
