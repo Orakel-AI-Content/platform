@@ -13,15 +13,17 @@ import {
 } from '@/components/upload-queue';
 import { useListState, type ListConfig } from '@/components/list-state.ts';
 import type { MediaPickerPage } from '@/components/media-picker';
-import { Button } from '@/components/legacy-ui/button';
-import { Input } from '@/components/legacy-ui/input';
-import { Label } from '@/components/legacy-ui/label';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/Button';
+import { FormItem } from '@/components/ui/Form';
+import Input from '@/components/ui/Input';
+import classNames from '@/components/ui/utils/classNames';
 
 // Biblioteca de mídia do site (#52, #186, #188): envio de várias imagens pela fila (escolher
 // no campo ou soltar sobre a biblioteca), com o resultado de cada arquivo, e a grade paginada
 // no servidor, com busca por nome, nome e data de envio de cada imagem e as miniaturas de
-// media.<domínio>. Busca e página ficam na URL (`q`, `pagina`).
+// media.<domínio>. Busca e página ficam na URL (`q`, `pagina`). Envio no FormItem, Input e
+// Button do Ecme (#281); a área de soltar destaca a borda em `primary`, como o `ui/Upload`
+// arrastável do Ecme, sem usá-lo (ele envia ao escolher e tem lista própria).
 
 /** Mídia na grade: a miniatura já resolvida para o endereço de mídia do site. */
 export type MediaItem = {
@@ -55,7 +57,7 @@ export function MediaThumbnail({ item }: { item: MediaItem }) {
         width={item.width}
         height={item.height}
         loading="lazy"
-        className="aspect-square w-full rounded-md border border-border object-cover"
+        className="aspect-square w-full rounded-md border border-gray-200 object-cover dark:border-gray-700"
       />
     </picture>
   );
@@ -153,20 +155,23 @@ export function MediaLibrary({
     <div
       {...dropProps}
       data-dragging={dragging || undefined}
-      className={cn(
-        'space-y-6 rounded-md border-2 border-dashed border-transparent',
-        dragging && 'border-primary bg-muted',
+      className={classNames(
+        'space-y-6 rounded-lg border-2 border-dashed border-transparent',
+        dragging && 'border-primary',
       )}
     >
       {canWrite && (
         <form onSubmit={upload} className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="media-file">
-              Imagens (JPEG, PNG, WebP ou AVIF, até 25 MB cada; ou solte aqui)
-            </Label>
+          <FormItem
+            htmlFor="media-file"
+            label="Imagens (JPEG, PNG, WebP ou AVIF, até 25 MB cada; ou solte aqui)"
+            className="mb-0"
+          >
             <Input id="media-file" ref={fileInput} type="file" accept={ACCEPT} multiple required />
-          </div>
-          <Button type="submit">Enviar imagens</Button>
+          </FormItem>
+          <Button type="submit" variant="solid">
+            Enviar imagens
+          </Button>
         </form>
       )}
       <UploadList entries={queue.entries} notice={queue.notice} />
@@ -187,7 +192,7 @@ export function MediaLibrary({
         ))}
       </ul>
       {items.length === 0 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           {search === '' ? 'Nenhuma imagem na biblioteca.' : 'Nenhuma imagem com esse nome.'}
         </p>
       )}

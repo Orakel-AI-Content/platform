@@ -385,6 +385,15 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'bg-white',
     minimum: 4.5,
   },
+  // Fila de envio da mídia (#281): envio pronto em `success` no body (o recusado usa a mensagem
+  // de erro no body, acima).
+  {
+    name: 'envio pronto na fila',
+    theme: 'claro',
+    text: 'text-success',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
   // SchemaForm (#245): aviso de campo sem editor, dentro da seção em Card.
   {
     name: 'aviso no cartão',
@@ -412,6 +421,13 @@ const ECME_PAIRS: readonly EcmePair[] = [
     theme: 'escuro',
     text: 'dark:text-error',
     background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'envio pronto na fila',
+    theme: 'escuro',
+    text: 'dark:text-success',
+    background: 'dark:bg-gray-950',
     minimum: 4.5,
   },
   {

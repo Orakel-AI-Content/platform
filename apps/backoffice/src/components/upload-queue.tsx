@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { cn } from '@/lib/utils';
-
 // Fila de envio da biblioteca (#188): até 20 imagens por vez, 3 subindo ao mesmo tempo por
 // XHR (o `fetch` não dá progresso de upload) para a rota de envio, e o resultado de cada uma
 // pela leitura dos envios por chave (`media_uploads`, #185): enviando N% → processando →
-// pronta ou recusada com o motivo, seja a recusa da rota ou do job.
+// pronta ou recusada com o motivo, seja a recusa da rota ou do job. Cores de estado nos tokens
+// do Ecme (#281).
 
 /** Mais que isso num lote: aviso, e só as primeiras sobem. */
 export const MAX_FILES = 20;
@@ -214,6 +213,12 @@ export function useUploadQueue({
   return { entries, notice, add };
 }
 
+/** Cor de estado do arquivo: recusada e pronta se destacam; o resto é texto secundário. */
+const STATE_COLOR: Partial<Record<EntryState['kind'], string>> = {
+  recusada: 'text-error',
+  pronta: 'text-success',
+};
+
 /** Lista dos envios: um arquivo por linha, com o estado em `role="status"`. */
 export function UploadList({
   entries,
@@ -234,10 +239,7 @@ export function UploadList({
               <span className="font-medium break-all">{entry.name}</span>
               <span
                 role="status"
-                className={cn(
-                  entry.state.kind === 'recusada' ? 'text-destructive' : 'text-muted-foreground',
-                  entry.state.kind === 'pronta' && 'text-success',
-                )}
+                className={STATE_COLOR[entry.state.kind] ?? 'text-gray-600 dark:text-gray-400'}
               >
                 {entryLabel(entry.state)}
               </span>
