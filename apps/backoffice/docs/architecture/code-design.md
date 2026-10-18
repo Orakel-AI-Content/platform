@@ -4,14 +4,14 @@ Consulte ao escrever código em `src/`. Convenções gerais (nomes, erros, logs)
 
 ## Camadas
 
-| Camada           | Pode importar                                   | Não pode                   |
-| ---------------- | ----------------------------------------------- | -------------------------- |
-| `src/app`        | domínio, auth, db (só `getDb`), componentes     | ter regra de negócio       |
-| `src/components` | tipos do domínio, `@/components`, `@/lib/utils` | acessar banco ou env       |
-| `src/domain`     | db (executor, schema), `content-model`          | Next, React, `process.env` |
-| `src/db`         | schema, env (só `getDb`)                        | domínio                    |
-| `src/jobs`       | domínio, db, lib                                | Next                       |
-| `src/bin`        | jobs, domínio, db, lib, env                     | Next                       |
+| Camada           | Pode importar                               | Não pode                   |
+| ---------------- | ------------------------------------------- | -------------------------- |
+| `src/app`        | domínio, auth, db (só `getDb`), componentes | ter regra de negócio       |
+| `src/components` | tipos do domínio, `@/components`            | acessar banco ou env       |
+| `src/domain`     | db (executor, schema), `content-model`      | Next, React, `process.env` |
+| `src/db`         | schema, env (só `getDb`)                    | domínio                    |
+| `src/jobs`       | domínio, db, lib                            | Next                       |
+| `src/bin`        | jobs, domínio, db, lib, env                 | Next                       |
 
 ## Padrões
 

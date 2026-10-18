@@ -7,9 +7,9 @@ import { SystemTheme } from '@/components/system-theme';
 import { ModalAppElement } from '@/components/ui/ModalAppElement';
 import { MotionProvider } from '@/components/ui/MotionProvider';
 import { ToastProvider } from '@/components/ui/toast';
+import classNames from '@/components/ui/utils/classNames';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 import { parseThemeMode, THEME_COOKIE, THEME_SCRIPT } from '@/configs/theme.config';
-import { cn } from '@/lib/utils';
 
 import './globals.css';
 
@@ -37,7 +37,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // de erro do Next (404, exceção), sem esse <head>, o SystemTheme põe a classe no cliente.
   const mode = parseThemeMode((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang="pt-BR" className={cn(inter.variable, mode)} suppressHydrationWarning>
+    <html lang="pt-BR" className={classNames(inter.variable, mode)} suppressHydrationWarning>
       {mode === undefined && (
         <head>
           <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
