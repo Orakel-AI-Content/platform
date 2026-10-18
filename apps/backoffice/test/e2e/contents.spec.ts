@@ -303,7 +303,7 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
     await expect(
       other
         .getByRole('navigation', { name: 'Paginação' })
-        .getByRole('button', { name: 'Página 2' }),
+        .getByRole('button', { name: 'Página 2', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
     await expect(other.getByRole('columnheader', { name: /Título/ })).toHaveAttribute(
       'aria-sort',

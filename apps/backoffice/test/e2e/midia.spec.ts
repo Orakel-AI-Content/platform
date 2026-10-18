@@ -277,7 +277,7 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
       await expect(
         page
           .getByRole('navigation', { name: 'Paginação' })
-          .getByRole('button', { name: 'Página 2' }),
+          .getByRole('button', { name: 'Página 2', exact: true }),
       ).toHaveAttribute('aria-current', 'page');
       await page.waitForLoadState('networkidle');
 
