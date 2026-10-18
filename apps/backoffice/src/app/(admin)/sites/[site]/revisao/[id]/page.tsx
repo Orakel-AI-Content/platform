@@ -62,14 +62,14 @@ export default async function ReviewPage({ params }: Params) {
         ])}
         title={<>Revisão de “{latest.data.title}”</>}
       />
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-gray-600 dark:text-gray-400">
         Versão {latest.version} · /{latest.data.slug}
       </p>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <iframe
           src={previewUrl}
           title={`Visualização de “${latest.data.title}” no site`}
-          className="h-[75vh] w-full rounded-md border border-border bg-background"
+          className="h-[75vh] w-full rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
         />
         <ReviewPanel
           version={latest.version}

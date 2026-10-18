@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ReviewPanel } from './review-panel.tsx';
 
 // Painel da revisão (#75): erros da release, checklist com os rótulos recebidos, bloqueio,
-// permissão e a mensagem de aprovação.
+// permissão e a mensagem de aprovação. No Ecme (#277), o conteúdo fica num Card.
 
 afterEach(cleanup);
 
@@ -56,6 +56,18 @@ describe('painel de revisão', () => {
     expect(screen.getByText('Nenhum problema de validação.')).toBeTruthy();
   });
 
+  it('fica num Card dentro do complementar rotulado pela versão', () => {
+    renderPanel();
+
+    const panel = screen.getByRole('complementary', { name: 'Revisão da versão 2' });
+    const card = panel.querySelector(':scope > .card');
+    expect(card).toBeTruthy();
+    expect(card?.contains(screen.getByRole('button', { name: 'Aprovar' }))).toBe(true);
+    expect(card?.contains(screen.getByRole('heading', { name: 'Validação da release' }))).toBe(
+      true,
+    );
+  });
+
   it('liga para a visualização em nova aba', () => {
     renderPanel();
 
@@ -69,7 +81,8 @@ describe('painel de revisão', () => {
       issues: [{ message: 'O bloco faq não é suportado pela release do site' }],
     });
 
-    expect(screen.getByText('O bloco faq não é suportado pela release do site')).toBeTruthy();
+    const issue = screen.getByText('O bloco faq não é suportado pela release do site');
+    expect(issue.closest('ul')?.classList.contains('text-error')).toBe(true);
     const button = screen.getByRole('button', { name: 'Aprovar' });
     expect(button.hasAttribute('disabled')).toBe(true);
     expect(button.getAttribute('aria-describedby')).toBeTruthy();
