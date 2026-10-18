@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
+import AxeBuilder from '@axe-core/playwright';
 import { contentPath, mediaUrl } from '@orakel/core/v1';
 import { expect, test, type Page } from '@playwright/test';
 import { and, eq } from 'drizzle-orm';
@@ -27,6 +28,7 @@ import { analyzeTables } from './statistics.ts';
 // Precisa do .env.local (banco e S3, pelo playwright.config.ts) e de exemplo-a semeado.
 
 const SITE = 'exemplo-a';
+const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 const FIXTURE = new URL('fixtures/foto-gps.jpg', import.meta.url);
 
 test.setTimeout(240_000);
@@ -228,7 +230,8 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
     page,
   }) => {
     await loginAs(page, 'editor@orakel.local');
-    const count = page.getByRole('navigation', { name: 'Paginação' }).getByRole('status');
+    // A contagem fica ao lado do nav "Paginação" do Ecme, não dentro dele (#269).
+    const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
     let started = Date.now();
     await page.goto(`/sites/${LIBRARY_SITE}/midia`);
@@ -251,7 +254,7 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
 
     // A paginação também só com teclado, sem repetir imagem.
     await page.goto(`/sites/${LIBRARY_SITE}/midia`);
-    const next = page.getByRole('button', { name: 'Próxima' });
+    const next = page.getByRole('button', { name: 'Próxima página' });
     for (let step = 0; step < 80; step += 1) {
       if (await next.evaluate((element) => element === document.activeElement)) break;
       await page.keyboard.press('Tab');
@@ -261,6 +264,27 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
     await expect(page.getByText('foto-25.jpg ·', { exact: false })).toBeVisible();
     await expect(page.getByText('foto-24.jpg ·', { exact: false })).toHaveCount(0);
   });
+
+  // Busca, contagem e paginação nos controles do Ecme (#269), nos dois temas.
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`lista sem violação do axe (${colorScheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await loginAs(page, 'editor@orakel.local');
+      await page.goto(`/sites/${LIBRARY_SITE}/midia?pagina=2`);
+      await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+        '2.000 resultados',
+      );
+      await expect(
+        page
+          .getByRole('navigation', { name: 'Paginação' })
+          .getByRole('button', { name: 'Página 2' }),
+      ).toHaveAttribute('aria-current', 'page');
+      await page.waitForLoadState('networkidle');
+
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+    });
+  }
 });
 
 test('envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com o motivo (#188)', async ({

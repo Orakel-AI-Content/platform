@@ -39,7 +39,7 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/autores$/);
   await page.getByLabel('Buscar por nome').fill(author.toUpperCase());
   await expect(page.getByRole('row', { name: new RegExp(author) })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Paginação' }).getByRole('status')).toHaveText(
+  await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
     '1 resultado',
   );
   await expectNoViolations(page);
