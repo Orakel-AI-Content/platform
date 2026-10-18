@@ -31,11 +31,33 @@ test('endereço inexistente mostra "não encontrado" com o cabeçalho e status 4
     await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
     await expect(page.getByRole('banner')).toContainText(OPERATOR);
   }
-  await expectNoAxeViolations(page);
 
   await page.getByRole('link', { name: 'Ir para a lista de sites' }).click();
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
 });
+
+// Telas de estado no visual do Ecme (#283), nos dois temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`"não encontrado" sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, OPERATOR);
+    for (const path of ['/qualquer', '/sites/exemplo-a/nada/aqui']) {
+      await page.goto(path);
+      await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
+      await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${colorScheme}\\b`));
+      await expectNoAxeViolations(page);
+    }
+  });
+
+  test(`tela de erro sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, OPERATOR);
+    await page.goto('/teste-de-erro');
+    await expect(page.getByRole('heading', { name: 'Algo deu errado' })).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${colorScheme}\\b`));
+    await expectNoAxeViolations(page);
+  });
+}
 
 test('exceção numa página mostra a tela de erro, e "Tentar de novo" busca de novo', async ({
   page,
@@ -48,7 +70,6 @@ test('exceção numa página mostra a tela de erro, e "Tentar de novo" busca de 
   await expect(page.getByText(/Código do erro: \S+/)).toBeVisible();
   // A mensagem da exceção fica só nos logs.
   await expect(page.getByText('Erro provocado pelo E2E')).toHaveCount(0);
-  await expectNoAxeViolations(page);
 
   // A página falha sempre: o retry busca de novo e a tela de erro volta.
   const refetch = page.waitForRequest(
