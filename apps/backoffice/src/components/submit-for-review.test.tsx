@@ -35,7 +35,7 @@ describe('enviar para revisão', () => {
 
     const status = await screen.findByText(/Só um rascunho/);
     expect(status.getAttribute('role')).toBe('status');
-    expect(status.className).toContain('text-destructive');
+    expect(status.className).toContain('text-error');
   });
 });
 
