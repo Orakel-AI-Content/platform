@@ -9,7 +9,7 @@ apps/backoffice/
 │   ├── app/                     App Router: telas e route handlers
 │   │   ├── (admin)/             área autenticada (layout confere o Access)
 │   │   └── api/                 export/v1 (rede interna), health
-│   ├── components/              ui/ (shadcn/ui) e componentes de tela
+│   ├── components/              ui/, shared/, template/ e layouts/ (Ecme) e componentes de tela
 │   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, media, export, import, builds)
 │   ├── db/                      client.ts, schema/, site-ids.ts
 │   ├── auth/                    access-jwt.ts, internal-tokens.ts, request-actor.ts
