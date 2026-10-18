@@ -1,12 +1,14 @@
 'use client';
 
 import { ErrorScreen } from '@/components/error-screen';
+import { THEME_COOKIE_SCRIPT } from '@/configs/theme.config';
 
 import './globals.css';
 
 // Falha no layout de (admin) ou no raiz (#77), ex.: banco fora do ar ao ler a sessão. Substitui
 // o layout raiz inteiro, então traz o próprio <html>, o CSS e um cabeçalho estático: aqui não
-// há sessão para mostrar quem está conectado.
+// há sessão para mostrar quem está conectado. Sem o cookie no servidor, o tema escolhido vem do
+// script do <head>, antes da primeira pintura (#283); o <html> suprime o aviso da classe.
 export default function GlobalError({
   error,
   retry,
@@ -15,12 +17,17 @@ export default function GlobalError({
   retry: () => void;
 }) {
   return (
-    <html lang="pt-BR">
-      <body className="min-h-screen antialiased">
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_COOKIE_SCRIPT }} />
         <title>Erro · Orakel Backoffice</title>
-        <header className="border-b border-border">
+      </head>
+      <body className="min-h-screen bg-gray-100 antialiased dark:bg-gray-950">
+        <header className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
           <div className="mx-auto flex max-w-6xl items-center px-6 py-3">
-            <span className="font-semibold">Orakel Backoffice</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">
+              Orakel Backoffice
+            </span>
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-6 py-8">
