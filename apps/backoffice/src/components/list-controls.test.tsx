@@ -4,10 +4,12 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/legacy-ui/table';
+import Table from '@/components/ui/Table';
 
 import { ListPagination, ListToolbar, SortableHead } from './list-controls.tsx';
 import { listFeatures, useListState, type ListConfig } from './list-state.ts';
+
+const { THead, TBody, Tr, Td } = Table;
 
 // Controles de lista (#106): busca sem acentos, filtros, cabeçalho ordenável com aria-sort e
 // paginação, ligados a uma lista de teste com o estado na URL (router.replace simulado).
@@ -104,8 +106,8 @@ function TestList() {
         onClear={list.clearFilters}
       />
       <Table>
-        <TableHeader>
-          <TableRow>
+        <THead>
+          <Tr>
             {table.getHeaderGroups()[0]?.headers.map((header) => (
               <SortableHead
                 key={header.id}
@@ -115,17 +117,17 @@ function TestList() {
                 onToggle={() => header.column.toggleSorting()}
               />
             ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+          </Tr>
+        </THead>
+        <TBody>
           {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell>{row.original.id}</TableCell>
-              <TableCell>{row.original.title}</TableCell>
-              <TableCell>{row.original.kind}</TableCell>
-            </TableRow>
+            <Tr key={row.id}>
+              <Td>{row.original.id}</Td>
+              <Td>{row.original.title}</Td>
+              <Td>{row.original.kind}</Td>
+            </Tr>
           ))}
-        </TableBody>
+        </TBody>
       </Table>
       <ListPagination
         total={table.getPrePaginatedRowModel().rows.length}
