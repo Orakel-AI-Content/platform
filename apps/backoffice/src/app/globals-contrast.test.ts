@@ -983,6 +983,110 @@ const ECME_PAIRS: readonly EcmePair[] = [
     text: 'dark:hover:text-white',
     background: 'dark:bg-gray-950',
     minimum: 4.5,
+  }, // Texto rico e popover de link (#275): o conteúdo e a barra sobre o fundo do editor (o
+  // contêiner do `shared/RichTextEditor`, gray-100 e gray-700), e o campo de link sobre a
+  // superfície do Dropdown (white e gray-900). Os ícones são gráficos (3:1, WCAG 1.4.11). O
+  // `dark:prose-p:text-gray-400` do Ecme cede ao texto do campo; o `text-primary` do botão
+  // ativo, ao `primary-mild`.
+  {
+    name: 'texto do editor',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'intertítulo do editor',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'ícone da barra do editor',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 3,
+  },
+  {
+    name: 'ícone da barra do editor no hover',
+    theme: 'claro',
+    text: 'hover:text-primary-mild',
+    background: 'bg-gray-100',
+    minimum: 3,
+  },
+  {
+    name: 'ícone ativo da barra do editor',
+    theme: 'claro',
+    text: 'aria-pressed:text-primary',
+    background: 'bg-gray-100',
+    minimum: 3,
+  },
+  {
+    name: 'rótulo e dica do campo de link',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'erro do campo de link',
+    theme: 'claro',
+    text: 'text-error',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto do editor',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+    ecme: 'dark:text-gray-400',
+  },
+  {
+    name: 'intertítulo do editor',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
+  {
+    name: 'ícone da barra do editor',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 3,
+  },
+  {
+    name: 'ícone da barra do editor no hover',
+    theme: 'escuro',
+    text: 'dark:hover:text-primary-mild',
+    background: 'dark:bg-gray-700',
+    minimum: 3,
+  },
+  {
+    name: 'ícone ativo da barra do editor',
+    theme: 'escuro',
+    text: 'dark:aria-pressed:text-primary-mild',
+    background: 'dark:bg-gray-700',
+    minimum: 3,
+    ecme: 'text-primary',
+  },
+  {
+    name: 'rótulo e dica do campo de link',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'erro do campo de link',
+    theme: 'escuro',
+    text: 'dark:text-error',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
   },
 ];
 
