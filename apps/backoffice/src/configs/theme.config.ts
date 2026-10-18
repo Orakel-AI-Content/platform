@@ -55,3 +55,10 @@ export function applyThemeChoice(choice: ThemeChoice, doc: Document = document):
  * vai precisar de nonce ou hash.
  */
 export const THEME_SCRIPT = `document.documentElement.classList.add(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')`;
+
+/**
+ * Script inline e bloqueante da `global-error`, que substitui o layout raiz e, como Client
+ * Component, não lê o cookie no servidor: aplica o modo do cookie (não é `HttpOnly`) quando
+ * válido e, sem ele ou com valor desconhecido, cai no THEME_SCRIPT.
+ */
+export const THEME_COOKIE_SCRIPT = `(function(){var m=document.cookie.match(/(?:^|;\\s*)${THEME_COOKIE}=([^;]*)/),v=m&&m[1];if(${JSON.stringify(THEME_MODES)}.indexOf(v)>=0)document.documentElement.classList.add(v);else ${THEME_SCRIPT}})()`;
