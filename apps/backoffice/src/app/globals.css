@@ -71,18 +71,8 @@
   --gray-900: #171717;
   --gray-950: #0a0a0a;
 
-  /* Apelidos de transição: os nomes do shadcn que as telas ainda usam, apontando para a paleta
-     do Ecme. Cada Story de tela troca os nomes ao migrar; a limpeza do épico os remove. */
-  --background: var(--neutral);
-  --foreground: var(--gray-900);
-  --muted: var(--gray-100);
-  --muted-foreground: var(--gray-600);
-  --border: var(--gray-200);
-  --primary-foreground: var(--neutral);
-  --destructive: var(--error);
-  --destructive-foreground: var(--neutral);
-  --success-foreground: var(--neutral);
-  --info-foreground: var(--neutral);
+  /* Tokens próprios do Backoffice, sem equivalente no Ecme: a cor do foco visível (#85) e o
+     raio de rounded-md. */
   --ring: var(--primary);
   --radius: 0.5rem;
 }
@@ -95,16 +85,6 @@
   --success: #10b981;
   --info: #2a85ff;
   --warning: #f59e0b;
-
-  --background: var(--gray-950);
-  --foreground: var(--gray-100);
-  --muted: var(--gray-800);
-  --muted-foreground: var(--gray-400);
-  --border: var(--gray-700);
-  --primary-foreground: var(--gray-950);
-  --destructive-foreground: var(--gray-950);
-  --success-foreground: var(--gray-950);
-  --info-foreground: var(--gray-950);
 }
 
 @theme inline {
@@ -140,17 +120,7 @@
   --color-gray-900: var(--gray-900);
   --color-gray-950: var(--gray-950);
 
-  /* Apelidos de transição (ver :root). */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-success-foreground: var(--success-foreground);
-  --color-info-foreground: var(--info-foreground);
+  /* Tokens próprios do Backoffice (ver :root). */
   --color-ring: var(--ring);
   --radius-md: var(--radius);
 }
@@ -175,8 +145,8 @@
   }
 }
 
+/* Fundo e texto da página nos tokens do Ecme, por tema. */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  @apply bg-neutral text-gray-900 dark:bg-gray-950 dark:text-gray-100;
   font-family: var(--font-sans);
 }
