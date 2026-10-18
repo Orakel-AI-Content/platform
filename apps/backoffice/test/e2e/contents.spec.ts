@@ -610,6 +610,35 @@ test.describe('barra de ações do editor (#109)', () => {
     });
   }
 
+  // Texto rico no Ecme (#275): barra, conteúdo e o popover de link aberto com o erro do campo,
+  // sem violação do axe nos dois temas. Não salva: o conteúdo da seção fica como está.
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`texto rico com o popover de link sem violação do axe (${colorScheme})`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await loginAs(page, 'editor@orakel.local');
+      await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+      // Os 20 blocos daqui são sumários: um bloco de texto novo traz o editor.
+      await addBlock(page, 'Texto');
+      await page.getByRole('textbox', { name: 'Texto', exact: true }).fill('Primeiro parágrafo.');
+      const toolbar = page.getByRole('toolbar', { name: 'Formatação: Texto' });
+      const linkButton = toolbar.getByRole('button', { name: 'Link', exact: true });
+      const linkPopover = page.locator(`[id="${await linkButton.getAttribute('popovertarget')}"]`);
+      const href = linkPopover.getByLabel('Endereço do link');
+      await linkButton.focus();
+      await page.keyboard.press('Enter');
+      await expect(href).toBeFocused();
+      await page.keyboard.type('javascript:alert(1)');
+      await page.keyboard.press('Enter');
+      await expect(href).toHaveAttribute('aria-invalid', 'true');
+
+      await page.mouse.move(0, 0);
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+    });
+  }
+
   test('recolhe e expande blocos só pelo teclado; recolhido, o bloco ocupa uma linha (#135)', async ({
     page,
   }) => {

@@ -2,12 +2,22 @@
 
 import type { Inline, RichText } from '@orakel/content-model/v1';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
-import { Bold, Code, Heading2, Heading3, Italic, Link, List, ListOrdered } from 'lucide-react';
 import type { ReactNode } from 'react';
+import {
+  PiCode,
+  PiLink,
+  PiListBullets,
+  PiListNumbers,
+  PiTextB,
+  PiTextHThree,
+  PiTextHTwo,
+  PiTextItalic,
+} from 'react-icons/pi';
 
-import { IconButton } from '@/components/legacy-ui/icon-button';
+import { IconButton } from '@/components/shared/IconButton';
+import classNames from '@/components/ui/utils/classNames';
 
-import { LinkPopover } from './link-popover.tsx';
+import { LinkPopover, PRESSED_CLASS } from './link-popover.tsx';
 
 import {
   inlinesDocFromTipTap,
@@ -33,6 +43,20 @@ const toDoc = (mode: RichTextMode, value: unknown): TipTapNode | undefined => {
 const fromDoc = (mode: RichTextMode, doc: TipTapNode) =>
   mode === 'richText' ? richTextFromTipTap(doc) : inlinesDocFromTipTap(doc);
 
+// Contêiner do `shared/RichTextEditor` do Ecme (v1.3.10, e5f9a1d), sobre o editor e a barra
+// daqui (#275). O conteúdo não usa o `prose` do Ecme: o plugin de tipografia traz a própria
+// paleta, fora do `@theme`. Texto como o do campo (o `dark:prose-p:text-gray-400` do Ecme fica
+// em 4,11:1 sobre o gray-700), intertítulos como os títulos, links sublinhados na cor do texto
+// (como no `prose`). O foco fica no contorno global de 2px na cor `ring`, sem o
+// `focus:outline-hidden` do Ecme. Pares em `ECME_PAIRS` do globals-contrast.test.ts.
+const CONTENT_CLASS = [
+  'm-2 min-h-20 text-sm text-gray-800 dark:text-gray-100',
+  '[&_p+p]:mt-2 [&_a]:underline [&_code]:font-mono',
+  '[&_h2]:mt-3 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-gray-900 dark:[&_h2]:text-gray-100',
+  '[&_h3]:mt-3 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-gray-900 dark:[&_h3]:text-gray-100',
+  '[&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-6 [&_ol]:pl-6 [&_li]:my-1',
+].join(' ');
+
 type Action = {
   label: string;
   icon: ReactNode;
@@ -44,25 +68,25 @@ type Action = {
 const MARK_ACTIONS: Action[] = [
   {
     label: 'Negrito',
-    icon: <Bold />,
+    icon: <PiTextB />,
     active: (e) => e.isActive('bold'),
     run: (e) => e.chain().focus().toggleBold().run(),
   },
   {
     label: 'Itálico',
-    icon: <Italic />,
+    icon: <PiTextItalic />,
     active: (e) => e.isActive('italic'),
     run: (e) => e.chain().focus().toggleItalic().run(),
   },
   {
     label: 'Código',
-    icon: <Code />,
+    icon: <PiCode />,
     active: (e) => e.isActive('code'),
     run: (e) => e.chain().focus().toggleCode().run(),
   },
   {
     label: 'Link',
-    icon: <Link />,
+    icon: <PiLink />,
     active: (e) => e.isActive('link'),
   },
 ];
@@ -70,25 +94,25 @@ const MARK_ACTIONS: Action[] = [
 const BLOCK_ACTIONS: Action[] = [
   {
     label: 'Intertítulo 2',
-    icon: <Heading2 />,
+    icon: <PiTextHTwo />,
     active: (e) => e.isActive('heading', { level: 2 }),
     run: (e) => e.chain().focus().toggleHeading({ level: 2 }).run(),
   },
   {
     label: 'Intertítulo 3',
-    icon: <Heading3 />,
+    icon: <PiTextHThree />,
     active: (e) => e.isActive('heading', { level: 3 }),
     run: (e) => e.chain().focus().toggleHeading({ level: 3 }).run(),
   },
   {
     label: 'Lista',
-    icon: <List />,
+    icon: <PiListBullets />,
     active: (e) => e.isActive('bulletList'),
     run: (e) => e.chain().focus().toggleBulletList().run(),
   },
   {
     label: 'Lista numerada',
-    icon: <ListOrdered />,
+    icon: <PiListNumbers />,
     active: (e) => e.isActive('orderedList'),
     run: (e) => e.chain().focus().toggleOrderedList().run(),
   },
@@ -107,11 +131,19 @@ function Toolbar({ editor, mode, label }: { editor: Editor; mode: RichTextMode; 
     selector: ({ editor: current }) => actions.map((action) => action.active(current)),
   });
   return (
-    <div role="toolbar" aria-label={`Formatação: ${label}`} className="flex items-center gap-1">
+    <div
+      role="toolbar"
+      aria-label={`Formatação: ${label}`}
+      className="flex items-center gap-1 px-2 text-gray-900 dark:text-gray-100"
+    >
       {groups.map((group, groupIndex) => (
         <div key={groupIndex} className="contents">
           {groupIndex > 0 && (
-            <div role="separator" aria-orientation="vertical" className="mx-1 h-5 w-px bg-border" />
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-600"
+            />
           )}
           {group.map((action) => {
             const index = actions.indexOf(action);
@@ -127,7 +159,7 @@ function Toolbar({ editor, mode, label }: { editor: Editor; mode: RichTextMode; 
                 label={action.label}
                 icon={action.icon}
                 aria-pressed={pressed[index] ?? false}
-                className="aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                className={PRESSED_CLASS}
                 onClick={() => run(editor)}
               />
             );
@@ -160,17 +192,28 @@ export function RichTextEditor({
         'aria-label': label,
         'aria-invalid': invalid ? 'true' : 'false',
         ...(describedBy ? { 'aria-describedby': describedBy } : {}),
-        class:
-          'min-h-20 rounded-md border border-border bg-background px-3 py-2 text-sm aria-invalid:border-destructive',
+        class: CONTENT_CLASS,
       },
     },
     onUpdate: ({ editor: current }) => onChange(fromDoc(mode, current.getJSON() as TipTapNode)),
   });
+  // No Tiptap 3 o editor não re-renderiza a cada transação; assina só o foco (como no Ecme).
+  const focused = useEditorState({
+    editor,
+    selector: ({ editor: current }) => Boolean(current?.isFocused),
+  });
   if (!editor) return null;
   return (
-    <div className="space-y-2">
+    <div
+      className={classNames(
+        'rich-text-editor rounded-xl ring-1 ring-gray-200 dark:ring-gray-600 border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 pt-3',
+        focused && 'ring-primary border-primary',
+        invalid && 'bg-error-subtle',
+        focused && invalid && 'bg-error-subtle ring-error border-error',
+      )}
+    >
       <Toolbar editor={editor} mode={mode} label={label} />
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="max-h-[600px] overflow-auto px-2" />
     </div>
   );
 }
