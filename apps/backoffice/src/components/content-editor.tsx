@@ -2,9 +2,9 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Block } from '@orakel/content-model/v1';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Fragment, useEffect, useId, useState, useTransition } from 'react';
+import { Fragment, useEffect, useId, useState, useTransition, type ComponentProps } from 'react';
+import { PiArrowDown, PiArrowUp, PiCaretDown, PiCaretRight, PiPlus, PiTrash } from 'react-icons/pi';
 import { FormProvider, get, useFieldArray, useForm, type FieldValues } from 'react-hook-form';
 
 import {
@@ -27,12 +27,14 @@ import { SchemaFields, type FieldRenderer } from '@/components/forms/schema-form
 import { zonedDateTimeField } from '@/components/forms/zoned-datetime-field';
 import { BLOCK_TYPE_LABEL } from '@/components/site-labels.ts';
 import { blockSummary, blockText } from '@/components/block-summary.ts';
-import { ActionsMenu } from '@/components/legacy-ui/actions-menu';
-import { Button, buttonVariants } from '@/components/legacy-ui/button';
-import { IconButton } from '@/components/legacy-ui/icon-button';
+import { IconButton } from '@/components/shared/IconButton';
+import StickyFooter from '@/components/shared/StickyFooter';
+import { Button } from '@/components/ui/Button';
+import Dropdown from '@/components/ui/Dropdown';
+import Tooltip from '@/components/ui/Tooltip';
+import classNames from '@/components/ui/utils/classNames';
 import { useLeaveGuard } from '@/components/use-leave-guard.ts';
 import type { ContentEdit } from '@/domain/content/contents.ts';
-import { cn } from '@/lib/utils';
 
 // Editor de artigos e páginas (#45): um formulário só; os metadados e cada bloco são
 // desenhados pelo gerador, e a lista de blocos (tipo, ordem, remoção) é daqui. O `n` de
@@ -98,6 +100,20 @@ const errorAt = (errors: FieldValues, path: string): string | undefined => {
   const node = get(errors, path) as { message?: string; root?: { message?: string } } | undefined;
   return node?.root?.message ?? node?.message;
 };
+
+/** Gatilho de "Inserir bloco" com a aparência do `IconButton` (`Button` `plain` `xs`: 32 px). */
+const INSERT_TOGGLE_CLASS =
+  'button inline-flex h-8 w-8 items-center justify-center rounded-lg text-base hover:text-primary-mild';
+
+/**
+ * "Inserir bloco" (#134) no `Dropdown` do Ecme, que dá as setas, o typeahead e o Esc com o
+ * foco de volta. Como no `IconButton`, a dica é só visual: o `aria-describedby` que o
+ * `Tooltip` injeta repetiria o nome, então fica de fora.
+ */
+function InsertMenu(props: ComponentProps<typeof Dropdown> & { 'aria-describedby'?: string }) {
+  // O `aria-describedby` depois do spread substitui o do `Tooltip`.
+  return <Dropdown {...props} aria-describedby={undefined} />;
+}
 
 export function ContentEditor({
   mode,
@@ -307,7 +323,7 @@ export function ContentEditor({
           })(event)
         }
       >
-        <fieldset className="space-y-4 rounded-md border border-border p-4">
+        <fieldset className="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
           <legend className="px-1 text-sm font-semibold">Dados do conteúdo</legend>
           <SchemaFields
             schema={ContentMetaSchema}
@@ -325,13 +341,13 @@ export function ContentEditor({
               Blocos
             </h2>
             <Button
-              variant="outline"
+              type="button"
               size="sm"
               onClick={() => setCollapsed(new Set(blocks.fields.map((field) => field.id)))}
             >
               Recolher todos
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setCollapsed(new Set())}>
+            <Button type="button" size="sm" onClick={() => setCollapsed(new Set())}>
               Expandir todos
             </Button>
           </div>
@@ -342,35 +358,34 @@ export function ContentEditor({
             const isCollapsed = collapsed.has(field.id);
             return (
               <Fragment key={field.id}>
-                <ActionsMenu
-                  trigger={{ label: `Inserir bloco na posição ${position}`, icon: <Plus /> }}
-                >
-                  {offered.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={buttonVariants({
-                        variant: 'ghost',
-                        size: 'sm',
-                        className: 'justify-start',
-                      })}
-                      onClick={() => insertBlock(index, option)}
-                    >
-                      {BLOCK_TYPE_LABEL[option]}
-                    </button>
-                  ))}
-                </ActionsMenu>
+                <Tooltip title={`Inserir bloco na posição ${position}`} wrapperClass="inline-flex">
+                  <InsertMenu
+                    aria-label={`Inserir bloco na posição ${position}`}
+                    toggleClassName={INSERT_TOGGLE_CLASS}
+                    renderTitle={<PiPlus aria-hidden />}
+                  >
+                    {offered.map((option) => (
+                      <Dropdown.Item
+                        key={option}
+                        eventKey={option}
+                        onClick={() => insertBlock(index, option)}
+                      >
+                        {BLOCK_TYPE_LABEL[option]}
+                      </Dropdown.Item>
+                    ))}
+                  </InsertMenu>
+                </Tooltip>
                 <fieldset
                   id={`${id}-block-${index}`}
                   tabIndex={-1}
-                  className="rounded-md border border-border p-4"
+                  className="rounded-xl border border-gray-200 p-4 dark:border-gray-700"
                 >
                   {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
                   <legend className="sr-only">{`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}</legend>
                   <div className="flex items-center gap-2">
                     <IconButton
                       label={`Conteúdo do bloco ${position}`}
-                      icon={isCollapsed ? <ChevronRight /> : <ChevronDown />}
+                      icon={isCollapsed ? <PiCaretRight /> : <PiCaretDown />}
                       aria-expanded={!isCollapsed}
                       aria-controls={`${id}-block-body-${index}`}
                       onClick={() => toggleBlock(field.id)}
@@ -380,7 +395,7 @@ export function ContentEditor({
                     </span>
                     {isCollapsed && (
                       <span
-                        className="min-w-0 flex-1 truncate text-sm text-muted-foreground"
+                        className="min-w-0 flex-1 truncate text-sm"
                         title={blockText(form.getValues(`blocks.${index}`)) || undefined}
                       >
                         {blockSummary(form.getValues(`blocks.${index}`))}
@@ -389,14 +404,14 @@ export function ContentEditor({
                     <div className="ml-auto flex shrink-0 gap-1">
                       <IconButton
                         label={`Mover bloco ${position} para cima`}
-                        icon={<ArrowUp />}
+                        icon={<PiArrowUp />}
                         // aria-disabled (não disabled): o foco fica no botão depois de mover.
                         aria-disabled={index === 0}
                         onClick={() => index > 0 && blocks.move(index, index - 1)}
                       />
                       <IconButton
                         label={`Mover bloco ${position} para baixo`}
-                        icon={<ArrowDown />}
+                        icon={<PiArrowDown />}
                         aria-disabled={index === blocks.fields.length - 1}
                         onClick={() =>
                           index < blocks.fields.length - 1 && blocks.move(index, index + 1)
@@ -404,7 +419,7 @@ export function ContentEditor({
                       />
                       <IconButton
                         label={`Remover bloco ${position}`}
-                        icon={<Trash2 />}
+                        icon={<PiTrash />}
                         onClick={() => removeBlock(index)}
                       />
                     </div>
@@ -423,7 +438,7 @@ export function ContentEditor({
               </Fragment>
             );
           })}
-          {blocksError && <p className="text-sm text-destructive">{blocksError}</p>}
+          {blocksError && <p className="text-sm text-error">{blocksError}</p>}
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1.5">
               <label htmlFor={`${id}-new-type`} className="text-sm font-medium">
@@ -431,7 +446,7 @@ export function ContentEditor({
               </label>
               <select
                 id={`${id}-new-type`}
-                className="flex min-h-9 rounded-md border border-border bg-background px-3 py-1 text-sm"
+                className="flex h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100"
                 value={nextType ?? ''}
                 onChange={(event) =>
                   setNextType(isBlockType(event.target.value) ? event.target.value : undefined)
@@ -445,7 +460,7 @@ export function ContentEditor({
               </select>
             </div>
             <Button
-              variant="outline"
+              type="button"
               size="sm"
               disabled={nextType === undefined}
               onClick={() => nextType && blocks.append(newBlock(nextType))}
@@ -455,48 +470,47 @@ export function ContentEditor({
           </div>
         </section>
 
-        <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border bg-background py-3">
-          <Button type="submit" disabled={pending || form.formState.isSubmitting}>
+        <StickyFooter
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-200 bg-white py-3 dark:border-gray-700 dark:bg-gray-800"
+          stickyClass="z-10"
+        >
+          <Button type="submit" variant="solid" disabled={pending || form.formState.isSubmitting}>
             {pending ? 'Salvando…' : mode === 'create' ? 'Criar conteúdo' : 'Salvar nova versão'}
           </Button>
           {previewUrl ? (
-            <a
+            <Button
+              asElement="a"
               href={previewUrl}
               target="_blank"
               rel="noopener noreferrer"
               aria-describedby={`${id}-preview-note`}
-              className={buttonVariants({ variant: 'outline' })}
             >
               Ver prévia<span className="sr-only"> (abre em nova aba)</span>
-            </a>
+            </Button>
           ) : (
-            <Button variant="outline" disabled aria-describedby={`${id}-preview-note`}>
+            <Button type="button" disabled aria-describedby={`${id}-preview-note`}>
               Ver prévia
             </Button>
           )}
           {/* aria-live sem role: o `status` da barra é a confirmação do salvamento. */}
-          <p
-            id={`${id}-preview-note`}
-            aria-live="polite"
-            className="text-sm text-muted-foreground empty:hidden"
-          >
+          <p id={`${id}-preview-note`} aria-live="polite" className="text-sm empty:hidden">
             {previewNote}
           </p>
           {/* Uma região só: a confirmação do salvamento ou a remoção, a mais recente (#112). */}
-          <p role="status" className="text-sm text-muted-foreground">
+          <p role="status" className="text-sm">
             {removed ? `Bloco ${removed.position} removido.` : saved}
           </p>
           {removed && (
-            <Button variant="outline" size="sm" onClick={undoRemove}>
+            <Button type="button" size="sm" onClick={undoRemove}>
               Desfazer
             </Button>
           )}
-          <div role="alert" className={cn(summary.length > 0 && 'text-sm text-destructive')}>
+          <div role="alert" className={classNames(summary.length > 0 && 'text-sm text-error')}>
             {summary.map((line) => (
               <p key={line}>{line}</p>
             ))}
           </div>
-        </div>
+        </StickyFooter>
       </form>
     </FormProvider>
   );
