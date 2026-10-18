@@ -62,6 +62,13 @@ const rows: ContentListItem[] = [
   },
 ];
 
+// O filtro é o combobox do react-select: abre com a seta e escolhe a opção pelo nome.
+async function choose(user: ReturnType<typeof userEvent.setup>, label: string, option: string) {
+  screen.getByRole('combobox', { name: label }).focus();
+  await user.keyboard('{ArrowDown}');
+  await user.click(screen.getByRole('option', { name: option }));
+}
+
 describe('tabela de conteúdos', () => {
   it('mostra cada conteúdo com tipo e status da versão mais recente', () => {
     render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
@@ -190,8 +197,8 @@ describe('busca, filtros, ordem e paginação (#107)', () => {
     const user = userEvent.setup();
     renderMany();
 
-    await user.selectOptions(screen.getByLabelText('Tipo'), 'page');
-    await user.selectOptions(screen.getByLabelText('Status'), 'rascunho');
+    await choose(user, 'Tipo', 'Página');
+    await choose(user, 'Status', 'Rascunho');
     expect(titles()).toEqual([
       'Receita 27',
       'Receita 21',
@@ -238,13 +245,13 @@ describe('busca, filtros, ordem e paginação (#107)', () => {
     expect(statuses.at(-1)).toBe('Rascunho');
   });
 
-  it('25 por página, com contagem e Anterior/Próxima', async () => {
+  it('25 por página, com contagem e Página anterior/Próxima página', async () => {
     const user = userEvent.setup();
     renderMany();
 
     expect(screen.getAllByRole('row')).toHaveLength(26);
     expect(screen.getByRole('status').textContent).toBe('30 resultados');
-    await user.click(screen.getByRole('button', { name: 'Próxima' }));
+    await user.click(screen.getByRole('button', { name: 'Próxima página' }));
 
     expect(screen.getAllByRole('row')).toHaveLength(6);
     expect(navigation.get()).toBe('pagina=2');
@@ -255,7 +262,9 @@ describe('busca, filtros, ordem e paginação (#107)', () => {
     renderMany();
 
     expect(screen.getByLabelText<HTMLInputElement>('Buscar por título').value).toBe('receita');
-    expect(screen.getByLabelText<HTMLSelectElement>('Status').value).toBe('publicado');
+    expect(screen.getByRole('combobox', { name: 'Status' }).closest('.select')?.textContent).toBe(
+      'Publicado',
+    );
     expect(titles()[0]).toBe('Receita 02');
     expect(screen.getByRole('status').textContent).toBe('14 resultados');
   });

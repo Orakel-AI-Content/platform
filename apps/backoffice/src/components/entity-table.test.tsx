@@ -139,12 +139,15 @@ describe('busca por nome e paginação (#108)', () => {
     expect(screen.getAllByRole('row')).toHaveLength(26);
     expect(screen.getByRole('status').textContent).toBe('30 resultados');
     expect(screen.queryByText('30 autores')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Anterior' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Página anterior' })).toHaveProperty(
+      'disabled',
+      true,
+    );
 
-    await user.click(screen.getByRole('button', { name: 'Próxima' }));
+    await user.click(screen.getByRole('button', { name: 'Próxima página' }));
 
     expect(names()).toEqual(['Autor 26', 'Autor 27', 'Autor 28', 'Autor 29', 'Autor 30']);
-    expect(screen.getByRole('button', { name: 'Próxima' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Próxima página' })).toHaveProperty('disabled', true);
     expect(navigation.get()).toBe('pagina=2');
   });
 

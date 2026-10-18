@@ -175,15 +175,14 @@ describe('biblioteca de mídia', () => {
       refresh: vi.fn(() => Promise.resolve(null)),
     });
 
-    expect(screen.getByRole('navigation', { name: 'Paginação' }).textContent).toContain(
-      '50 resultados',
-    );
+    expect(screen.getByText('50 resultados').getAttribute('role')).toBe('status');
+    expect(screen.getByRole('navigation', { name: 'Paginação' })).toBeTruthy();
     await user.type(screen.getByRole('searchbox', { name: 'Buscar por nome do arquivo' }), 'p');
     expect(router.replace).toHaveBeenLastCalledWith('/sites/exemplo-a/midia?q=p', {
       scroll: false,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Próxima' }));
+    await user.click(screen.getByRole('button', { name: 'Próxima página' }));
     expect(router.replace).toHaveBeenLastCalledWith(expect.stringContaining('pagina=2'), {
       scroll: false,
     });
