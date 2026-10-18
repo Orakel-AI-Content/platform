@@ -52,6 +52,13 @@ const stateOf = (name: string) =>
     .closest('li')
     ?.querySelector('[role="status"]')?.textContent;
 
+/** Classe do estado de um arquivo (cor de estado). */
+const stateClassOf = (name: string) =>
+  within(screen.getByRole('list', { name: 'Envios' }))
+    .getByText(name)
+    .closest('li')
+    ?.querySelector('[role="status"]')?.className;
+
 describe('fila de envio', () => {
   it('cada arquivo mostra o progresso e depois o resultado; um recusado não para os outros', async () => {
     const send = vi.fn<SendFile>((sent, onProgress) => {
@@ -101,6 +108,8 @@ describe('fila de envio', () => {
     );
     expect(send).toHaveBeenCalledTimes(3);
     expect(onReady).toHaveBeenCalled();
+    expect(stateClassOf('praia.jpg')).toBe('text-success');
+    expect(stateClassOf('texto.txt')).toBe('text-error');
   });
 
   it('mostra a porcentagem enquanto sobe', async () => {
