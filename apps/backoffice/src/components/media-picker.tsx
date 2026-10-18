@@ -84,7 +84,8 @@ export function MediaPicker({
 
   return (
     <>
-      <Button ref={buttonRef} size="sm" aria-haspopup="dialog" onClick={openDialog}>
+      {/* `type="button"`: o seletor fica dentro do formulário do editor, e abrir não o envia. */}
+      <Button ref={buttonRef} type="button" size="sm" aria-haspopup="dialog" onClick={openDialog}>
         {label}
       </Button>
       <Dialog
@@ -99,7 +100,7 @@ export function MediaPicker({
             <h2 id={`${id}-title`} className="text-lg font-semibold">
               Escolher imagem
             </h2>
-            <Button variant="plain" size="sm" onClick={close}>
+            <Button type="button" variant="plain" size="sm" onClick={close}>
               Fechar
             </Button>
           </div>

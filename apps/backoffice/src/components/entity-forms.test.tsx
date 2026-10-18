@@ -2,8 +2,10 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { APP_ELEMENT_ID } from './ui/utils/modalApp.ts';
 import { EntityForm, InstitutionalTextsForm, type EntityFormResult } from './entity-forms.tsx';
 
 // Formulários de entidades (#46): rótulos por tipo, recusa no campo e volta para a lista.
@@ -19,8 +21,19 @@ afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
 
+// O seletor de imagem é o Dialog do Ecme (#280): o react-modal esconde o contêiner da app.
+let app: HTMLElement;
+
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
+
 afterEach(() => {
   cleanup();
+  app.remove();
   vi.clearAllMocks();
 });
 
@@ -49,6 +62,7 @@ describe('formulários de entidades', () => {
         }}
         action={action}
       />,
+      { container: app },
     );
 
     await user.type(screen.getByLabelText('Nome'), 'Carla Dias');
@@ -56,7 +70,9 @@ describe('formulários de entidades', () => {
     // A foto pela grade de miniaturas (#182).
     const photo = screen.getByRole('group', { name: 'Foto' });
     await user.click(within(photo).getByRole('button', { name: 'Escolher imagem' }));
-    await user.click(await within(photo).findByRole('button', { name: 'Mídia 2 · 400×400' }));
+    const picker = screen.getByRole('dialog', { name: 'Escolher imagem' });
+    await user.click(await within(picker).findByRole('button', { name: 'Mídia 2 · 400×400' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
     await waitFor(() => expect(action).toHaveBeenCalled());

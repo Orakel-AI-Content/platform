@@ -270,6 +270,23 @@ describe('grade de miniaturas', () => {
     expect(inDialog().queryByRole('navigation', { name: 'Paginação' })).toBeNull();
   });
 
+  it('dentro de um formulário, abrir e fechar não o enviam', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <MediaPicker label="Escolher imagem" load={library(3)} onSelect={vi.fn()} />
+      </form>,
+      { container: app },
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Escolher imagem' }));
+    await user.click(inDialog().getByRole('button', { name: 'Fechar' }));
+    await expectClosed();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('buttonRef recebe o botão que abre (foco vindo de fora)', () => {
     const buttonRef = vi.fn();
     render(
