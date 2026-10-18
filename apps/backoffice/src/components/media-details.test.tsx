@@ -1,17 +1,38 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { APP_ELEMENT_ID } from './ui/utils/modalApp.ts';
 import { MediaDetails } from './media-details.tsx';
 import type { MediaItem } from './media-library.tsx';
 
-// Detalhes de uma imagem (#187): o botão da imagem abre o diálogo com dimensões, formatos e
-// identificador; "Copiar identificador" confirma (ou explica a falha) em role="status"; Esc
-// fecha e o foco volta à imagem. O Esc nativo é o evento `cancel` seguido de `close`.
+// Detalhes de uma imagem (#187, no Dialog do Ecme desde #279): o botão da imagem abre o
+// diálogo com dimensões, formatos e identificador; "Copiar identificador" confirma (ou explica
+// a falha) em role="status"; Esc e "Fechar" fecham e o foco volta à imagem.
+
+let app: HTMLElement;
+
+beforeAll(() => {
+  // O happy-dom rejeita a animação nativa que o motion cancela ao desmontar.
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
+
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
 
 afterEach(() => {
   cleanup();
+  app.remove();
   vi.unstubAllGlobals();
 });
 
@@ -27,10 +48,16 @@ const item: MediaItem = {
 };
 
 function renderDetails(media: MediaItem = item) {
-  render(<MediaDetails item={media} timeZone="America/Sao_Paulo" />);
+  render(<MediaDetails item={media} timeZone="America/Sao_Paulo" />, { container: app });
   const trigger = screen.getByRole('button', { name: /Praia ação 01\.jpg|Sem nome/ });
-  const dialog = document.querySelector('dialog') as HTMLDialogElement;
-  return { trigger, dialog };
+  return { trigger };
+}
+
+const dialog = (name: string | RegExp = /Praia ação 01\.jpg|Sem nome/) =>
+  screen.getByRole('dialog', { name });
+
+async function expectClosed() {
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 }
 
 function stubClipboard(writeText: (text: string) => Promise<void>) {
@@ -42,91 +69,108 @@ function stubClipboard(writeText: (text: string) => Promise<void>) {
 describe('detalhes da imagem', () => {
   it('a imagem é um botão; ativar abre os detalhes com dimensões, formatos e identificador', async () => {
     const user = userEvent.setup();
-    const { trigger, dialog } = renderDetails();
+    const { trigger } = renderDetails();
 
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
     expect(trigger.textContent).toBe('Praia ação 01.jpg · 01/10/2026, 12:30 BRT');
+    expect(screen.queryByRole('dialog')).toBeNull();
     await user.click(trigger);
 
-    expect(dialog.open).toBe(true);
-    const details = within(dialog);
+    const details = within(dialog('Praia ação 01.jpg'));
     expect(details.getByRole('heading', { level: 2 }).textContent).toBe('Praia ação 01.jpg');
-    const terms = [...dialog.querySelectorAll('dt')].map((dt) => [
-      dt.textContent,
-      dt.nextElementSibling?.textContent,
-    ]);
+    const terms = details
+      .getAllByRole('term')
+      .map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(terms).toEqual([
       ['Dimensões', '1600×900 px'],
       ['Formatos disponíveis', 'AVIF, WebP'],
       ['Identificador', '42'],
       ['Enviada em', '01/10/2026, 12:30 BRT'],
     ]);
+    expect(details.getAllByRole('button', { name: 'Fechar' })).toHaveLength(1);
   });
 
   it.each([['{Enter}'], [' ']])('%s no botão da imagem também abre', async (key) => {
     const user = userEvent.setup();
-    const { trigger, dialog } = renderDetails();
+    const { trigger } = renderDetails();
 
     trigger.focus();
     await user.keyboard(key);
 
-    expect(dialog.open).toBe(true);
+    expect(dialog()).toBeTruthy();
+  });
+
+  it('o foco fica preso no diálogo, e a app por trás fica inerte', async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderDetails();
+
+    await user.click(trigger);
+    const details = dialog();
+    expect(app.getAttribute('aria-hidden')).toBe('true');
+    for (let i = 0; i < 4; i++) {
+      await user.tab();
+      expect(details.contains(document.activeElement)).toBe(true);
+    }
+    await user.tab({ shift: true });
+    expect(details.contains(document.activeElement)).toBe(true);
   });
 
   it('copiar põe o identificador na área de transferência e confirma em role="status"', async () => {
     const user = userEvent.setup();
     const clipboard = stubClipboard(() => Promise.resolve());
-    const { trigger, dialog } = renderDetails();
+    const { trigger } = renderDetails();
 
     await user.click(trigger);
-    await user.click(within(dialog).getByRole('button', { name: 'Copiar identificador' }));
+    const details = within(dialog());
+    await user.click(details.getByRole('button', { name: 'Copiar identificador' }));
 
     expect(clipboard.writeText).toHaveBeenCalledWith('42');
     await waitFor(() =>
-      expect(within(dialog).getByRole('status').textContent).toBe('Identificador copiado.'),
+      expect(details.getByRole('status').textContent).toBe('Identificador copiado.'),
     );
+    expect(details.getByRole('status').className).not.toContain('text-error');
   });
 
   it('cópia recusada mostra o erro, com o identificador, na mesma região', async () => {
     const user = userEvent.setup();
     stubClipboard(() => Promise.reject(new Error('NotAllowedError')));
-    const { trigger, dialog } = renderDetails();
+    const { trigger } = renderDetails();
 
     await user.click(trigger);
-    await user.click(within(dialog).getByRole('button', { name: 'Copiar identificador' }));
+    const details = within(dialog());
+    await user.click(details.getByRole('button', { name: 'Copiar identificador' }));
 
-    const status = within(dialog).getByRole('status');
+    const status = details.getByRole('status');
     await waitFor(() =>
       expect(status.textContent).toBe('Não foi possível copiar; o identificador é 42.'),
     );
-    expect(status.className).toContain('text-destructive');
+    expect(status.className).toContain('text-error');
   });
 
   it('Esc fecha, devolve o foco à imagem e limpa a mensagem', async () => {
     const user = userEvent.setup();
     stubClipboard(() => Promise.resolve());
-    const { trigger, dialog } = renderDetails();
+    const { trigger } = renderDetails();
 
     trigger.focus();
     await user.keyboard('{Enter}');
-    within(dialog).getByRole('button', { name: 'Copiar identificador' }).focus();
+    const details = within(dialog());
+    details.getByRole('button', { name: 'Copiar identificador' }).focus();
     await user.keyboard('{Enter}');
     await waitFor(() =>
-      expect(within(dialog).getByRole('status').textContent).toBe('Identificador copiado.'),
+      expect(details.getByRole('status').textContent).toBe('Identificador copiado.'),
     );
-    dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
-    dialog.close();
+    await user.keyboard('{Escape}');
 
-    expect(dialog.open).toBe(false);
+    await expectClosed();
     expect(document.activeElement).toBe(trigger);
-    await waitFor(() =>
-      expect(within(dialog).getByRole('status', { hidden: true }).textContent).toBe(''),
-    );
+    await user.click(trigger);
+    expect(within(dialog()).getByRole('status').textContent).toBe('');
   });
 
   it('sem envio registrado, usa os textos de reserva; "Fechar" também devolve o foco', async () => {
     const user = userEvent.setup();
-    const { trigger, dialog } = renderDetails({
+    const { trigger } = renderDetails({
       ...item,
       originalName: null,
       uploadedAt: null,
@@ -135,12 +179,12 @@ describe('detalhes da imagem', () => {
 
     expect(trigger.textContent).toBe('Sem nome (Mídia 42) · Data de envio não registrada');
     await user.click(trigger);
-    expect(within(dialog).getByRole('heading', { level: 2 }).textContent).toBe(
-      'Sem nome (Mídia 42)',
-    );
-    await user.click(within(dialog).getByRole('button', { name: 'Fechar' }));
+    const details = within(dialog('Sem nome (Mídia 42)'));
+    expect(details.getByRole('heading', { level: 2 }).textContent).toBe('Sem nome (Mídia 42)');
+    expect(details.getAllByRole('definition')[1]?.textContent).toBe('—');
+    await user.click(details.getByRole('button', { name: 'Fechar' }));
 
-    expect(dialog.open).toBe(false);
+    await expectClosed();
     expect(document.activeElement).toBe(trigger);
   });
 });

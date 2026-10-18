@@ -1,15 +1,17 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media-library';
 import { formatDateTime } from '@/components/site-labels.ts';
-import { Button } from '@/components/legacy-ui/button';
+import Button from '@/components/ui/Button';
+import Dialog from '@/components/ui/Dialog';
 
-// Detalhes de uma imagem da biblioteca (#187): a imagem da grade é um botão que abre um
-// `<dialog>` nativo com `showModal` (sem Radix, como o `MediaPicker`), com nome, dimensões,
-// formatos, identificador e data de envio, e "Copiar identificador" pela área de
-// transferência. Esc ou "Fechar" devolvem o foco à imagem.
+// Detalhes de uma imagem da biblioteca (#187): a imagem da grade é um botão que abre o Dialog
+// do Ecme (#279), com nome, dimensões, formatos, identificador e data de envio, e "Copiar
+// identificador" pela área de transferência. Esc, o fundo ou "Fechar" fecham, e o react-modal
+// devolve o foco à imagem. O "Fechar" é o botão explícito ao lado do `h2` (`closable={false}`,
+// para não haver dois), e o título fica no corpo em `h2`, em vez do `h5` do `title` do Dialog.
 
 /** Nome original, ou o texto de reserva das mídias sem envio registrado (#186). */
 export function mediaName(item: MediaItem): string {
@@ -39,10 +41,15 @@ type Copy = { kind: 'ok' | 'error'; text: string } | null;
 
 export function MediaDetails({ item, timeZone }: { item: MediaItem; timeZone: string }) {
   const id = useId();
-  const trigger = useRef<HTMLButtonElement>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
   const [copy, setCopy] = useState<Copy>(null);
   const formats = (item.formats ?? []).map((format) => FORMAT_LABEL[format] ?? format);
+
+  // Ao fechar, a mensagem da cópia some.
+  function close() {
+    setOpen(false);
+    setCopy(null);
+  }
 
   async function copyId() {
     try {
@@ -60,31 +67,23 @@ export function MediaDetails({ item, timeZone }: { item: MediaItem; timeZone: st
   return (
     <>
       <button
-        ref={trigger}
         type="button"
         aria-haspopup="dialog"
-        onClick={() => dialog.current?.showModal()}
-        className="w-full space-y-1 rounded-md text-left hover:bg-muted"
+        onClick={() => setOpen(true)}
+        className="w-full space-y-1 rounded-md text-left hover:bg-gray-200 dark:hover:bg-gray-800"
       >
         <MediaThumbnail item={item} />
-        <span className="block text-xs text-muted-foreground">{mediaCaption(item, timeZone)}</span>
+        <span className="block text-xs text-gray-600 dark:text-gray-400">
+          {mediaCaption(item, timeZone)}
+        </span>
       </button>
-      <dialog
-        ref={dialog}
-        aria-labelledby={`${id}-title`}
-        // Esc (cancel) ou "Fechar": o foco volta à imagem, e a mensagem da cópia some.
-        onClose={() => {
-          setCopy(null);
-          trigger.current?.focus();
-        }}
-        className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-md border border-border bg-background p-4 text-foreground shadow-md backdrop:bg-black/50"
-      >
+      <Dialog isOpen={open} onClose={close} closable={false} aria={{ labelledby: `${id}-title` }}>
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-4">
             <h2 id={`${id}-title`} className="text-lg font-semibold break-all">
               {mediaName(item)}
             </h2>
-            <Button variant="ghost" size="sm" onClick={() => dialog.current?.close()}>
+            <Button variant="plain" size="sm" onClick={close}>
               Fechar
             </Button>
           </div>
@@ -92,30 +91,27 @@ export function MediaDetails({ item, timeZone }: { item: MediaItem; timeZone: st
             <MediaThumbnail item={item} />
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">Dimensões</dt>
+            <dt className="text-gray-600 dark:text-gray-400">Dimensões</dt>
             <dd>
               {item.width}×{item.height} px
             </dd>
-            <dt className="text-muted-foreground">Formatos disponíveis</dt>
+            <dt className="text-gray-600 dark:text-gray-400">Formatos disponíveis</dt>
             <dd>{formats.length > 0 ? formats.join(', ') : '—'}</dd>
-            <dt className="text-muted-foreground">Identificador</dt>
+            <dt className="text-gray-600 dark:text-gray-400">Identificador</dt>
             <dd className="tabular-nums">{item.id}</dd>
-            <dt className="text-muted-foreground">Enviada em</dt>
+            <dt className="text-gray-600 dark:text-gray-400">Enviada em</dt>
             <dd>{mediaUploadedAt(item, timeZone)}</dd>
           </dl>
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => void copyId()}>
+            <Button size="sm" onClick={() => void copyId()}>
               Copiar identificador
             </Button>
-            <p
-              role="status"
-              className={copy?.kind === 'error' ? 'text-sm text-destructive' : 'text-sm'}
-            >
+            <p role="status" className={copy?.kind === 'error' ? 'text-sm text-error' : 'text-sm'}>
               {copy?.text}
             </p>
           </div>
         </div>
-      </dialog>
+      </Dialog>
     </>
   );
 }
