@@ -318,3 +318,33 @@ test('envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com
   await expect(row('foto-gps.jpg')).toContainText('pronta', { timeout: 60_000 });
   await expect(row('paisagem.jpg')).toContainText('pronta', { timeout: 60_000 });
 });
+
+// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, nos dois temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`fila de envio preenchida sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    const small = await sharp({
+      create: { width: 320, height: 240, channels: 3, background: '#e76f51' },
+    })
+      .jpeg()
+      .toBuffer();
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${SITE}/midia`);
+
+    await page.getByLabel(/^Imagens \(JPEG/).setInputFiles([
+      { name: `axe-${colorScheme}.jpg`, mimeType: 'image/jpeg', buffer: small },
+      { name: 'notas.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('não é imagem') },
+    ]);
+    await page.getByRole('button', { name: 'Enviar imagens' }).click();
+
+    const row = (name: string) =>
+      page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
+    await expect(row('notas.jpg').getByRole('status')).toHaveText(/^recusada: /);
+    await expect(row(`axe-${colorScheme}.jpg`).getByRole('status')).toHaveText('pronta', {
+      timeout: 60_000,
+    });
+
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
