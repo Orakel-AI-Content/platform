@@ -371,6 +371,58 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
     expect(accessibility.violations).toEqual([]);
   });
 
+  // Lista cheia na Table do Ecme (#273): a 1280 px nada rola na horizontal, nenhuma célula
+  // passa de duas linhas de texto e o axe não acha violação, nos dois temas.
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`lista cheia a 1280 px, até duas linhas por célula, sem violação do axe (${colorScheme})`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await loginAs(page, 'editor@orakel.local');
+      await page.goto(`/sites/${BIG_SITE}/conteudos`);
+      expect(page.viewportSize()?.width).toBe(1280);
+      const table = page.getByRole('table');
+      await expect(table.locator('tbody tr')).toHaveCount(25);
+
+      const overflow = await table.evaluate((element) => [
+        document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        element.parentElement!.scrollWidth - element.parentElement!.clientWidth,
+      ]);
+      expect(overflow).toEqual([0, 0]);
+
+      // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
+      // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
+      const lines = await table.locator('tbody td').evaluateAll((cells) =>
+        cells.map((cell) => {
+          const found: { top: number; bottom: number }[] = [];
+          const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+            if (!node.textContent?.trim()) continue;
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            for (const rect of range.getClientRects()) {
+              if (rect.width <= 1 || rect.height <= 1) continue;
+              const middle = (rect.top + rect.bottom) / 2;
+              const line = found.find((l) => l.top <= middle && middle <= l.bottom);
+              if (line === undefined) found.push({ top: rect.top, bottom: rect.bottom });
+              else
+                Object.assign(line, {
+                  top: Math.min(line.top, rect.top),
+                  bottom: Math.max(line.bottom, rect.bottom),
+                });
+            }
+          }
+          return found.length;
+        }),
+      );
+      expect(lines.length).toBeGreaterThan(0);
+      expect(lines.filter((count) => count > 2)).toEqual([]);
+
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+    });
+  }
+
   test('busca sem resultado mostra a mensagem, e "Limpar busca" volta a lista', async ({
     page,
   }) => {
