@@ -2,10 +2,12 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
 import type { MediaItem } from '../media-library.tsx';
+import { APP_ELEMENT_ID } from '../ui/utils/modalApp.ts';
 import { entityField, mediaField, type MediaSource } from './picker-fields.tsx';
 import { SchemaForm } from './schema-form.tsx';
 
@@ -20,7 +22,20 @@ afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
 
-afterEach(cleanup);
+// O seletor de imagem é o Dialog do Ecme (#280): o react-modal esconde o contêiner da app.
+let app: HTMLElement;
+
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
+
+afterEach(() => {
+  cleanup();
+  app.remove();
+});
 
 const schema = z.object({
   mediaId: z.number().int().positive(),
@@ -73,11 +88,13 @@ function renderForm(
       submitLabel="Salvar"
       onSubmit={onSubmit}
     />,
+    { container: app },
   );
   return { onSubmit, media };
 }
 
-const dialogOf = (group: HTMLElement) => group.querySelector('dialog') as HTMLDialogElement;
+// O seletor é o Dialog do Ecme (#280), num portal fora do grupo do campo.
+const picker = () => screen.getByRole('dialog', { name: 'Escolher imagem' });
 
 describe('seletores', () => {
   it('mídia vazia mostra "Nenhuma imagem"; a obrigatória vazia é recusada no campo', async () => {
@@ -101,13 +118,13 @@ describe('seletores', () => {
     const field = screen.getByRole('group', { name: 'Mídia' });
     const choose = within(field).getByRole('button', { name: 'Escolher imagem' });
     await user.click(choose);
-    const option = await within(dialogOf(field)).findByRole('button', {
+    const option = await within(picker()).findByRole('button', {
       name: 'Mídia 2 · 800×600',
     });
     option.focus();
     await user.keyboard('{Enter}');
 
-    expect(dialogOf(field).open).toBe(false);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(within(field).getByText('Mídia 2 · 800×600', { selector: 'p' })).toBeTruthy();
     const change = within(field).getByRole('button', { name: 'Trocar' });
     expect(document.activeElement).toBe(change);

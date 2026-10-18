@@ -166,8 +166,8 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await expect(row).toContainText('Rascunho');
 });
 
-// Campos de imagem, de entidades e de data no Ecme (#272): com a capa escolhida (miniatura,
-// "Trocar" e "Remover" na tela), sem violação do axe nos dois temas.
+// Campos de imagem, de entidades e de data no Ecme (#272): com o seletor aberto (#280) e com a
+// capa escolhida (miniatura, "Trocar" e "Remover" na tela), sem violação do axe nos dois temas.
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`campos de imagem, entidades e data sem violação do axe (${colorScheme})`, async ({
     page,
@@ -180,6 +180,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const cover = page.getByRole('group', { name: 'Capa', exact: true });
     await cover.getByRole('button', { name: 'Escolher imagem' }).click();
     const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
+    // O seletor aberto (Dialog do Ecme, #280), com a grade e a paginação.
+    await expect(grid.getByRole('status')).toHaveText(/^Página 1 de \d+ · \d+ image(m|ns)$/);
+    await expect(grid.getByRole('navigation', { name: 'Paginação' })).toBeVisible();
+    await page.mouse.move(0, 0);
+    const picker = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(picker.violations).toEqual([]);
     await grid
       .getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ })
       .first()
