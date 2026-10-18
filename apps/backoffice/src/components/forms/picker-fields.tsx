@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media-library';
 import { MediaPicker, type MediaPickerPage } from '@/components/media-picker';
-import { Button } from '@/components/legacy-ui/button';
-import { Checkbox } from '@/components/legacy-ui/checkbox';
+import Button from '@/components/ui/Button';
+import Checkbox from '@/components/ui/Checkbox';
 
 import type { FieldProps, FieldRenderer } from './schema-form.tsx';
 
 // Seletores do gerador para referências do site: mídia (um ID, pela grade de miniaturas) e
-// entidades (lista de IDs). Só escolhem entre o que já existe; criar é de outras telas.
+// entidades (lista de IDs). Só escolhem entre o que já existe; criar é de outras telas. Visual
+// do Ecme (#272): `Button` e `Checkbox` de `ui/`; o diálogo `MediaPicker` fica para a #50.
 
 export type PickerOption = { id: number; label: string };
 
@@ -83,7 +84,7 @@ function MediaField({
         {item ? (
           <MediaThumbnail item={item} />
         ) : (
-          <div className="aspect-square rounded-md border border-dashed border-border" />
+          <div className="aspect-square rounded-md border border-dashed border-gray-300 dark:border-gray-600" />
         )}
       </div>
       <p className="text-sm">
@@ -107,7 +108,8 @@ function MediaField({
       />
       {optional && current !== undefined && (
         <Button
-          variant="ghost"
+          type="button"
+          variant="plain"
           size="sm"
           onClick={() => {
             onChange(Number.NaN);
@@ -128,7 +130,7 @@ export function entityField(options: readonly PickerOption[], empty: string): Fi
     const selected = new Set(Array.isArray(value) ? (value as number[]) : []);
     if (options.length === 0) {
       return (
-        <p id={id} className="text-sm text-muted-foreground">
+        <p id={id} className="text-sm text-gray-600 dark:text-gray-400">
           {empty}
         </p>
       );
@@ -143,19 +145,20 @@ export function entityField(options: readonly PickerOption[], empty: string): Fi
         className="flex flex-wrap gap-x-6 gap-y-2"
       >
         {options.map((option) => (
-          <label key={option.id} className="flex min-h-6 items-center gap-2 text-sm">
-            <Checkbox
-              checked={selected.has(option.id)}
-              onChange={(event) => {
-                const next = new Set(selected);
-                if (event.target.checked) next.add(option.id);
-                else next.delete(option.id);
-                // Ordem estável: a das opções.
-                onChange(options.map((o) => o.id).filter((optionId) => next.has(optionId)));
-              }}
-            />
+          <Checkbox
+            key={option.id}
+            className="min-h-6 text-sm"
+            checked={selected.has(option.id)}
+            onChange={(checked) => {
+              const next = new Set(selected);
+              if (checked) next.add(option.id);
+              else next.delete(option.id);
+              // Ordem estável: a das opções.
+              onChange(options.map((o) => o.id).filter((optionId) => next.has(optionId)));
+            }}
+          >
             {option.label}
-          </label>
+          </Checkbox>
         ))}
       </div>
     );

@@ -1,13 +1,14 @@
 'use client';
 
-import { Input } from '@/components/legacy-ui/input';
+import Input from '@/components/ui/Input';
 
 import type { FieldProps, FieldRenderer } from './schema-form.tsx';
 
 // Data e hora no fuso do site (#183): o seletor `datetime-local` mostra e recebe a hora de
 // parede do site, e o valor gravado é ISO com o offset do fuso naquele instante (horário de
 // verão incluído), o formato de `IsoDateTimeSchema`. Só `Intl`, sem biblioteca de datas, no
-// padrão do `formatDateTime` (site-labels.ts).
+// padrão do `formatDateTime` (site-labels.ts). O seletor é o `Input` do Ecme (#272), ainda
+// nativo.
 
 const formats = new Map<string, Intl.DateTimeFormat>();
 
@@ -117,7 +118,9 @@ export function zonedDateTimeField(timeZone: string): FieldRenderer {
     return (
       <Input
         id={id}
-        ref={ref}
+        // O `ref` do Input do Ecme também admite um componente (`asElement`); o foco do erro só
+        // precisa do elemento do DOM.
+        ref={(element) => ref(element instanceof HTMLElement ? element : null)}
         type="datetime-local"
         readOnly={readOnly}
         aria-invalid={invalid}
