@@ -184,6 +184,28 @@ test('revisor não tem editor nem link para criar ou editar', async ({ page }) =
   await expect(page).toHaveURL(/\/sites\/exemplo-a$/);
 });
 
+// Histórico de versões e leitura de uma versão no Ecme (#271): Table e Tag sem violação do axe.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`versões e uma versão sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a/conteudos');
+    await page
+      .getByRole('table')
+      .getByRole('link', { name: / \(versões\)$/ })
+      .first()
+      .click();
+    await expect(page.getByRole('heading', { level: 1, name: /^Versões de/ })).toBeVisible();
+    const versions = page.url();
+    for (const path of [versions, `${versions}/versoes/1`]) {
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+    }
+  });
+}
+
 const BIG_SITE = `e2e-conteudos-${Date.now()}`;
 const BIG_COUNT = 2000;
 /** Abrir a lista e atualizar a busca ou o filtro: teto da #35 (CA1). */
