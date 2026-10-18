@@ -2,15 +2,18 @@
 
 import { useId, useRef, useState, type ComponentProps } from 'react';
 
-import { Button } from '@/components/legacy-ui/button';
-import { Input } from '@/components/legacy-ui/input';
-import { Label } from '@/components/legacy-ui/label';
-import { TableHead } from '@/components/legacy-ui/table';
+import { Button } from '@/components/ui/Button';
+import { FormItem } from '@/components/ui/Form';
+import Input from '@/components/ui/Input';
+import Pagination from '@/components/ui/Pagination';
+import Select from '@/components/ui/Select';
+import Table from '@/components/ui/Table';
 
 // Controles das listas filtradas no cliente (#106): busca e filtros, cabeçalho ordenável e
-// paginação. O estado é de `useListState` (URL); aqui só a interface.
+// paginação. O estado é de `useListState` (URL); aqui só a interface, nos componentes do Ecme
+// (#269).
 
-const SELECT_CLASS = 'flex min-h-9 rounded-md border border-border bg-background px-3 py-1 text-sm';
+const { Th, Sorter } = Table;
 
 export type ListFilterControl = {
   column: string;
@@ -19,6 +22,10 @@ export type ListFilterControl = {
   value: string | undefined;
   options: readonly { value: string; label: string }[];
 };
+
+type FilterOption = { value: string; label: string };
+
+const ALL: FilterOption = { value: '', label: 'Todos' };
 
 /**
  * Busca e filtros da lista. A busca guarda o texto digitado localmente (a URL chega depois
@@ -58,8 +65,7 @@ export function ListToolbar({
       className="flex flex-wrap items-end gap-3"
       onSubmit={(event) => event.preventDefault()}
     >
-      <div className="min-w-56 flex-1 space-y-1.5">
-        <Label htmlFor={`${id}-search`}>{searchLabel}</Label>
+      <FormItem htmlFor={`${id}-search`} label={searchLabel} className="mb-0 min-w-56 flex-1">
         <Input
           ref={searchRef}
           id={`${id}-search`}
@@ -70,28 +76,29 @@ export function ListToolbar({
             onSearchChange(event.target.value);
           }}
         />
-      </div>
-      {filters.map((filter) => (
-        <div key={filter.column} className="space-y-1.5">
-          <Label htmlFor={`${id}-${filter.column}`}>{filter.label}</Label>
-          <select
-            id={`${id}-${filter.column}`}
-            className={SELECT_CLASS}
-            value={filter.value ?? ''}
-            onChange={(event) => onFilterChange?.(filter.column, event.target.value || undefined)}
+      </FormItem>
+      {filters.map((filter) => {
+        const options = [ALL, ...filter.options];
+        return (
+          <FormItem
+            key={filter.column}
+            htmlFor={`${id}-${filter.column}`}
+            label={filter.label}
+            className="mb-0 min-w-44"
           >
-            <option value="">Todos</option>
-            {filter.options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      ))}
+            <Select<FilterOption>
+              inputId={`${id}-${filter.column}`}
+              isSearchable={false}
+              options={options}
+              value={options.find((option) => option.value === (filter.value ?? '')) ?? ALL}
+              onChange={(option) => onFilterChange?.(filter.column, option?.value || undefined)}
+            />
+          </FormItem>
+        );
+      })}
       {active && (
         <Button
-          variant="outline"
+          type="button"
           onClick={() => {
             onClear();
             requestAnimationFrame(() => searchRef.current?.focus());
@@ -104,18 +111,18 @@ export function ListToolbar({
   );
 }
 
-const ARIA_SORT = { asc: 'ascending', desc: 'descending' } as const;
 const SORT_TEXT = { asc: 'ordem crescente', desc: 'ordem decrescente' } as const;
-const SORT_ARROW = { asc: '↑', desc: '↓' } as const;
 
 /**
- * Cabeçalho ordenável: `aria-sort` no `th` e um botão (clique, Enter ou Espaço) que alterna o
- * sentido. O sentido também vai no nome do botão, para o leitor de tela anunciar a troca.
+ * Cabeçalho ordenável: `aria-sort` no `th` (o `sort` do `Th`) e um botão (clique, Enter ou
+ * Espaço) que alterna o sentido. O sentido também vai no nome do botão, para o leitor de tela
+ * anunciar a troca; o `Sorter` é só o ícone.
  */
 export function SortableHead({
   label,
   direction,
   onToggle,
+  className,
   ...props
 }: Omit<ComponentProps<'th'>, 'children'> & {
   label: string;
@@ -123,27 +130,30 @@ export function SortableHead({
   onToggle: () => void;
 }) {
   return (
-    <TableHead aria-sort={direction ? ARIA_SORT[direction] : 'none'} {...props}>
+    <Th
+      sort={direction || 'none'}
+      className={className ?? 'h-10 px-3 text-left align-middle font-medium whitespace-nowrap'}
+      {...props}
+    >
       <button
         type="button"
-        className="-mx-1 inline-flex items-center gap-1 rounded px-1 font-medium"
+        className="-mx-1 inline-flex min-h-6 items-center gap-1 rounded px-1 font-medium"
         onClick={onToggle}
       >
         {label}
-        <span aria-hidden="true" className="text-muted-foreground">
-          {direction ? SORT_ARROW[direction] : '↕'}
-        </span>
+        <Sorter sort={direction || true} />
         <span className="sr-only">{direction ? `, ${SORT_TEXT[direction]}` : ', sem ordem'}</span>
       </button>
-    </TableHead>
+    </Th>
   );
 }
 
 const count = new Intl.NumberFormat('pt-BR');
 
 /**
- * Contagem de resultados (anunciada em `role="status"`) e Anterior/Próxima, desabilitados
- * nas pontas. `page` começa em 1.
+ * Contagem de resultados (anunciada em `role="status"`), "Página X de Y" e a `Pagination` do
+ * Ecme, que já é o `nav "Paginação"` (Página anterior e Próxima página desabilitados nas
+ * pontas, `aria-current="page"` na atual). `page` começa em 1.
  */
 export function ListPagination({
   total,
@@ -157,32 +167,18 @@ export function ListPagination({
   onPageChange: (page: number) => void;
 }) {
   const pages = Math.max(pageCount, 1);
+  const current = Math.min(page, pages);
   return (
-    <nav aria-label="Paginação" className="flex flex-wrap items-center justify-between gap-3">
-      <p role="status" className="text-sm text-muted-foreground tabular-nums">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p role="status" className="text-sm tabular-nums">
         {total === 1 ? '1 resultado' : `${count.format(total)} resultados`}
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm tabular-nums">
-          Página {Math.min(page, pages)} de {pages}
+          Página {current} de {pages}
         </span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-        >
-          Anterior
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page >= pages}
-          onClick={() => onPageChange(page + 1)}
-        >
-          Próxima
-        </Button>
+        <Pagination total={pages} pageSize={1} currentPage={current} onChange={onPageChange} />
       </div>
-    </nav>
+    </div>
   );
 }

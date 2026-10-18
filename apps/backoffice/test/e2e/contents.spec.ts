@@ -252,7 +252,8 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
     context,
   }) => {
     await loginAs(page, 'editor@orakel.local');
-    const count = page.getByRole('navigation', { name: 'Paginação' }).getByRole('status');
+    // A contagem fica ao lado do nav "Paginação" do Ecme, não dentro dele (#269).
+    const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
     let started = Date.now();
     await page.goto(`/sites/${BIG_SITE}/conteudos`);
@@ -270,7 +271,10 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
     expect(Date.now() - started).toBeLessThan(MAX_MS);
 
     started = Date.now();
-    await page.getByLabel('Tipo').selectOption({ label: 'Página' });
+    // O filtro é o combobox do react-select (#269): abre com a seta e escolhe pelo nome.
+    await page.getByRole('combobox', { name: 'Tipo' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await page.getByRole('option', { name: 'Página', exact: true }).click();
     await expect(page).toHaveURL(/tipo=page/);
     // Os 20 "Promoção" (múltiplos de 100) são todos páginas: a busca e o filtro combinam.
     await expect(count).toHaveText('20 resultados');
@@ -282,7 +286,7 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
       .getByRole('columnheader', { name: /Título/ })
       .getByRole('button')
       .click();
-    await page.getByRole('button', { name: 'Próxima' }).click();
+    await page.getByRole('button', { name: 'Próxima página' }).click();
     await expect(page.getByText('Página 2 de 20')).toBeVisible();
     await expect(page).toHaveURL(/tipo=page/);
     await expect(page).toHaveURL(/ordem=title/);
@@ -291,11 +295,16 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
 
     const other = await context.newPage();
     await other.goto(page.url());
-    await expect(
-      other.getByRole('navigation', { name: 'Paginação' }).getByRole('status'),
-    ).toHaveText('500 resultados');
+    await expect(other.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '500 resultados',
+    );
     await expect(other.getByText('Página 2 de 20')).toBeVisible();
-    await expect(other.getByLabel('Tipo')).toHaveValue('page');
+    await expect(other.getByRole('search').getByText('Página', { exact: true })).toBeVisible();
+    await expect(
+      other
+        .getByRole('navigation', { name: 'Paginação' })
+        .getByRole('button', { name: 'Página 2', exact: true }),
+    ).toHaveAttribute('aria-current', 'page');
     await expect(other.getByRole('columnheader', { name: /Título/ })).toHaveAttribute(
       'aria-sort',
       'ascending',
