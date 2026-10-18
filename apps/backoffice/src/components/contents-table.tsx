@@ -11,22 +11,17 @@ import { listFeatures, useListState, type ListConfig } from '@/components/list-s
 import {
   CONTENT_KIND_LABEL,
   CONTENT_STATUS_LABEL,
-  CONTENT_STATUS_VARIANT,
+  CONTENT_STATUS_TAG,
   formatDateTime,
 } from '@/components/site-labels.ts';
-import { Badge } from '@/components/legacy-ui/badge';
-import { Button, buttonVariants } from '@/components/legacy-ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/legacy-ui/table';
+import { StateTag } from '@/components/site-status';
+import { Button } from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
+import Table from '@/components/ui/Table';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 const column = createColumnHelper<typeof listFeatures, ContentListItem>();
+const { THead, TBody, Tr, Th, Td } = Table;
 
 const KINDS = Object.keys(CONTENT_KIND_LABEL) as ContentListItem['kind'][];
 const STATUSES = Object.keys(CONTENT_STATUS_LABEL) as ContentListItem['status'][];
@@ -64,7 +59,7 @@ function columnsFor(siteId: string, timeZone: string) {
       cell: (info) => (
         <Link
           href={`/sites/${siteId}/conteudos/${info.row.original.id}`}
-          className="font-medium underline underline-offset-4"
+          className="font-semibold text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
         >
           {info.getValue()}
           <span className="sr-only"> (versões)</span>
@@ -77,9 +72,9 @@ function columnsFor(siteId: string, timeZone: string) {
       filterFn: 'equalsString',
       sortFn: byText((item) => CONTENT_STATUS_LABEL[item.status]),
       cell: (info) => (
-        <Badge variant={CONTENT_STATUS_VARIANT[info.getValue()]}>
+        <StateTag color={CONTENT_STATUS_TAG[info.getValue()]}>
           {CONTENT_STATUS_LABEL[info.getValue()]}
-        </Badge>
+        </StateTag>
       ),
     }),
     column.accessor('version', {
@@ -153,7 +148,7 @@ export function ContentsTable({
       {found === 0 ? (
         <EmptyState
           action={
-            <Button variant="outline" onClick={list.clearFilters}>
+            <Button type="button" onClick={list.clearFilters}>
               Limpar busca
             </Button>
           }
@@ -161,10 +156,10 @@ export function ContentsTable({
           Nenhum conteúdo encontrado.
         </EmptyState>
       ) : (
-        <Table>
-          <TableHeader>
+        <Table compact>
+          <THead>
             {table.getHeaderGroups().map((group) => (
-              <TableRow key={group.id}>
+              <Tr key={group.id}>
                 {group.headers.map((header) =>
                   header.column.getCanSort() ? (
                     <SortableHead
@@ -175,41 +170,41 @@ export function ContentsTable({
                       onToggle={() => header.column.toggleSorting()}
                     />
                   ) : (
-                    <TableHead key={header.id} scope="col">
+                    <Th key={header.id} scope="col">
                       <table.FlexRender header={header} />
-                    </TableHead>
+                    </Th>
                   ),
                 )}
                 {canWrite && (
-                  <TableHead scope="col">
+                  <Th scope="col">
                     <span className="sr-only">Ações</span>
-                  </TableHead>
+                  </Th>
                 )}
-              </TableRow>
+              </Tr>
             ))}
-          </TableHeader>
-          <TableBody>
+          </THead>
+          <TBody>
             {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <Tr key={row.id}>
                 {row.getAllCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <Td key={cell.id}>
                     <table.FlexRender cell={cell} />
-                  </TableCell>
+                  </Td>
                 ))}
                 {canWrite && (
-                  <TableCell>
-                    <Link
+                  <Td>
+                    <ButtonLink
                       href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
-                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                      size="xs"
                     >
                       Editar
                       <span className="sr-only"> {row.original.title}</span>
-                    </Link>
-                  </TableCell>
+                    </ButtonLink>
+                  </Td>
                 )}
-              </TableRow>
+              </Tr>
             ))}
-          </TableBody>
+          </TBody>
         </Table>
       )}
       <ListPagination

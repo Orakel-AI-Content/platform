@@ -62,6 +62,11 @@ const rows: ContentListItem[] = [
   },
 ];
 
+/** Cor do ponto da tag (o `prefixClass` da Tag do Ecme) em que o texto aparece. */
+function tagColor(element: HTMLElement) {
+  return element.closest('.tag')?.querySelector('.tag-prefix')?.className;
+}
+
 // O filtro é o combobox do react-select: abre com a seta e escolhe a opção pelo nome.
 async function choose(user: ReturnType<typeof userEvent.setup>, label: string, option: string) {
   screen.getByRole('combobox', { name: label }).focus();
@@ -82,12 +87,21 @@ describe('tabela de conteúdos', () => {
     expect(screen.getByRole('status').textContent).toBe('2 resultados');
   });
 
-  it('dá a cada status o badge da sua variante, com o texto do status (#86)', () => {
-    render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
+  it('dá a cada status a tag da sua cor, com o texto do status (#86)', () => {
+    const draft: ContentListItem = {
+      ...rows[0]!,
+      id: 3,
+      title: 'Rascunho novo',
+      status: 'rascunho',
+    };
+    render(
+      <ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={[...rows, draft]} />,
+    );
 
     const table = within(screen.getByRole('table'));
-    expect(table.getByText('Em revisão').className).toContain('text-warning');
-    expect(table.getByText('Publicado').className).toContain('bg-success');
+    expect(tagColor(table.getByText('Em revisão'))).toContain('bg-warning');
+    expect(tagColor(table.getByText('Publicado'))).toContain('bg-success');
+    expect(tagColor(table.getByText('Rascunho'))).toContain('bg-gray-400');
   });
 
   it('sem content.write não tem links de criar nem de editar', () => {
