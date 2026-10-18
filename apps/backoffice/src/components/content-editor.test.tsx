@@ -212,12 +212,28 @@ describe('editor de conteúdo', () => {
 });
 
 describe('barra de ações e continuar no editor (#109)', () => {
-  it('o botão e o resultado ficam numa barra fixa no rodapé', () => {
+  it('o botão e o resultado ficam no StickyFooter, a barra fixa no rodapé', async () => {
+    // O StickyFooter fixa a barra quando ela não cabe inteira na tela (IntersectionObserver).
+    let report: IntersectionObserverCallback = () => {};
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          report = callback;
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
     renderEditor();
 
     const bar = screen.getByRole('button', { name: 'Salvar nova versão' }).parentElement;
-    expect(bar?.className).toContain('sticky');
-    expect(bar?.className).toContain('bottom-0');
+    act(() =>
+      report([{ intersectionRatio: 0.5 } as IntersectionObserverEntry], {} as IntersectionObserver),
+    );
+    await waitFor(() => expect(bar?.className).toContain('sticky'));
+    vi.unstubAllGlobals();
     expect(bar?.querySelector('[role="status"]')).toBeTruthy();
     expect(bar?.querySelector('[role="alert"]')).toBeTruthy();
   });
@@ -456,6 +472,25 @@ describe('desfazer a remoção de bloco (#112)', () => {
   });
 });
 
+describe('editor no Ecme (#274)', () => {
+  it('os botões do editor e o rodapé usam só os tokens do Ecme, sem as cores do shadcn', () => {
+    renderEditor();
+
+    const bar = screen.getByRole('button', { name: 'Salvar nova versão' }).parentElement;
+    const own = [
+      bar,
+      screen.getByRole('group', { name: 'Bloco 1: Sumário' }),
+      screen.getByRole('button', { name: 'Recolher todos' }),
+      screen.getByRole('button', { name: 'Adicionar bloco' }),
+    ];
+    for (const element of own) {
+      expect(element?.outerHTML).not.toMatch(
+        /muted-foreground|border-border|destructive|bg-background/,
+      );
+    }
+  });
+});
+
 describe('controles de bloco com ícones (#131)', () => {
   it('mover e remover são botões de ícone com a posição no nome; as pontas ficam indisponíveis e focáveis', async () => {
     const user = userEvent.setup();
@@ -463,10 +498,9 @@ describe('controles de bloco com ícones (#131)', () => {
 
     for (const name of ['Mover bloco 2 para cima', 'Mover bloco 2 para baixo', 'Remover bloco 2']) {
       const button = screen.getByRole('button', { name });
-      // O texto visível é só a dica, fora da árvore de acessibilidade.
-      expect(button.lastElementChild?.getAttribute('aria-hidden')).toBe('true');
-      expect(button.lastElementChild?.textContent).toBe(name);
-      expect(button.querySelector('svg')).toBeTruthy();
+      // O IconButton do Ecme (#270): nome pelo aria-label, ícone fora da árvore de acessibilidade.
+      expect(button.textContent).toBe('');
+      expect(button.querySelector('svg')?.closest('[aria-hidden="true"]')).toBeTruthy();
     }
     const first = screen.getByRole('button', { name: 'Mover bloco 1 para cima' });
     const last = screen.getByRole('button', { name: 'Mover bloco 3 para baixo' });
@@ -489,13 +523,15 @@ describe('controles de bloco com ícones (#131)', () => {
 
 describe('inserir bloco em qualquer posição (#134)', () => {
   const three = { ...meta, blocks: [toc(1, 'A'), toc(2, 'B'), toc(3, 'C')] };
-  const listOf = (trigger: HTMLElement) => {
-    const list = document.getElementById(trigger.getAttribute('popovertarget') ?? '');
-    if (list === null) throw new Error('gatilho sem lista');
-    return list;
+  /** Abre o Dropdown do gatilho pelo teclado e devolve o menu. */
+  const openMenu = async (user: ReturnType<typeof userEvent.setup>, trigger: HTMLElement) => {
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    return screen.findByRole('menu');
   };
 
-  it('há um ponto antes de cada bloco, com a posição no nome e os tipos da release', () => {
+  it('há um ponto antes de cada bloco, com a posição no nome e os tipos da release', async () => {
+    const user = userEvent.setup();
     renderEditor({ defaultValues: three, blockTypes: ['text', 'toc', 'image'] });
 
     const triggers = screen.getAllByRole('button', { name: /^Inserir bloco na posição/ });
@@ -504,8 +540,13 @@ describe('inserir bloco em qualquer posição (#134)', () => {
       'Inserir bloco na posição 2',
       'Inserir bloco na posição 3',
     ]);
+    // A dica é só visual: o nome não se repete como descrição.
+    expect(triggers[1]?.hasAttribute('aria-describedby')).toBe(false);
+    const menu = await openMenu(user, triggers[1] as HTMLElement);
     expect(
-      [...listOf(triggers[1] as HTMLElement).querySelectorAll('button')].map((b) => b.textContent),
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
     ).toEqual(['Texto', 'Sumário', 'Imagem']);
   });
 
@@ -513,13 +554,11 @@ describe('inserir bloco em qualquer posição (#134)', () => {
     const user = userEvent.setup();
     const action = renderEditor({ defaultValues: three });
     const trigger = screen.getByRole('button', { name: 'Inserir bloco na posição 2' });
-    const list = listOf(trigger);
-    const hide = vi.fn();
-    list.hidePopover = hide;
+    const menu = await openMenu(user, trigger);
 
-    await user.click(within(list).getByRole('button', { name: 'Sumário' }));
+    await user.click(within(menu).getByRole('menuitem', { name: 'Sumário' }));
 
-    expect(hide).toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
     expect(screen.getByRole('group', { name: 'Bloco 2: Sumário' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Remover bloco 4' })).toBeTruthy();
     const titles = screen.getAllByLabelText<HTMLInputElement>('Título do sumário');

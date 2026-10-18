@@ -7,7 +7,8 @@
 // - o `solid` usa `dark:text-gray-950`: o texto branco sobre o `primary` do escuro dá 3,56:1
 //   (par em ECME_PAIRS do globals-contrast.test.ts);
 // - `href` e `download` tipados (#247), para o link com cara de botão (`asElement={Link}` ou
-//   `asElement="a"`), como o `href` do Dropdown.Item (#239).
+//   `asElement="a"`), como o `href` do Dropdown.Item (#239); `target` e `rel` (#274), para o
+//   link que abre em nova aba.
 'use client';
 
 import classNames from '../utils/classNames';
@@ -25,6 +26,9 @@ export interface ButtonProps extends CommonProps, Omit<ComponentPropsWithRef<'bu
   href?: string;
   /** Com `asElement="a"`: baixa o destino com este nome (rota de download). */
   download?: string;
+  /** Com `asElement="a"`: onde abrir o destino (`_blank`, com `rel="noopener noreferrer"`). */
+  target?: string;
+  rel?: string;
   active?: boolean;
   block?: boolean;
   clickFeedback?: boolean;
