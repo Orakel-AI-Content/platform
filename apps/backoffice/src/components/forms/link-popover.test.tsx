@@ -2,22 +2,13 @@
 import { TextBlockSchema } from '@orakel/content-model/v1';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MotionGlobalConfig } from 'motion/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { richTextField } from './rich-text-field.tsx';
 import { SchemaForm } from './schema-form.tsx';
 
 // Popover de link (#132) com o editor TipTap real. O happy-dom não implementa a Popover API:
 // abrir é o evento `toggle`, e `hidePopover` é espionado (o E2E confere o navegador).
-
-// A mensagem de erro do FormItem (#275) anima com o motion, que o happy-dom cancela no `cleanup`.
-beforeAll(() => {
-  MotionGlobalConfig.skipAnimations = true;
-});
-afterAll(() => {
-  MotionGlobalConfig.skipAnimations = false;
-});
 
 afterEach(cleanup);
 
