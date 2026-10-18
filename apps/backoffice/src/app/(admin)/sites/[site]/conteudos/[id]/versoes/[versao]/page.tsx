@@ -4,11 +4,11 @@ import { notFound } from 'next/navigation';
 import { ContentVersionView } from '@/components/content-version-view';
 import {
   CONTENT_STATUS_LABEL,
-  CONTENT_STATUS_VARIANT,
+  CONTENT_STATUS_TAG,
   formatDateTime,
 } from '@/components/site-labels.ts';
-import { Badge } from '@/components/legacy-ui/badge';
 import { noRead } from '@/components/forbidden-screen';
+import { StateTag } from '@/components/site-status';
 
 import { PageHeader, siteTrail } from '../../../../editorial-page.tsx';
 import { itemTitle } from '../../../../item-title.ts';
@@ -68,10 +68,10 @@ export default async function ContentVersionPage({ params }: Params) {
           </>
         }
       />
-      <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        <Badge variant={CONTENT_STATUS_VARIANT[version.status]}>
+      <p className="flex flex-wrap items-center gap-2 text-sm">
+        <StateTag color={CONTENT_STATUS_TAG[version.status]}>
           {CONTENT_STATUS_LABEL[version.status]}
-        </Badge>
+        </StateTag>
         Gravada em {formatDateTime(version.createdAt, timeZone)}
         {version.version === latest ? ' · versão mais recente' : ` · mais recente: ${latest}`}
       </p>

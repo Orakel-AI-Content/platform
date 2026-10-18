@@ -54,7 +54,7 @@ export default async function ContentVersionsPage({ params }: Params) {
         ])}
         title={<>Versões de “{latest.data.title}”</>}
       />
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm">
         {CONTENT_KIND_LABEL[latest.data.kind]} · ID {contentId} · /{latest.data.slug}
       </p>
       {canWrite && (
