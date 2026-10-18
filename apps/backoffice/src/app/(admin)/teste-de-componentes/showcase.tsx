@@ -3,11 +3,13 @@
 import { motion } from 'motion/react';
 import { useState } from 'react';
 import { HiOutlinePlus } from 'react-icons/hi';
+import { PiArrowUp, PiLinkSimple } from 'react-icons/pi';
 import AsyncSelect from 'react-select/async';
 import CreatableSelect from 'react-select/creatable';
 
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import { IconButton } from '@/components/shared/IconButton';
 import Loading from '@/components/shared/Loading';
 import MediaSkeleton from '@/components/shared/loaders/MediaSkeleton';
 import TextBlockSkeleton from '@/components/shared/loaders/TextBlockSkeleton';
@@ -369,6 +371,16 @@ export function Showcase({ linkPage }: { linkPage: number }) {
           <Tooltip title="Publicado há 2 dias" placement="right">
             Publicado
           </Tooltip>
+        </div>
+      </section>
+
+      <section aria-labelledby="vitrine-icon-button" className="space-y-3">
+        <h2 id="vitrine-icon-button" className="text-lg font-semibold">
+          IconButton
+        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <IconButton label="Inserir link" icon={<PiLinkSimple />} />
+          <IconButton label="Mover bloco 1 para cima" icon={<PiArrowUp />} aria-disabled />
         </div>
       </section>
 

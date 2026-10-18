@@ -95,6 +95,58 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// IconButton (#270): Button só de ícone com a dica do Tooltip, que não vira descrição do botão.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`IconButton na vitrine: alvo de 24 px, foco de 2px e dica no hover e no foco (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const icons = section(page, 'IconButton');
+    const ring = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--ring)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+
+    for (const name of ['Inserir link', 'Mover bloco 1 para cima']) {
+      const button = icons.getByRole('button', { name, exact: true });
+      const box = await button.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(24);
+      expect(box?.height).toBeGreaterThanOrEqual(24);
+
+      await tabTo(page, button);
+      expect(
+        await button.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            color: style.outlineColor,
+            style: style.outlineStyle,
+            width: style.outlineWidth,
+          };
+        }),
+      ).toEqual({ color: ring, style: 'solid', width: '2px' });
+      await expect(page.getByRole('tooltip')).toHaveText(name);
+      await expect(button).not.toHaveAttribute('aria-describedby');
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('tooltip')).toHaveCount(0);
+    }
+    await expect(icons.getByRole('button', { name: 'Mover bloco 1 para cima' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+
+    await icons.getByRole('button', { name: 'Inserir link' }).hover();
+    await expect(page.getByRole('tooltip')).toHaveText('Inserir link');
+    expect((await audit(page)).violations).toEqual([]);
+  });
+}
+
 test('a vitrine vem renderizada do servidor', async ({ page }) => {
   await login(page);
   const response = await page.request.get(SHOWCASE);
