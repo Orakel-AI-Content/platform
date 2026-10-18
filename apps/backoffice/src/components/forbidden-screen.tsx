@@ -1,7 +1,5 @@
-import Link from 'next/link';
-
 import { StatusScreen } from '@/components/status-screen';
-import { buttonVariants } from '@/components/legacy-ui/button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import type { Role } from '@/db/schema/index.ts';
 import { PERMISSIONS, type Action } from '@/domain/access/rbac.ts';
 
@@ -44,11 +42,7 @@ export function ForbiddenScreen({
   return (
     <StatusScreen
       title="Sem permissão"
-      action={
-        <Link href={back.href} className={buttonVariants({ variant: 'outline' })}>
-          {back.label}
-        </Link>
-      }
+      action={<ButtonLink href={back.href}>{back.label}</ButtonLink>}
     >
       {/* Anunciado como o alerta que esta tela substitui: a aba mantém o título da página. */}
       <p role="alert">{forbiddenReason(action)}</p>
