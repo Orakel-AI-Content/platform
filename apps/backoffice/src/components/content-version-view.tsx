@@ -10,6 +10,9 @@ import type { ContentData } from '@/db/schema/index.ts';
 
 const MARK_TAG = { bold: 'strong', italic: 'em', code: 'code' } as const;
 
+// Valor de um par rótulo/valor: o rótulo fica no cinza do body, o valor no tom dos títulos.
+const VALUE = 'text-gray-900 dark:text-gray-100';
+
 function Inlines({ nodes }: { nodes: Inline[] }) {
   return nodes.map((node, index) => {
     if (node.type === 'link') {
@@ -69,11 +72,11 @@ function BlockBody({ block }: { block: Block }) {
     case 'quote':
       return (
         <figure>
-          <blockquote className="border-l-2 border-border pl-4">
+          <blockquote className="border-l-2 border-gray-200 pl-4 dark:border-gray-700">
             <Inlines nodes={block.content} />
           </blockquote>
           {(block.attribution ?? block.sourceUrl) && (
-            <figcaption className="text-sm text-muted-foreground">
+            <figcaption className="text-sm">
               {block.attribution}
               {block.sourceUrl ? ` (${block.sourceUrl})` : ''}
             </figcaption>
@@ -83,14 +86,14 @@ function BlockBody({ block }: { block: Block }) {
     case 'image':
       return (
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-          <dt className="text-muted-foreground">Mídia</dt>
-          <dd>{block.mediaId}</dd>
-          <dt className="text-muted-foreground">Texto alternativo</dt>
-          <dd>{block.decorative === true ? 'Decorativa' : block.alt}</dd>
+          <dt>Mídia</dt>
+          <dd className={VALUE}>{block.mediaId}</dd>
+          <dt>Texto alternativo</dt>
+          <dd className={VALUE}>{block.decorative === true ? 'Decorativa' : block.alt}</dd>
           {block.caption && (
             <>
-              <dt className="text-muted-foreground">Legenda</dt>
-              <dd>
+              <dt>Legenda</dt>
+              <dd className={VALUE}>
                 <Inlines nodes={block.caption} />
               </dd>
             </>
@@ -102,7 +105,7 @@ function BlockBody({ block }: { block: Block }) {
         <dl className="space-y-2">
           {block.items.map((item, i) => (
             <div key={i}>
-              <dt className="font-medium">{item.question}</dt>
+              <dt className="font-medium text-gray-900 dark:text-gray-100">{item.question}</dt>
               <dd>
                 <Inlines nodes={item.answer} />
               </dd>
@@ -138,8 +141,8 @@ export function ContentVersionView({ data }: { data: ContentData }) {
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           {meta.map(([label, value]) => (
             <div key={label} className="contents">
-              <dt className="text-muted-foreground">{label}</dt>
-              <dd>{value}</dd>
+              <dt>{label}</dt>
+              <dd className={VALUE}>{value}</dd>
             </div>
           ))}
         </dl>
@@ -150,8 +153,11 @@ export function ContentVersionView({ data }: { data: ContentData }) {
         </h2>
         <ol className="space-y-4">
           {data.blocks.map((block) => (
-            <li key={block.n} className="space-y-2 rounded-md border border-border p-4">
-              <h3 className="text-sm font-semibold text-muted-foreground">
+            <li
+              key={block.n}
+              className="space-y-2 rounded-xl border border-gray-200 p-4 dark:border-gray-700"
+            >
+              <h3 className="text-sm font-semibold">
                 {BLOCK_TYPE_LABEL[block.type]} · bloco {block.n}
               </h3>
               <BlockBody block={block} />

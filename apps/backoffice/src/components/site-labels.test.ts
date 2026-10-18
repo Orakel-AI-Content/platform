@@ -4,6 +4,7 @@ import {
   BUILD_STATUS_LABEL,
   BUILD_STATUS_VARIANT,
   CONTENT_STATUS_LABEL,
+  CONTENT_STATUS_TAG,
   CONTENT_STATUS_VARIANT,
   LIFECYCLE_LABEL,
   LIFECYCLE_ORDER,
@@ -18,6 +19,7 @@ import {
 
 const groups = [
   ['status de conteúdo', CONTENT_STATUS_LABEL, CONTENT_STATUS_VARIANT],
+  ['status de conteúdo na tag', CONTENT_STATUS_LABEL, CONTENT_STATUS_TAG],
   ['estado de site', SITE_STATE_LABEL, SITE_STATE_VARIANT],
   ['resultado de build', BUILD_STATUS_LABEL, BUILD_STATUS_VARIANT],
 ] as const;

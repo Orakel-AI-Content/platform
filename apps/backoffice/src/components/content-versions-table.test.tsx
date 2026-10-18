@@ -16,6 +16,11 @@ const rows: ContentVersionRow[] = [1, 2, 3].map((version) => ({
   approval: null,
 }));
 
+/** Cor do ponto da tag (o `prefixClass` da Tag do Ecme) em que o texto aparece. */
+function tagColor(element: HTMLElement) {
+  return element.closest('.tag')?.querySelector('.tag-prefix')?.className;
+}
+
 describe('tabela de versões', () => {
   it('lista as versões em ordem crescente com link para cada uma', () => {
     render(
@@ -36,9 +41,18 @@ describe('tabela de versões', () => {
     ]);
     expect(screen.getAllByRole('row')[1]?.textContent).toContain('Publicado');
     expect(screen.getByText('3 versões')).toBeTruthy();
+    expect(
+      screen.getAllByRole('columnheader').map((th) => [th.textContent, th.getAttribute('scope')]),
+    ).toEqual([
+      ['Versão', 'col'],
+      ['Status', 'col'],
+      ['Título', 'col'],
+      ['Gravada em', 'col'],
+      ['Aprovação', 'col'],
+    ]);
   });
 
-  it('dá a cada status o badge da sua variante, com o texto do status (#86)', () => {
+  it('dá a cada status a tag da sua cor, com o texto do status (#86)', () => {
     render(
       <ContentVersionsTable
         siteId="exemplo-a"
@@ -48,9 +62,9 @@ describe('tabela de versões', () => {
       />,
     );
 
-    expect(screen.getByText('Publicado').className).toContain('bg-success');
-    for (const badge of screen.getAllByText('Rascunho')) {
-      expect(badge.className).toContain('bg-muted');
+    expect(tagColor(screen.getByText('Publicado'))).toContain('bg-success');
+    for (const tag of screen.getAllByText('Rascunho')) {
+      expect(tagColor(tag)).toContain('bg-gray-400');
     }
   });
 

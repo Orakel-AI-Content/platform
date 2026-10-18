@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react';
 
-import { Button } from '@/components/legacy-ui/button';
+import { Button } from '@/components/ui/Button';
+import classNames from '@/components/ui/utils/classNames';
 
 // Botão "Enviar para revisão" da página do conteúdo (#74), no padrão das ações da página do
 // site: a Server Action delega ao domínio e o retorno é anunciado em role=status. A página o
@@ -26,6 +27,8 @@ export function SubmitForReview({
     <div className="space-y-2">
       {available && (
         <Button
+          type="button"
+          variant="solid"
           size="sm"
           disabled={pending}
           onClick={() => startTransition(async () => setStatus(await action()))}
@@ -33,12 +36,7 @@ export function SubmitForReview({
           {pending ? 'Enviando…' : 'Enviar para revisão'}
         </Button>
       )}
-      <p
-        role="status"
-        className={
-          status?.ok === false ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'
-        }
-      >
+      <p role="status" className={classNames('text-sm', status?.ok === false && 'text-error')}>
         {status?.message}
       </p>
     </div>

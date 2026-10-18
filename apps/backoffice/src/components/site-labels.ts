@@ -69,7 +69,21 @@ export const SITE_STATE_LABEL: Record<SiteSummary['state'], string> = {
  * texto fica no cinza da Tag: o `text-<cor>` sobre o `bg-<cor>-subtle` das tabelas do Ecme não
  * chega a 4,5:1 no claro.
  */
-export type StateTagColor = 'bg-success' | 'bg-info' | 'bg-warning' | 'bg-error';
+export type StateTagColor =
+  'bg-success' | 'bg-info' | 'bg-warning' | 'bg-error' | 'bg-primary-mild' | 'bg-gray-400';
+
+/**
+ * Cor da tag de cada status de conteúdo: nenhum repete a de outro. Agendado fica no azul claro
+ * ao lado do azul de aprovado, como o `info`/`info-solid` do badge antigo.
+ */
+export const CONTENT_STATUS_TAG: Record<ContentListItem['status'], StateTagColor> = {
+  rascunho: 'bg-gray-400',
+  em_revisao: 'bg-warning',
+  aprovado: 'bg-info',
+  agendado: 'bg-primary-mild',
+  publicado: 'bg-success',
+  despublicado: 'bg-error',
+};
 
 /** Cor da tag de cada estado de site. */
 export const SITE_STATE_VARIANT: Record<SiteSummary['state'], StateTagColor> = {
