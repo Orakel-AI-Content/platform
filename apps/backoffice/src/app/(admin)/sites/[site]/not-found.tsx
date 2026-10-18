@@ -1,10 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import { StatusScreen } from '@/components/status-screen';
-import { buttonVariants } from '@/components/legacy-ui/button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 // Item inexistente num site que existe (#78): conteúdo, autor, versão… O link volta ao site.
 // Site inexistente não chega aqui: o notFound() do layout do site cai no (admin)/not-found,
@@ -14,11 +13,7 @@ export default function SiteNotFound() {
   return (
     <StatusScreen
       title="Página não encontrada"
-      action={
-        <Link href={`/sites/${site}`} className={buttonVariants({ variant: 'outline' })}>
-          Ir para o site {site}
-        </Link>
-      }
+      action={<ButtonLink href={`/sites/${site}`}>Ir para o site {site}</ButtonLink>}
     >
       O endereço não existe neste site ou o item foi removido.
     </StatusScreen>

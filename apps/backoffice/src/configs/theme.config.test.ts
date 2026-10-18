@@ -2,10 +2,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  applyStoredTheme,
   applyThemeChoice,
   applyThemeClass,
+  cookieThemeMode,
   parseThemeMode,
   resolveTheme,
+  THEME_COOKIE_SCRIPT,
   themeCookie,
 } from './theme.config';
 
@@ -97,4 +100,77 @@ describe('applyThemeChoice', () => {
       expect(document.documentElement.className).toBe(mode);
     },
   );
+});
+
+describe('THEME_COOKIE_SCRIPT', () => {
+  // Roda o script como o <head> da global-error: cookie lido pelo getter, sistema pelo matchMedia.
+  function run(cookie: string, prefersDark: boolean): string {
+    vi.spyOn(document, 'cookie', 'get').mockReturnValue(cookie);
+    vi.stubGlobal('matchMedia', () => ({ matches: prefersDark }) as MediaQueryList);
+    // O happy-dom não executa <script>: o texto do script roda como função, que é o que ele é.
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const apply = new Function(THEME_COOKIE_SCRIPT) as () => void;
+    apply();
+    return document.documentElement.className;
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.documentElement.className = '';
+  });
+
+  it.each([
+    ['orakel-theme=light', true, 'light'],
+    ['outro=1; orakel-theme=dark', false, 'dark'],
+  ] as const)('cookie válido vale, contra o sistema (%s)', (cookie, prefersDark, mode) => {
+    expect(run(cookie, prefersDark)).toBe(mode);
+  });
+
+  it.each([
+    ['', true, 'dark'],
+    ['', false, 'light'],
+    ['orakel-theme=system', true, 'dark'],
+    ['orakel-theme=Dark', false, 'light'],
+    ['meu-orakel-theme=dark', false, 'light'],
+  ] as const)(
+    'cookie ausente ou desconhecido cai no sistema ("%s")',
+    (cookie, prefersDark, mode) => {
+      expect(run(cookie, prefersDark)).toBe(mode);
+    },
+  );
+});
+
+describe('cookieThemeMode', () => {
+  it('lê o modo entre os cookies', () => {
+    expect(cookieThemeMode('orakel-theme=dark')).toBe('dark');
+    expect(cookieThemeMode('outro=1; orakel-theme=light; mais=2')).toBe('light');
+  });
+
+  it('ausente, desconhecido ou de outro cookie vale como sistema', () => {
+    expect(cookieThemeMode('')).toBeUndefined();
+    expect(cookieThemeMode('orakel-theme=system')).toBeUndefined();
+    expect(cookieThemeMode('meu-orakel-theme=dark')).toBeUndefined();
+  });
+});
+
+describe('applyStoredTheme', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.documentElement.className = '';
+  });
+
+  // Como a global-error montada no cliente: o React deixou o <html> sem classe.
+  it.each([
+    ['orakel-theme=light', true, 'light'],
+    ['orakel-theme=dark', false, 'dark'],
+    ['', true, 'dark'],
+    ['', false, 'light'],
+    ['orakel-theme=Dark', false, 'light'],
+  ] as const)('cookie "%s" (sistema escuro: %s) põe %s', (cookie, prefersDark, mode) => {
+    vi.spyOn(document, 'cookie', 'get').mockReturnValue(cookie);
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: prefersDark } as MediaQueryList);
+    applyStoredTheme();
+    expect(document.documentElement.className).toBe(mode);
+  });
 });
