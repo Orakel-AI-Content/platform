@@ -166,6 +166,40 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await expect(row).toContainText('Rascunho');
 });
 
+// Campos de imagem, de entidades e de data no Ecme (#272): com a capa escolhida (miniatura,
+// "Trocar" e "Remover" na tela), sem violação do axe nos dois temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`campos de imagem, entidades e data sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a/conteudos/novo');
+    await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
+
+    const cover = page.getByRole('group', { name: 'Capa', exact: true });
+    await cover.getByRole('button', { name: 'Escolher imagem' }).click();
+    const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
+    await grid
+      .getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ })
+      .first()
+      .click();
+    await expect(grid).toBeHidden();
+    await expect(cover.getByRole('button', { name: 'Remover' })).toBeVisible();
+    await expect(
+      page.getByRole('group', { name: 'Autores' }).getByRole('checkbox').first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('group', { name: 'Taxonomias' }).getByRole('checkbox').first(),
+    ).toBeVisible();
+    await expect(page.getByLabel('Data de publicação')).toBeVisible();
+
+    await page.mouse.move(0, 0);
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
+
 test('revisor não tem editor nem link para criar ou editar', async ({ page }) => {
   await loginAs(page, 'revisor@orakel.local');
   await page.goto('/sites/exemplo-a/conteudos');
