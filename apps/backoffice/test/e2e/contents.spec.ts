@@ -548,7 +548,12 @@ test.describe('barra de ações do editor (#109)', () => {
       await expect(page.getByRole('menu')).toBeVisible();
 
       await page.mouse.move(0, 0);
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      // As guardas de foco do floating-ui (`aria-hidden` e `tabindex=0`, repassam o foco na
+      // hora) ficam de fora, como em components.spec.ts.
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(WCAG)
+        .exclude('[data-floating-ui-focus-guard]')
+        .analyze();
       expect(accessibility.violations).toEqual([]);
     });
   }
