@@ -105,11 +105,16 @@ describe('biblioteca de mídia', () => {
     expect(refresh).toHaveBeenCalledWith('exemplo-a', 1, '');
   });
 
-  it('o rótulo do envio usa space-y-1.5, como os outros campos', () => {
+  it('o campo de envio é obrigatório, aceita várias imagens e só os formatos da rota', () => {
     renderLibrary({ items: [], canWrite: true, refresh: vi.fn(() => Promise.resolve(null)) });
 
-    expect(screen.getByLabelText(/^Imagens \(JPEG/).parentElement?.className).toContain(
-      'space-y-1.5',
+    const input = screen.getByLabelText<HTMLInputElement>(/^Imagens \(JPEG/);
+    expect(input.type).toBe('file');
+    expect(input.required).toBe(true);
+    expect(input.multiple).toBe(true);
+    expect(input.accept).toBe('image/jpeg,image/png,image/webp,image/avif');
+    expect(screen.getByRole('button', { name: 'Enviar imagens' }).getAttribute('type')).toBe(
+      'submit',
     );
   });
 
