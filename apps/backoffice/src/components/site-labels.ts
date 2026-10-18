@@ -1,6 +1,5 @@
 import type { Block } from '@orakel/content-model/v1';
 
-import type { BadgeVariant } from '@/components/legacy-ui/badge';
 import type { LastBuild } from '@/domain/builds/builds.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { PendingOrigin } from '@/domain/pending-changes/record.ts';
@@ -45,16 +44,6 @@ export const CONTENT_STATUS_LABEL: Record<ContentListItem['status'], string> = {
   agendado: 'Agendado',
   publicado: 'Publicado',
   despublicado: 'Despublicado',
-};
-
-/** Variante do badge de cada status de conteúdo: nenhum repete a de outro. */
-export const CONTENT_STATUS_VARIANT: Record<ContentListItem['status'], BadgeVariant> = {
-  rascunho: 'muted',
-  em_revisao: 'warning',
-  aprovado: 'info',
-  agendado: 'info-solid',
-  publicado: 'success-solid',
-  despublicado: 'outline',
 };
 
 /** Estado operacional de um site (lista de sites). */
