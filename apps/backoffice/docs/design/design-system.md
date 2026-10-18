@@ -23,15 +23,19 @@ ferramenta interna. Meta de acessibilidade: `docs/design/accessibility.md` da ra
   `text` (`{ visible, label }`), o botão mostra um texto próprio no lugar de "Mais ações", e
   o nome acessível contém esse texto; `align="start"` abre a lista para a direita (menu na
   borda esquerda, como o seletor de site).
-- **Diálogo de grade de miniaturas:** `MediaPicker` (`src/components/media-picker.tsx`),
-  próprio (o shadcn usaria Radix): um botão (`aria-haspopup="dialog"`) abre um `<dialog>`
-  nativo com `showModal`, que prende o foco e torna o resto da página inerte. Dentro, o título
-  "Escolher imagem", a página de miniaturas vinda de `load(page)` (a Server Action da leitura
-  paginada), cada uma um botão comum "Mídia N · L×A", "Anterior"/"Próxima" desabilitados nas
-  pontas e "Página X de Y · N imagens" em `role="status"` (também carregando, erro e vazio).
-  Escolher chama `onSelect(id)` e fecha; Esc fecha sem escolher; no `close` o foco volta ao
-  botão de origem por `focus()`, sem depender do navegador. A miniatura é a `MediaThumbnail`
-  (`media-library.tsx`), a mesma da biblioteca.
+- **Diálogo de grade de miniaturas:** `MediaPicker` (`src/components/media-picker.tsx`), no
+  `ui/Dialog` do Ecme desde a #280. Um `ui/Button` (`type="button"`, porque fica dentro de
+  formulários, com `aria-haspopup="dialog"`) abre o diálogo controlado. O react-modal prende o
+  foco, torna a app inerte e, ao fechar, devolve o foco ao botão de origem. Dentro ficam o
+  título "Escolher imagem" (`h2` em `aria-labelledby`, com `closable={false}` e o "Fechar" ao
+  lado) e a página de miniaturas vinda de `load(page)` (a Server Action da leitura paginada),
+  cada uma um botão comum "Mídia N · L×A". Abaixo vêm a `ui/Pagination` (`nav "Paginação"`,
+  pontas desabilitadas, `aria-current="page"`) e "Página X de Y · N imagens" em
+  `role="status"` (também carregando, erro e vazio). A paginação só aparece depois da primeira
+  página lida. Enquanto a próxima carrega, a grade anterior continua na tela, para o foco não se
+  perder, e só a resposta mais recente vale. Escolher chama `onSelect(id)` e fecha; Esc, o
+  fundo e "Fechar" fecham sem escolher. A miniatura é a `MediaThumbnail` (`media-library.tsx`),
+  a mesma da biblioteca.
 - **Detalhes da imagem:** `MediaDetails` (`src/components/media-details.tsx`): na biblioteca,
   cada imagem é um botão (`aria-haspopup="dialog"`) com a miniatura e a legenda "<nome> ·
   <data>", que abre um `<dialog>` nativo com `showModal`, como o `MediaPicker`: nome no `h2`,
