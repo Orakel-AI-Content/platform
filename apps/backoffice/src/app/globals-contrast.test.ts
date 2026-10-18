@@ -29,7 +29,7 @@ const light = variables(block(/^:root\s*\{([^}]*)\}/m));
 const dark = new Map([...light, ...variables(block(/^\.dark\s*\{([^}]*)\}/m))]);
 const THEMES = { claro: light, escuro: dark };
 
-/** Valor final da variável no tema, seguindo `var(--outra)` (os apelidos apontam para o Ecme). */
+/** Valor final da variável no tema, seguindo `var(--outra)` (ex.: --ring → --primary). */
 function resolve(theme: Theme, name: string, seen: readonly string[] = []): string | undefined {
   const value = theme.get(name);
   const reference = value === undefined ? undefined : /^var\(--([\w-]+)\)$/.exec(value);
@@ -85,33 +85,58 @@ function contrast(a: string, b: string): number {
   return (high + 0.05) / (low + 0.05);
 }
 
-/** [primeiro plano, fundo, mínimo]: texto a 4,5:1 (1.4.3) e foco a 3:1 (1.4.11, 2.4.13). */
-const PAIRS: readonly (readonly [string, string, number])[] = [
-  // Apelidos de transição, como as telas ainda os combinam.
-  ['foreground', 'background', 4.5],
-  ['foreground', 'muted', 4.5],
-  ['muted-foreground', 'background', 4.5],
-  ['muted-foreground', 'muted', 4.5],
-  ['primary-foreground', 'primary', 4.5],
-  ['destructive-foreground', 'destructive', 4.5],
-  ['destructive', 'background', 4.5],
-  ['success-foreground', 'success', 4.5],
-  ['info-foreground', 'info', 4.5],
-  // Cores do Ecme como texto sobre o fundo, como fundo do texto e no hover do botão.
-  ['primary', 'background', 4.5],
-  ['primary-foreground', 'primary-mild', 4.5],
-  ['error', 'background', 4.5],
-  ['warning', 'background', 4.5],
-  ['success', 'background', 4.5],
-  ['info', 'background', 4.5],
-  ['gray-900', 'gray-100', 4.5],
-  ['gray-600', 'gray-100', 4.5],
-  // Foco.
-  ['ring', 'background', 3],
-  ['ring', 'muted', 3],
-];
-
 type ThemeName = keyof typeof THEMES;
+
+/**
+ * [primeiro plano, fundo, mínimo] em cada tema: texto a 4,5:1 (1.4.3) e foco a 3:1 (1.4.11,
+ * 2.4.13). O fundo da página é neutral no claro e gray-950 no escuro (o body do globals.css);
+ * o fundo atenuado, gray-100 e gray-800; o texto secundário, gray-600 e gray-400.
+ */
+const PAIRS: Record<ThemeName, readonly (readonly [string, string, number])[]> = {
+  claro: [
+    // Texto e texto secundário sobre o fundo da página e o atenuado.
+    ['gray-900', 'neutral', 4.5],
+    ['gray-900', 'gray-100', 4.5],
+    ['gray-600', 'neutral', 4.5],
+    ['gray-600', 'gray-100', 4.5],
+    // Texto sobre as cores do Ecme como fundo e no hover do botão.
+    ['neutral', 'primary', 4.5],
+    ['neutral', 'primary-mild', 4.5],
+    ['neutral', 'error', 4.5],
+    ['neutral', 'success', 4.5],
+    ['neutral', 'info', 4.5],
+    // Cores do Ecme como texto sobre o fundo da página.
+    ['primary', 'neutral', 4.5],
+    ['error', 'neutral', 4.5],
+    ['warning', 'neutral', 4.5],
+    ['success', 'neutral', 4.5],
+    ['info', 'neutral', 4.5],
+    // Foco.
+    ['ring', 'neutral', 3],
+    ['ring', 'gray-100', 3],
+  ],
+  escuro: [
+    ['gray-100', 'gray-950', 4.5],
+    ['gray-100', 'gray-800', 4.5],
+    ['gray-400', 'gray-950', 4.5],
+    ['gray-400', 'gray-800', 4.5],
+    ['gray-950', 'primary', 4.5],
+    ['gray-950', 'primary-mild', 4.5],
+    ['gray-950', 'error', 4.5],
+    ['gray-950', 'success', 4.5],
+    ['gray-950', 'info', 4.5],
+    ['primary', 'gray-950', 4.5],
+    ['error', 'gray-950', 4.5],
+    ['warning', 'gray-950', 4.5],
+    ['success', 'gray-950', 4.5],
+    ['info', 'gray-950', 4.5],
+    // A escala gray não muda de tema: os pares claros dela valem também aqui.
+    ['gray-900', 'gray-100', 4.5],
+    ['gray-600', 'gray-100', 4.5],
+    ['ring', 'gray-950', 3],
+    ['ring', 'gray-800', 3],
+  ],
+};
 
 /**
  * Pares do Ecme (#217) como o tema os combina: no Ecme o tema escuro não troca tokens, troca o
@@ -1149,14 +1174,17 @@ describe('conversão OKLCH', () => {
   });
 });
 
-describe.each(Object.entries(THEMES))('tokens do tema %s', (_, theme) => {
-  it.each(PAIRS)('%s sobre %s chega a %d:1', (foreground, background, minimum) => {
-    const fg = resolve(theme, foreground);
-    const bg = resolve(theme, background);
-    expect(fg, `--${foreground}`).toBeDefined();
-    expect(bg, `--${background}`).toBeDefined();
-    expect(contrast(fg!, bg!)).toBeGreaterThanOrEqual(minimum);
-  });
+describe.each(Object.entries(THEMES))('tokens do tema %s', (name, theme) => {
+  it.each(PAIRS[name as ThemeName])(
+    '%s sobre %s chega a %d:1',
+    (foreground, background, minimum) => {
+      const fg = resolve(theme, foreground);
+      const bg = resolve(theme, background);
+      expect(fg, `--${foreground}`).toBeDefined();
+      expect(bg, `--${background}`).toBeDefined();
+      expect(contrast(fg!, bg!)).toBeGreaterThanOrEqual(minimum);
+    },
+  );
 });
 
 describe('pares do Ecme como o tema os combina', () => {

@@ -68,7 +68,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
         ])}
         title={<>Editar “{latest.data.title}”</>}
       />
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-gray-600 dark:text-gray-400">
         Partindo da versão {latest.version}; salvar grava a versão {latest.version + 1} em rascunho.
       </p>
       <ContentEditor

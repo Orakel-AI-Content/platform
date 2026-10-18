@@ -23,7 +23,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     return (
       <main className="mx-auto max-w-xl p-8">
         <h1 className="text-xl font-semibold">Sem acesso</h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
           Sua identidade não tem acesso ao Backoffice. Peça a uma pessoa administradora.
         </p>
       </main>
@@ -37,7 +37,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       {/* Primeira parada do Tab (WCAG 2.4.1): visível só com foco; leva o foco ao <main>. */}
       <a
         href="#conteudo"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-neutral focus:px-3 focus:py-2 focus:text-sm dark:focus:bg-gray-950"
       >
         Pular para o conteúdo
       </a>

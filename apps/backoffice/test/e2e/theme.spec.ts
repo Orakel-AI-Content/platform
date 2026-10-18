@@ -11,7 +11,7 @@ import { THEME_COOKIE } from '../../src/configs/theme.config.ts';
 const SCHEMES = ['light', 'dark'] as const;
 type Scheme = (typeof SCHEMES)[number];
 
-/** `--background` de cada tema no globals.css: neutral (#ffffff) e gray-950 (#0a0a0a). */
+/** Fundo do body de cada tema no globals.css: neutral (#ffffff) e gray-950 (#0a0a0a). */
 const BACKGROUND: Record<Scheme, string> = {
   light: 'rgb(255, 255, 255)',
   dark: 'rgb(10, 10, 10)',

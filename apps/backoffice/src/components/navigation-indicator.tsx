@@ -36,7 +36,7 @@ export function NavigationIndicator() {
       className="pointer-events-none fixed inset-x-0 top-2 z-50 flex justify-center"
     >
       {pending && (
-        <span className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground">
+        <span className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-neutral dark:text-gray-950">
           Carregando…
         </span>
       )}
