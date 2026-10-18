@@ -1,23 +1,14 @@
 'use client';
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
-import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
 import { ListPagination, ListToolbar } from '@/components/list-controls.tsx';
 import { listFeatures, useListState, type ListConfig } from '@/components/list-state.ts';
-
-import { Button, buttonVariants } from '@/components/legacy-ui/button';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/legacy-ui/table';
+import { Button } from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
+import Table from '@/components/ui/Table';
 
 /** Linha de uma lista de entidades: o servidor já formata as células como texto. */
 export type EntityRow = { id: number; name: string; cells: string[] };
@@ -45,6 +36,7 @@ type EntityTableProps = {
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, EntityRow>();
 const listColumn = createColumnHelper<typeof listFeatures, EntityRow>();
+const { THead, TBody, Tr, Th, Td } = Table;
 
 /** Só busca (`q`) e página: sem filtros, sem ordenação, na ordem do servidor. */
 const LIST: ListConfig = { filters: [], sortable: [] };
@@ -117,7 +109,7 @@ function SearchableEntityTable({
       {found === 0 ? (
         <EmptyState
           action={
-            <Button variant="outline" onClick={list.clearFilters}>
+            <Button type="button" onClick={list.clearFilters}>
               Limpar busca
             </Button>
           }
@@ -150,43 +142,38 @@ function EntityRowsTable({
   caption,
 }: Pick<EntityTableProps, 'basePath' | 'headers' | 'rows' | 'canWrite'> & { caption?: string }) {
   return (
-    <Table>
-      {caption && <TableCaption>{caption}</TableCaption>}
-      <TableHeader>
-        <TableRow>
+    <Table compact>
+      {caption && <caption className="mt-4 caption-bottom text-sm">{caption}</caption>}
+      <THead>
+        <Tr>
           {headers.map((header) => (
-            <TableHead key={header} scope="col">
-              {header}
-            </TableHead>
+            <Th key={header}>{header}</Th>
           ))}
           {canWrite && (
-            <TableHead scope="col">
+            <Th>
               <span className="sr-only">Ações</span>
-            </TableHead>
+            </Th>
           )}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+        </Tr>
+      </THead>
+      <TBody>
         {rows.map((row) => (
-          <TableRow key={row.id}>
-            <TableCell>{row.name}</TableCell>
+          <Tr key={row.id}>
+            <Td>{row.name}</Td>
             {headers.slice(1).map((header, index) => (
-              <TableCell key={header}>{row.cells[index] ?? ''}</TableCell>
+              <Td key={header}>{row.cells[index] ?? ''}</Td>
             ))}
             {canWrite && (
-              <TableCell>
-                <Link
-                  href={`${basePath}/${row.id}`}
-                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                >
+              <Td>
+                <ButtonLink href={`${basePath}/${row.id}`} size="xs">
                   Editar
                   <span className="sr-only"> {row.name}</span>
-                </Link>
-              </TableCell>
+                </ButtonLink>
+              </Td>
             )}
-          </TableRow>
+          </Tr>
         ))}
-      </TableBody>
+      </TBody>
     </Table>
   );
 }
