@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 
+import { SystemTheme } from '@/components/system-theme';
 import { ModalAppElement } from '@/components/ui/ModalAppElement';
 import { MotionProvider } from '@/components/ui/MotionProvider';
 import { ToastProvider } from '@/components/ui/toast';
@@ -32,7 +33,8 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // Tema (#203): com cookie, a classe já vem no HTML do servidor; sem ele, o script do <head>
   // a põe pela preferência do sistema antes da primeira pintura. Como o script muda a classe
-  // antes da hidratação, o <html> suprime o aviso de diferença (só dos atributos dele).
+  // antes da hidratação, o <html> suprime o aviso de diferença (só dos atributos dele). No shell
+  // de erro do Next (404, exceção), sem esse <head>, o SystemTheme põe a classe no cliente.
   const mode = parseThemeMode((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <html lang="pt-BR" className={cn(inter.variable, mode)} suppressHydrationWarning>
@@ -44,6 +46,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body className="min-h-screen antialiased">
         {/* Contêiner da app (#209): `appElement` do react-modal e `inert` enquanto há diálogo
             aberto; o portal dos diálogos fica no <body>, fora dele. */}
+        {mode === undefined && <SystemTheme />}
         <MotionProvider>
           <ModalAppElement />
           <div id={APP_ELEMENT_ID}>{children}</div>
