@@ -12,7 +12,8 @@ export const metadata: Metadata = { title: 'Teste de componentes' };
 // Vitrine dos componentes do Ecme (#205; workspace#45): onde o E2E audita cada componente
 // portado com axe e teclado, nos dois temas. Mesmo gate do teste-de-erro: só com
 // E2E_ERROR_ROUTE (compose local); sem a variável, que é o padrão, a página não existe. Cada
-// Task de componente acrescenta a sua seção; a remoção fica para a limpeza do épico (#52).
+// Task de componente acrescenta a sua seção. Fica depois da migração (#52): é o harness de axe e
+// teclado dos componentes do Ecme, não visual antigo.
 type SearchParams = { searchParams: Promise<{ 'pagina-link'?: string | string[] }> };
 
 export default async function ComponentsShowcasePage({ searchParams }: SearchParams) {
