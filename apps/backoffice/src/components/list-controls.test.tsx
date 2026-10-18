@@ -137,6 +137,16 @@ function TestList() {
   );
 }
 
+// O filtro é o combobox do react-select: abre com a seta e escolhe a opção pelo nome.
+async function choose(user: ReturnType<typeof userEvent.setup>, label: string, option: string) {
+  screen.getByRole('combobox', { name: label }).focus();
+  await user.keyboard('{ArrowDown}');
+  await user.click(screen.getByRole('option', { name: option }));
+}
+
+const filterValue = (label: string) =>
+  screen.getByRole('combobox', { name: label }).closest('.select')?.textContent;
+
 const titles = () =>
   screen
     .getAllByRole('row')
@@ -160,7 +170,7 @@ describe('ListToolbar', () => {
     render(<TestList />);
     expect(screen.queryByRole('button', { name: 'Limpar filtros' })).toBeNull();
 
-    await user.selectOptions(screen.getByLabelText('Tipo'), 'page');
+    await choose(user, 'Tipo', 'Página');
     expect(titles()).toEqual(['Quem somos']);
     await user.type(screen.getByLabelText('Buscar por título'), 'guia');
     expect(screen.getByRole('status').textContent).toBe('0 resultados');
@@ -169,7 +179,7 @@ describe('ListToolbar', () => {
 
     expect(navigation.get()).toBe('');
     expect(screen.getByLabelText<HTMLInputElement>('Buscar por título').value).toBe('');
-    expect(screen.getByLabelText<HTMLInputElement>('Tipo').value).toBe('');
+    expect(filterValue('Tipo')).toBe('Todos');
     expect(screen.getByRole('status').textContent).toBe('30 resultados');
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByLabelText('Buscar por título')),
@@ -181,7 +191,7 @@ describe('ListToolbar', () => {
     render(<TestList />);
 
     expect(screen.getByLabelText<HTMLInputElement>('Buscar por título').value).toBe('guia');
-    expect(screen.getByLabelText<HTMLInputElement>('Tipo').value).toBe('article');
+    expect(filterValue('Tipo')).toBe('Artigo');
     expect(screen.getByRole('columnheader', { name: /Título/ }).getAttribute('aria-sort')).toBe(
       'descending',
     );
@@ -215,16 +225,20 @@ describe('SortableHead', () => {
 });
 
 describe('ListPagination', () => {
-  it('mostra a contagem e desabilita Anterior na primeira página e Próxima na última', async () => {
+  it('mostra a contagem e desabilita Página anterior na primeira página e Próxima página na última', async () => {
     const user = userEvent.setup();
     render(<TestList />);
-    const previous = () => screen.getByRole('button', { name: 'Anterior' });
-    const next = () => screen.getByRole('button', { name: 'Próxima' });
+    const previous = () => screen.getByRole('button', { name: 'Página anterior' });
+    const next = () => screen.getByRole('button', { name: 'Próxima página' });
+    const pagination = () => screen.getByRole('navigation', { name: 'Paginação' });
 
     expect(screen.getByRole('status').textContent).toBe('30 resultados');
     expect(screen.getAllByRole('row')).toHaveLength(26);
     expect(previous()).toHaveProperty('disabled', true);
     expect(next()).toHaveProperty('disabled', false);
+    expect(
+      within(pagination()).getByRole('button', { name: 'Página 1' }).getAttribute('aria-current'),
+    ).toBe('page');
 
     await user.click(next());
 
@@ -232,7 +246,13 @@ describe('ListPagination', () => {
     expect(screen.getAllByRole('row')).toHaveLength(6);
     expect(previous()).toHaveProperty('disabled', false);
     expect(next()).toHaveProperty('disabled', true);
+    expect(
+      within(pagination()).getByRole('button', { name: 'Página 2' }).getAttribute('aria-current'),
+    ).toBe('page');
     expect(navigation.get()).toBe('pagina=2');
+
+    await user.click(within(pagination()).getByRole('button', { name: 'Página 1' }));
+    expect(navigation.get()).toBe('');
   });
 
   it('volta à página 1 quando a busca ou o filtro mudam', async () => {
@@ -245,7 +265,7 @@ describe('ListPagination', () => {
     expect(screen.getByText('Página 1 de 2')).toBeDefined();
 
     act(() => navigation.set('pagina=2'));
-    await user.selectOptions(screen.getByLabelText('Tipo'), 'article');
+    await choose(user, 'Tipo', 'Artigo');
     expect(navigation.get()).toBe('tipo=article');
   });
 
