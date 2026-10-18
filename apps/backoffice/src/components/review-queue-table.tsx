@@ -5,20 +5,13 @@ import Link from 'next/link';
 
 import { EmptyState } from '@/components/empty-state';
 import { CONTENT_KIND_LABEL, formatDateTime } from '@/components/site-labels.ts';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/legacy-ui/table';
+import Table from '@/components/ui/Table';
 import type { ReviewQueueItem } from '@/domain/content/contents.ts';
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, ReviewQueueItem>();
+const { THead, TBody, Tr, Th, Td } = Table;
 
 function columnsFor(siteId: string, timeZone: string) {
   return column.columns([
@@ -27,7 +20,7 @@ function columnsFor(siteId: string, timeZone: string) {
       cell: (info) => (
         <Link
           href={`/sites/${siteId}/revisao/${info.row.original.id}`}
-          className="font-medium underline underline-offset-4"
+          className="font-semibold text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
         >
           {info.getValue()}
           <span className="sr-only"> (revisar)</span>
@@ -67,34 +60,34 @@ export function ReviewQueueTable({
     return <EmptyState>Nenhum conteúdo aguardando revisão.</EmptyState>;
   }
   return (
-    <Table>
-      <TableCaption>
+    <Table compact>
+      <caption className="mt-4 caption-bottom text-sm">
         {rows.length === 1
           ? '1 conteúdo aguardando revisão'
           : `${rows.length} conteúdos aguardando revisão`}
-      </TableCaption>
-      <TableHeader>
+      </caption>
+      <THead>
         {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id}>
+          <Tr key={group.id}>
             {group.headers.map((header) => (
-              <TableHead key={header.id} scope="col">
+              <Th key={header.id}>
                 <table.FlexRender header={header} />
-              </TableHead>
+              </Th>
             ))}
-          </TableRow>
+          </Tr>
         ))}
-      </TableHeader>
-      <TableBody>
+      </THead>
+      <TBody>
         {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
+          <Tr key={row.id}>
             {row.getAllCells().map((cell) => (
-              <TableCell key={cell.id}>
+              <Td key={cell.id}>
                 <table.FlexRender cell={cell} />
-              </TableCell>
+              </Td>
             ))}
-          </TableRow>
+          </Tr>
         ))}
-      </TableBody>
+      </TBody>
     </Table>
   );
 }
