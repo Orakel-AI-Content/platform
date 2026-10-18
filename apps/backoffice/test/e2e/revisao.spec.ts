@@ -134,12 +134,6 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
   ).toBeVisible();
   await expect(reviewer.getByText('Nenhum problema de validação.')).toBeVisible();
 
-  const accessibility = await new AxeBuilder({ page: reviewer })
-    .withTags(WCAG)
-    .exclude('iframe')
-    .analyze();
-  expect(accessibility.violations).toEqual([]);
-
   // Os 5 itens do checklist (REVIEW_CHECKLIST), marcados pelo teclado.
   const items = reviewer.getByRole('checkbox');
   await expect(items).toHaveCount(5);
@@ -159,3 +153,38 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
   await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toHaveCount(0);
   await context.close();
 });
+
+// Tela de revisão no Ecme (#277): o painel ao lado da visualização, com checklist e "Aprovar", e
+// o axe sem violação nos dois temas (fora o iframe, que é o site).
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`tela de revisão sem violação do axe (${colorScheme})`, async ({ page, browser }) => {
+    const slug = `e2e-tela-${colorScheme}-${Date.now()}`;
+    const title = `Artigo ${slug}`;
+    await loginAs(page, 'editor@orakel.local');
+    await createDraft(page, title, slug);
+    await page.getByRole('button', { name: 'Enviar para revisão' }).click();
+    await expect(page.getByRole('main').getByRole('status')).toHaveText('Enviado para revisão.');
+
+    const context = await browser.newContext({ ignoreHTTPSErrors: true, colorScheme });
+    const reviewer = await context.newPage();
+    await reviewer.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(reviewer, 'revisor@orakel.local');
+    await reviewer.goto('/sites/exemplo-a/revisao');
+    await reviewer.getByRole('link', { name: `${title} (revisar)` }).click();
+
+    const panel = reviewer.getByRole('complementary', { name: 'Revisão da versão 1' });
+    await expect(panel.getByText('Nenhum problema de validação.')).toBeVisible();
+    await expect(
+      panel.getByRole('link', { name: 'Abrir a visualização em nova aba' }),
+    ).toBeVisible();
+    await expect(panel.getByRole('checkbox')).toHaveCount(5);
+    await expect(panel.getByRole('button', { name: 'Aprovar' })).toBeEnabled();
+
+    const accessibility = await new AxeBuilder({ page: reviewer })
+      .withTags(WCAG)
+      .exclude('iframe')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+    await context.close();
+  });
+}

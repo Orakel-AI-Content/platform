@@ -67,7 +67,7 @@ export function ReviewPanel({
             href={previewUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary underline underline-offset-4"
+            className="text-primary underline underline-offset-4 dark:text-primary-mild"
           >
             Abrir a visualização em nova aba
           </a>
