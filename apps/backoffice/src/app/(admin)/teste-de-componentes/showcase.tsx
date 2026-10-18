@@ -581,7 +581,7 @@ export function Showcase({ linkPage }: { linkPage: number }) {
           initial={{ x: -120 }}
           animate={{ x: 0 }}
           transition={{ duration: 3 }}
-          className="w-fit rounded-md bg-muted px-3 py-2 text-sm"
+          className="w-fit rounded-md bg-gray-100 px-3 py-2 text-sm dark:bg-gray-800"
         >
           Painel animado
         </motion.div>
@@ -664,12 +664,12 @@ export function Showcase({ linkPage }: { linkPage: number }) {
         </h2>
         <div
           data-vitrine-rolagem=""
-          className="h-[150vh] rounded-md border border-border p-4 text-sm"
+          className="h-[150vh] rounded-md border border-gray-200 p-4 text-sm dark:border-gray-700"
         >
           Área longa para rolar.
         </div>
         <StickyFooter
-          stickyClass="bottom-0 border-t border-border bg-background px-4 py-3"
+          stickyClass="bottom-0 border-t border-gray-200 bg-neutral px-4 py-3 dark:border-gray-700 dark:bg-gray-950"
           defaultClass="px-4 py-3"
         >
           <div className="flex justify-end gap-3">
