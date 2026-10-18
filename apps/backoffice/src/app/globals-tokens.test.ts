@@ -43,7 +43,7 @@ describe('cores das classes de src/', () => {
     // Guarda contra o teste passar sem ler nada (regex ou caminho quebrado).
     expect(files.length).toBeGreaterThan(50);
     expect([...used.keys()]).toEqual(
-      expect.arrayContaining(['muted-foreground', 'destructive', 'primary', 'success']),
+      expect.arrayContaining(['primary', 'error', 'success', 'gray-500']),
     );
   });
 
