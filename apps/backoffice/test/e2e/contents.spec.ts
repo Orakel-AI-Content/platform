@@ -506,32 +506,52 @@ test.describe('barra de ações do editor (#109)', () => {
     await loginAs(page, 'editor@orakel.local');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
     const trigger = page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true });
-    const list = page.locator(`[id="${await trigger.getAttribute('popovertarget')}"]`);
+    const menu = page.getByRole('menu');
 
+    // O Dropdown do Ecme (#274): Enter abre o menu, Esc fecha e devolve o foco ao gatilho.
     await trigger.focus();
     await page.keyboard.press('Enter');
-    await expect(list).toBeVisible();
+    await expect(menu).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     await page.keyboard.press('Escape');
-    await expect(list).toBeHidden();
+    await expect(menu).toBeHidden();
     await expect(trigger).toBeFocused();
 
-    // Abre de novo e chega ao "Sumário" pelo Tab (a lista vem logo depois do gatilho).
+    // Abre de novo e chega ao "Sumário" pelas setas.
     await page.keyboard.press('Enter');
-    const toc = list.getByRole('button', { name: 'Sumário' });
+    const toc = menu.getByRole('menuitem', { name: 'Sumário' });
     for (let step = 0; step < 6; step += 1) {
-      await page.keyboard.press('Tab');
       if (await toc.evaluate((node) => node === document.activeElement)) break;
+      await page.keyboard.press('ArrowDown');
     }
     await expect(toc).toBeFocused();
     await page.keyboard.press('Enter');
 
-    await expect(list).toBeHidden();
+    await expect(menu).toBeHidden();
     const inserted = page.getByRole('group', { name: 'Bloco 2: Sumário', exact: true });
     await expect(inserted.getByLabel('Título do sumário')).toBeFocused();
     await expect(inserted.getByLabel('Título do sumário')).toHaveValue('');
     await expect(page.getByRole('group', { name: /^Bloco \d+:/ })).toHaveCount(21);
     await expect(page.getByRole('button', { name: 'Remover bloco 21', exact: true })).toBeVisible();
   });
+
+  // Editor no Ecme (#274): com um bloco recolhido, o menu de inserir aberto e o rodapé fixo,
+  // sem violação do axe nos dois temas.
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`editar sem violação do axe (${colorScheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await loginAs(page, 'editor@orakel.local');
+      await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+      await page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Salvar nova versão' })).toBeInViewport();
+      await page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true }).click();
+      await expect(page.getByRole('menu')).toBeVisible();
+
+      await page.mouse.move(0, 0);
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+    });
+  }
 
   test('recolhe e expande blocos só pelo teclado; recolhido, o bloco ocupa uma linha (#135)', async ({
     page,
