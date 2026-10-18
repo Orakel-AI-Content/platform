@@ -73,4 +73,10 @@ describe('visualização de versão', () => {
     }
     expect(container.querySelector('form, input, textarea, select, [contenteditable]')).toBeNull();
   });
+
+  it('usa só os tokens do Ecme, sem as cores do shadcn (#271)', () => {
+    const { container } = render(<ContentVersionView data={data} />);
+
+    expect(container.innerHTML).not.toMatch(/muted-foreground|border-border|destructive/);
+  });
 });
