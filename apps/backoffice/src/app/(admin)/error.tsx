@@ -1,6 +1,6 @@
 'use client';
 
-import { ErrorScreen } from '@/components/error-screen';
+import { ErrorScreen } from '@/components/shared/ErrorScreen';
 
 // Exceção numa página de (admin) (#77): a tela aparece dentro do layout, com o cabeçalho.
 // Falha no próprio layout de (admin) não passa por aqui: sobe até o global-error.tsx.

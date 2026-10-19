@@ -1,5 +1,5 @@
 import { ContentEditor } from '@/components/content-editor';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 
 import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
 import { createContentAction } from '../actions.ts';

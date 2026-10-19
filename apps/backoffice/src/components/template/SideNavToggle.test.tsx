@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import navigationConfig, { filterNavigation } from '@/configs/navigation.config';
 
-import { SideNavProvider } from './side-nav-context.tsx';
+import { SideNavProvider } from './SideNavContext.tsx';
 import SideNav from './SideNav.tsx';
 import SideNavToggle from './SideNavToggle.tsx';
 

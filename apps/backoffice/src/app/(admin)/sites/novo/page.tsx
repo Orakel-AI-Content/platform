@@ -2,7 +2,7 @@ import { RESOURCES } from '@orakel/content-model/v1';
 import { THEME_SUMMARIES } from '@orakel/tokens';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import { backToSites, ForbiddenScreen } from '@/components/forbidden-screen';
+import { backToSites, ForbiddenScreen } from '@/components/shared/ForbiddenScreen';
 import { emptySiteConfig } from '@/components/site-config-form-values.ts';
 import { SiteConfigForm } from '@/components/site-config-form';
 import { can } from '@/domain/access/rbac.ts';

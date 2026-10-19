@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { ContentEditor } from '@/components/content-editor';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import { getEnv } from '@/env.ts';
 
 import { noWrite, PageHeader, siteTrail } from '../../../editorial-page.tsx';

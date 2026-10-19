@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import Table from '@/components/ui/Table';
 
-import { ListPagination, ListToolbar, SortableHead } from './list-controls.tsx';
-import { listFeatures, useListState, type ListConfig } from './list-state.ts';
+import { ListPagination, ListToolbar, SortableHead } from './ListControls.tsx';
+import { listFeatures, useListState, type ListConfig } from './useListState.ts';
 
 const { THead, TBody, Tr, Td } = Table;
 

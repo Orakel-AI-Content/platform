@@ -33,7 +33,7 @@ import { Button } from '@/components/ui/Button';
 import Dropdown from '@/components/ui/Dropdown';
 import Tooltip from '@/components/ui/Tooltip';
 import classNames from '@/components/ui/utils/classNames';
-import { useLeaveGuard } from '@/components/use-leave-guard.ts';
+import { useLeaveGuard } from '@/components/shared/useLeaveGuard.ts';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
 // Editor de artigos e páginas (#45): um formulário só; os metadados e cada bloco são

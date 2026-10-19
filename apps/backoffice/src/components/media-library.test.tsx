@@ -11,7 +11,7 @@ import type { SendFile } from './upload-queue.tsx';
 
 // Biblioteca de mídia (#52, #186): envio pela rota, "processando" até o total da página
 // crescer, recusa com o motivo, grade sem envio para quem não edita, nome e data de cada
-// imagem no fuso do site, e busca e página pela URL (`list-state`).
+// imagem no fuso do site, e busca e página pela URL (`useListState`).
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
 const search = vi.hoisted(() => ({ value: '' }));

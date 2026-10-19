@@ -1,4 +1,4 @@
-import { StatusScreen } from '@/components/status-screen';
+import { StatusScreen } from '@/components/shared/StatusScreen';
 import { Button } from '@/components/ui/Button';
 
 // Conteúdo da tela de erro (#77), comum ao error.tsx de (admin) e ao global-error.tsx. Nunca

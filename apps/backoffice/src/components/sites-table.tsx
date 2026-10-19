@@ -15,7 +15,7 @@ import {
   type PublishNow,
   type PublishStatus,
 } from '@/components/site-status';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState } from '@/components/shared/EmptyState';
 import Dropdown from '@/components/ui/Dropdown';
 import Table from '@/components/ui/Table';
 import type { SiteSummary } from '@/domain/sites/sites.ts';

@@ -3,7 +3,7 @@ import type { ColumnSort } from '@tanstack/react-table';
 // Estado das listas na URL (`q`, `ordem`, `pagina`, `por-pagina` e os filtros), sem React nem
 // `'use client'`:
 // a leitura serve ao servidor (a página Mídia pagina no servidor, #186) e ao cliente
-// (`useListState`, em `list-state.ts`).
+// (`useListState`, em `useListState.ts`).
 
 /** Itens por página de toda lista sem `pageSizes` (decisão da #35; com o seletor do DataTable
  * do Ecme, a lista que optar por ele escolhe entre os seus tamanhos, #215). */

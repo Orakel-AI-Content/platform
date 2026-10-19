@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
 
-import { ListPagination, ListToolbar } from '@/components/list-controls.tsx';
+import { ListPagination, ListToolbar } from '@/components/shared/ListControls.tsx';
 import { MediaDetails } from '@/components/media-details';
 import {
   UploadList,
@@ -11,7 +11,7 @@ import {
   type SendFile,
   type UploadStatus,
 } from '@/components/upload-queue';
-import { useListState, type ListConfig } from '@/components/list-state.ts';
+import { useListState, type ListConfig } from '@/components/shared/useListState.ts';
 import type { MediaPickerPage } from '@/components/media-picker';
 import { Button } from '@/components/ui/Button';
 import { FormItem } from '@/components/ui/Form';
@@ -66,7 +66,7 @@ export function MediaThumbnail({ item }: { item: MediaItem }) {
 /** Formatos que a rota aceita (a assinatura do arquivo é conferida no domínio). */
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/avif';
 
-/** Lista sem filtros nem ordenação: só a busca e a página da URL (`list-state`). */
+/** Lista sem filtros nem ordenação: só a busca e a página da URL (`useListState`). */
 const MEDIA_LIST: ListConfig = { filters: [], sortable: [] };
 
 export function MediaLibrary({

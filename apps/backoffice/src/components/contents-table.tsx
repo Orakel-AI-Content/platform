@@ -4,9 +4,9 @@ import { createColumnHelper, useTable, type Row } from '@tanstack/react-table';
 import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
 
-import { EmptyState } from '@/components/empty-state';
-import { ListPagination, ListToolbar, SortableHead } from '@/components/list-controls.tsx';
-import { listFeatures, useListState, type ListConfig } from '@/components/list-state.ts';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { ListPagination, ListToolbar, SortableHead } from '@/components/shared/ListControls.tsx';
+import { listFeatures, useListState, type ListConfig } from '@/components/shared/useListState.ts';
 
 import {
   CONTENT_KIND_LABEL,

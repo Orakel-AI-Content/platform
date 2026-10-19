@@ -3,7 +3,7 @@
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { navigationTarget } from '@/components/navigation-target.ts';
+import { navigationTarget } from '@/components/shared/navigationTarget.ts';
 
 // Carregamento da navegação (#77): acende no clique de um link interno e apaga quando o
 // endereço muda. Um `loading.tsx` não serve aqui: só aparece quando muda o segmento logo

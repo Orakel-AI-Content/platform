@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(location.search),
 }));
 
-const { NavigationIndicator } = await import('./navigation-indicator.tsx');
+const { NavigationIndicator } = await import('./NavigationIndicator.tsx');
 
 afterEach(cleanup);
 beforeEach(() => {

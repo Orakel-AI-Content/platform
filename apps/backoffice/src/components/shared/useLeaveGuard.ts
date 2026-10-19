@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-import { navigationTarget } from '@/components/navigation-target.ts';
+import { navigationTarget } from '@/components/shared/navigationTarget.ts';
 
 // Aviso ao sair com alterações não salvas (#111): fechar a aba ou recarregar dispara a
 // confirmação do navegador (`beforeunload`), e o clique num link interno pergunta antes de

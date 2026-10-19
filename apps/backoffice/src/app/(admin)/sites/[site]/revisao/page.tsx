@@ -1,5 +1,5 @@
 import { ReviewQueueTable } from '@/components/review-queue-table';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import { listReviewQueue } from '@/domain/content/contents.ts';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';

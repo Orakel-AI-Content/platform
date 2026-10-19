@@ -1,5 +1,5 @@
-import { backToSites } from '@/components/forbidden-screen';
-import { StatusScreen } from '@/components/status-screen';
+import { backToSites } from '@/components/shared/ForbiddenScreen';
+import { StatusScreen } from '@/components/shared/StatusScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 // "Não encontrado" dentro do layout (admin) (#77): `notFound()` das páginas e o catch-all

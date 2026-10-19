@@ -23,7 +23,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { listStateQuery, parseListState, type ListConfig, type ListPatch } from './list-query.ts';
+import { listStateQuery, parseListState, type ListConfig, type ListPatch } from './listQuery.ts';
 
 /** Texto para comparar na busca: sem acentos (NFD sem as marcas) e em minúsculas. */
 export function normalizeText(value: string): string {
@@ -55,7 +55,7 @@ export const listFeatures = tableFeatures({
   paginatedRowModel: createPaginatedRowModel(),
 });
 
-// Tipos e leitura da URL num módulo sem `'use client'` (`list-query.ts`): a página do servidor
+// Tipos e leitura da URL num módulo sem `'use client'` (`listQuery.ts`): a página do servidor
 // também lê `q` e `pagina` (Mídia, #186), e o Next não deixa o servidor chamar função cliente.
 export {
   listStateQuery,
@@ -65,7 +65,7 @@ export {
   type ListFilterConfig,
   type ListPatch,
   type ListState,
-} from './list-query.ts';
+} from './listQuery.ts';
 
 /**
  * Estado de uma lista filtrada guardado na URL: a URL é a única fonte (abrir o endereço

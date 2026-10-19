@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { PERMISSIONS } from '@/domain/access/rbac.ts';
 
-import { backToSite, backToSites, ForbiddenScreen, forbiddenReason } from './forbidden-screen.tsx';
+import { backToSite, backToSites, ForbiddenScreen, forbiddenReason } from './ForbiddenScreen.tsx';
 
 // Tela de permissão (#80): título, motivo com os papéis da matriz do RBAC e saída.
 

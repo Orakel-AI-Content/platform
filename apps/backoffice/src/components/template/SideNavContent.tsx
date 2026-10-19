@@ -8,7 +8,7 @@
 import { usePathname } from 'next/navigation';
 import classNames from '@/components/ui/utils/classNames';
 import VerticalMenuContent from '@/components/template/VerticalMenuContent';
-import { SiteSwitcher, type SwitcherSite } from '@/components/site-switcher';
+import { SiteSwitcher, type SwitcherSite } from '@/components/template/SiteSwitcher';
 import {
   activeNavigationKey,
   NAV_ITEM_TYPE_TITLE,

@@ -15,7 +15,7 @@ import { usePathname } from 'next/navigation';
 import NavToggle from '@/components/shared/NavToggle';
 import Drawer from '@/components/ui/Drawer';
 import classNames from '@/components/ui/utils/classNames';
-import type { SwitcherSite } from '@/components/site-switcher';
+import type { SwitcherSite } from '@/components/template/SiteSwitcher';
 import type { NavigationTree } from '@/configs/navigation.config';
 import SideNavContent from './SideNavContent';
 

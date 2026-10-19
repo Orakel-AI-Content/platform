@@ -9,7 +9,7 @@ import {
   parseListState,
   useListState,
   type ListConfig,
-} from './list-state.ts';
+} from './useListState.ts';
 
 // Estado de lista na URL (#106): normalização da busca, leitura e escrita dos searchParams.
 

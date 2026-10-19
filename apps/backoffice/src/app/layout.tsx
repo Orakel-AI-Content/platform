@@ -3,7 +3,7 @@ import localFont from 'next/font/local';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 
-import { SystemTheme } from '@/components/system-theme';
+import { SystemTheme } from '@/components/shared/SystemTheme';
 import { ModalAppElement } from '@/components/ui/ModalAppElement';
 import { MotionProvider } from '@/components/ui/MotionProvider';
 import { ToastProvider } from '@/components/ui/toast';

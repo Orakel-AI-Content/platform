@@ -1,6 +1,6 @@
 import { ContentsTable } from '@/components/contents-table';
 import { listContents } from '@/domain/content/contents.ts';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LEAVE_MESSAGE, useLeaveGuard } from './use-leave-guard.ts';
+import { LEAVE_MESSAGE, useLeaveGuard } from './useLeaveGuard.ts';
 
 // Aviso ao sair (#111): só com alterações, pergunta no clique de link interno e no
 // `beforeunload`; ficar cancela o clique antes do indicador de navegação.
@@ -12,7 +12,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-const { NavigationIndicator } = await import('./navigation-indicator.tsx');
+const { NavigationIndicator } = await import('./NavigationIndicator.tsx');
 
 // O happy-dom não tem `window.confirm`: cada teste decide a resposta.
 const confirm = vi.fn<(message?: string) => boolean>();

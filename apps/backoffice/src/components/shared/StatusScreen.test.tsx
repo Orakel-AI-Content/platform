@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import Link from 'next/link';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { StatusScreen } from './status-screen.tsx';
+import { StatusScreen } from './StatusScreen.tsx';
 
 // Tela de estado (#77): título como heading da seção, frase e ação.
 
