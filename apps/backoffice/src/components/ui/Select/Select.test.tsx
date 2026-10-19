@@ -10,7 +10,8 @@ import { FormContainer, FormItem } from '../Form/index.tsx';
 import { Select } from './index.tsx';
 
 // Select do Ecme (#208) sobre o react-select: rótulo e erro do FormItem no combobox, instanceId
-// estável, opção em foco marcada e as variantes async e creatable pelo `componentAs`.
+// estável, opção em foco marcada e as variantes async e creatable pelo `componentAs`. Múltiplo
+// (#319): botão de remover e região viva em pt-BR, adicionar e remover pelo teclado.
 
 type Opcao = { value: string; label: string };
 
@@ -145,5 +146,124 @@ describe('Select', () => {
       expect.objectContaining({ value: 'Entrevistas' }),
       expect.anything(),
     );
+  });
+
+  // O happy-dom cria `TouchEvent`, e o react-select o toma por tela de toque: tira o foco do
+  // campo ao escolher (`blurInputOnSelect`) e a região viva some. No navegador de mesa, não;
+  // `blurInputOnSelect={false}` reproduz isso aqui (o e2e cobre o comportamento real).
+  describe('múltiplo', () => {
+    it('cada valor tem o botão "Remover <opção>", sem o rótulo em inglês do react-select', () => {
+      render(
+        <Select<Opcao, true>
+          isMulti
+          options={OPCOES}
+          defaultValue={[OPCOES[1]!]}
+          aria-label="Categorias"
+        />,
+      );
+
+      const remover = screen.getByRole('button', { name: 'Remover Guias' });
+      expect(remover.className).toContain('select-multi-value-remove');
+      expect(remover.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+      expect(document.querySelector('[aria-label^="Remove "]')).toBeNull();
+    });
+
+    it('clicar em "Remover <opção>" tira só aquele valor', async () => {
+      const onChange = vi.fn();
+      render(
+        <Select<Opcao, true>
+          isMulti
+          options={OPCOES}
+          defaultValue={[OPCOES[0]!, OPCOES[1]!]}
+          aria-label="Categorias"
+          onChange={onChange}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remover Notícias' }));
+      expect(onChange).toHaveBeenCalledWith(
+        [OPCOES[1]],
+        expect.objectContaining({ action: 'remove-value' }),
+      );
+      expect(screen.queryByRole('button', { name: 'Remover Notícias' })).toBeNull();
+    });
+
+    it('pelo teclado: Enter adiciona, Backspace remove o último e a região viva anuncia em pt-BR', async () => {
+      const onChange = vi.fn();
+      render(
+        <Select<Opcao, true>
+          isMulti
+          options={OPCOES}
+          defaultValue={[OPCOES[0]!]}
+          aria-label="Categorias"
+          blurInputOnSelect={false}
+          onChange={onChange}
+        />,
+      );
+
+      await userEvent.tab();
+      await userEvent.keyboard('{ArrowDown}');
+      await userEvent.keyboard('{Enter}');
+      expect(onChange).toHaveBeenLastCalledWith(
+        [OPCOES[0], OPCOES[1]],
+        expect.objectContaining({ action: 'select-option' }),
+      );
+      expect(screen.getByRole('button', { name: 'Remover Guias' })).toBeTruthy();
+      const anuncio = document.getElementById('aria-selection')!;
+      expect(anuncio.textContent).toContain('opção Guias selecionada.');
+      expect(anuncio.textContent).not.toMatch(/selected/);
+
+      await userEvent.keyboard('{Backspace}');
+      expect(onChange).toHaveBeenLastCalledWith(
+        [OPCOES[0]],
+        expect.objectContaining({ action: 'pop-value' }),
+      );
+      expect(screen.queryByRole('button', { name: 'Remover Guias' })).toBeNull();
+      expect(anuncio.textContent).toContain('opção Guias removida.');
+      expect(anuncio.textContent).not.toMatch(/deselected|selected/);
+    });
+
+    it('pelo teclado: seta para a esquerda foca o valor e Backspace remove o valor em foco', async () => {
+      const onChange = vi.fn();
+      render(
+        <Select<Opcao, true>
+          isMulti
+          options={OPCOES}
+          defaultValue={[OPCOES[0]!, OPCOES[1]!]}
+          aria-label="Categorias"
+          blurInputOnSelect={false}
+          onChange={onChange}
+        />,
+      );
+
+      await userEvent.tab();
+      await userEvent.keyboard('{ArrowLeft}{ArrowLeft}');
+      expect(document.getElementById('aria-focused')?.textContent).toBe(
+        'valor Notícias em foco, 1 de 2.',
+      );
+      await userEvent.keyboard('{Backspace}');
+      expect(onChange).toHaveBeenLastCalledWith(
+        [OPCOES[1]],
+        expect.objectContaining({ action: 'remove-value' }),
+      );
+    });
+
+    it('o chamador vence: ariaLiveMessages parcial mantém as demais mensagens em pt-BR', async () => {
+      render(
+        <Select<Opcao, true>
+          isMulti
+          options={OPCOES}
+          aria-label="Categorias"
+          blurInputOnSelect={false}
+          ariaLiveMessages={{ onChange: ({ label }) => `escolheu ${label}` }}
+        />,
+      );
+
+      await userEvent.tab();
+      await userEvent.keyboard('{ArrowDown}{Enter}');
+      const anuncio = document.getElementById('aria-selection')!;
+      expect(anuncio.textContent).toContain('escolheu Notícias');
+      expect(anuncio.textContent).not.toMatch(/Use Up and Down|press/);
+    });
   });
 });
