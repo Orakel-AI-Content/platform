@@ -5,6 +5,8 @@
 // `aria-describedby`: em volta do <li>, o <span> dela ficaria solto na <ul>. `next/link` no lugar do `Link` do react-router, o caminho já resolvido para o
 // site (`navigationPath`, #236) e `aria-current="page"` no link do item ativo. Sem
 // `AuthorityCheck`: a árvore chega filtrada do servidor (`filterNavigation`).
+'use client';
+
 import Link from 'next/link';
 import { Menu } from '@/components/ui/Menu';
 import Tooltip from '@/components/ui/Tooltip';
