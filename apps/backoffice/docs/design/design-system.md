@@ -14,7 +14,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 - **Componentes:** as primitivas do Ecme em `src/components/ui/` (uma pasta por componente,
   como no template: Alert, Avatar, Badge, Button, Card, Checkbox, Dialog, Drawer, Dropdown,
   Form, Input, InputGroup, Menu, Notification, Pagination, Radio, Segment, Select, Skeleton,
-  Spinner, Switcher, Table, Tabs, Tag, toast, Tooltip) e as peças compostas em `src/components/shared/` (AdaptiveCard,
+  Spinner, Switcher, Table, Tabs, Tag, TimeInput, toast, Tooltip) e as peças compostas em `src/components/shared/` (AdaptiveCard,
   ConfirmDialog, DataTable, Loading, StickyFooter e o `IconButton`, que não tem equivalente no
   template). Componente que a tela precisa e ainda não foi portado: copie a fonte do Ecme,
   mantendo a API e a aparência, e mude só o que Next, acessibilidade e tipos pedem. Porte sob
@@ -49,6 +49,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   | Item do Segment, claro                 | `text-gray-500` (4,35:1)             | `text-gray-600`                            |
   | Item do Segment, escuro                | `dark:text-gray-400` (4,11:1)        | `dark:text-gray-200`                       |
   | Foco no Segment, escuro                | `outline-ring` (2,91:1)              | `dark:outline-primary-mild` (3,50:1)       |
+  | Foco no campo do TimeInput, escuro     | `outline-none` (ring: 2,91:1)        | `dark:outline-primary-mild` (3,50:1)       |
 
   Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS`, no tema em
   que aparece.
