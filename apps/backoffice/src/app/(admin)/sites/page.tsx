@@ -1,5 +1,5 @@
 import { currentActor } from '@/auth/request-actor.ts';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import { SitesTable } from '@/components/sites-table';
 import { Button } from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/Button/ButtonLink';

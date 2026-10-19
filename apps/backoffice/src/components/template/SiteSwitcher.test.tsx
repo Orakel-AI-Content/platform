@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { sameAreaIn, SiteSwitcher, siteInitials } from './site-switcher.tsx';
+import { sameAreaIn, SiteSwitcher, siteInitials } from './SiteSwitcher.tsx';
 
 // Seletor de site (#172, #241): o Dropdown com os sites recebidos, o atual marcado e cada item
 // na mesma área do outro site; abre pelo teclado e Esc devolve o foco. Recolhida, as iniciais

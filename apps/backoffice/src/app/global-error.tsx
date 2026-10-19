@@ -2,7 +2,7 @@
 
 import { useLayoutEffect } from 'react';
 
-import { ErrorScreen } from '@/components/error-screen';
+import { ErrorScreen } from '@/components/shared/ErrorScreen';
 import { applyStoredTheme, THEME_COOKIE_SCRIPT } from '@/configs/theme.config';
 
 import './globals.css';

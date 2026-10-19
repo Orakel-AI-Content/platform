@@ -8,7 +8,7 @@
 import NavToggle from '@/components/shared/NavToggle';
 import classNames from '@/components/ui/utils/classNames';
 import type { CommonProps } from '@/components/ui/@types/common';
-import { SIDE_NAV_ID, useSideNav } from './side-nav-context';
+import { SIDE_NAV_ID, useSideNav } from './SideNavContext';
 
 const SideNavToggle = ({ className }: CommonProps) => {
   const { collapsed, setCollapsed } = useSideNav();

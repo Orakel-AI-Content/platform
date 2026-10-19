@@ -7,7 +7,7 @@ import {
   CONTENT_STATUS_TAG,
   formatDateTime,
 } from '@/components/site-labels.ts';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import { StateTag } from '@/components/site-status';
 
 import { PageHeader, siteTrail } from '../../../../editorial-page.tsx';

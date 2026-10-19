@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import Link from 'next/link';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EmptyState } from './empty-state.tsx';
+import { EmptyState } from './EmptyState.tsx';
 
 // Estado vazio das listas (#87): mensagem sempre; a ação só quando a página a passa.
 

@@ -3,7 +3,7 @@ import { THEME_SUMMARIES } from '@orakel/tokens';
 import { notFound } from 'next/navigation';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import { backToSite, ForbiddenScreen } from '@/components/forbidden-screen';
+import { backToSite, ForbiddenScreen } from '@/components/shared/ForbiddenScreen';
 import { editValues } from '@/components/site-config-form-values.ts';
 import { SiteConfigForm } from '@/components/site-config-form';
 import { getDb } from '@/db/client.ts';

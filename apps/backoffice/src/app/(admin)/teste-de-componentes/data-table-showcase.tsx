@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 
-import { useListState, type ListConfig } from '@/components/list-state';
+import { useListState, type ListConfig } from '@/components/shared/useListState';
 import DataTable, { type ColumnDef, type OnSortParam } from '@/components/shared/DataTable';
 import { Card } from '@/components/ui/Card';
 

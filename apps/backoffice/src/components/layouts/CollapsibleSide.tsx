@@ -9,8 +9,8 @@ import SideNav from '@/components/template/SideNav';
 import Header from '@/components/template/Header';
 import SideNavToggle from '@/components/template/SideNavToggle';
 import MobileNav from '@/components/template/MobileNav';
-import { SideNavProvider } from '@/components/template/side-nav-context';
-import type { SwitcherSite } from '@/components/site-switcher';
+import { SideNavProvider } from '@/components/template/SideNavContext';
+import type { SwitcherSite } from '@/components/template/SiteSwitcher';
 import type { NavigationTree } from '@/configs/navigation.config';
 import type { ReactNode } from 'react';
 

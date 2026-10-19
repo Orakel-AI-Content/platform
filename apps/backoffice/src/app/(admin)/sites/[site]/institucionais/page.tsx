@@ -1,6 +1,6 @@
 import { InstitutionalTextsForm } from '@/components/entity-forms';
 import { getInstitutionalTexts } from '@/domain/sites/sites.ts';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 
 import { updateInstitutionalTextsAction } from '../editorial-actions.ts';
 import { noWrite, PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';

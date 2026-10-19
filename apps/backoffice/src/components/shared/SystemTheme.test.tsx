@@ -2,7 +2,7 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { SystemTheme } from './system-theme.tsx';
+import { SystemTheme } from './SystemTheme.tsx';
 
 // Tema do sistema montado no cliente (#283): o <html> sem classe de tema a recebe pelo sistema.
 

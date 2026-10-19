@@ -2,8 +2,8 @@ import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import CollapsibleSide from '@/components/layouts/collapsible-side';
-import { NavigationIndicator } from '@/components/navigation-indicator';
+import CollapsibleSide from '@/components/layouts/CollapsibleSide';
+import { NavigationIndicator } from '@/components/shared/NavigationIndicator';
 import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
 import ThemeSwitcher from '@/components/template/ThemeSwitcher';
 import UserProfileDropdown from '@/components/template/UserProfileDropdown';

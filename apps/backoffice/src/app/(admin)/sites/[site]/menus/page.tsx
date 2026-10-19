@@ -1,6 +1,6 @@
 import { EntityTable } from '@/components/entity-table';
 import { listMenus } from '@/domain/content/menus.ts';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';

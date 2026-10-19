@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { cache, type ReactNode } from 'react';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import { backToSite, ForbiddenScreen, noRead } from '@/components/forbidden-screen';
+import { backToSite, ForbiddenScreen, noRead } from '@/components/shared/ForbiddenScreen';
 import { getDb, type Executor } from '@/db/client.ts';
 import { can, type Actor } from '@/domain/access/rbac.ts';
 import { listAuthors } from '@/domain/content/authors.ts';

@@ -3,9 +3,9 @@
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import { useMemo, type ReactNode } from 'react';
 
-import { EmptyState } from '@/components/empty-state';
-import { ListPagination, ListToolbar } from '@/components/list-controls.tsx';
-import { listFeatures, useListState, type ListConfig } from '@/components/list-state.ts';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { ListPagination, ListToolbar } from '@/components/shared/ListControls.tsx';
+import { listFeatures, useListState, type ListConfig } from '@/components/shared/useListState.ts';
 import { Button } from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Table from '@/components/ui/Table';

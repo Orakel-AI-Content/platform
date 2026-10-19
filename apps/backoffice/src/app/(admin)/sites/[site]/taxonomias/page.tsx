@@ -1,7 +1,7 @@
 import { EntityTable } from '@/components/entity-table';
 import { TAXONOMY_KIND_LABEL } from '@/components/site-labels.ts';
 import { listTaxonomies } from '@/domain/content/taxonomies.ts';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';

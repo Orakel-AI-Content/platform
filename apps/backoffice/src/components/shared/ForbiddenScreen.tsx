@@ -1,4 +1,4 @@
-import { StatusScreen } from '@/components/status-screen';
+import { StatusScreen } from '@/components/shared/StatusScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import type { Role } from '@/db/schema/index.ts';
 import { PERMISSIONS, type Action } from '@/domain/access/rbac.ts';

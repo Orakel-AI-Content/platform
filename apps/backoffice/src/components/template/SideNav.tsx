@@ -15,7 +15,7 @@
 
 import Link from 'next/link';
 import classNames from '@/components/ui/utils/classNames';
-import type { SwitcherSite } from '@/components/site-switcher';
+import type { SwitcherSite } from '@/components/template/SiteSwitcher';
 import type { NavigationTree } from '@/configs/navigation.config';
 import SideNavContent from './SideNavContent';
 import {
@@ -25,7 +25,7 @@ import {
   SIDE_NAV_CONTENT_GUTTER,
   SIDE_NAV_WIDTH,
 } from './constants';
-import { SIDE_NAV_ID, useSideNav } from './side-nav-context';
+import { SIDE_NAV_ID, useSideNav } from './SideNavContext';
 
 type SideNavProps = {
   /** Árvore de navegação já filtrada para quem pede (`filterNavigation`). */

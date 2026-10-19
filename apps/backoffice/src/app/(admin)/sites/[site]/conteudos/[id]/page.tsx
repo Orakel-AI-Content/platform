@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { ContentVersionsTable } from '@/components/content-versions-table';
 import { CONTENT_KIND_LABEL } from '@/components/site-labels.ts';
-import { noRead } from '@/components/forbidden-screen';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import { SubmitForReview } from '@/components/submit-for-review';
 import { can } from '@/domain/access/rbac.ts';
 

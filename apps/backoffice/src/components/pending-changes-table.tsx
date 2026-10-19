@@ -3,7 +3,7 @@
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { formatDateTime, PENDING_ORIGIN_LABEL, pendingItem } from '@/components/site-labels.ts';
 import Table from '@/components/ui/Table';
 import type { PendingChange } from '@/domain/pending-changes/list.ts';

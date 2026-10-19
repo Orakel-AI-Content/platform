@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 
-import { StatusScreen } from '@/components/status-screen';
+import { StatusScreen } from '@/components/shared/StatusScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 // Item inexistente num site que existe (#78): conteúdo, autor, versão… O link volta ao site.
