@@ -1403,6 +1403,107 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 4.5,
     ecme: 'text-neutral',
   },
+  // DateTimepicker (#318): o Calendar e o foco sobre o painel (`.picker-panel`: bg-white no
+  // claro, como o cartão, e dark:bg-gray-900 no escuro). O TimeInput, o Button e o botão de
+  // limpar ficam sobre os próprios fundos, já nos pares deles.
+  {
+    name: 'dia do mês no painel do DateTimepicker',
+    theme: 'claro',
+    text: 'text-gray-700',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'dia de outro mês no painel do DateTimepicker',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'marca de hoje no painel do DateTimepicker',
+    theme: 'claro',
+    text: 'ring-primary',
+    background: 'bg-white',
+    minimum: 3,
+  },
+  {
+    name: 'mês e ano do cabeçalho no painel do DateTimepicker',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês e ano do cabeçalho no hover no painel do DateTimepicker',
+    theme: 'claro',
+    text: 'hover:text-primary',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês ou ano na grade no painel do DateTimepicker',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'foco no painel do DateTimepicker',
+    theme: 'claro',
+    text: 'outline-ring',
+    background: 'bg-white',
+    minimum: 3,
+  },
+  {
+    name: 'dia do mês no painel do DateTimepicker',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'dia de outro mês no painel do DateTimepicker',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'marca de hoje no painel do DateTimepicker',
+    theme: 'escuro',
+    text: 'ring-primary',
+    background: 'dark:bg-gray-900',
+    minimum: 3,
+  },
+  {
+    name: 'mês e ano do cabeçalho no painel do DateTimepicker',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês e ano do cabeçalho no hover no painel do DateTimepicker',
+    theme: 'escuro',
+    text: 'dark:hover:text-primary-mild',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês ou ano na grade no painel do DateTimepicker',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'foco no painel do DateTimepicker',
+    theme: 'escuro',
+    text: 'outline-ring',
+    background: 'dark:bg-gray-900',
+    minimum: 3,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`.
