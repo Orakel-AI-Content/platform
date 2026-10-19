@@ -10,10 +10,12 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm, type FieldValues } from 'react-hook-form';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
 import { toast, ToastProvider } from '@/components/ui/toast';
+import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { SchemaFields, SchemaForm, type FieldProps } from './SchemaForm.tsx';
 
@@ -27,10 +29,20 @@ afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
 
+// Remover item confirma num diálogo (#327), que esconde o contêiner da app.
+let app: HTMLElement;
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
+
 afterEach(async () => {
   act(() => toast.removeAll());
   await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
   cleanup();
+  app.remove();
 });
 
 /** Campo de rich text simplificado (o de verdade, com TipTap, é da #43). */
@@ -113,8 +125,28 @@ describe('SchemaForm', () => {
     await user.tab();
     await user.keyboard('R2');
 
-    screen.getByRole('button', { name: 'Remover pergunta 1' }).focus();
+    // Remover confirma num diálogo: Esc e Cancelar não removem e devolvem o foco ao botão.
+    const removeFirst = screen.getByRole('button', { name: 'Remover pergunta 1' });
+    expect(removeFirst.className).toContain('text-error');
+    removeFirst.focus();
     await user.keyboard('{Enter}');
+    expect(screen.getByRole('alertdialog', { name: 'Remover pergunta 1?' })).toBeTruthy();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(document.activeElement).toBe(removeFirst);
+    await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(document.activeElement).toBe(removeFirst);
+    expect(screen.getAllByLabelText('Pergunta')).toHaveLength(2);
+
+    await user.keyboard('{Enter}');
+    const confirm = within(screen.getByRole('alertdialog')).getByRole('button', {
+      name: 'Remover',
+    });
+    expect(confirm.className).toContain('bg-error');
+    await user.click(confirm);
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(screen.getAllByLabelText('Pergunta')).toHaveLength(1);
 
     screen.getByRole('button', { name: 'Salvar' }).focus();
