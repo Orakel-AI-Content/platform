@@ -78,7 +78,7 @@ const Avatar = (props: AvatarProps) => {
   if (src) {
     children = (
       <img
-        className={`avatar-img avatar-${shape}`}
+        className={classNames('avatar-img', `avatar-${shape}`)}
         src={src}
         srcSet={srcSet}
         alt={alt}
@@ -95,7 +95,7 @@ const Avatar = (props: AvatarProps) => {
     children = (
       <span
         ref={avatarChildren}
-        className={`avatar-string ${typeof size === 'number' ? '' : `avatar-inner-${size}`}`}
+        className={classNames('avatar-string', typeof size !== 'number' && `avatar-inner-${size}`)}
         style={{
           ...childrenSizeStyle,
           ...stringCentralized,

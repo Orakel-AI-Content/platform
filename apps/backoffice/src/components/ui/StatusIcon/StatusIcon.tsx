@@ -1,6 +1,7 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/StatusIcon/StatusIcon.tsx
 // Adaptado (#212): o ícone fica `aria-hidden`; o tipo vem no texto de quem o usa.
 import { HiCheckCircle, HiInformationCircle, HiExclamation, HiXCircle } from 'react-icons/hi';
+import classNames from '../utils/classNames';
 import type { TypeAttributes, CommonProps } from '../@types/common';
 import type { ReactNode, JSX } from 'react';
 
@@ -41,7 +42,7 @@ const StatusIcon = (props: StatusIconProps) => {
   const icon = ICONS[type];
 
   return (
-    <span aria-hidden className={`text-2xl ${iconColor || icon.color}`}>
+    <span aria-hidden className={classNames('text-2xl', iconColor || icon.color)}>
       {custom || icon.icon}
     </span>
   );

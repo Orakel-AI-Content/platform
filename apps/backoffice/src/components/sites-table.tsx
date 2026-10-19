@@ -18,6 +18,7 @@ import {
 import { EmptyState } from '@/components/empty-state';
 import Dropdown from '@/components/ui/Dropdown';
 import Table from '@/components/ui/Table';
+import classNames from '@/components/ui/utils/classNames';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
@@ -45,7 +46,7 @@ function TwoLines({ children, secondary }: { children: ReactNode; secondary?: Re
 /** Texto cortado numa largura máxima, com o texto inteiro em `title`. */
 function Truncated({ text, className }: { text: string; className: string }) {
   return (
-    <span title={text} className={`block truncate ${className}`}>
+    <span title={text} className={classNames('block truncate', className)}>
       {text}
     </span>
   );
