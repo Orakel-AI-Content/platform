@@ -32,6 +32,7 @@
     "@sentry/nextjs": "catalog:",
     "@sentry/node": "catalog:",
     "@tanstack/react-table": "catalog:",
+    "@tanstack/table-core": "catalog:",
     "@tiptap/core": "catalog:",
     "@tiptap/extension-bold": "catalog:",
     "@tiptap/extension-code": "catalog:",

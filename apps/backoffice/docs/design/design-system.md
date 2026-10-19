@@ -178,8 +178,13 @@ Não negociável, em toda tela e todo componente portado:
   ("Identificador copiado."); a falha (sem contexto seguro, permissão negada) mostra o
   identificador na mesma região, em `text-error`. Esc, o fundo ou "Fechar" fecham, e o foco
   volta à imagem.
-- **Tabelas:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (`useTable`
-  com `tableFeatures`); a biblioteca traz skills em `node_modules/@tanstack/react-table/skills/`.
+- **Tabelas:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (colunas
+  com `createColumnHelper` e `tableFeatures`); a biblioteca traz skills em
+  `node_modules/@tanstack/react-table/skills/`. Tabela sem interação (só leitura: fila de
+  revisão, pendências, versões) é Server Component, sem `'use client'`: monta a instância com
+  `constructTable` e `coreReactivityFeature: storeReactivityBindings()` (de
+  `@tanstack/table-core/store-reactivity-bindings`) e desenha com `flexRender`. Tabela com
+  busca, filtro, ordem, paginação ou ação na linha é cliente e usa `useTable`.
   Linha de tabela densa (lista de sites): no máximo duas linhas por célula, a principal e a
   secundária em `text-xs` (ex.: nome com `id · domínio` embaixo); texto longo é cortado
   (`truncate` com `max-w-*`) com o inteiro em `title`, em vez de quebrar. A ação principal da

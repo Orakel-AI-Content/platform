@@ -1,6 +1,10 @@
-'use client';
-
-import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
+import {
+  constructTable,
+  createColumnHelper,
+  flexRender,
+  tableFeatures,
+} from '@tanstack/react-table';
+import { storeReactivityBindings } from '@tanstack/table-core/store-reactivity-bindings';
 import Link from 'next/link';
 
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -12,8 +16,9 @@ import {
 import Table from '@/components/ui/Table';
 import type { PendingChange } from '@/domain/pending-changes/list.ts';
 
-// TanStack Table 9: só as features usadas (nenhuma além do modelo de linhas básico).
-const features = tableFeatures({});
+// TanStack Table 9 sem hook (Server Component): só o modelo de linhas básico, com a
+// reatividade do TanStack Store que o `constructTable` exige no lugar da do `useTable`.
+const features = tableFeatures({ coreReactivityFeature: storeReactivityBindings() });
 const column = createColumnHelper<typeof features, PendingChange>();
 const { THead, TBody, Tr, Th, Td } = Table;
 
@@ -60,7 +65,7 @@ export function PendingChangesTable({
   timeZone: string;
   rows: PendingChange[];
 }) {
-  const table = useTable({ features, columns: columnsFor(siteId, timeZone), data: rows });
+  const table = constructTable({ features, columns: columnsFor(siteId, timeZone), data: rows });
   if (rows.length === 0) {
     return <EmptyState>Nenhuma mudança pendente: o site publicado está em dia.</EmptyState>;
   }
@@ -74,7 +79,7 @@ export function PendingChangesTable({
           <Tr key={group.id}>
             {group.headers.map((header) => (
               <Th key={header.id}>
-                <table.FlexRender header={header} />
+                {flexRender(header.column.columnDef.header, header.getContext())}
               </Th>
             ))}
           </Tr>
@@ -84,9 +89,7 @@ export function PendingChangesTable({
         {table.getRowModel().rows.map((row) => (
           <Tr key={row.id}>
             {row.getAllCells().map((cell) => (
-              <Td key={cell.id}>
-                <table.FlexRender cell={cell} />
-              </Td>
+              <Td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</Td>
             ))}
           </Tr>
         ))}

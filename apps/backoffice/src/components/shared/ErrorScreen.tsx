@@ -1,3 +1,5 @@
+'use client';
+
 import { StatusScreen } from '@/components/shared/StatusScreen';
 import { Button } from '@/components/ui/Button';
 
