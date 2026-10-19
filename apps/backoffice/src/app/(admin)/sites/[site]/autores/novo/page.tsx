@@ -1,4 +1,4 @@
-import { EntityForm } from '@/components/entity-forms';
+import { EntityForm } from '@/components/editorial/EntityForms';
 
 import { mediaSource } from '../../conteudos/editor-options.ts';
 import { createAuthorAction } from '../../editorial-actions.ts';

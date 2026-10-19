@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { EntityForm } from '@/components/entity-forms';
+import { EntityForm } from '@/components/editorial/EntityForms';
 import { can } from '@/domain/access/rbac.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 

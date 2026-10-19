@@ -1,6 +1,6 @@
 import { currentActor } from '@/auth/request-actor.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { SitesTable } from '@/components/sites-table';
+import { SitesTable } from '@/components/sites/SitesTable';
 import { Button } from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { can } from '@/domain/access/rbac.ts';

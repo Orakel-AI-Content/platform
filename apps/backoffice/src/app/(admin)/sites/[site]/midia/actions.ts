@@ -1,7 +1,7 @@
 'use server';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import type { MediaItem } from '@/components/media-library';
+import type { MediaItem } from '@/components/media/MediaLibrary';
 import { getDb } from '@/db/client.ts';
 import { getMediaByIds, listMediaPage } from '@/domain/content/media.ts';
 import { getUploads, type UploadState } from '@/domain/media/upload.ts';

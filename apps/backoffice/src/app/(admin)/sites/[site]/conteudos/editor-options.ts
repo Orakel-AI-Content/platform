@@ -1,5 +1,5 @@
-import type { ContentEditorOptions } from '@/components/content-editor';
-import type { MediaSource } from '@/components/forms/picker-fields';
+import type { ContentEditorOptions } from '@/components/contents/ContentEditor';
+import type { MediaSource } from '@/components/forms/PickerFields';
 import type { Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
 import { listAuthors } from '@/domain/content/authors.ts';

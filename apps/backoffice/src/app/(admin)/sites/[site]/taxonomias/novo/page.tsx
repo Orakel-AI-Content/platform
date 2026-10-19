@@ -1,4 +1,4 @@
-import { EntityForm } from '@/components/entity-forms';
+import { EntityForm } from '@/components/editorial/EntityForms';
 
 import { createTaxonomyAction } from '../../editorial-actions.ts';
 import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
