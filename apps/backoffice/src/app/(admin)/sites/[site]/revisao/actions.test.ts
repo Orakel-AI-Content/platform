@@ -32,6 +32,7 @@ describe('aprovar na tela de revisão', () => {
 
     expect(await approveAction('exemplo-a', 1, 2, checklist)).toEqual({
       ok: false,
+      message: 'Sessão inválida; entre de novo.',
       issues: [{ path: [], message: 'Sessão inválida; entre de novo.' }],
     });
     expect(mocks.approveVersion).not.toHaveBeenCalled();
@@ -52,6 +53,7 @@ describe('aprovar na tela de revisão', () => {
 
     expect(await approveAction('exemplo-a', 1, 2, checklist)).toEqual({
       ok: false,
+      message: 'Não foi possível aprovar.',
       issues: [{ path: [], message: 'Marque todos os itens do checklist' }],
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();

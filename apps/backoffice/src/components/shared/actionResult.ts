@@ -4,3 +4,10 @@
  * Server Action importar o tipo. Os resultados de formulário estendem o lado do erro.
  */
 export type ActionResult = { ok: true; message: string } | { ok: false; message: string };
+
+/**
+ * Retorno de formulário: o `ActionResult`, com a recusa do servidor no erro (`issues` com
+ * `path` viram erro do campo; sem, vão para o resumo do `SchemaForm`).
+ */
+export type FormActionResult<I> =
+  Extract<ActionResult, { ok: true }> | (Extract<ActionResult, { ok: false }> & { issues: I[] });
