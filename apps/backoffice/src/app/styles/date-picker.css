@@ -1,15 +1,23 @@
 /* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_date-picker.css
-   Adaptado (#317):
-   - só as classes do calendário (CalendarBase, tabelas e Day); as do campo com popover
-     (`.picker`, `.picker-panel`, `.date-picker*` do painel) vêm com o DateTimepicker (#318), e
-     as de intervalo (`-selected-start`, `-selected-end`, `-inrange-today`) ficam fora com o
-     RangeCalendar;
+   Adaptado (#317, #318):
+   - as classes do calendário (CalendarBase, tabelas e Day) e as do painel do DateTimepicker
+     (`.picker`, `.picker-panel`, #318); ficam fora as `.date-picker` e `.date-picker-*` que
+     nenhum componente portado usa (`-panel`, `-today`, `-month-cell*`, `-year-cell*`…) e as de
+     intervalo (`-selected-start`, `-selected-end`, `-inrange-today`), com o RangeCalendar;
    - dia de outro mês em gray-600 (claro) e gray-400 (escuro), não gray-400 e gray-600, que ficam
      abaixo de 4,5:1 sobre o cartão; para seguir distinto do dia do mês (gray-700 e gray-400, em
      negrito pela linha), perde o negrito;
    - mês e ano ativos com `text-neutral dark:text-gray-950`, como o Button solid: o branco sobre
      o primary do escuro dá 3,56:1. */
 @layer components {
+  .picker {
+    @apply z-40;
+  }
+
+  .picker-panel {
+    @apply shadow-xl dark:shadow-2xl bg-white dark:bg-gray-900 rounded-2xl p-4 dark:border-2 dark:border-gray-700;
+  }
+
   .picker-view {
     @apply min-w-[280px] w-full flex gap-6;
   }
