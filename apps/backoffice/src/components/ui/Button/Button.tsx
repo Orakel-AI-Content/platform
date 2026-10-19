@@ -164,9 +164,7 @@ const Button = (props: ButtonProps) => {
   };
 
   const getBtnColor = ({ bgColor, hoverColor, activeColor, textColor }: ButtonColor) => {
-    return `${bgColor} ${
-      unclickable ? disabledClass : hoverColor + ' ' + activeColor
-    } ${textColor}`;
+    return classNames(bgColor, unclickable ? disabledClass : [hoverColor, activeColor], textColor);
   };
 
   const btnColor = () => {
