@@ -130,6 +130,33 @@ describe('popover de link', () => {
     expect(editor.textContent).toBe('Guia');
   });
 
+  it('clicar em Aplicar e em Remover link mexe só no link, sem enviar o formulário (#303)', async () => {
+    const user = userEvent.setup();
+    const onSubmit = renderEditor([paragraph([{ type: 'text', text: 'Guia' }])]);
+    const editor = await screen.findByRole('textbox', { name: 'Texto' });
+    await user.click(editor);
+    await user.keyboard('{Control>}a{/Control}');
+    const { button, popover, hide } = linkPopover();
+    toggle(popover, 'open');
+
+    await user.type(within(popover).getByLabelText('Endereço do link'), '/sobre/');
+    await user.click(within(popover).getByRole('button', { name: 'Aplicar' }));
+
+    expect(hide).toHaveBeenCalled();
+    await waitFor(() => expect(editor.querySelector('a')?.getAttribute('href')).toBe('/sobre/'));
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await user.click(editor);
+    await user.keyboard('{Control>}a{/Control}');
+    await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'));
+    toggle(popover, 'open');
+    await user.click(await within(popover).findByRole('button', { name: 'Remover link' }));
+
+    await waitFor(() => expect(editor.querySelector('a')).toBeNull());
+    expect(editor.textContent).toBe('Guia');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('sem seleção, aplicar insere o endereço como texto do link', async () => {
     const user = userEvent.setup();
     renderEditor([paragraph([{ type: 'text', text: 'Veja ' }])]);
