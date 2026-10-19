@@ -292,10 +292,13 @@ Não negociável, em toda tela e todo componente portado:
   (`n`, `type`). O que o schema sozinho não descreve (rich text, seletor de mídia ou de
   entidade) entra por `fields`, um campo registrado por caminho, com `*` no lugar dos
   índices, que recebe `id`, `label`, `value`, `onChange`, `invalid` e `describedBy` (ligue
-  esses dois ao controle). Nó sem desenho e sem campo registrado aparece como aviso.
+  esses dois ao controle). Nó sem desenho e sem campo registrado aparece como aviso, num
+  `Alert type="warning"` do Ecme.
   O `onSubmit` pode devolver a recusa do servidor (`{ path, message }[]`): com `path`, vira
   erro do campo; sem, vai para o resumo. Lista vazia em campo opcional (rich text apagado) é
-  enviada como ausente. O resumo (`role="alert"`, sempre montado) sai de `formState.errors`:
+  enviada como ausente. O resumo é o `ErrorSummary` (`src/components/shared/`): um `Alert`
+  do Ecme (`type="danger"`) dentro de um contêiner `role="alert"` sempre montado, como o
+  `ActionAlert`. Sai de `formState.errors`:
   um item por campo inválido, "<rótulo>: <mensagem>", com a posição em cada lista
   ("Pergunta (pergunta 2)"), na ordem do schema, e acompanha a correção. Cada item é um botão
   que leva o foco ao campo (`setFocus`; campo registrado precisa ligar o `ref`); o erro da
@@ -306,10 +309,14 @@ Não negociável, em toda tela e todo componente portado:
   de todas as seções aparece depois delas; sem `sections`, uma coluna só. Durante o envio o
   botão fica desabilitado e mostra `pendingLabel` ("Salvando…" por padrão; "Cadastrando…",
   "Criando…", "Aprovando…" por quem chama), sem segundo envio. Quem fica na tela confirma
-  devolvendo `{ success: mensagem }`: o texto aparece ao lado do botão, numa região
-  `role="status"` em `text-success`, e some no próximo envio. Quem sai da tela confirma no
-  destino: o cadastro de site vai para `/sites?cadastrado=<id>`, e a tabela anuncia no toast
-  depois de montar e tira a marca da URL (como o `?criado=1` do conteúdo).
+  devolvendo `{ success: mensagem }`, que vai para o toast do retorno padrão (`pushSuccess`,
+  ver "Retorno das ações"), como a aprovação na revisão. Quem sai da tela também confirma no
+  toast, que vive no layout raiz: criar autor, taxonomia ou menu chama `pushSuccess` antes de
+  voltar para a lista. O cadastro de site confirma no destino: vai para
+  `/sites?cadastrado=<id>`, e a tabela anuncia no toast depois de montar e tira a marca da URL
+  (como o `?criado=1` do conteúdo). Os resultados das Server Actions de formulário
+  (`EntityFormResult`, `SiteFormResult`, `ApproveResult`) são `FormActionResult<issue>`: o
+  `ActionResult` com as `issues` da recusa no erro.
   Dentro de um formulário maior (`FormProvider`), `SchemaFields` desenha um schema sob um
   prefixo (`blocks.2`), com os caminhos completos no registro (`blocks.*.content`): é como o
   editor de conteúdo monta cada bloco, com o rodapé de ações no `StickyFooter`. Referências do
