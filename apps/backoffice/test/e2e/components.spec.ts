@@ -406,6 +406,118 @@ test('Checkbox e Checkbox.Group alternam com Espaço e expõem o estado', async 
   await expect(status).toHaveText('Formatos escolhidos: video.');
 });
 
+// Switcher, Radio e Segment (#315): papel e estado expostos, operados só pelo teclado e com o
+// foco de 2px visível (no Switcher, no rótulo; o <input> fica só para o leitor de tela).
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Switcher, Radio e Segment pelo teclado, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-switcher"]')
+      .include('[aria-labelledby="vitrine-radio"]')
+      .include('[aria-labelledby="vitrine-segment"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+
+    const outline = (locator: Locator) =>
+      locator.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { color: style.outlineColor, style: style.outlineStyle, width: style.outlineWidth };
+      });
+    const color = (variable: string) =>
+      page.evaluate((name) => {
+        const probe = document.createElement('span');
+        probe.style.color = `var(${name})`;
+        document.body.append(probe);
+        const value = getComputedStyle(probe).color;
+        probe.remove();
+        return value;
+      }, variable);
+    // As transições do Ecme (`transition-colors`, `transition-all`) animam também o contorno:
+    // as leituras esperam assentar.
+    const solid2px = { color: await color('--ring'), style: 'solid', width: '2px' };
+    // No escuro, o foco do Segment é primary-mild: o --ring sobre o trilho gray-700 dá 2,91:1.
+    const segmentFocus = {
+      ...solid2px,
+      color: colorScheme === 'dark' ? await color('--primary-mild') : solid2px.color,
+    };
+
+    // Switcher: Tab chega ao <input role="switch">, Espaço alterna, o rótulo mostra o foco.
+    const switchers = section(page, 'Switcher');
+    const comentarios = switchers.getByRole('switch', { name: 'Comentários abertos' });
+    await expect(comentarios).toBeChecked();
+    await tabTo(page, comentarios);
+    await expect.poll(() => outline(comentarios.locator('xpath=..'))).toEqual(solid2px);
+    await page.keyboard.press('Space');
+    await expect(comentarios).not.toBeChecked();
+    await expect(switchers.getByRole('status')).toHaveText('Comentários fechados.');
+    await expect(comentarios.locator('xpath=..')).not.toHaveClass(/switcher-checked/);
+    await page.keyboard.press('Space');
+    await expect(comentarios).toBeChecked();
+    await expect(switchers.getByRole('switch', { name: 'Indisponível' })).toBeDisabled();
+
+    // Radio: uma parada só no Tab; as setas trocam a escolha e pulam a desabilitada.
+    const radios = section(page, 'Radio');
+    const tema = radios.getByRole('radiogroup', { name: 'Tema do site' });
+    const claro = tema.getByRole('radio', { name: 'Claro' });
+    await expect(claro).toBeChecked();
+    await tabTo(page, claro);
+    await expect.poll(() => outline(claro)).toEqual(solid2px);
+    await page.keyboard.press('ArrowDown');
+    await expect(tema.getByRole('radio', { name: 'Escuro' })).toBeChecked();
+    await expect(tema.getByRole('radio', { name: 'Escuro' })).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(tema.getByRole('radio', { name: 'Sistema' })).toBeChecked();
+    await expect(radios.getByRole('status')).toHaveText('Tema escolhido: sistema.');
+    await page.keyboard.press('ArrowDown');
+    await expect(tema.getByRole('radio', { name: 'Claro' })).toBeChecked();
+    await expect(tema.getByRole('radio', { name: 'Alto contraste' })).toBeDisabled();
+    await page.keyboard.press('Tab');
+    await expect(
+      radios
+        .getByRole('radiogroup', { name: 'Frequência' })
+        .getByRole('radio', { name: 'Semanal' }),
+    ).toBeFocused();
+
+    // Segment: botões alternáveis; Enter e Espaço trocam o pressionado.
+    const segments = section(page, 'Segment');
+    const visualizacao = segments.getByRole('group', { name: 'Visualização' });
+    const lista = visualizacao.getByRole('button', { name: 'Lista' });
+    const grade = visualizacao.getByRole('button', { name: 'Grade' });
+    await expect(lista).toHaveAttribute('aria-pressed', 'true');
+    await tabTo(page, grade);
+    await expect.poll(() => outline(grade)).toEqual(segmentFocus);
+    await page.keyboard.press('Enter');
+    await expect(grade).toHaveAttribute('aria-pressed', 'true');
+    await expect(lista).toHaveAttribute('aria-pressed', 'false');
+    await expect(visualizacao.getByRole('button', { name: 'Calendário' })).toBeDisabled();
+
+    const canais = segments.getByRole('group', { name: 'Canais' });
+    const newsletter = canais.getByRole('button', { name: 'Newsletter' });
+    await tabTo(page, newsletter);
+    await page.keyboard.press('Space');
+    await expect(newsletter).toHaveAttribute('aria-pressed', 'true');
+    await expect(canais.getByRole('button', { name: 'Site' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(segments.getByRole('status')).toHaveText(
+      'Visualização: grade. Canais: site, newsletter.',
+    );
+    await page.keyboard.press('Space');
+    await expect(newsletter).toHaveAttribute('aria-pressed', 'false');
+
+    expect(hydration).toEqual([]);
+  });
+}
+
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`Select pelo teclado: rótulo, setas, Enter e Esc, sem violação do axe com o menu aberto (${colorScheme})`, async ({
     page,

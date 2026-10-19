@@ -28,9 +28,12 @@ import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
 import { Notification } from '@/components/ui/Notification';
 import { Pagination } from '@/components/ui/Pagination';
+import { Radio, type RadioValue } from '@/components/ui/Radio';
+import { Segment, type SegmentValue } from '@/components/ui/Segment';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
+import { Switcher } from '@/components/ui/Switcher';
 import { Table, type ThSort } from '@/components/ui/Table';
 import { Tabs } from '@/components/ui/Tabs';
 import { Tag } from '@/components/ui/Tag';
@@ -84,6 +87,10 @@ export function Showcase({ linkPage }: { linkPage: number }) {
   const [lastAction, setLastAction] = useState('Nenhuma ação.');
   const [formatos, setFormatos] = useState<CheckboxGroupValue>(['texto']);
   const [acao, setAcao] = useState('Nenhuma ação escolhida.');
+  const [comentarios, setComentarios] = useState(true);
+  const [tema, setTema] = useState<RadioValue>('claro');
+  const [visualizacao, setVisualizacao] = useState<SegmentValue>('lista');
+  const [canais, setCanais] = useState<SegmentValue>(['site']);
   const [pagina, setPagina] = useState(1);
   const [ordem, setOrdem] = useState<ThSort>('none');
   return (
@@ -215,6 +222,95 @@ export function Showcase({ linkPage }: { linkPage: number }) {
         </Checkbox.Group>
         <p role="status" className="text-sm">
           Formatos escolhidos: {formatos.length === 0 ? 'nenhum' : formatos.join(', ')}.
+        </p>
+      </section>
+
+      <section aria-labelledby="vitrine-switcher" className="space-y-3">
+        <h2 id="vitrine-switcher" className="text-lg font-semibold">
+          Switcher
+        </h2>
+        <div className="flex flex-wrap items-center gap-4">
+          <Switcher
+            aria-label="Comentários abertos"
+            checked={comentarios}
+            onChange={(checked) => setComentarios(checked)}
+          />
+          <Switcher aria-label="Destaque na home" defaultChecked />
+          <Switcher
+            aria-label="Newsletter"
+            checkedContent="Sim"
+            unCheckedContent="Não"
+            defaultChecked
+          />
+          <Switcher aria-label="Rascunho automático" checkedContent="Sim" unCheckedContent="Não" />
+          <Switcher aria-label="Sincronizando" isLoading defaultChecked />
+          <Switcher aria-label="Indisponível" disabled />
+        </div>
+        <p role="status" className="text-sm">
+          Comentários {comentarios ? 'abertos' : 'fechados'}.
+        </p>
+      </section>
+
+      <section aria-labelledby="vitrine-radio" className="space-y-3">
+        <h2 id="vitrine-radio" className="text-lg font-semibold">
+          Radio
+        </h2>
+        <p id="vitrine-tema" className="text-sm font-semibold">
+          Tema do site
+        </p>
+        <Radio.Group
+          aria-labelledby="vitrine-tema"
+          name="vitrine-tema"
+          value={tema}
+          onChange={(value) => setTema(value)}
+        >
+          <Radio value="claro">Claro</Radio>
+          <Radio value="escuro">Escuro</Radio>
+          <Radio value="sistema">Sistema</Radio>
+          <Radio value="alto-contraste" disabled>
+            Alto contraste
+          </Radio>
+        </Radio.Group>
+        <p role="status" className="text-sm">
+          Tema escolhido: {tema}.
+        </p>
+        <Radio.Group aria-label="Frequência" vertical value="semanal">
+          <Radio value="diaria">Diária</Radio>
+          <Radio value="semanal">Semanal</Radio>
+        </Radio.Group>
+      </section>
+
+      <section aria-labelledby="vitrine-segment" className="space-y-3">
+        <h2 id="vitrine-segment" className="text-lg font-semibold">
+          Segment
+        </h2>
+        <div className="flex flex-wrap items-center gap-4">
+          <Segment
+            aria-label="Visualização"
+            value={visualizacao}
+            onChange={(value) => setVisualizacao(value)}
+          >
+            <Segment.Item value="lista">Lista</Segment.Item>
+            <Segment.Item value="grade">Grade</Segment.Item>
+            <Segment.Item value="calendario" disabled>
+              Calendário
+            </Segment.Item>
+          </Segment>
+          <Segment
+            aria-label="Canais"
+            size="sm"
+            selectionType="multiple"
+            value={canais}
+            onChange={(value) => setCanais(value)}
+          >
+            <Segment.Item value="site">Site</Segment.Item>
+            <Segment.Item value="newsletter">Newsletter</Segment.Item>
+            <Segment.Item value="redes">Redes</Segment.Item>
+          </Segment>
+        </div>
+        <p role="status" className="text-sm">
+          Visualização: {String(visualizacao)}. Canais:{' '}
+          {canais.length === 0 ? 'nenhum' : [canais].flat().join(', ')}.
         </p>
       </section>
 

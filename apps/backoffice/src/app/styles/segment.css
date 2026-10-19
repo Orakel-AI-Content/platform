@@ -1,0 +1,42 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_segment.css
+   Adaptado (#315), pela acessibilidade:
+   - sem `outline-none`, que apagava o foco do teclado: vale o contorno --ring de 2px da regra
+     global; no escuro, em `dark:outline-primary-mild`, porque o --ring sobre o `dark:bg-gray-700`
+     do trilho dá 2,91:1;
+   - o item não ativo tem cor própria, `text-gray-600 dark:text-gray-200`: no Ecme herdava a do
+     body (`text-gray-500` sobre `bg-gray-100`, 4,35:1; `dark:text-gray-400` sobre
+     `dark:bg-gray-700`, 4,11:1). */
+@layer components {
+  .segment {
+    @apply inline-flex rounded-xl p-1;
+  }
+
+  .segment-item {
+    @apply font-semibold
+      text-gray-600
+      dark:text-gray-200
+      cursor-pointer
+      select-none
+      rounded-xl
+      px-5
+      md:w-auto
+      transition-all
+      duration-100;
+
+    &:focus-visible {
+      @apply dark:outline-primary-mild;
+    }
+
+    &:not(.segment-item-active):not(.segment-item-disabled) {
+      @apply hover:text-gray-800 hover:dark:text-gray-100;
+    }
+
+    &.segment-item-active {
+      @apply bg-white text-gray-800 dark:bg-gray-800 dark:text-gray-100 shadow-sm;
+    }
+
+    &.segment-item-disabled {
+      @apply cursor-not-allowed opacity-40;
+    }
+  }
+}
