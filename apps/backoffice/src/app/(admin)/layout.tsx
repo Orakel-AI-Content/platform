@@ -7,6 +7,7 @@ import { NavigationIndicator } from '@/components/navigation-indicator';
 import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
 import ThemeSwitcher from '@/components/template/ThemeSwitcher';
 import UserProfileDropdown from '@/components/template/UserProfileDropdown';
+import classNames from '@/components/ui/utils/classNames';
 import navigationConfig, { filterNavigation } from '@/configs/navigation.config';
 import { parseThemeMode, THEME_COOKIE } from '@/configs/theme.config';
 
@@ -56,7 +57,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <main
           id="conteudo"
           tabIndex={-1}
-          className={`flex-auto bg-gray-100 dark:bg-gray-950 ${PAGE_CONTAINER_GUTTER_X} ${PAGE_CONTAINER_GUTTER_Y} focus-visible:outline-none`}
+          className={classNames(
+            'flex-auto bg-gray-100 dark:bg-gray-950',
+            PAGE_CONTAINER_GUTTER_X,
+            PAGE_CONTAINER_GUTTER_Y,
+            'focus-visible:outline-none',
+          )}
         >
           {children}
         </main>

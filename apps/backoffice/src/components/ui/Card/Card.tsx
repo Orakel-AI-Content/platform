@@ -1,7 +1,7 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/Card/Card.tsx
 'use client';
 
-import classNames from 'classnames';
+import classNames from '../utils/classNames';
 import { useConfig } from '../ConfigProvider';
 import type { CommonProps } from '../@types/common';
 import type { ReactNode, ComponentPropsWithRef, MouseEvent, Ref } from 'react';

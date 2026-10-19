@@ -3,7 +3,7 @@
 // `default`, a área ganha `role="status"` com "Carregando…" para leitores de tela; no `cover`, o
 // contêiner fica com `aria-busy` e a sobreposição com o mesmo status.
 import Spinner from '@/components/ui/Spinner';
-import classNames from 'classnames';
+import classNames from '@/components/ui/utils/classNames';
 import type { CommonProps } from '@/components/ui/@types/common';
 import type { ElementType, ReactNode } from 'react';
 

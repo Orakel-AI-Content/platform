@@ -5,7 +5,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import classNames from 'classnames';
+import classNames from '@/components/ui/utils/classNames';
 import type { HTMLAttributes, ReactNode } from 'react';
 
 interface StickyFooterProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {

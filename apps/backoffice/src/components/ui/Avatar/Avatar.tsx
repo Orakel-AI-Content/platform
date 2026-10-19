@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import useMergedRef from '../hooks/useMergeRef';
-import classNames from 'classnames';
+import classNames from '../utils/classNames';
 import type { CommonProps, TypeAttributes } from '../@types/common';
 import type { ReactNode, Ref } from 'react';
 
@@ -78,7 +78,7 @@ const Avatar = (props: AvatarProps) => {
   if (src) {
     children = (
       <img
-        className={`avatar-img avatar-${shape}`}
+        className={classNames('avatar-img', `avatar-${shape}`)}
         src={src}
         srcSet={srcSet}
         alt={alt}
@@ -95,7 +95,7 @@ const Avatar = (props: AvatarProps) => {
     children = (
       <span
         ref={avatarChildren}
-        className={`avatar-string ${typeof size === 'number' ? '' : `avatar-inner-${size}`}`}
+        className={classNames('avatar-string', typeof size !== 'number' && `avatar-inner-${size}`)}
         style={{
           ...childrenSizeStyle,
           ...stringCentralized,

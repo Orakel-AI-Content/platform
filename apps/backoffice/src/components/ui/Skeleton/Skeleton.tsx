@@ -1,7 +1,7 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/Skeleton/Skeleton.tsx
 // Adaptado (#206): `aria-hidden`, fora da árvore de acessibilidade (é só a forma do conteúdo que
 // vem); quem carrega anuncia com o Loading ou `aria-busy`.
-import classNames from 'classnames';
+import classNames from '../utils/classNames';
 import type { CommonProps } from '../@types/common';
 import type { ElementType, Ref } from 'react';
 
