@@ -8,7 +8,7 @@ import {
   formatDateTime,
 } from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { StateTag } from '@/components/site-status';
+import { StateTag } from '@/components/sites/SiteStatus';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 

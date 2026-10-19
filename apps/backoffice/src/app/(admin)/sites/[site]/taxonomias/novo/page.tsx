@@ -1,4 +1,4 @@
-import { EntityForm } from '@/components/entity-forms';
+import { EntityForm } from '@/components/editorial/EntityForms';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 
