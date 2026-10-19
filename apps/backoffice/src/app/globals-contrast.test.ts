@@ -1784,9 +1784,10 @@ const ECME_PAIRS: readonly EcmePair[] = [
     text: 'dark:text-gray-100',
     background: 'dark:bg-gray-800',
     minimum: 4.5,
-  }, // Ação destrutiva (#327): o gatilho transparente em `text-error` sobre o body e o cartão já
-  // está em "mensagem de erro"; falta o popover do link (branco no claro, gray-900 no escuro).
-  // O "Confirmar" em `bg-error` é o texto do `solid` sobre o `error`.
+  },
+  // Ação destrutiva (#327): o gatilho em `text-error`, branco no claro (como o cartão, em
+  // "mensagem de erro") e transparente no escuro, sobre o body e o cartão (idem) e o popover do
+  // link (gray-900). O "Confirmar" em `bg-error` é o texto do `solid` sobre o `error`.
   {
     name: 'ação destrutiva no popover',
     theme: 'claro',

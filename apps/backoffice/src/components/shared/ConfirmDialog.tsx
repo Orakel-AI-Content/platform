@@ -9,8 +9,10 @@
 // - sem `onClose`, o Esc, o fundo e o botão Fechar chamam o `onCancel`.
 // Acrescentado (#327): a cor de erro da ação destrutiva, a do botão "Delete" do `CustomerEdit`
 // do Ecme (`dangerButtonClass`, no gatilho) e o "Confirmar" em `bg-error`
-// (`dangerConfirmButtonProps`, com `type="danger"`). No escuro, o fundo do botão `default`
-// (gray-700) daria 3,67:1 com o `error`; o gatilho fica transparente nos dois temas.
+// (`dangerConfirmButtonProps`, com `type="danger"`). O Ecme deixa o gatilho transparente; aqui
+// só no escuro, onde o fundo do `default` (gray-700) daria 3,67:1 com o `error`. No claro, fica
+// o branco do `default`: transparente, numa linha de tabela em hover sobre o body (#eeeeee),
+// o `error` daria 4,25:1.
 'use client';
 
 import {
@@ -42,7 +44,7 @@ interface ConfirmDialogProps extends Omit<DialogProps, 'title'> {
 
 /** `customColorClass` do botão que dispara a ação destrutiva (contorno e texto em `error`). */
 export const dangerButtonClass = () =>
-  'bg-transparent border-error ring-1 ring-error text-error hover:border-error hover:ring-error hover:text-error dark:bg-transparent dark:border-error dark:ring-error dark:text-error dark:hover:border-error dark:hover:text-error';
+  'border-error ring-1 ring-error text-error hover:border-error hover:ring-error hover:text-error dark:bg-transparent dark:border-error dark:ring-error dark:text-error dark:hover:border-error dark:hover:text-error';
 
 /** "Confirmar" de um `ConfirmDialog type="danger"`: o `solid` em `bg-error`. */
 export const dangerConfirmButtonProps: ButtonProps = {
