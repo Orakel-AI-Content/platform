@@ -19,8 +19,8 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   a hora de parede no fuso do site e devolver o instante; na troca de horário, a hora repetida
   vale a primeira ocorrência e a inexistente avança pelo salto) e as peças compostas em
   `src/components/shared/` (AdaptiveCard,
-  ConfirmDialog, DataTable, Loading, StickyFooter e o `IconButton`, que não tem equivalente no
-  template). Componente que a tela precisa e ainda não foi portado: copie a fonte do Ecme,
+  ConfirmDialog, Container, DataTable, EllipsisButton, Loading, StickyFooter e o `IconButton`,
+  que não tem equivalente no template) e `src/components/template/` (BottomStickyBar). Componente que a tela precisa e ainda não foi portado: copie a fonte do Ecme,
   mantendo a API e a aparência, e mude só o que Next, acessibilidade e tipos pedem. Porte sob
   demanda, não o catálogo inteiro. Exceção: o subcomponente que a API do componente portado
   expõe vem junto, mesmo sem tela que o use, para a API ficar a do Ecme — `Avatar.Group`
@@ -170,6 +170,15 @@ Não negociável, em toda tela e todo componente portado:
   exemplo-a"); os itens são `Dropdown.Item` (links por `asElement={Link}`), com o item da
   linha em `sr-only` quando o texto visível não o diz. O Dropdown abre, fecha (clique fora e
   Esc), navega por setas e devolve o foco ao gatilho.
+- **Botão de "mais ações":** `EllipsisButton` (`src/components/shared/EllipsisButton.tsx`), o
+  do Ecme: `Button` `plain`, `circle`, `xs` (32 px) com os três pontos do `react-icons/pi`,
+  `aria-hidden`. O tipo exige o nome: `aria-label` quando é só o ícone ("Mais ações do
+  formulário"), ou texto visível nos filhos. Sem dica; quando ela for necessária, `IconButton`.
+- **Barra de ações do formulário:** `BottomStickyBar` (`src/components/template/BottomStickyBar.tsx`),
+  sempre `sticky` no fim da janela, com fundo e borda do cartão, encostada nas bordas do `main`
+  (margem negativa igual aos gutters de `PAGE_CONTAINER_GUTTER_X`). Por dentro, como no Ecme, um
+  `Container` (`src/components/shared/Container.tsx`, `container mx-auto`, com `asElement`) e os
+  mesmos gutters, com as ações à direita.
 - **Botão de ícone:** `IconButton` (`src/components/shared/IconButton.tsx`), sobre o `Button`
   (`plain`, `xs`: 32 px, acima do mínimo de 24 px) e o `Tooltip` do Ecme, para ações repetidas
   e compactas, como os controles de cada bloco do editor. O nome vem de `label` (`aria-label`,
