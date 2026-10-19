@@ -10,10 +10,16 @@
 // - o indicador de carregamento usa `text-primary`: o `text-${themeColor}` do Ecme é montado
 //   em tempo de execução e não sai no CSS do Tailwind;
 // - ícones dos indicadores `aria-hidden`; `componentAs` e `field` com tipos sem `any`.
+// Adaptado (#319):
+// - no múltiplo, o botão de remover do valor se chama "Remover <opção>" (o react-select diz
+//   "Remove <opção>"), e a região viva anuncia em pt-BR (seleção, remoção, foco no valor,
+//   resultados e guias de teclado); quem passar `components.MultiValueRemove`,
+//   `ariaLiveMessages` ou `screenReaderStatus` vence o padrão.
 'use client';
 
+import { useMemo } from 'react';
 import cn from '../utils/classNames';
-import ReactSelect from 'react-select';
+import ReactSelect, { components as selectComponents } from 'react-select';
 import type CreatableSelect from 'react-select/creatable';
 import type AsyncSelect from 'react-select/async';
 import { useConfig } from '../ConfigProvider';
@@ -25,7 +31,13 @@ import DefaultOption from './Option';
 import Spinner from '../Spinner/Spinner';
 import { CONTROL_SIZES } from '../utils/constants';
 import type { CommonProps, TypeAttributes } from '../@types/common';
-import type { ClearIndicatorProps, Props as ReactSelectProps, GroupBase } from 'react-select';
+import type {
+  AriaLiveMessages,
+  ClearIndicatorProps,
+  MultiValueRemoveProps,
+  Props as ReactSelectProps,
+  GroupBase,
+} from 'react-select';
 import type { AsyncProps } from 'react-select/async';
 import type { CreatableProps } from 'react-select/creatable';
 
@@ -48,6 +60,90 @@ const DefaultClearIndicator = <Option, IsMulti extends boolean, Group extends Gr
     </div>
   );
 };
+
+const DefaultMultiValueRemove = <Option, IsMulti extends boolean, Group extends GroupBase<Option>>(
+  props: MultiValueRemoveProps<Option, IsMulti, Group>,
+) => {
+  const { data, innerProps, selectProps } = props;
+  return (
+    <selectComponents.MultiValueRemove
+      {...props}
+      innerProps={{ ...innerProps, 'aria-label': `Remover ${selectProps.getOptionLabel(data)}` }}
+    />
+  );
+};
+
+/** Posição "n de total" para a região viva; vazia sem lista. */
+const position = <T,>(list: readonly T[] | undefined, item: T) =>
+  list && list.length ? `${list.indexOf(item) + 1} de ${list.length}` : '';
+
+/** As mensagens da região viva do react-select, em pt-BR. */
+function ariaLiveMessagesPtBr<
+  Option,
+  IsMulti extends boolean,
+  Group extends GroupBase<Option>,
+>(): AriaLiveMessages<Option, IsMulti, Group> {
+  return {
+    guidance: ({ context, isSearchable, isMulti, tabSelectsValue, isInitialFocus, ...props }) => {
+      switch (context) {
+        case 'menu':
+          return `Use as setas para cima e para baixo para escolher, Enter para selecionar a opção em foco e Esc para sair do menu${tabSelectsValue ? ', Tab para selecionar a opção e sair do menu' : ''}.`;
+        case 'input':
+          return isInitialFocus
+            ? `${props['aria-label'] || 'Seleção'} em foco${isSearchable ? ', digite para filtrar a lista' : ''}, seta para baixo abre o menu${isMulti ? ', seta para a esquerda leva aos valores escolhidos' : ''}.`
+            : '';
+        case 'value':
+          return 'Use as setas para a esquerda e para a direita para passar pelos valores escolhidos e Backspace para remover o valor em foco.';
+        default:
+          return '';
+      }
+    },
+    onChange: ({ action, label = '', labels, isDisabled }) => {
+      switch (action) {
+        case 'deselect-option':
+        case 'pop-value':
+        case 'remove-value':
+          return `opção ${label} removida.`;
+        case 'clear':
+          return 'Todas as opções escolhidas foram removidas.';
+        case 'initial-input-focus':
+          return labels.length > 1
+            ? `opções ${labels.join(', ')} selecionadas.`
+            : `opção ${labels.join(', ')} selecionada.`;
+        case 'select-option':
+          return isDisabled
+            ? `opção ${label} desabilitada. Escolha outra opção.`
+            : `opção ${label} selecionada.`;
+        default:
+          return '';
+      }
+    },
+    onFocus: ({
+      context,
+      focused,
+      options,
+      label = '',
+      selectValue,
+      isDisabled,
+      isSelected,
+      isAppleDevice,
+    }) => {
+      if (context === 'value' && selectValue) {
+        return `valor ${label} em foco, ${position(selectValue, focused)}.`;
+      }
+      if (context === 'menu' && isAppleDevice) {
+        const status = `${isSelected ? ' selecionada' : ''}${isDisabled ? ' desabilitada' : ''}`;
+        return `${label}${status}, ${position(options, focused)}.`;
+      }
+      return '';
+    },
+    onFilter: ({ inputValue, resultsMessage }) =>
+      `${resultsMessage}${inputValue ? ` para a busca ${inputValue}` : ''}.`,
+  };
+}
+
+const screenReaderStatusPtBr = ({ count }: { count: number }) =>
+  count === 1 ? '1 resultado disponível' : `${count} resultados disponíveis`;
 
 const DefaultLoadingIndicator = () => {
   return <Spinner className="select-loading-indicatior text-primary" />;
@@ -86,8 +182,15 @@ function Select<
     instanceId,
     'aria-invalid': ariaInvalid,
     'aria-errormessage': ariaErrorMessage,
+    ariaLiveMessages,
+    screenReaderStatus,
     ...rest
   } = props;
+
+  const liveMessages = useMemo(
+    () => ({ ...ariaLiveMessagesPtBr<Option, IsMulti, Group>(), ...ariaLiveMessages }),
+    [ariaLiveMessages],
+  );
 
   const { controlSize } = useConfig();
   const formControlSize = useForm()?.size;
@@ -189,8 +292,11 @@ function Select<
         LoadingIndicator: DefaultLoadingIndicator,
         DropdownIndicator: DefaultDropdownIndicator,
         ClearIndicator: DefaultClearIndicator,
+        MultiValueRemove: DefaultMultiValueRemove,
         ...components,
       }}
+      ariaLiveMessages={liveMessages}
+      screenReaderStatus={screenReaderStatus ?? screenReaderStatusPtBr}
       inputId={inputId ?? formItem?.controlId}
       instanceId={instanceId ?? generatedInstanceId}
       aria-invalid={isSelectInvalid ? true : ariaInvalid}
