@@ -1,15 +1,28 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MotionGlobalConfig } from 'motion/react';
 import type { ComponentProps } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { toast, ToastProvider } from '@/components/ui/toast';
 
 import { ReviewPanel } from './ReviewPanel.tsx';
 
 // Painel da revisão (#75): erros da release, checklist com os rótulos recebidos, bloqueio,
-// permissão e a mensagem de aprovação. No Ecme (#277), o conteúdo fica num Card.
+// permissão e a mensagem de aprovação (no toast, #325). No Ecme (#277), o conteúdo fica num Card.
 
-afterEach(cleanup);
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
+afterEach(async () => {
+  act(() => toast.removeAll());
+  await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
+  cleanup();
+});
 
 // Os itens de REVIEW_CHECKLIST (domínio), como a página os passa.
 const checklist = [
@@ -110,9 +123,10 @@ describe('painel de revisão', () => {
     expect(screen.getAllByText('Marque este item para aprovar.')).toHaveLength(4);
   });
 
-  it('pelo teclado, com o checklist completo, aprova com as chaves e anuncia o resultado', async () => {
+  it('pelo teclado, com o checklist completo, aprova com as chaves e anuncia no toast', async () => {
     const approve = vi.fn().mockResolvedValue({ ok: true, message: 'Versão 2 aprovada.' });
     const { rerender } = renderPanel({ approve });
+    render(<ToastProvider />);
     const user = userEvent.setup();
 
     for (const item of checklist) {
@@ -123,9 +137,11 @@ describe('painel de revisão', () => {
     await user.keyboard('{Enter}');
 
     expect(approve).toHaveBeenCalledWith(checklist.map((item) => item.key));
-    expect((await screen.findByRole('status')).textContent).toBe('Versão 2 aprovada.');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Versão 2 aprovada.'));
+    expect(screen.getByRole('status').querySelector('.notification')).not.toBeNull();
 
-    // A página revalida com a versão aprovada: o painel continua e a mensagem também.
+    // A página revalida com a versão aprovada: o painel continua, sem o formulário; o aviso
+    // fica no toast, fora do painel.
     rerender(
       <ReviewPanel
         version={2}
@@ -138,12 +154,13 @@ describe('painel de revisão', () => {
       />,
     );
     expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
-    expect(screen.getByRole('status').textContent).toBe('Versão 2 aprovada.');
+    expect(screen.getByRole('complementary').querySelector('[role="status"]')).toBeNull();
   });
 
   it('recusa do domínio aparece no resumo do formulário', async () => {
     const approve = vi.fn().mockResolvedValue({
       ok: false,
+      message: 'Não foi possível aprovar.',
       issues: [
         { path: [], message: 'A versão 2 não é a mais recente: o conteúdo está na versão 3' },
       ],

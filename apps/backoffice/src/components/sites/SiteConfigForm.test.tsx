@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { RESOURCES, SiteConfigSchema, type SiteConfig } from '@orakel/content-model/v1';
 import { THEME_IDS, THEME_SUMMARIES } from '@orakel/tokens';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { toast, ToastProvider } from '@/components/ui/toast';
 
 import { editValues } from './siteConfigFormValues.ts';
 import type { SiteFormResult } from './siteConfigFormValues.ts';
@@ -24,7 +26,9 @@ afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  act(() => toast.removeAll());
+  await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
   cleanup();
   vi.clearAllMocks();
 });
@@ -80,19 +84,18 @@ describe('formulário da configuração do site', () => {
   it('salvar sem mudar envia a mesma configuração, sem os textos institucionais', async () => {
     const user = userEvent.setup();
     const action = renderEdit({ ok: true, message: 'Configuração salva (versão 2).' });
+    render(<ToastProvider />);
 
     expect(screen.getByLabelText('ID').hasAttribute('readonly')).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
 
     await waitFor(() => expect(action).toHaveBeenCalled());
     expect(action.mock.calls[0]?.[0]).toEqual(config);
-    const status = await screen.findByText('Configuração salva (versão 2).');
-    expect(status.getAttribute('role')).toBe('status');
-    expect(status.className).toContain('text-success');
-    // Ao lado do botão: no mesmo grupo dele.
-    expect(
-      status.parentElement?.contains(screen.getByRole('button', { name: 'Salvar configuração' })),
-    ).toBe(true);
+    // No toast do template (#325), na região status do ToastProvider.
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Configuração salva (versão 2).'),
+    );
+    expect(screen.getByRole('status').querySelector('.notification')).not.toBeNull();
   });
 
   it('edição: "Salvando…" durante o envio, com o botão desabilitado', async () => {

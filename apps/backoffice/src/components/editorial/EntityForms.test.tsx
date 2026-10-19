@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
 import Modal from 'react-modal';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toast, ToastProvider } from '@/components/ui/toast';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp.ts';
 import { EntityForm, InstitutionalTextsForm, type EntityFormResult } from './EntityForms.tsx';
 
@@ -31,7 +32,9 @@ beforeEach(() => {
   Modal.setAppElement(app);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  act(() => toast.removeAll());
+  await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
   cleanup();
   app.remove();
   vi.clearAllMocks();
@@ -138,7 +141,7 @@ describe('formulários de entidades', () => {
     expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/menus');
   });
 
-  it('criar: "Criando…" com o botão desabilitado até a resposta', async () => {
+  it('criar: "Criando…" até a resposta; o sucesso vai para o toast antes de voltar', async () => {
     const user = userEvent.setup();
     let finish: (result: EntityFormResult) => void = () => undefined;
     const action = vi.fn(
@@ -156,6 +159,7 @@ describe('formulários de entidades', () => {
         action={action}
       />,
     );
+    render(<ToastProvider />);
 
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
@@ -165,19 +169,21 @@ describe('formulários de entidades', () => {
     );
     finish(ok);
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/taxonomias'));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Salvo.'));
   });
 
-  it('textos institucionais: a confirmação aparece ao lado do botão', async () => {
+  it('textos institucionais: a confirmação aparece no toast', async () => {
     const user = userEvent.setup();
     const action = vi.fn(() =>
       Promise.resolve<EntityFormResult>({ ok: true, message: 'Textos salvos.' }),
     );
     render(<InstitutionalTextsForm defaultValues={{}} action={action} />);
+    render(<ToastProvider />);
 
     await user.click(screen.getByRole('button', { name: 'Salvar textos' }));
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Textos salvos.'));
-    expect(screen.getByRole('status').className).toContain('text-success');
+    expect(screen.getByRole('status').querySelector('.notification')).not.toBeNull();
     expect(router.refresh).toHaveBeenCalled();
   });
 });
