@@ -18,7 +18,11 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   ConfirmDialog, DataTable, Loading, StickyFooter e o `IconButton`, que não tem equivalente no
   template). Componente que a tela precisa e ainda não foi portado: copie a fonte do Ecme,
   mantendo a API e a aparência, e mude só o que Next, acessibilidade e tipos pedem. Porte sob
-  demanda, não o catálogo inteiro. As classes de cada componente ficam numa folha por componente
+  demanda, não o catálogo inteiro. Exceção: o subcomponente que a API do componente portado
+  expõe vem junto, mesmo sem tela que o use, para a API ficar a do Ecme — `Avatar.Group`
+  (`AvatarGroup`) e `Dropdown.Menu` (o submenu, `DropdownSub` e `DropdownSubItem`, que o
+  `DropdownMenu` usa para o item que abre o submenu), auditados na vitrine e no E2E. Utilitário
+  sem import não fica. As classes de cada componente ficam numa folha por componente
   em `src/app/styles/`, em `@layer components`, importada por `src/app/globals.css`. Junte
   classes sempre com o `classNames` de `src/components/ui/utils/` (`twMerge` sobre `classnames`).
   Ícones do `react-icons` (`react-icons/pi`, como no template), sempre `aria-hidden`.

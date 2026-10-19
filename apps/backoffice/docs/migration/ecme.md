@@ -51,16 +51,17 @@ ThemeConfigurator completo.
 
 ## Mapeamento
 
-| Ecme                                                                                                                                | Backoffice                                                                                               |
-| ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `src/components/ui/*`                                                                                                               | `src/components/ui/` (substitui o shadcn, um componente por pasta como no Ecme)                          |
-| `src/components/shared/*`                                                                                                           | `src/components/shared/`                                                                                 |
-| `src/components/template/{Header,SideNav,SideNavToggle,MobileNav,UserProfileDropdown,PageContainer,LayoutBase,VerticalMenuContent}` | `src/components/template/`                                                                               |
-| `src/components/layouts/PostLoginLayout/components/CollapsibleSide.tsx`                                                             | `src/components/layouts/CollapsibleSide.tsx`, usado por `src/app/(admin)/layout.tsx`                     |
-| `src/configs/navigation.config/*`, `navigation-icon.config.tsx`                                                                     | `src/configs/navigation.config.ts` (áreas globais e do site)                                             |
-| `src/configs/theme.config.ts`, `store/themeStore.ts`                                                                                | `src/configs/theme.config.ts` + cookie de tema (sem zustand para o tema, se o cookie bastar)             |
-| `src/assets/styles/{tailwind,components,template}/*`                                                                                | `src/app/globals.css` (`@theme`) e `src/app/styles/` com as classes de componente em `@layer components` |
-| `src/utils/hooks/{useResponsive,useLayout,useMenuActive}`                                                                           | `src/components/template/hooks/`, seguros para SSR                                                       |
+| Ecme                                                                                                       | Backoffice                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/ui/*`                                                                                      | `src/components/ui/` (substitui o shadcn, um componente por pasta como no Ecme)                                                                               |
+| `src/components/shared/*`                                                                                  | `src/components/shared/`                                                                                                                                      |
+| `src/components/template/{Header,SideNav,SideNavToggle,MobileNav,UserProfileDropdown,VerticalMenuContent}` | `src/components/template/`                                                                                                                                    |
+| `src/components/layouts/PostLoginLayout/components/CollapsibleSide.tsx`                                    | `src/components/layouts/CollapsibleSide.tsx`, usado por `src/app/(admin)/layout.tsx`                                                                          |
+| `src/views/<área>/<Tela>/components/*`                                                                     | `src/components/<área>/` (`contents/`, `editorial/`, `forms/`, `media/`, `review/`, `sites/`), componentes de uma tela só, chamados pelas rotas de `src/app/` |
+| `src/configs/navigation.config/*`, `navigation-icon.config.tsx`                                            | `src/configs/navigation.config.ts` (áreas globais e do site) e `src/configs/navigation-icon.config.tsx`                                                       |
+| `src/configs/theme.config.ts`, `store/themeStore.ts`                                                       | `src/configs/theme.config.ts` + cookie de tema (sem zustand para o tema, se o cookie bastar)                                                                  |
+| `src/assets/styles/{tailwind,components,template}/*`                                                       | `src/app/globals.css` (`@theme`) e `src/app/styles/` com as classes de componente em `@layer components`                                                      |
+| `src/utils/hooks/{useResponsive,useLayout,useMenuActive}`                                                  | não portados                                                                                                                                                  |
 
 ## Regras de porte
 
