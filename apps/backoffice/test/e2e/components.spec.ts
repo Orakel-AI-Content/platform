@@ -604,6 +604,107 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Upload (#320): com `draggable`, o <input type="file"> transparente cobre a área e é a parada do
+// Tab, nomeado pelo texto da área; Enter e Espaço abrem o seletor de arquivos (nativo) e a área
+// desenha o foco de 2px. Sem `draggable`, o botão "Escolher arquivo" abre o seletor; cada arquivo
+// da lista tem "Remover <arquivo>".
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Upload pelo teclado, sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-upload"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+
+    const ring = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--ring)';
+      document.body.append(probe);
+      const value = getComputedStyle(probe).color;
+      probe.remove();
+      return value;
+    });
+    const outline = (locator: Locator) =>
+      locator.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { color: style.outlineColor, style: style.outlineStyle, width: style.outlineWidth };
+      });
+
+    const uploads = section(page, 'Upload');
+    const status = uploads.getByRole('status');
+    const drop = uploads.getByLabel('Escolha um arquivo ou arraste e solte aqui');
+    await expect(status).toHaveText('Anexos escolhidos: 0.');
+
+    // Área de soltar: Tab chega ao input, a área mostra o foco; Enter e Espaço abrem o seletor.
+    await tabTo(page, drop);
+    await expect
+      .poll(() => outline(drop.locator('xpath=..')))
+      .toEqual({ color: ring, style: 'solid', width: '2px' });
+    for (const key of ['Enter', 'Space']) {
+      const [chooser] = await Promise.all([
+        page.waitForEvent('filechooser'),
+        page.keyboard.press(key),
+      ]);
+      expect(chooser.isMultiple()).toBe(true);
+      await chooser.setFiles({
+        name: `anexo-${key}.txt`,
+        mimeType: 'text/plain',
+        buffer: Buffer.from('pauta'),
+      });
+    }
+    await expect(status).toHaveText('Anexos escolhidos: 2.');
+    await expect(uploads.getByText('anexo-Enter.txt')).toBeVisible();
+
+    // Arrastar sobre a área a destaca; sair tira o destaque.
+    const area = drop.locator('xpath=..');
+    await area.dispatchEvent('dragover');
+    await expect(area).toHaveClass(/(^| )border-primary( |$)/);
+    await area.dispatchEvent('dragleave');
+    await expect(area).not.toHaveClass(/(^| )border-primary( |$)/);
+
+    // Remover pelo teclado, pelo nome do arquivo.
+    const remove = uploads.getByRole('button', { name: 'Remover anexo-Enter.txt' });
+    await tabTo(page, remove);
+    await page.keyboard.press('Enter');
+    await expect(status).toHaveText('Anexos escolhidos: 1.');
+    await expect(uploads.getByText('anexo-Enter.txt')).toHaveCount(0);
+
+    // Sem draggable: o botão abre o seletor, e o arquivo novo substitui o da lista (limite 1).
+    await expect(uploads.getByText('pauta-da-semana.pdf')).toBeVisible();
+    const choose = uploads.getByRole('button', { name: 'Escolher arquivo' });
+    await tabTo(page, choose);
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.keyboard.press('Enter'),
+    ]);
+    await chooser.setFiles({
+      name: 'capa.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+    await expect(uploads.getByRole('img', { name: 'Prévia de capa.png' })).toBeVisible();
+    await expect(uploads.getByText('pauta-da-semana.pdf')).toHaveCount(0);
+
+    await expect(uploads.getByLabel('Envio bloqueado')).toBeDisabled();
+
+    const afterChanges = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-upload"]')
+      .analyze();
+    expect(afterChanges.violations).toEqual([]);
+    expect(hydration).toEqual([]);
+  });
+}
+
 // DateTimepicker (#318): o site em Lisboa e o navegador em São Paulo; o campo, o calendário e o
 // horário mostram a hora de parede de Lisboa e o valor devolvido é o instante dela (ISO com o
 // offset de Lisboa). Enter e Espaço abrem o painel, Esc fecha e devolve o foco ao campo.
