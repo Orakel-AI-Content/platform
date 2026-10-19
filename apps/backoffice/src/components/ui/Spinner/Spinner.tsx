@@ -1,7 +1,7 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/Spinner/Spinner.tsx
 // Adaptado (#205): o svg sai com `aria-hidden` por padrão (sem nome acessível, é só indicador);
 // quem usa anuncia o carregamento (`aria-busy` no Button, `role="status"` em volta).
-import classNames from 'classnames';
+import classNames from '../utils/classNames';
 import { CgSpinner } from 'react-icons/cg';
 import type { CommonProps } from '../@types/common';
 import type { ElementType, Ref } from 'react';
