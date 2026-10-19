@@ -134,11 +134,11 @@ export function LinkPopover({ editor, pressed }: { editor: Editor; pressed: bool
           )}
         </FormItem>
         <div className="flex flex-wrap gap-2">
-          <Button variant="solid" size="sm" onClick={apply}>
+          <Button type="button" variant="solid" size="sm" onClick={apply}>
             Aplicar
           </Button>
           {hasLink && (
-            <Button size="sm" onClick={remove}>
+            <Button type="button" size="sm" onClick={remove}>
               Remover link
             </Button>
           )}
