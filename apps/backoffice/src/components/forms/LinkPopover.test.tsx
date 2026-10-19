@@ -2,7 +2,11 @@
 import { TextBlockSchema } from '@orakel/content-model/v1';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { richTextField } from './RichTextField.tsx';
 import { SchemaForm } from './SchemaForm.tsx';
@@ -10,7 +14,31 @@ import { SchemaForm } from './SchemaForm.tsx';
 // Popover de link (#132) com o editor TipTap real. O happy-dom não implementa a Popover API:
 // abrir é o evento `toggle`, e `hidePopover` é espionado (o E2E confere o navegador).
 
-afterEach(cleanup);
+// "Remover link" confirma num diálogo (#327), que esconde o contêiner da app.
+let app: HTMLElement;
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
+afterEach(() => {
+  cleanup();
+  app.remove();
+});
+
+/** Confirma no diálogo de "Remover link". */
+async function confirmRemove(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = await screen.findByRole('alertdialog', { name: 'Remover o link?' });
+  await user.click(within(dialog).getByRole('button', { name: 'Remover' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+}
 
 const paragraph = (children: unknown[]) => ({ type: 'paragraph', children });
 
@@ -126,8 +154,40 @@ describe('popover de link', () => {
 
     toggle(popover, 'open');
     await user.click(within(popover).getByRole('button', { name: 'Remover link' }));
+    await confirmRemove(user);
     await waitFor(() => expect(editor.querySelector('a')).toBeNull());
     expect(editor.textContent).toBe('Guia');
+    expect(editor.contains(document.activeElement)).toBe(true);
+  });
+
+  it('Remover link fecha o popover e confirma; Esc e Cancelar mantêm o link e voltam ao botão Link', async () => {
+    const user = userEvent.setup();
+    renderEditor([
+      paragraph([{ type: 'link', href: '/guia/', children: [{ type: 'text', text: 'Guia' }] }]),
+    ]);
+    const editor = await screen.findByRole('textbox', { name: 'Texto' });
+    await user.click(editor);
+    await user.keyboard('{Control>}a{/Control}');
+    const { button, popover, hide } = linkPopover();
+    await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'));
+
+    for (const dismiss of ['Esc', 'Cancelar'] as const) {
+      toggle(popover, 'open');
+      const removeLink = await within(popover).findByRole('button', { name: 'Remover link' });
+      expect(removeLink.className).toContain('text-error');
+      hide.mockClear();
+      await user.click(removeLink);
+      expect(hide).toHaveBeenCalled();
+      const dialog = await screen.findByRole('alertdialog', { name: 'Remover o link?' });
+      expect(within(dialog).getByRole('button', { name: 'Remover' }).className).toContain(
+        'bg-error',
+      );
+      if (dismiss === 'Esc') await user.keyboard('{Escape}');
+      else await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(button));
+      expect(editor.querySelector('a')?.getAttribute('href')).toBe('/guia/');
+    }
   });
 
   it('clicar em Aplicar e em Remover link mexe só no link, sem enviar o formulário (#303)', async () => {
@@ -151,6 +211,7 @@ describe('popover de link', () => {
     await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'));
     toggle(popover, 'open');
     await user.click(await within(popover).findByRole('button', { name: 'Remover link' }));
+    await confirmRemove(user);
 
     await waitFor(() => expect(editor.querySelector('a')).toBeNull());
     expect(editor.textContent).toBe('Guia');

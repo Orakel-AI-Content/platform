@@ -93,6 +93,26 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await expect(linkPopover).toBeHidden();
   await expect(textEditor).toBeFocused();
 
+  // "Remover link" fecha o popover e confirma num diálogo (#327): Esc mantém o link e devolve
+  // o foco ao botão Link; "Remover" tira o link, o texto fica e o foco volta ao editor.
+  const removeLinkDialog = page.getByRole('alertdialog', { name: 'Remover o link?' });
+  await linkButton.focus();
+  await page.keyboard.press('Enter');
+  await linkPopover.getByRole('button', { name: 'Remover link' }).click();
+  await expect(linkPopover).toBeHidden();
+  await expect(removeLinkDialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(removeLinkDialog).toHaveCount(0);
+  await expect(linkButton).toBeFocused();
+  await expect(textEditor.locator('a')).toHaveAttribute('href', '/guias/');
+  await page.keyboard.press('Enter');
+  await linkPopover.getByRole('button', { name: 'Remover link' }).click();
+  await removeLinkDialog.getByRole('button', { name: 'Remover' }).click();
+  await expect(removeLinkDialog).toHaveCount(0);
+  await expect(textEditor.locator('a')).toHaveCount(0);
+  await expect(textEditor).toContainText('Primeiro parágrafo do artigo. Veja /guias/');
+  await expect(textEditor).toBeFocused();
+
   // A imagem do bloco pela grade de miniaturas (#182), só com o teclado.
   await addBlock(page, 'Imagem');
   const imageField = page.getByRole('group', { name: 'Mídia', exact: true });
@@ -117,6 +137,16 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await page.getByLabel('Pergunta', { exact: true }).fill('Funciona offline?');
   await page.getByRole('textbox', { name: 'Resposta' }).click();
   await page.keyboard.type('Não, precisa de conexão.');
+  // Remover pergunta confirma num diálogo (#327).
+  await page.getByRole('button', { name: 'Adicionar pergunta' }).click();
+  await expect(page.getByLabel('Pergunta', { exact: true })).toHaveCount(2);
+  await page.getByRole('button', { name: 'Remover pergunta 2' }).click();
+  await page
+    .getByRole('alertdialog', { name: 'Remover pergunta 2?' })
+    .getByRole('button', { name: 'Remover' })
+    .click();
+  await expect(page.getByLabel('Pergunta', { exact: true })).toHaveCount(1);
+  await expect(page.getByLabel('Pergunta', { exact: true })).toHaveValue('Funciona offline?');
 
   // Sem texto alternativo nem decorativa: recusado com a mensagem junto do campo.
   await page.getByRole('button', { name: 'Criar conteúdo' }).click();
@@ -205,6 +235,22 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.mouse.move(0, 0);
     const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(accessibility.violations).toEqual([]);
+
+    // "Remover" da capa confirma num diálogo (#327), sem violação com ele aberto: Cancelar
+    // mantém a imagem; "Remover" esvazia o campo e leva o foco a "Escolher imagem".
+    const remove = cover.getByRole('button', { name: 'Remover' });
+    const dialog = page.getByRole('alertdialog', { name: 'Remover a imagem de Capa?' });
+    await remove.click();
+    await expect(dialog).toBeVisible();
+    const withDialog = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(withDialog.violations).toEqual([]);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(remove).toBeFocused();
+    await remove.click();
+    await dialog.getByRole('button', { name: 'Remover' }).click();
+    await expect(cover.getByText('Nenhuma imagem')).toBeVisible();
+    await expect(cover.getByRole('button', { name: 'Escolher imagem' })).toBeFocused();
   });
 }
 

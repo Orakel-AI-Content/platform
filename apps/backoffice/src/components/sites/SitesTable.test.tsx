@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { toast, ToastProvider } from '@/components/ui/toast';
+import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { SitesTable } from './SitesTable.tsx';
@@ -21,10 +23,25 @@ beforeAll(() => {
 afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
+// "Publicar agora" confirma num diálogo (#327), que esconde o contêiner da app.
+let app: HTMLElement;
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
+
+/** Confirma no diálogo de "Publicar agora". */
+async function confirmPublish(user: ReturnType<typeof userEvent.setup>, siteId: string) {
+  const dialog = await screen.findByRole('alertdialog', { name: `Publicar ${siteId} agora?` });
+  await user.click(within(dialog).getByRole('button', { name: 'Publicar' }));
+}
 afterEach(async () => {
   act(() => toast.removeAll());
   await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
   cleanup();
+  app.remove();
   vi.clearAllMocks();
 });
 
@@ -180,6 +197,7 @@ describe('tabela de sites', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-b' }));
+    await confirmPublish(user, 'exemplo-b');
 
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('Build de exemplo-b enfileirado.'),
@@ -197,6 +215,7 @@ describe('tabela de sites', () => {
 
     expect(screen.getAllByRole('alert')).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-b' }));
+    await confirmPublish(user, 'exemplo-b');
 
     const region = screen.getByRole('alert');
     await waitFor(() => expect(region.textContent).toBe('Site pausado.'));

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useTransition, type ReactNode } from 'react';
+import { useState, useTransition, type ReactNode } from 'react';
 
 import {
   BUILD_STATUS_LABEL,
@@ -11,6 +11,10 @@ import {
 } from '@/components/shared/siteLabels.ts';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
+import ConfirmDialog, {
+  dangerButtonClass,
+  dangerConfirmButtonProps,
+} from '@/components/shared/ConfirmDialog.tsx';
 import { Button } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Tag';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
@@ -82,7 +86,8 @@ export function PendingCount({ siteId, count }: { siteId: string; count: number 
 
 /**
  * Enfileira o build já, com a própria transição (cada linha da lista tem o seu "Enfileirando…");
- * `onResult` é o `report` do `useActionResult` de quem decide onde fica o erro.
+ * `onResult` é o `report` do `useActionResult` de quem decide onde fica o erro. Muda o site
+ * publicado sem esperar a janela: pede confirmação, na cor de erro (#327).
  */
 export function PublishNowButton({
   siteId,
@@ -97,16 +102,34 @@ export function PublishNowButton({
   size?: 'xs' | 'sm';
 }) {
   const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
   return (
-    <Button
-      type="button"
-      size={size}
-      disabled={pending}
-      onClick={() => startTransition(async () => onResult(await action(siteId)))}
-    >
-      {pending ? 'Enfileirando…' : 'Publicar agora'}
-      <span className="sr-only"> {siteId}</span>
-    </Button>
+    <>
+      <Button
+        type="button"
+        size={size}
+        disabled={pending}
+        customColorClass={dangerButtonClass}
+        onClick={() => setConfirming(true)}
+      >
+        {pending ? 'Enfileirando…' : 'Publicar agora'}
+        <span className="sr-only"> {siteId}</span>
+      </Button>
+      <ConfirmDialog
+        isOpen={confirming}
+        type="danger"
+        title={`Publicar ${siteId} agora?`}
+        confirmText="Publicar"
+        confirmButtonProps={dangerConfirmButtonProps}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          startTransition(async () => onResult(await action(siteId)));
+        }}
+      >
+        <p>O build entra na fila já, sem esperar a janela de agrupamento, e o site no ar muda.</p>
+      </ConfirmDialog>
+    </>
   );
 }
 

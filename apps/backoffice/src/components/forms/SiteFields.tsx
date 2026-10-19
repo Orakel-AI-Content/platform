@@ -3,6 +3,10 @@
 import type { ThemeSummary } from '@orakel/tokens';
 import { useState } from 'react';
 
+import ConfirmDialog, {
+  dangerButtonClass,
+  dangerConfirmButtonProps,
+} from '@/components/shared/ConfirmDialog.tsx';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Input from '@/components/ui/Input';
@@ -93,6 +97,8 @@ function FlagsField({ id, label, value, onChange, invalid, describedBy, ref }: F
     })),
   );
   const [nextKey, setNextKey] = useState(rows.length);
+  // Remover pede confirmação (#327); a linha fica depois de fechar, para o título não mudar.
+  const [removing, setRemoving] = useState({ key: -1, index: 0, open: false });
   const update = (next: FlagRow[]) => {
     setRows(next);
     onChange(
@@ -133,14 +139,28 @@ function FlagsField({ id, label, value, onChange, invalid, describedBy, ref }: F
           </Checkbox>
           <Button
             type="button"
-            variant="plain"
             size="sm"
-            onClick={() => update(rows.filter((r) => r.key !== row.key))}
+            customColorClass={dangerButtonClass}
+            onClick={() => setRemoving({ key: row.key, index, open: true })}
           >
             Remover recurso {index + 1}
           </Button>
         </div>
       ))}
+      <ConfirmDialog
+        isOpen={removing.open}
+        type="danger"
+        title={`Remover recurso ${removing.index + 1}?`}
+        confirmText="Remover"
+        confirmButtonProps={dangerConfirmButtonProps}
+        onCancel={() => setRemoving({ ...removing, open: false })}
+        onConfirm={() => {
+          update(rows.filter((r) => r.key !== removing.key));
+          setRemoving({ ...removing, open: false });
+        }}
+      >
+        <p>O recurso sai da configuração ao salvar.</p>
+      </ConfirmDialog>
       <Button
         ref={ref}
         type="button"

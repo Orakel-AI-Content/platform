@@ -5,6 +5,10 @@ import type { Editor } from '@tiptap/react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { PiLink } from 'react-icons/pi';
 
+import ConfirmDialog, {
+  dangerButtonClass,
+  dangerConfirmButtonProps,
+} from '@/components/shared/ConfirmDialog.tsx';
 import { IconButton } from '@/components/shared/IconButton';
 import { Button } from '@/components/ui/Button';
 import { FormItem } from '@/components/ui/Form';
@@ -32,10 +36,18 @@ export function LinkPopover({ editor, pressed }: { editor: Editor; pressed: bool
   const hintId = `${id}-link-hint`;
   const errorId = `${id}-link-error`;
   const popoverRef = useRef<HTMLDivElement>(null);
+  const linkButtonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [href, setHref] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [hasLink, setHasLink] = useState(false);
+  // "Remover link" pede confirmação (#327). O popover fecha antes: um clique no diálogo,
+  // fora dele, o fecharia de qualquer jeito (light dismiss), e o "Remover link" some com ele.
+  // Ao fechar para confirmar, o foco não vai ao editor: o foco do TipTap (adiado) o tiraria
+  // do diálogo.
+  const [removing, setRemoving] = useState(false);
+  const confirming = useRef(false);
+  const removed = useRef(false);
 
   useEffect(() => {
     const popover = popoverRef.current;
@@ -48,6 +60,9 @@ export function LinkPopover({ editor, pressed }: { editor: Editor; pressed: bool
         setHasLink(editor.isActive('link'));
         setError(undefined);
         requestAnimationFrame(() => inputRef.current?.focus());
+      } else if (confirming.current) {
+        // O `toggle` chega depois (tarefa própria): só aqui a confirmação já pode receber o foco.
+        confirming.current = false;
       } else {
         // Esc ou clique fora devolvem o foco ao botão; o critério é voltar ao editor.
         editor.commands.focus();
@@ -83,14 +98,29 @@ export function LinkPopover({ editor, pressed }: { editor: Editor; pressed: bool
     close();
   };
 
-  const remove = () => {
-    editor.chain().focus().extendMarkRange('link').unsetLink().run();
+  const askRemove = () => {
+    confirming.current = true;
     close();
+    setRemoving(true);
+  };
+
+  const remove = () => {
+    removed.current = true;
+    setRemoving(false);
+  };
+
+  // Depois de o react-modal devolver o foco (ao "Remover link", já escondido): removido, o
+  // link sai e o foco vai ao editor; cancelado, o foco volta ao botão Link da barra.
+  const afterClose = () => {
+    if (removed.current) editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    else linkButtonRef.current?.focus();
+    removed.current = false;
   };
 
   return (
     <>
       <IconButton
+        ref={linkButtonRef}
         label="Link"
         icon={<PiLink />}
         aria-pressed={pressed}
@@ -138,12 +168,29 @@ export function LinkPopover({ editor, pressed }: { editor: Editor; pressed: bool
             Aplicar
           </Button>
           {hasLink && (
-            <Button type="button" size="sm" onClick={remove}>
+            <Button
+              type="button"
+              size="sm"
+              customColorClass={dangerButtonClass}
+              onClick={askRemove}
+            >
               Remover link
             </Button>
           )}
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={removing}
+        type="danger"
+        title="Remover o link?"
+        confirmText="Remover"
+        confirmButtonProps={dangerConfirmButtonProps}
+        onCancel={() => setRemoving(false)}
+        onConfirm={remove}
+        onAfterClose={afterClose}
+      >
+        <p>O texto continua no editor, sem o link.</p>
+      </ConfirmDialog>
     </>
   );
 }

@@ -226,6 +226,30 @@ Não negociável, em toda tela e todo componente portado:
 type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`UNDO_MS`)
   devolve o bloco na mesma posição; só a remoção mais recente se desfaz, e salvar ou sair do
   editor tiram o toast.
+- **Confirmação e ação destrutiva:** remover algo que não se desfaz e as ações que afetam o
+  site publicado pedem confirmação num `ConfirmDialog type="danger"`
+  (`src/components/shared/ConfirmDialog.tsx`), como o "Delete" do `CustomerEdit` do Ecme
+  (#327). O estado (aberto e o alvo) fica no próprio componente, e a ação só roda no
+  `onConfirm`; o título pergunta e nomeia o alvo ("Remover pergunta 2?", "Publicar exemplo-a
+  agora?"), e o "Confirmar" diz o verbo ("Remover", "Publicar"). O botão que abre a
+  confirmação usa o `dangerButtonClass` no `customColorClass` (contorno e texto em `error`;
+  branco no claro, transparente no escuro), e o "Confirmar", o `dangerConfirmButtonProps` no
+  `confirmButtonProps` (`bg-error`). "Cancelar", Esc e o fundo fecham sem efeito e o
+  foco volta ao botão de origem; quando o botão some com a ação ("Remover" da mídia, "Remover
+  link"), o foco vai ao controle que fica, no `onAfterClose`. Depois de confirmar, o retorno
+  segue o padrão acima (toast ou `ActionAlert`). Confirmam hoje:
+  - remover item de lista do `SchemaForm` ("Remover <item> N");
+  - "Remover recurso N" da configuração do site;
+  - "Remover" da mídia de um campo (capa, avatar);
+  - "Remover link" do rich text: o popover fecha antes de abrir o diálogo;
+  - **ações que afetam o site publicado:** só "Publicar agora" (lista e página do site), que
+    muda o site no ar sem esperar a janela de agrupamento. Salvar configuração ou conteúdo,
+    aprovar na revisão, as etapas do ciclo de vida, o G1 e a janela não confirmam: passam
+    pela janela ou não mudam o que está no ar.
+
+  Remover bloco do editor não confirma (desfaz no toast, acima), nem o "Remover <arquivo>" da
+  fila de envio e o "Remover <opção>" do `Select` múltiplo, que não apagam dado salvo.
+
 - **Tabelas:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (colunas
   com `createColumnHelper` e `tableFeatures`); a biblioteca traz skills em
   `node_modules/@tanstack/react-table/skills/`. Tabela sem interação (só leitura: fila de

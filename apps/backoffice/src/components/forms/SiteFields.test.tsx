@@ -2,8 +2,11 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
+
+import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { SchemaForm, type SchemaFormIssue } from './SchemaForm.tsx';
 import { choiceField, flagsField, linesField, themeField } from './SiteFields.tsx';
@@ -19,7 +22,19 @@ afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
 
-afterEach(cleanup);
+// Remover recurso confirma num diálogo (#327), que esconde o contêiner da app.
+let app: HTMLElement;
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
+
+afterEach(() => {
+  cleanup();
+  app.remove();
+});
 
 const schema = z.object({
   domains: z.array(z.string().min(1)).min(1),
@@ -87,8 +102,19 @@ describe('campos da configuração do site', () => {
     });
 
     const group = screen.getByRole('group', { name: 'Recursos ligados' });
-    within(group).getByRole('button', { name: 'Remover recurso 1' }).focus();
+    const removeFirst = within(group).getByRole('button', { name: 'Remover recurso 1' });
+    expect(removeFirst.className).toContain('text-error');
+    removeFirst.focus();
+    // Cancelar não remove e devolve o foco ao botão; "Remover" do diálogo remove.
     await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(document.activeElement).toBe(removeFirst);
+    expect(within(group).getByLabelText('Nome do recurso 2')).toBeTruthy();
+    await user.keyboard('{Enter}');
+    const dialog = screen.getByRole('alertdialog', { name: 'Remover recurso 1?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remover' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     within(group).getByRole('button', { name: 'Adicionar recurso' }).focus();
     await user.keyboard('{Enter}');
     await user.type(within(group).getByLabelText('Nome do recurso 2'), 'busca');

@@ -166,11 +166,24 @@ describe('seletores', () => {
         name: 'Remover',
       }),
     ).toBeNull();
-    await user.click(within(cover).getByRole('button', { name: 'Remover' }));
+    // Remover confirma num diálogo (#327): Cancelar mantém a imagem e devolve o foco ao botão.
+    const remove = within(cover).getByRole('button', { name: 'Remover' });
+    expect(remove.className).toContain('text-error');
+    await user.click(remove);
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(document.activeElement).toBe(remove);
+    expect(within(cover).queryByText('Nenhuma imagem')).toBeNull();
+    await user.click(remove);
+    const dialog = screen.getByRole('alertdialog', { name: 'Remover a imagem de Capa?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remover' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
 
     expect(within(cover).getByText('Nenhuma imagem')).toBeTruthy();
-    expect(document.activeElement).toBe(
-      within(cover).getByRole('button', { name: 'Escolher imagem' }),
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        within(cover).getByRole('button', { name: 'Escolher imagem' }),
+      ),
     );
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());

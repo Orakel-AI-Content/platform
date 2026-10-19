@@ -204,6 +204,20 @@ for (const colorScheme of ['light', 'dark'] as const) {
       .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
       .analyze();
     expect(accessibility.violations).toEqual([]);
+
+    // "Publicar agora" da linha confirma num diálogo (#327), sem violação com ele aberto;
+    // Cancelar não publica e devolve o foco ao botão da linha.
+    const publish = page.getByRole('button', { name: 'Publicar agora exemplo-a' });
+    await publish.click();
+    const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
+    await expect(dialog).toBeVisible();
+    const withDialog = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+      .analyze();
+    expect(withDialog.violations).toEqual([]);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(publish).toBeFocused();
   });
 }
 

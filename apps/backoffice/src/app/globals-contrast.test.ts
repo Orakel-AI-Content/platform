@@ -1785,6 +1785,37 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-800',
     minimum: 4.5,
   },
+  // Ação destrutiva (#327): o gatilho em `text-error`, branco no claro (como o cartão, em
+  // "mensagem de erro") e transparente no escuro, sobre o body e o cartão (idem) e o popover do
+  // link (gray-900). O "Confirmar" em `bg-error` é o texto do `solid` sobre o `error`.
+  {
+    name: 'ação destrutiva no popover',
+    theme: 'claro',
+    text: 'text-error',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'confirmar destrutivo',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'bg-error',
+    minimum: 4.5,
+  },
+  {
+    name: 'ação destrutiva no popover',
+    theme: 'escuro',
+    text: 'dark:text-error',
+    background: 'dark:bg-gray-900',
+    minimum: 4.5,
+  },
+  {
+    name: 'confirmar destrutivo',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-error',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`.

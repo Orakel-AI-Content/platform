@@ -18,6 +18,10 @@ import * as z from 'zod';
 
 import { pushSuccess } from '@/components/shared/ActionFeedback.tsx';
 import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
+import ConfirmDialog, {
+  dangerButtonClass,
+  dangerConfirmButtonProps,
+} from '@/components/shared/ConfirmDialog.tsx';
 import { ErrorSummary } from '@/components/shared/ErrorSummary.tsx';
 import Alert from '@/components/ui/Alert';
 import Button from '@/components/ui/Button';
@@ -462,6 +466,9 @@ function ArrayField({
   label: string;
 }) {
   const { fields, append, remove } = useFieldArray({ control: ctx.control, name: path });
+  // Remover pede confirmação (#327). O índice fica depois de fechar: o título não muda
+  // durante a saída do diálogo.
+  const [removing, setRemoving] = useState({ index: 0, open: false });
   const itemNode = describe(element).node;
   const itemLabel = ctx.labels[`${pattern(path)}.*`] ?? 'item';
   const arrayError = get(ctx.errors, path) as
@@ -477,11 +484,30 @@ function ArrayField({
         <fieldset key={item.id} className={classNames(groupClass, 'p-4')}>
           <legend className="px-1 text-sm font-semibold">{`${itemLabel} ${index + 1}`}</legend>
           <Children ctx={ctx} shape={itemNode.shape} prefix={`${path}.${index}`} />
-          <Button type="button" variant="plain" size="sm" onClick={() => remove(index)}>
+          <Button
+            type="button"
+            size="sm"
+            customColorClass={dangerButtonClass}
+            onClick={() => setRemoving({ index, open: true })}
+          >
             {`Remover ${itemLabel} ${index + 1}`}
           </Button>
         </fieldset>
       ))}
+      <ConfirmDialog
+        isOpen={removing.open}
+        type="danger"
+        title={`Remover ${itemLabel} ${removing.index + 1}?`}
+        confirmText="Remover"
+        confirmButtonProps={dangerConfirmButtonProps}
+        onCancel={() => setRemoving({ ...removing, open: false })}
+        onConfirm={() => {
+          remove(removing.index);
+          setRemoving({ ...removing, open: false });
+        }}
+      >
+        <p>O item e o que foi preenchido nele saem do formulário.</p>
+      </ConfirmDialog>
       {typeof message === 'string' && <p className="text-sm font-semibold text-error">{message}</p>}
       <Button type="button" size="sm" onClick={() => append(emptyValue(element))}>
         {`Adicionar ${itemLabel}`}
