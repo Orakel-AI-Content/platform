@@ -13,9 +13,10 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 
 - **Componentes:** as primitivas do Ecme em `src/components/ui/` (uma pasta por componente,
   como no template: Alert, Avatar, Badge, Button, Card, Checkbox, Dialog, Drawer, Dropdown,
-  Form, Input, InputGroup, Menu, Notification, Pagination, Radio, Segment, Select, Skeleton,
-  Spinner, Switcher, Table, Tabs, Tag, TimeInput, toast, Tooltip, Upload (com o `FileItem`), e o
-  Calendar e o DateTimepicker, em `DatePicker/` como no template, com a prop `timeZone` para mostrar os dias e
+  Form, Input, InputGroup, Menu, Notification, Pagination, Progress (linha e círculo, como
+  `role="progressbar"`), Radio, Segment, Select, Skeleton, Spinner, Steps (`<ol>` com o estado
+  de cada etapa em texto e `aria-current="step"` na atual), Switcher, Table, Tabs, Tag,
+  TimeInput, toast, Tooltip, e o Calendar e o DateTimepicker, em `DatePicker/` como no template, com a prop `timeZone` para mostrar os dias e
   a hora de parede no fuso do site e devolver o instante; na troca de horário, a hora repetida
   vale a primeira ocorrência e a inexistente avança pelo salto) e as peças compostas em
   `src/components/shared/` (AdaptiveCard,

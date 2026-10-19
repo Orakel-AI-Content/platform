@@ -34,11 +34,13 @@ import { Input } from '@/components/ui/Input';
 import { InputGroup } from '@/components/ui/InputGroup';
 import { Notification } from '@/components/ui/Notification';
 import { Pagination } from '@/components/ui/Pagination';
+import { Progress } from '@/components/ui/Progress';
 import { Radio, type RadioValue } from '@/components/ui/Radio';
 import { Segment, type SegmentValue } from '@/components/ui/Segment';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
+import { Steps } from '@/components/ui/Steps';
 import { Switcher } from '@/components/ui/Switcher';
 import { Table, type ThSort } from '@/components/ui/Table';
 import { Tabs } from '@/components/ui/Tabs';
@@ -149,6 +151,7 @@ export function Showcase({ linkPage }: { linkPage: number }) {
   const [anexos, setAnexos] = useState(0);
   const [pagina, setPagina] = useState(1);
   const [ordem, setOrdem] = useState<ThSort>('none');
+  const [etapa, setEtapa] = useState(1);
   return (
     <>
       <section aria-labelledby="vitrine-button" className="space-y-3">
@@ -805,6 +808,66 @@ export function Showcase({ linkPage }: { linkPage: number }) {
             />
             <p className="text-sm">Página na URL: {linkPage}.</p>
           </div>
+        </Card>
+      </section>
+
+      <section aria-labelledby="vitrine-progress" className="space-y-3">
+        <h2 id="vitrine-progress" className="text-lg font-semibold">
+          Progress
+        </h2>
+        <Card>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <p id="progresso-envio" className="text-sm">
+                Envio de capa.jpg
+              </p>
+              <Progress percent={45} aria-labelledby="progresso-envio" />
+            </div>
+            <Progress percent={80} size="sm" aria-label="Processamento das variantes" />
+            <Progress percent={100} showInfo={false} aria-label="Build concluído" />
+            <div className="flex flex-wrap items-center gap-6">
+              <Progress variant="circle" percent={30} width={96} aria-label="Artigos revisados" />
+              <Progress
+                variant="circle"
+                percent={75}
+                width={96}
+                gapDegree={70}
+                gapPosition="bottom"
+                customInfo="3/4"
+                aria-label="Etapas do build"
+              />
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      <section aria-labelledby="vitrine-steps" className="space-y-3">
+        <h2 id="vitrine-steps" className="text-lg font-semibold">
+          Steps
+        </h2>
+        <Steps current={1}>
+          <Steps.Item title="Criado" />
+          <Steps.Item title="Configurado" />
+          <Steps.Item title="Publicado" />
+        </Steps>
+        <Card>
+          <div className="space-y-4">
+            <Steps current={etapa} onChange={setEtapa}>
+              <Steps.Item title="Conteúdo" />
+              <Steps.Item title="Revisão" />
+              <Steps.Item title="Publicação" />
+            </Steps>
+            <p role="status" className="text-sm">
+              Etapa escolhida: {etapa + 1}.
+            </p>
+          </div>
+        </Card>
+        <Card>
+          <Steps vertical current={2} status="error">
+            <Steps.Item title="Render" description="Páginas geradas." />
+            <Steps.Item title="Verificação" description="Links e imagens conferidos." />
+            <Steps.Item title="Publicação" description="O deploy falhou." />
+          </Steps>
         </Card>
       </section>
 
