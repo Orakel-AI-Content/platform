@@ -1,5 +1,5 @@
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { PendingChangesTable } from '@/components/pending-changes-table';
+import { PendingChangesTable } from '@/components/sites/PendingChangesTable';
 import { listPendingChanges } from '@/domain/pending-changes/list.ts';
 
 import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';

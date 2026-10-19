@@ -1,6 +1,6 @@
 // Módulo sem 'use client': o servidor não pode chamar função de módulo cliente.
 import { parseListState } from '@/components/shared/listQuery.ts';
-import { MediaLibrary } from '@/components/media-library';
+import { MediaLibrary } from '@/components/media/MediaLibrary';
 import { listMediaPage } from '@/domain/content/media.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 

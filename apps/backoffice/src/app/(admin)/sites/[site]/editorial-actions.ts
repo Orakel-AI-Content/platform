@@ -5,7 +5,7 @@ import type { Author, Menu, Taxonomy } from '@orakel/content-model/v1';
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import type { EntityFormResult } from '@/components/entity-forms';
+import type { EntityFormResult } from '@/components/editorial/EntityForms';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
 import { createAuthor, updateAuthor } from '@/domain/content/authors.ts';

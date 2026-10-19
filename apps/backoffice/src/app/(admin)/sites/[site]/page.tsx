@@ -1,22 +1,22 @@
-import { LifecycleSteps } from '@/components/lifecycle-steps';
+import { LifecycleSteps } from '@/components/sites/LifecycleSteps';
 import {
   BuildWindowForm,
   LifecycleAction,
   LifecycleActionScope,
   RegisterG1Form,
-} from '@/components/site-actions';
+} from '@/components/sites/SiteActions';
 import {
   formatDateTime,
   formatDuration,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
-} from '@/components/site-labels.ts';
+} from '@/components/shared/siteLabels.ts';
 import {
   LastBuildSummary,
   PendingCount,
   PublishNowPanel,
   StateTag,
-} from '@/components/site-status';
+} from '@/components/sites/SiteStatus';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';

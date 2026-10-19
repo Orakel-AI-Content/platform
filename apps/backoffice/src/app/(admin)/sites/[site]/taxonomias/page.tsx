@@ -1,5 +1,5 @@
-import { EntityTable } from '@/components/entity-table';
-import { TAXONOMY_KIND_LABEL } from '@/components/site-labels.ts';
+import { EntityTable } from '@/components/editorial/EntityTable';
+import { TAXONOMY_KIND_LABEL } from '@/components/shared/siteLabels.ts';
 import { listTaxonomies } from '@/domain/content/taxonomies.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';

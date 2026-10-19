@@ -3,8 +3,8 @@ import { THEME_SUMMARIES } from '@orakel/tokens';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import { backToSites, ForbiddenScreen } from '@/components/shared/ForbiddenScreen';
-import { emptySiteConfig } from '@/components/site-config-form-values.ts';
-import { SiteConfigForm } from '@/components/site-config-form';
+import { emptySiteConfig } from '@/components/sites/siteConfigFormValues.ts';
+import { SiteConfigForm } from '@/components/sites/SiteConfigForm';
 import { can } from '@/domain/access/rbac.ts';
 
 import { PageHeader } from '../[site]/editorial-page.tsx';
