@@ -6,8 +6,9 @@ import { CONTENT_KIND_LABEL } from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { SubmitForReview } from '@/components/contents/SubmitForReview';
 import { can } from '@/domain/access/rbac.ts';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
-import { PageHeader, siteTrail } from '../../editorial-page.tsx';
 import { itemTitle } from '../../item-title.ts';
 import { submitForReviewAction } from '../actions.ts';
 import { readContentVersions } from '../content-versions.ts';

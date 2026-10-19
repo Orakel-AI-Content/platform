@@ -7,11 +7,13 @@ import { ReviewPanel } from '@/components/review/ReviewPanel';
 import { can } from '@/domain/access/rbac.ts';
 import { REVIEW_CHECKLIST, reviewIssues } from '@/domain/reviews/reviews.ts';
 import { getEnv } from '@/env.ts';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
 import { itemTitle } from '../../item-title.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
 import { positiveInt } from '../../conteudos/params.ts';
-import { PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
+import { sitePageContext } from '../../editorial-page.tsx';
 import { approveAction } from '../actions.ts';
 
 export const dynamic = 'force-dynamic';

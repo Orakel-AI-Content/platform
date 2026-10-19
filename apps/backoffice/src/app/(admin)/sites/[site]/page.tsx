@@ -21,6 +21,8 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
 import {
   advanceLifecycleAction,
@@ -28,7 +30,7 @@ import {
   registerG1Action,
   setBuildWindowAction,
 } from '../actions.ts';
-import { PageHeader, sitePageContext, siteTrail } from './editorial-page.tsx';
+import { sitePageContext } from './editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

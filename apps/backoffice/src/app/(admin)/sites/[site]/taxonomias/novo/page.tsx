@@ -1,7 +1,9 @@
 import { EntityForm } from '@/components/editorial/EntityForms';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
 import { createTaxonomyAction } from '../../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
+import { noWrite, sitePageContext } from '../../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

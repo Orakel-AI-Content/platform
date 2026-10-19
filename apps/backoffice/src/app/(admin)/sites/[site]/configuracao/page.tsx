@@ -9,9 +9,10 @@ import { SiteConfigForm } from '@/components/sites/SiteConfigForm';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { currentConfig } from '@/domain/sites/sites.ts';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
 import { updateSiteConfigAction } from '../../actions.ts';
-import { PageHeader, siteTrail } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
