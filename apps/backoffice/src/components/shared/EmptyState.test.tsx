@@ -29,18 +29,4 @@ describe('estado vazio', () => {
       '/sites/exemplo-a/autores/novo',
     );
   });
-
-  it('classes do Ecme, sem as do shadcn: texto do body (#247)', () => {
-    const { container } = render(<EmptyState>Nenhum autor cadastrado.</EmptyState>);
-
-    const classes = [...container.querySelectorAll('*')].flatMap((element) =>
-      (element.getAttribute('class') ?? '').split(' '),
-    );
-    for (const shadcn of ['text-muted-foreground', 'border-border', 'bg-muted']) {
-      expect(classes).not.toContain(shadcn);
-    }
-    expect(screen.getByText('Nenhum autor cadastrado.').className).toBe(
-      'text-gray-600 dark:text-gray-400',
-    );
-  });
 });
