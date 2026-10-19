@@ -1947,3 +1947,73 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(collapsed.violations).toEqual([]);
   });
 }
+
+// Progress e Steps (#321): o Progress como progressbar com valor e nome nas duas variantes; o
+// Steps como <ol> com o estado de cada etapa em texto e aria-current na atual; com onChange,
+// cada etapa é um botão que o Tab alcança, com o foco de 2px, e que o Enter e o Espaço escolhem.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Progress e Steps pelo teclado, sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-progress"]')
+      .include('[aria-labelledby="vitrine-steps"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+
+    const progress = section(page, 'Progress');
+    const envio = progress.getByRole('progressbar', { name: 'Envio de capa.jpg' });
+    await expect(envio).toHaveAttribute('aria-valuenow', '45');
+    await expect(envio).toHaveAttribute('aria-valuemin', '0');
+    await expect(envio).toHaveAttribute('aria-valuemax', '100');
+    await expect(envio).toHaveText('45%');
+    await expect(progress.getByRole('progressbar', { name: 'Etapas do build' })).toHaveAttribute(
+      'aria-valuenow',
+      '75',
+    );
+    await expect(progress.getByRole('progressbar')).toHaveCount(5);
+
+    const steps = section(page, 'Steps');
+    const ciclo = steps.getByRole('list').first();
+    // O texto do <li> inclui o número do ícone (aria-hidden); o ✓ da concluída é svg.
+    await expect(ciclo.getByRole('listitem')).toHaveText([
+      'Criado (concluída)',
+      '2Configurado (atual)',
+      '3Publicado (pendente)',
+    ]);
+    await expect(ciclo.locator('[aria-current="step"]')).toHaveText('2Configurado (atual)');
+
+    const ring = await ringColor(page);
+    const revisao = steps.getByRole('button', { name: 'Revisão (atual)' });
+    await tabTo(page, revisao);
+    expect(await outline(revisao)).toEqual({ color: ring, style: 'solid', width: '2px' });
+    await page.keyboard.press('Tab');
+    await expect(steps.getByRole('button', { name: 'Publicação (pendente)' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(steps.getByRole('status')).toHaveText('Etapa escolhida: 3.');
+    await expect(steps.getByRole('button', { name: 'Publicação (atual)' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Space');
+    await expect(steps.getByRole('status')).toHaveText('Etapa escolhida: 1.');
+    await expect(steps.getByRole('button', { name: 'Conteúdo (atual)' })).toBeFocused();
+    await expect(steps.getByRole('button', { name: 'Revisão (pendente)' })).toBeVisible();
+
+    await expect(
+      steps.getByRole('listitem').filter({ hasText: 'O deploy falhou.' }),
+    ).toHaveAttribute('aria-current', 'step');
+    await expect(steps.getByText('(com erro)')).toHaveCount(1);
+
+    const after = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-steps"]')
+      .analyze();
+    expect(after.violations).toEqual([]);
+    expect(hydration).toEqual([]);
+  });
+}

@@ -21,11 +21,13 @@
 @import './styles/menu.css';
 @import './styles/notification.css';
 @import './styles/pagination.css';
+@import './styles/progress.css';
 @import './styles/radio.css';
 @import './styles/segment.css';
 @import './styles/select.css';
 @import './styles/side-nav.css';
 @import './styles/skeleton.css';
+@import './styles/steps.css';
 @import './styles/switcher.css';
 @import './styles/table.css';
 @import './styles/tabs.css';
