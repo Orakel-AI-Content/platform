@@ -622,14 +622,22 @@ for (const colorScheme of ['light', 'dark'] as const) {
       .analyze();
     expect(accessibility.violations).toEqual([]);
 
-    const ring = await page.evaluate(() => {
-      const probe = document.createElement('span');
-      probe.style.color = 'var(--ring)';
-      document.body.append(probe);
-      const value = getComputedStyle(probe).color;
-      probe.remove();
-      return value;
-    });
+    const color = (variable: string) =>
+      page.evaluate((name) => {
+        const probe = document.createElement('span');
+        probe.style.color = `var(${name})`;
+        document.body.append(probe);
+        const value = getComputedStyle(probe).color;
+        probe.remove();
+        return value;
+      }, variable);
+    const ring = await color('--ring');
+    // No escuro, o foco do remover é primary-mild: o --ring sobre o gray-700 do item dá 2,91:1.
+    const removeFocus = {
+      color: colorScheme === 'dark' ? await color('--primary-mild') : ring,
+      style: 'solid',
+      width: '2px',
+    };
     const outline = (locator: Locator) =>
       locator.evaluate((element) => {
         const style = getComputedStyle(element);
@@ -671,6 +679,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     // Remover pelo teclado, pelo nome do arquivo.
     const remove = uploads.getByRole('button', { name: 'Remover anexo-Enter.txt' });
     await tabTo(page, remove);
+    await expect.poll(() => outline(remove)).toEqual(removeFocus);
     await page.keyboard.press('Enter');
     await expect(status).toHaveText('Anexos escolhidos: 1.');
     await expect(uploads.getByText('anexo-Enter.txt')).toHaveCount(0);

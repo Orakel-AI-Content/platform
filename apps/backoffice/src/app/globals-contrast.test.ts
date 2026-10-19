@@ -1238,6 +1238,54 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 3,
     ecme: 'outline-ring',
   },
+  // Upload (#320): nome e tamanho do arquivo e o foco do botão de remover sobre o item da lista
+  // (bg-gray-100 e dark:bg-gray-700). O foco da área de soltar fica sobre o body ou o cartão, já
+  // nos pares "foco no body" e "foco no cartão".
+  {
+    name: 'nome do arquivo no Upload',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'nome do arquivo no Upload',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+  },
+  {
+    name: 'tamanho do arquivo no Upload',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+    ecme: 'text-gray-500',
+  },
+  {
+    name: 'tamanho do arquivo no Upload',
+    theme: 'escuro',
+    text: 'dark:text-gray-300',
+    background: 'dark:bg-gray-700',
+    minimum: 4.5,
+    ecme: 'dark:text-gray-400',
+  },
+  {
+    name: 'foco no remover arquivo do Upload',
+    theme: 'claro',
+    text: 'outline-ring',
+    background: 'bg-gray-100',
+    minimum: 3,
+  },
+  {
+    name: 'foco no remover arquivo do Upload',
+    theme: 'escuro',
+    text: 'dark:outline-primary-mild',
+    background: 'dark:bg-gray-700',
+    minimum: 3,
+    ecme: 'outline-ring',
+  },
   // Calendar (#317), sobre o cartão (bg-white e dark:bg-gray-800, o fundo mais claro em que ele
   // aparece no escuro; o painel do DateTimepicker, dark:bg-gray-900, dá mais contraste). Os dias
   // da semana herdam o texto do cartão; o foco é o do cartão; desabilitado (opacity-30) fica
