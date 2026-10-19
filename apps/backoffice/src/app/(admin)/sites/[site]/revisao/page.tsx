@@ -1,8 +1,10 @@
 import { ReviewQueueTable } from '@/components/review-queue-table';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { listReviewQueue } from '@/domain/content/contents.ts';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
-import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
+import { sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

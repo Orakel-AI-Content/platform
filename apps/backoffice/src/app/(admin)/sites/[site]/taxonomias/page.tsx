@@ -3,8 +3,10 @@ import { TAXONOMY_KIND_LABEL } from '@/components/site-labels.ts';
 import { listTaxonomies } from '@/domain/content/taxonomies.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
-import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
+import { sitePageContext } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

@@ -6,8 +6,9 @@ import { backToSites, ForbiddenScreen } from '@/components/shared/ForbiddenScree
 import { emptySiteConfig } from '@/components/site-config-form-values.ts';
 import { SiteConfigForm } from '@/components/site-config-form';
 import { can } from '@/domain/access/rbac.ts';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { sitesTrail } from '@/components/shared/trail.ts';
 
-import { PageHeader } from '../[site]/editorial-page.tsx';
 import { createSiteAction } from '../actions.ts';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,7 @@ export default async function NewSitePage() {
     <section aria-labelledby="new-site-title" className="form-width space-y-6">
       <PageHeader
         id="new-site-title"
-        trail={[{ label: 'Sites', href: '/sites' }, { label: 'Cadastrar site' }]}
+        trail={sitesTrail([{ label: 'Cadastrar site' }])}
         title="Cadastrar site"
       />
       <SiteConfigForm

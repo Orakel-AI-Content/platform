@@ -4,19 +4,14 @@ import { notFound } from 'next/navigation';
 import { EntityForm } from '@/components/entity-forms';
 import { can } from '@/domain/access/rbac.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
+import { withoutId } from '@/components/shared/withoutId.ts';
 
 import { mediaSource } from '../../conteudos/editor-options.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { updateAuthorAction } from '../../editorial-actions.ts';
-import {
-  lookupSite,
-  noWrite,
-  PageHeader,
-  readAuthors,
-  sitePageContext,
-  withoutId,
-  siteTrail,
-} from '../../editorial-page.tsx';
+import { lookupSite, noWrite, readAuthors, sitePageContext } from '../../editorial-page.tsx';
 import { itemTitle } from '../../item-title.ts';
 
 export const dynamic = 'force-dynamic';

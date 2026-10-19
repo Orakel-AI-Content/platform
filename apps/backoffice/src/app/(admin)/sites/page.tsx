@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { can } from '@/domain/access/rbac.ts';
 import { TFVARS_FILENAME } from '@/domain/sites/sites.ts';
+import { PageHeader } from '@/components/shared/PageHeader';
 
-import { PageHeader } from './[site]/editorial-page.tsx';
 import { publishNow } from './actions.ts';
 import { readVisibleSites } from '../visible-sites.ts';
 

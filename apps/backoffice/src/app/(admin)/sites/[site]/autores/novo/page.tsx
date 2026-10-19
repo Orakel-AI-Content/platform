@@ -1,8 +1,10 @@
 import { EntityForm } from '@/components/entity-forms';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
 import { mediaSource } from '../../conteudos/editor-options.ts';
 import { createAuthorAction } from '../../editorial-actions.ts';
-import { noWrite, PageHeader, sitePageContext, siteTrail } from '../../editorial-page.tsx';
+import { noWrite, sitePageContext } from '../../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 

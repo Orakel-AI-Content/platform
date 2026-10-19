@@ -3,8 +3,10 @@ import { parseListState } from '@/components/shared/listQuery.ts';
 import { MediaLibrary } from '@/components/media-library';
 import { listMediaPage } from '@/domain/content/media.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
-import { PageHeader, siteTrail, sitePageContext } from '../editorial-page.tsx';
+import { sitePageContext } from '../editorial-page.tsx';
 import { listMediaPageAction, uploadStatusAction } from './actions.ts';
 import { MEDIA_PAGE_SIZE, mediaItems } from './items.ts';
 

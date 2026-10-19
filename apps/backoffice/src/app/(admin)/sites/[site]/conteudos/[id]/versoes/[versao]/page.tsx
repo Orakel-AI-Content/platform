@@ -9,8 +9,9 @@ import {
 } from '@/components/site-labels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { StateTag } from '@/components/site-status';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 
-import { PageHeader, siteTrail } from '../../../../editorial-page.tsx';
 import { itemTitle } from '../../../../item-title.ts';
 import { readContentVersions } from '../../../content-versions.ts';
 import { positiveInt } from '../../../params.ts';

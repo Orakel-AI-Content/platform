@@ -3,9 +3,11 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import Link from 'next/link';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PageHeader, siteTrail } from './editorial-page.tsx';
+import { PageHeader } from './PageHeader.tsx';
+import { sitesTrail, siteTrail } from './trail.ts';
 
-// Trilha das telas de site e de área (#173): Sites › Site › Área, links até a tela atual.
+// Trilha das telas de site e de área (#173): Sites › Site › Área, links até a tela atual; e a
+// das telas fora de um site (#307): Sites › <itens>.
 
 afterEach(cleanup);
 
@@ -143,5 +145,45 @@ describe('siteTrail nas telas de item (#174)', () => {
         .map((link) => link.getAttribute('href')),
     ).toEqual(['/sites', '/sites/exemplo-a', '/sites/exemplo-a/autores']);
     expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe('Ana');
+  });
+});
+
+describe('sitesTrail nas telas fora de um site (#307)', () => {
+  it('sem itens, Sites é a tela atual', () => {
+    expect(sitesTrail()).toEqual([{ label: 'Sites' }]);
+    expect(sitesTrail([])).toEqual([{ label: 'Sites' }]);
+  });
+
+  it('com itens, Sites vira link e os itens vêm depois', () => {
+    expect(sitesTrail([{ label: 'Cadastrar site' }])).toEqual([
+      { label: 'Sites', href: '/sites' },
+      { label: 'Cadastrar site' },
+    ]);
+  });
+
+  it('no cabeçalho: Sites é link e o item é a tela atual', () => {
+    render(
+      <PageHeader
+        id="t"
+        trail={sitesTrail([{ label: 'Cadastrar site' }])}
+        title="Cadastrar site"
+      />,
+    );
+
+    const nav = screen.getByRole('navigation', { name: 'Trilha de navegação' });
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([['Sites', '/sites']]);
+    expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe('Cadastrar site');
+  });
+
+  it('sem itens no cabeçalho, Sites leva aria-current e não é link', () => {
+    render(<PageHeader id="t" trail={sitesTrail()} title="Sites" />);
+
+    const nav = screen.getByRole('navigation', { name: 'Trilha de navegação' });
+    expect(within(nav).queryAllByRole('link')).toHaveLength(0);
+    expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe('Sites');
   });
 });
