@@ -6,6 +6,7 @@ import * as z from 'zod';
 
 import { SchemaForm, type SchemaFormIssue } from '@/components/forms/SchemaForm';
 import { CONTENT_STATUS_LABEL } from '@/components/shared/siteLabels.ts';
+import { SECTION_HINT_CLASS, SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import Card from '@/components/ui/Card';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
@@ -53,8 +54,6 @@ export function ReviewPanel({
   const [approved, setApproved] = useState<string | null>(null);
   const inReview = status === 'em_revisao';
   const blocked = issues.length > 0;
-  const titleClass = 'text-lg font-semibold text-gray-900 dark:text-gray-100';
-  const hintClass = 'text-sm text-gray-600 dark:text-gray-400';
 
   return (
     <aside aria-labelledby={`${id}-title`}>
@@ -74,7 +73,7 @@ export function ReviewPanel({
         </p>
 
         <section aria-labelledby={`${id}-issues`} className="space-y-2">
-          <h3 id={`${id}-issues`} className={titleClass}>
+          <h3 id={`${id}-issues`} className={SECTION_TITLE_CLASS}>
             Validação da release
           </h3>
           {blocked ? (
@@ -84,12 +83,12 @@ export function ReviewPanel({
               ))}
             </ul>
           ) : (
-            <p className={hintClass}>Nenhum problema de validação.</p>
+            <p className={SECTION_HINT_CLASS}>Nenhum problema de validação.</p>
           )}
         </section>
 
         <section aria-labelledby={`${id}-checklist`} className="space-y-3">
-          <h3 id={`${id}-checklist`} className={titleClass}>
+          <h3 id={`${id}-checklist`} className={SECTION_TITLE_CLASS}>
             Checklist
           </h3>
           {canApprove && inReview && approved === null ? (
@@ -125,14 +124,14 @@ export function ReviewPanel({
                 ))}
               </ul>
               {!inReview && approved === null && (
-                <p className={hintClass}>
+                <p className={SECTION_HINT_CLASS}>
                   Esta versão está {CONTENT_STATUS_LABEL[status].toLowerCase()}: só uma versão em
                   revisão pode ser aprovada.
                 </p>
               )}
             </>
           )}
-          <p role="status" className={hintClass}>
+          <p role="status" className={SECTION_HINT_CLASS}>
             {approved}
           </p>
         </section>
