@@ -81,15 +81,18 @@ ThemeConfigurator completo.
 - **Estilo:** só tokens do `@theme`, nenhuma cor solta; `dark:` como no Ecme, exceto nos pares
   que não chegam ao contraste AA, em que o port usa a classe substituta:
 
-  | Uso                                    | No Ecme                              | No port                                    |
-  | -------------------------------------- | ------------------------------------ | ------------------------------------------ |
-  | Texto do body, claro                   | `text-gray-500` (4,35:1)             | `text-gray-600` (7,17:1)                   |
-  | Placeholder do campo, claro            | `placeholder:text-gray-400` (2,31:1) | `placeholder:text-gray-600`                |
-  | Placeholder do campo, escuro           | `placeholder:text-gray-400` (4,11:1) | `dark:placeholder:text-gray-300`           |
-  | `primary` como texto no cartão, escuro | `text-primary` (4,25:1)              | `dark:text-primary-mild`                   |
-  | Texto do Badge, escuro                 | `text-white` (2,82:1)                | `text-neutral dark:text-gray-950` (7,02:1) |
-  | Fundo das iniciais do Avatar, claro    | `bg-gray-400` (2,31:1)               | `bg-gray-600` (7,17:1)                     |
-  | Item ativo do Menu na barra, escuro    | `text-primary` (4,25:1)              | `dark:text-primary-mild`                   |
+  | Uso                                                          | No Ecme                                          | No port                                    |
+  | ------------------------------------------------------------ | ------------------------------------------------ | ------------------------------------------ |
+  | Texto do body, claro                                         | `text-gray-500` (4,35:1)                         | `text-gray-600` (7,17:1)                   |
+  | Placeholder do campo, claro                                  | `placeholder:text-gray-400` (2,31:1)             | `placeholder:text-gray-600`                |
+  | Placeholder do campo, escuro                                 | `placeholder:text-gray-400` (4,11:1)             | `dark:placeholder:text-gray-300`           |
+  | `primary` como texto no cartão, escuro                       | `text-primary` (4,25:1)                          | `dark:text-primary-mild`                   |
+  | Texto do Badge, escuro                                       | `text-white` (2,82:1)                            | `text-neutral dark:text-gray-950` (7,02:1) |
+  | Fundo das iniciais do Avatar, claro                          | `bg-gray-400` (2,31:1)                           | `bg-gray-600` (7,17:1)                     |
+  | Item ativo do Menu na barra, escuro                          | `text-primary` (4,25:1)                          | `dark:text-primary-mild`                   |
+  | ✓ da etapa concluída do Steps, escuro                        | `text-white` (3,56:1)                            | `dark:text-gray-950` (5,56:1)              |
+  | Hover do título da etapa clicável do Steps no cartão, escuro | `text-primary` (4,25:1)                          | `dark:hover:text-primary-mild`             |
+  | Título e ícone da etapa com erro do Steps                    | `text-red-500`/`border-red-500` (fora da paleta) | `text-error`/`border-error`                |
 
   Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS` do
   `globals-contrast.test.ts` (#217), no tema em que aparece.
