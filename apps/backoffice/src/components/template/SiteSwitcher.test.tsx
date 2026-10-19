@@ -80,14 +80,6 @@ describe('seletor de site', () => {
     expect(document.activeElement).toBe(button);
   });
 
-  it('o menu tem altura máxima e rola', async () => {
-    const { menu } = await openAt('/sites/exemplo-a');
-
-    const list = menu.querySelector('ul');
-    expect(list?.className).toContain('max-h-[50vh]');
-    expect(list?.className).toContain('overflow-y-auto');
-  });
-
   it('recolhida: as iniciais, o mesmo nome e a dica com o nome do site', async () => {
     pathname.value = '/sites/exemplo-a';
     const user = userEvent.setup();

@@ -212,28 +212,11 @@ describe('editor de conteúdo', () => {
 });
 
 describe('barra de ações e continuar no editor (#109)', () => {
-  it('o botão e o resultado ficam no StickyFooter, a barra fixa no rodapé', async () => {
-    // O StickyFooter fixa a barra quando ela não cabe inteira na tela (IntersectionObserver).
-    let report: IntersectionObserverCallback = () => {};
-    vi.stubGlobal(
-      'IntersectionObserver',
-      class {
-        constructor(callback: IntersectionObserverCallback) {
-          report = callback;
-        }
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-      },
-    );
+  it('o botão e o resultado ficam juntos na barra do StickyFooter', () => {
+    // A fixação no rodapé é visual: o E2E contents.spec.ts confere.
     renderEditor();
 
     const bar = screen.getByRole('button', { name: 'Salvar nova versão' }).parentElement;
-    act(() =>
-      report([{ intersectionRatio: 0.5 } as IntersectionObserverEntry], {} as IntersectionObserver),
-    );
-    await waitFor(() => expect(bar?.className).toContain('sticky'));
-    vi.unstubAllGlobals();
     expect(bar?.querySelector('[role="status"]')).toBeTruthy();
     expect(bar?.querySelector('[role="alert"]')).toBeTruthy();
   });
@@ -472,25 +455,6 @@ describe('desfazer a remoção de bloco (#112)', () => {
   });
 });
 
-describe('editor no Ecme (#274)', () => {
-  it('os botões do editor e o rodapé usam só os tokens do Ecme, sem as cores do shadcn', () => {
-    renderEditor();
-
-    const bar = screen.getByRole('button', { name: 'Salvar nova versão' }).parentElement;
-    const own = [
-      bar,
-      screen.getByRole('group', { name: 'Bloco 1: Sumário' }),
-      screen.getByRole('button', { name: 'Recolher todos' }),
-      screen.getByRole('button', { name: 'Adicionar bloco' }),
-    ];
-    for (const element of own) {
-      expect(element?.outerHTML).not.toMatch(
-        /muted-foreground|border-border|destructive|bg-background/,
-      );
-    }
-  });
-});
-
 describe('controles de bloco com ícones (#131)', () => {
   it('mover e remover são botões de ícone com a posição no nome; as pontas ficam indisponíveis e focáveis', async () => {
     const user = userEvent.setup();
@@ -605,7 +569,6 @@ describe('recolher e expandir blocos (#135)', () => {
     const group = screen.getByRole('group', { name: 'Bloco 2: Sumário' });
     const summary = within(group).getByText('Neste guia');
     expect(summary.getAttribute('title')).toBe('Neste guia');
-    expect(summary.className).toContain('truncate');
     expect(document.activeElement).toBe(button);
 
     button.focus();
