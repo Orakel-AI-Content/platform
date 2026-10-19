@@ -9,11 +9,15 @@ import CreatableSelect from 'react-select/creatable';
 
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import Container from '@/components/shared/Container';
+import EllipsisButton from '@/components/shared/EllipsisButton';
 import { IconButton } from '@/components/shared/IconButton';
 import Loading from '@/components/shared/Loading';
 import MediaSkeleton from '@/components/shared/loaders/MediaSkeleton';
 import TextBlockSkeleton from '@/components/shared/loaders/TextBlockSkeleton';
 import StickyFooter from '@/components/shared/StickyFooter';
+import BottomStickyBar from '@/components/template/BottomStickyBar';
+import { PAGE_CONTAINER_GUTTER_X } from '@/components/template/constants';
 import { Alert } from '@/components/ui/Alert';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
@@ -598,6 +602,30 @@ export function Showcase({ linkPage }: { linkPage: number }) {
         </div>
       </section>
 
+      <section aria-labelledby="vitrine-ellipsis-button" className="space-y-3">
+        <h2 id="vitrine-ellipsis-button" className="text-lg font-semibold">
+          EllipsisButton
+        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <EllipsisButton aria-label="Mais ações do site" />
+          <EllipsisButton variant="default" shape="round">
+            Mais ações
+          </EllipsisButton>
+        </div>
+      </section>
+
+      <section aria-labelledby="vitrine-container" className="space-y-3">
+        <h2 id="vitrine-container" className="text-lg font-semibold">
+          Container
+        </h2>
+        <Container
+          asElement="article"
+          className="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-700"
+        >
+          Conteúdo centralizado na largura do breakpoint.
+        </Container>
+      </section>
+
       <section aria-labelledby="vitrine-alert" className="space-y-3">
         <h2 id="vitrine-alert" className="text-lg font-semibold">
           Alert
@@ -869,6 +897,33 @@ export function Showcase({ linkPage }: { linkPage: number }) {
             <p className="p-4 text-sm">Lista por baixo da sobreposição.</p>
           </Loading>
         </div>
+      </section>
+
+      {/* Barra de ações do formulário (#322): presa ao fim da janela enquanto a seção rola,
+          encostada nas bordas do `main`. Vem antes do "Rodapé fixo", que precisa ser o último. */}
+      <section aria-labelledby="vitrine-barra-de-acoes" className="space-y-3">
+        <h2 id="vitrine-barra-de-acoes" className="text-lg font-semibold">
+          BottomStickyBar
+        </h2>
+        <div
+          data-vitrine-rolagem-barra=""
+          className="h-[120vh] rounded-md border border-gray-200 p-4 text-sm dark:border-gray-700"
+        >
+          Formulário longo para rolar.
+        </div>
+        <BottomStickyBar>
+          <Container>
+            <div className={`flex items-center justify-between gap-3 ${PAGE_CONTAINER_GUTTER_X}`}>
+              <EllipsisButton aria-label="Mais ações do formulário" />
+              <div className="flex items-center gap-3">
+                <Button type="button">Descartar</Button>
+                <Button type="button" variant="solid">
+                  Publicar
+                </Button>
+              </div>
+            </div>
+          </Container>
+        </BottomStickyBar>
       </section>
 
       {/* Conteúdo alto o bastante para rolar: o rodapé fixo fica visível durante a rolagem. */}
