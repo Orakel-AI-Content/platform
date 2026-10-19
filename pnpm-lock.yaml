@@ -48,6 +48,9 @@ catalogs:
     '@tanstack/react-table':
       specifier: 9.2.4
       version: 9.2.4
+    '@tanstack/table-core':
+      specifier: 9.2.4
+      version: 9.2.4
     '@testing-library/dom':
       specifier: 10.4.2
       version: 10.4.2
@@ -290,6 +293,9 @@ importers:
       '@tanstack/react-table':
         specifier: 'catalog:'
         version: 9.2.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/table-core':
+        specifier: 'catalog:'
+        version: 9.2.4
       '@tiptap/core':
         specifier: 'catalog:'
         version: 3.31.4(@tiptap/pm@3.31.4)
