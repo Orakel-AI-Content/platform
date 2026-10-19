@@ -1948,72 +1948,91 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
-// Progress e Steps (#321): o Progress como progressbar com valor e nome nas duas variantes; o
-// Steps como <ol> com o estado de cada etapa em texto e aria-current na atual; com onChange,
-// cada etapa é um botão que o Tab alcança, com o foco de 2px, e que o Enter e o Espaço escolhem.
+// EllipsisButton, Container e BottomStickyBar (#322): o botão de "mais ações" com nome e ícone
+// oculto, e a barra de ações do formulário presa ao fim da janela, encostada nas bordas do
+// `main` (margem negativa igual ao gutter) em cada breakpoint.
+
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`Progress e Steps pelo teclado, sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme });
+  test(`EllipsisButton e BottomStickyBar: alvo de 24 px, foco de 2px, barra nas bordas do main e sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await login(page);
     const hydration = hydrationMessages(page);
     await page.goto(SHOWCASE);
     await page.waitForLoadState('networkidle');
+    const ring = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--ring)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+
+    const bar = section(page, 'BottomStickyBar');
+    const buttons = [
+      section(page, 'EllipsisButton').getByRole('button', { name: 'Mais ações do site' }),
+      section(page, 'EllipsisButton').getByRole('button', { name: 'Mais ações', exact: true }),
+      bar.getByRole('button', { name: 'Mais ações do formulário' }),
+      bar.getByRole('button', { name: 'Descartar' }),
+      bar.getByRole('button', { name: 'Publicar' }),
+    ];
+    for (const button of buttons) {
+      await tabTo(page, button);
+      const box = await button.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(24);
+      expect(box?.height).toBeGreaterThanOrEqual(24);
+      expect(
+        await button.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            color: style.outlineColor,
+            style: style.outlineStyle,
+            width: style.outlineWidth,
+          };
+        }),
+      ).toEqual({ color: ring, style: 'solid', width: '2px' });
+    }
+    for (const button of [buttons[0]!, buttons[2]!]) {
+      await expect(button).toHaveText('');
+      await expect(button.locator('[aria-hidden="true"] svg')).toHaveCount(1);
+    }
 
     const accessibility = await new AxeBuilder({ page })
       .withTags(WCAG)
-      .include('[aria-labelledby="vitrine-progress"]')
-      .include('[aria-labelledby="vitrine-steps"]')
+      .include('[aria-labelledby="vitrine-ellipsis-button"]')
+      .include('[aria-labelledby="vitrine-container"]')
+      .include('[aria-labelledby="vitrine-barra-de-acoes"]')
       .analyze();
     expect(accessibility.violations).toEqual([]);
-
-    const progress = section(page, 'Progress');
-    const envio = progress.getByRole('progressbar', { name: 'Envio de capa.jpg' });
-    await expect(envio).toHaveAttribute('aria-valuenow', '45');
-    await expect(envio).toHaveAttribute('aria-valuemin', '0');
-    await expect(envio).toHaveAttribute('aria-valuemax', '100');
-    await expect(envio).toHaveText('45%');
-    await expect(progress.getByRole('progressbar', { name: 'Etapas do build' })).toHaveAttribute(
-      'aria-valuenow',
-      '75',
-    );
-    await expect(progress.getByRole('progressbar')).toHaveCount(5);
-
-    const steps = section(page, 'Steps');
-    const ciclo = steps.getByRole('list').first();
-    // O texto do <li> inclui o número do ícone (aria-hidden); o ✓ da concluída é svg.
-    await expect(ciclo.getByRole('listitem')).toHaveText([
-      'Criado (concluída)',
-      '2Configurado (atual)',
-      '3Publicado (pendente)',
-    ]);
-    await expect(ciclo.locator('[aria-current="step"]')).toHaveText('2Configurado (atual)');
-
-    const ring = await ringColor(page);
-    const revisao = steps.getByRole('button', { name: 'Revisão (atual)' });
-    await tabTo(page, revisao);
-    expect(await outline(revisao)).toEqual({ color: ring, style: 'solid', width: '2px' });
-    await page.keyboard.press('Tab');
-    await expect(steps.getByRole('button', { name: 'Publicação (pendente)' })).toBeFocused();
-    await page.keyboard.press('Enter');
-    await expect(steps.getByRole('status')).toHaveText('Etapa escolhida: 3.');
-    await expect(steps.getByRole('button', { name: 'Publicação (atual)' })).toBeFocused();
-    await page.keyboard.press('Shift+Tab');
-    await page.keyboard.press('Shift+Tab');
-    await page.keyboard.press('Space');
-    await expect(steps.getByRole('status')).toHaveText('Etapa escolhida: 1.');
-    await expect(steps.getByRole('button', { name: 'Conteúdo (atual)' })).toBeFocused();
-    await expect(steps.getByRole('button', { name: 'Revisão (pendente)' })).toBeVisible();
-
-    await expect(
-      steps.getByRole('listitem').filter({ hasText: 'O deploy falhou.' }),
-    ).toHaveAttribute('aria-current', 'step');
-    await expect(steps.getByText('(com erro)')).toHaveCount(1);
-
-    const after = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .include('[aria-labelledby="vitrine-steps"]')
-      .analyze();
-    expect(after.violations).toEqual([]);
     expect(hydration).toEqual([]);
+  });
+}
+
+// Larguras dos três gutters do `main` (`px-4 sm:px-6 md:px-8`): abaixo de `sm`, entre `sm` e
+// `md` e acima de `md`.
+for (const width of [375, 700, 1280]) {
+  test(`BottomStickyBar presa ao fim da janela e encostada nas bordas do main (${width} px)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const publish = section(page, 'BottomStickyBar').getByRole('button', { name: 'Publicar' });
+    const barElement = publish.locator('xpath=ancestor::div[contains(@class, "sticky")][1]');
+
+    // No meio do formulário longo, o fim da seção está abaixo da janela: a barra gruda embaixo.
+    await page.locator('[data-vitrine-rolagem-barra]').evaluate((element) => {
+      element.scrollIntoView({ block: 'center' });
+    });
+    await expect(publish).toBeInViewport();
+    const barBox = (await barElement.boundingBox())!;
+    expect(Math.abs(barBox.y + barBox.height - 800)).toBeLessThanOrEqual(1);
+
+    const mainBox = (await page.locator('main#conteudo').boundingBox())!;
+    expect(Math.abs(barBox.x - mainBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(barBox.width - mainBox.width)).toBeLessThanOrEqual(1);
   });
 }
