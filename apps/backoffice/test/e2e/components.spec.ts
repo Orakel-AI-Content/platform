@@ -518,6 +518,92 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// TimeInput (#316): um campo por parte do horário, nomeados pelo rótulo do FormItem (a hora) e em
+// pt-BR (minuto, segundo e período), operados por digitação e setas, com o foco de 2px em cada um.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`TimeInput pelo teclado, sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-time-input"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+
+    const color = (variable: string) =>
+      page.evaluate((name) => {
+        const probe = document.createElement('span');
+        probe.style.color = `var(${name})`;
+        document.body.append(probe);
+        const value = getComputedStyle(probe).color;
+        probe.remove();
+        return value;
+      }, variable);
+    const outline = (locator: Locator) =>
+      locator.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { color: style.outlineColor, style: style.outlineStyle, width: style.outlineWidth };
+      });
+    // No escuro, o foco do campo é primary-mild: o --ring sobre o gray-700 do Input dá 2,91:1.
+    const fieldFocus = {
+      color: await color(colorScheme === 'dark' ? '--primary-mild' : '--ring'),
+      style: 'solid',
+      width: '2px',
+    };
+
+    const times = section(page, 'TimeInput');
+    const status = times.getByRole('status');
+    const hours = times.getByRole('textbox', { name: 'Horário de publicação' });
+    const minutes = times.getByRole('textbox', { name: 'Minuto' }).first();
+    await expect(hours).toHaveValue('09');
+    await expect(minutes).toHaveValue('30');
+
+    // Digitar a hora passa ao minuto; as setas sobem e descem o valor em foco.
+    await tabTo(page, hours);
+    await expect.poll(() => outline(hours)).toEqual(fieldFocus);
+    await page.keyboard.type('14');
+    await expect(hours).toHaveValue('14');
+    await expect(minutes).toBeFocused();
+    await expect.poll(() => outline(minutes)).toEqual(fieldFocus);
+    await page.keyboard.press('ArrowUp');
+    await expect(minutes).toHaveValue('31');
+    await expect(status).toHaveText('Horário de publicação: 14:31.');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect(status).toHaveText('Horário de publicação: 14:29.');
+
+    // Limpar: pelo teclado, esvazia os campos e devolve o foco à hora.
+    const clear = times.getByRole('button', { name: 'Limpar horário' }).first();
+    await tabTo(page, clear);
+    await page.keyboard.press('Enter');
+    await expect(status).toHaveText('Horário de publicação: nenhum.');
+    await expect(hours).toHaveValue('');
+    await expect(hours).toBeFocused();
+
+    // Inválido: o estado e a mensagem chegam aos campos.
+    const reminder = times.getByRole('textbox', { name: 'Horário do lembrete' });
+    await expect(reminder).toHaveAttribute('aria-invalid', 'true');
+    await expect(reminder).toHaveAccessibleDescription('Informe o horário');
+
+    // 12 h: o período alterna com as setas.
+    const period = times.getByRole('textbox', { name: 'Período' });
+    await expect(times.getByRole('textbox', { name: 'Horário em 12 h' })).toHaveValue('09');
+    await expect(times.getByRole('textbox', { name: 'Segundo' })).toHaveValue('00');
+    await expect(period).toHaveValue('am');
+    await tabTo(page, period);
+    await page.keyboard.press('ArrowUp');
+    await expect(period).toHaveValue('pm');
+
+    await expect(times.getByRole('textbox', { name: 'Horário bloqueado' })).toBeDisabled();
+
+    expect(hydration).toEqual([]);
+  });
+}
+
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`Select pelo teclado: rótulo, setas, Enter e Esc, sem violação do axe com o menu aberto (${colorScheme})`, async ({
     page,

@@ -1220,6 +1220,24 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 3,
     ecme: 'outline-ring',
   },
+  // TimeInput (#316): o foco de cada campo (hora, minuto…) fica sobre o fundo do Input, que não
+  // some no `focus-within` como some no `focus` do campo simples. O texto e o placeholder (`--`)
+  // são os do campo, já nos pares "texto do campo" e "placeholder do campo".
+  {
+    name: 'foco no campo de horário',
+    theme: 'claro',
+    text: 'outline-ring',
+    background: 'bg-gray-100',
+    minimum: 3,
+  },
+  {
+    name: 'foco no campo de horário',
+    theme: 'escuro',
+    text: 'dark:outline-primary-mild',
+    background: 'dark:bg-gray-700',
+    minimum: 3,
+    ecme: 'outline-ring',
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */

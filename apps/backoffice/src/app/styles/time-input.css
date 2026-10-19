@@ -1,0 +1,29 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_time-input.css
+   Adaptado (#316), pela acessibilidade:
+   - sem o `outline-none` do Ecme, que apagava o foco do teclado em cada campo: vale o contorno
+     --ring de 2px da regra global; no escuro, em `dark:outline-primary-mild`, porque o --ring
+     sobre o `dark:bg-gray-700` do campo dá 2,91:1 (como no segment.css);
+   - placeholder (`--`) em gray-600 (claro) e gray-300 (escuro), as cores do `.input`: sem regra
+     própria, o campo interno herdaria o placeholder do preflight (metade da cor do texto), abaixo
+     de 4,5:1. */
+@layer components {
+  .time-input-field {
+    @apply ring-0 w-6 text-center bg-transparent;
+
+    &::placeholder {
+      @apply text-gray-600 dark:text-gray-300;
+    }
+
+    &:focus-visible {
+      @apply dark:outline-primary-mild;
+    }
+  }
+
+  .time-input-wrapper {
+    @apply flex items-center h-full rtl:flex-row-reverse rtl:justify-end;
+  }
+
+  .time-input-separator {
+    @apply mx-2;
+  }
+}
