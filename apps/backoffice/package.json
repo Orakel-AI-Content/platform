@@ -46,6 +46,7 @@
     "@tiptap/pm": "catalog:",
     "@tiptap/react": "catalog:",
     "classnames": "catalog:",
+    "dayjs": "catalog:",
     "drizzle-orm": "catalog:",
     "graphile-worker": "catalog:",
     "jose": "catalog:",
