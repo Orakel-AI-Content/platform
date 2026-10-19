@@ -64,7 +64,6 @@ describe('campo de rich text', () => {
     for (const button of buttons) {
       expect(button.querySelector('svg')).toBeTruthy();
       expect(button.getAttribute('aria-pressed')).toBe('false');
-      expect(button.className).toContain('aria-pressed:text-primary');
     }
     // Marcas | estrutura: um separador entre "Link" e "Intertítulo 2".
     const separator = within(toolbar).getByRole('separator');

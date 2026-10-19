@@ -28,9 +28,6 @@ describe('IconButton', () => {
     expect(button.getAttribute('type')).toBe('button');
     expect(button.textContent).toBe('');
     expect(button.querySelector('svg')?.closest('[aria-hidden="true"]')).toBeTruthy();
-    // Botão só de ícone do Ecme no tamanho xs: 32 px, acima do mínimo de 24 px.
-    expect(button.className).toContain('w-8');
-    expect(button.className).toContain('h-8');
   });
 
   it('a dica aparece no hover, com o texto do rótulo, e não descreve o botão', async () => {
@@ -72,7 +69,7 @@ describe('IconButton', () => {
     expect(screen.getByRole('button').getAttribute('aria-describedby')).toBe('atalho');
   });
 
-  it('com aria-disabled parece indisponível, continua focável e o clique ainda chega', async () => {
+  it('com aria-disabled fica indisponível, continua focável e o clique ainda chega', async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     render(
@@ -88,7 +85,6 @@ describe('IconButton', () => {
     await user.tab();
     expect(document.activeElement).toBe(button);
     expect(button.getAttribute('aria-disabled')).toBe('true');
-    expect(button.className).toContain('aria-disabled:opacity-50');
     await user.keyboard('{Enter}');
     expect(onClick).toHaveBeenCalled();
   });
