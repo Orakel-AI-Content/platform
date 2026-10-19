@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media/MediaLibrary';
 import { MediaPicker, type MediaPickerPage } from '@/components/media/MediaPicker';
+import ConfirmDialog, {
+  dangerButtonClass,
+  dangerConfirmButtonProps,
+} from '@/components/shared/ConfirmDialog.tsx';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 
@@ -56,6 +60,10 @@ function MediaField({
   const current = typeof value === 'number' && Number.isFinite(value) ? value : undefined;
   const [known, setKnown] = useState<ReadonlyMap<number, MediaItem>>(new Map());
   const trigger = useRef<HTMLButtonElement | null>(null);
+  // "Remover" pede confirmação (#327). Confirmado, o foco vai a "Escolher imagem" no
+  // `onAfterClose`, que roda depois de o react-modal devolver o foco ao "Remover" (que some).
+  const [removing, setRemoving] = useState(false);
+  const removed = useRef(false);
   const item = current === undefined ? undefined : known.get(current);
 
   // Valor que veio salvo (ou trocado fora da grade): a miniatura vem da leitura por ID.
@@ -109,17 +117,32 @@ function MediaField({
       {optional && current !== undefined && (
         <Button
           type="button"
-          variant="plain"
           size="sm"
-          onClick={() => {
-            onChange(Number.NaN);
-            // O botão some com o valor: o foco vai para "Escolher imagem".
-            trigger.current?.focus();
-          }}
+          customColorClass={dangerButtonClass}
+          onClick={() => setRemoving(true)}
         >
           Remover
         </Button>
       )}
+      <ConfirmDialog
+        isOpen={removing}
+        type="danger"
+        title={`Remover a imagem de ${label}?`}
+        confirmText="Remover"
+        confirmButtonProps={dangerConfirmButtonProps}
+        onCancel={() => setRemoving(false)}
+        onConfirm={() => {
+          removed.current = true;
+          onChange(Number.NaN);
+          setRemoving(false);
+        }}
+        onAfterClose={() => {
+          if (removed.current) trigger.current?.focus();
+          removed.current = false;
+        }}
+      >
+        <p>O campo fica sem imagem; a mídia continua na biblioteca.</p>
+      </ConfirmDialog>
     </div>
   );
 }
