@@ -16,7 +16,10 @@ import {
 } from 'react-hook-form';
 import * as z from 'zod';
 
+import { pushSuccess } from '@/components/shared/ActionFeedback.tsx';
 import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
+import { ErrorSummary } from '@/components/shared/ErrorSummary.tsx';
+import Alert from '@/components/ui/Alert';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Checkbox from '@/components/ui/Checkbox';
@@ -83,7 +86,7 @@ export type SchemaFormProps<T> = {
   /**
    * Recebe o valor validado pelo schema. Pode devolver a recusa do servidor: cada issue com
    * `path` vira erro do campo; sem `path`, vai para o resumo. `{ success }` é a confirmação,
-   * mostrada ao lado do botão.
+   * mostrada no toast (retorno padrão das ações, `ActionFeedback.tsx`).
    */
   onSubmit: (value: T) => SubmitOutcome | Promise<SubmitOutcome>;
 };
@@ -120,8 +123,14 @@ const hintClass = 'mt-1 text-sm text-gray-600 dark:text-gray-400';
 /** Borda dos grupos (objeto, lista e item de lista). */
 const groupClass = 'rounded-xl border border-gray-200 dark:border-gray-700';
 
-/** Aviso de campo sem editor. */
-const warningClass = 'mb-7 rounded-xl border border-warning p-2 text-sm text-warning';
+/** Aviso de campo sem editor, no Alert de aviso do Ecme: nunca omissão silenciosa. */
+function NoEditor({ label, path }: { label: string; path: string }) {
+  return (
+    <Alert type="warning" showIcon duration={0} className="mb-7">
+      {label}: sem editor para este campo (registre um campo para {pattern(path)}).
+    </Alert>
+  );
+}
 
 /** Primeira mensagem de erro num nó da árvore de erros (pode estar num item interno). */
 function firstMessage(node: unknown): string | undefined {
@@ -417,11 +426,7 @@ function Node({
       return <ArrayField ctx={ctx} element={node.element} path={path} label={label} />;
     default:
       // Sem desenho padrão e sem campo registrado: aviso visível, nunca omissão silenciosa.
-      return (
-        <p className={warningClass}>
-          {label}: sem editor para este campo (registre um campo para {pattern(path)}).
-        </p>
-      );
+      return <NoEditor label={label} path={path} />;
   }
 }
 
@@ -463,11 +468,7 @@ function ArrayField({
     { message?: string; root?: { message?: string } } | undefined;
   const message = arrayError?.root?.message ?? arrayError?.message;
   if (itemNode.kind !== 'object') {
-    return (
-      <p className={warningClass}>
-        {label}: sem editor para este campo (registre um campo para {pattern(path)}).
-      </p>
-    );
+    return <NoEditor label={label} path={path} />;
   }
   return (
     <fieldset className={classNames(groupClass, 'mb-7 space-y-4 p-4')}>
@@ -588,7 +589,6 @@ export function SchemaForm<T>({
 }: SchemaFormProps<T>) {
   // Recusa do servidor sem `path`; os erros de campo vêm de `formState.errors`.
   const [general, setGeneral] = useState<string[]>([]);
-  const [success, setSuccess] = useState('');
   const resolver = zodResolver(
     z
       .unknown()
@@ -613,18 +613,14 @@ export function SchemaForm<T>({
           void form.handleSubmit(
             async (value) => {
               setGeneral([]);
-              setSuccess('');
               const outcome = await onSubmit(value as T);
               if (outcome !== undefined && 'success' in outcome) {
-                setSuccess(outcome.success);
+                pushSuccess(outcome.success);
                 return;
               }
               setGeneral(applyServerIssues(form.setError, outcome ?? []));
             },
-            () => {
-              setSuccess('');
-              setGeneral([]);
-            },
+            () => setGeneral([]),
           )(event);
         }}
       >
@@ -641,42 +637,14 @@ export function SchemaForm<T>({
             </ul>
           </nav>
         )}
-        <div
-          role="alert"
-          className={classNames(
-            (general.length > 0 || items.length > 0) &&
-              'space-y-1 text-sm font-semibold text-error',
-          )}
-        >
-          {general.map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-          {items.length > 0 && (
-            <>
-              <p>Corrija os campos destacados:</p>
-              <ul className="list-disc space-y-1 pl-5">
-                {items.map((item) => {
-                  const text = `${summaryLabel(labels ?? {}, item.path)}: ${item.message}`;
-                  return (
-                    <li key={item.path}>
-                      {item.focusable ? (
-                        <button
-                          type="button"
-                          className="text-left underline underline-offset-4"
-                          onClick={() => form.setFocus(item.path)}
-                        >
-                          {text}
-                        </button>
-                      ) : (
-                        text
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          )}
-        </div>
+        <ErrorSummary
+          lines={general}
+          items={items.map((item) => ({
+            key: item.path,
+            text: `${summaryLabel(labels ?? {}, item.path)}: ${item.message}`,
+            onFocus: item.focusable ? () => form.setFocus(item.path) : undefined,
+          }))}
+        />
         <SchemaFields
           schema={schema}
           labels={labels}
@@ -686,19 +654,14 @@ export function SchemaForm<T>({
           fields={fields}
           sections={sections}
         />
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="submit"
-            variant="solid"
-            disabled={submitDisabled || isSubmitting}
-            aria-describedby={submitDescribedBy}
-          >
-            {isSubmitting ? pendingLabel : submitLabel}
-          </Button>
-          <p role="status" className="text-sm text-success">
-            {success}
-          </p>
-        </div>
+        <Button
+          type="submit"
+          variant="solid"
+          disabled={submitDisabled || isSubmitting}
+          aria-describedby={submitDescribedBy}
+        >
+          {isSubmitting ? pendingLabel : submitLabel}
+        </Button>
       </form>
     </FormProvider>
   );

@@ -6,12 +6,14 @@ import {
   InstitutionalTextsSchema,
   QuoteBlockSchema,
 } from '@orakel/content-model/v1';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm, type FieldValues } from 'react-hook-form';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
+
+import { toast, ToastProvider } from '@/components/ui/toast';
 
 import { SchemaFields, SchemaForm, type FieldProps } from './SchemaForm.tsx';
 
@@ -25,7 +27,11 @@ afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
 
-afterEach(cleanup);
+afterEach(async () => {
+  act(() => toast.removeAll());
+  await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
+  cleanup();
+});
 
 /** Campo de rich text simplificado (o de verdade, com TipTap, é da #43). */
 function PlainInlines({ id, label, value, onChange, invalid, describedBy, ref }: FieldProps) {
@@ -221,6 +227,8 @@ describe('SchemaForm', () => {
 
     const warning = screen.getByText(/sem editor para este campo/);
     expect(within(warning).getByText(/content/)).toBeTruthy();
+    // No Alert de aviso do Ecme (#325).
+    expect(warning.closest('.alert')?.className).toContain('bg-warning-subtle');
   });
 });
 
@@ -327,6 +335,7 @@ describe('SchemaForm com o servidor', () => {
         onSubmit={onSubmit}
       />,
     );
+    render(<ToastProvider />);
 
     await user.click(screen.getByRole('button', { name: 'Criar' }));
     const pending = await screen.findByRole('button', { name: 'Criando…' });
@@ -336,13 +345,13 @@ describe('SchemaForm com o servidor', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
 
     finish({ success: 'Autor salvo.' });
-    const status = await screen.findByText('Autor salvo.');
-    expect(status.getAttribute('role')).toBe('status');
-    expect(status.className).toContain('text-success');
+    // A confirmação vai para o toast do template, na região status do ToastProvider (#325).
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Autor salvo.'));
+    expect(screen.getByRole('status').querySelector('.notification')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Criar' })).toHaveProperty('disabled', false);
   });
 
-  it('sem rótulo pendente usa "Salvando…"; o próximo envio apaga a confirmação', async () => {
+  it('sem rótulo pendente usa "Salvando…"; envio sem confirmação não mostra toast', async () => {
     const user = userEvent.setup();
     const outcomes: ((outcome: { success: string } | undefined) => void)[] = [];
     const onSubmit = vi.fn(
@@ -359,16 +368,17 @@ describe('SchemaForm com o servidor', () => {
         onSubmit={onSubmit}
       />,
     );
+    render(<ToastProvider />);
 
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
     expect(await screen.findByRole('button', { name: 'Salvando…' })).toBeTruthy();
-    outcomes[0]?.({ success: 'Salvo.' });
-    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Salvo.'));
+    outcomes[0]?.(undefined);
+    await screen.findByRole('button', { name: 'Salvar' });
+    expect(screen.getByRole('status').textContent).toBe('');
 
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
-    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(''));
-    outcomes[1]?.(undefined);
-    await screen.findByRole('button', { name: 'Salvar' });
+    outcomes[1]?.({ success: 'Salvo.' });
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Salvo.'));
   });
 
   it('rich text opcional apagado é enviado como ausente, sem erro', async () => {
@@ -546,6 +556,8 @@ describe('SchemaForm: resumo de erros', () => {
       'Resposta (pergunta 2)',
     ]);
     expect(within(alert).getByText('Corrija os campos destacados:')).toBeTruthy();
+    // No Alert danger do Ecme, dentro da região (#325).
+    expect(alert.querySelector('.alert')?.className).toContain('bg-error-subtle');
 
     // Campo nativo dentro da lista.
     items[0]?.focus();
