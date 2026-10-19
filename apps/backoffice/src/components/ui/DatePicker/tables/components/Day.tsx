@@ -6,7 +6,7 @@
 // - selecionado no escuro com `dark:text-gray-950`, como o Button solid, pelo contraste;
 // - `hidden` no lugar do `d-none`, que não existe no Tailwind nem no Ecme;
 // - sem as classes de intervalo (fundo `primary-subtle`, pontas e hoje no intervalo): sem
-//   `getRangeProps` e sem o RangeCalendar, nenhuma tela marca intervalo.
+//   o cálculo de intervalo e sem o RangeCalendar, nenhuma tela marca intervalo.
 import classNames from '../../../utils/classNames';
 import type { ComponentPropsWithRef, ReactNode, MouseEvent, Ref } from 'react';
 import type { CommonProps } from '../../../@types/common';

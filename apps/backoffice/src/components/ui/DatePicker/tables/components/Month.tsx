@@ -2,7 +2,7 @@
 // Adaptado (#317):
 // - prop `timeZone`: "hoje" é a data de parede de agora no fuso do site (`toZonedDate`), não a do
 //   navegador; o `value` já chega na hora de parede do fuso, convertido pelo Calendar;
-// - sem `range` (o `getRangeProps` não foi portado);
+// - sem `range` (o cálculo de intervalo não foi portado);
 // - o dia que recebe o Tab quando não há valor no mês é recalculado a cada mês exibido: no Ecme um
 //   `useMemo` sem dependências guardava o do primeiro mês, e ao paginar nenhum dia ficava
 //   focável; e "valor no mês" é `isSameMonth`, não `isAfter(startOf('month'))`, que deixava de

@@ -2,7 +2,7 @@
 // Adaptado (#317):
 // - prop `timeZone` (fuso IANA do site): o mês aberto por padrão é o de hoje no fuso do site, e o
 //   fuso segue à tabela de dias, que marca "hoje" nele;
-// - sem `range` (o `getRangeProps` e o RangeCalendar não foram portados);
+// - sem `range` (o cálculo de intervalo e o RangeCalendar não foram portados);
 // - carrega o locale pt-br do dayjs, o padrão do ConfigProvider no Backoffice.
 'use client';
 

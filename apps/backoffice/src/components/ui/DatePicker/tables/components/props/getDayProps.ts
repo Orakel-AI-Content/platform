@@ -1,5 +1,5 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/DatePicker/tables/components/props/getDayProps.ts
-// Adaptado (#317): sem o `getRangeProps` (nenhuma tela usa intervalo); `range`, `inRange`,
+// Adaptado (#317): sem o cálculo de intervalo (`props/` do Ecme; nenhuma tela usa intervalo); `range`, `inRange`,
 // `firstInRange`, `lastInRange` e `selectedInRange` ficam sempre falsos, e quem quiser marcar um
 // intervalo usa `isDateInRange` e afins no Month, como no Ecme.
 import { isSameDate } from '../../../utils';
