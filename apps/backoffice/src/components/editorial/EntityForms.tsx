@@ -1,88 +1,21 @@
 'use client';
 
-import {
-  AuthorSchema,
-  InstitutionalTextsSchema,
-  MenuSchema,
-  TaxonomySchema,
-} from '@orakel/content-model/v1';
+import { InstitutionalTextsSchema } from '@orakel/content-model/v1';
 import { useRouter } from 'next/navigation';
-import type * as z from 'zod';
 
-import { mediaField, type MediaSource } from '@/components/forms/PickerFields';
+import type { MediaSource } from '@/components/forms/PickerFields';
 import { richTextField } from '@/components/forms/RichTextField';
-import {
-  SchemaForm,
-  type FieldRenderer,
-  type SchemaFormIssue,
-} from '@/components/forms/SchemaForm';
+import { SchemaForm, type SchemaFormIssue } from '@/components/forms/SchemaForm';
+
+import { ENTITY_CONFIG, type EntityKind } from './entityConfig.ts';
 
 // Formulários das entidades editoriais do site (#46): o gerador sobre os schemas do
-// content-model; regras (slug único, permissão) ficam no domínio e voltam pelo campo.
+// content-model, configurados em `entityConfig.ts`; regras (slug único, permissão) ficam
+// no domínio e voltam pelo campo.
 
 /** Retorno das Server Actions das entidades (serializável; `path` aponta o campo). */
 export type EntityFormResult =
   { ok: true; message: string } | { ok: false; message: string; issues: SchemaFormIssue[] };
-
-export type EntityKind = 'author' | 'taxonomy' | 'menu';
-
-type EntityConfig = {
-  schema: z.ZodType;
-  /** Segmento da lista em `/sites/<site>/…`. */
-  segment: string;
-  labels: Record<string, string>;
-  hints?: Record<string, string>;
-  /** Campos especiais; os de mídia usam a biblioteca do site (só quando a página a passa). */
-  fields?: (media: MediaSource | undefined) => Record<string, FieldRenderer>;
-};
-
-const SLUG_HINT = 'Minúsculas, números e hífens.';
-
-export const ENTITY_CONFIG: Record<EntityKind, EntityConfig> = {
-  author: {
-    schema: AuthorSchema.omit({ id: true }),
-    segment: 'autores',
-    labels: {
-      name: 'Nome',
-      slug: 'Slug',
-      bio: 'Biografia',
-      expertise: 'Área de atuação',
-      avatarMediaId: 'Foto',
-    },
-    hints: { slug: SLUG_HINT },
-    fields: (media): Record<string, FieldRenderer> =>
-      media ? { avatarMediaId: mediaField(media, { optional: true }) } : {},
-  },
-  taxonomy: {
-    schema: TaxonomySchema.omit({ id: true }),
-    segment: 'taxonomias',
-    labels: {
-      kind: 'Tipo',
-      'kind=category': 'Categoria',
-      'kind=tag': 'Tag',
-      'kind=series': 'Série',
-      name: 'Nome',
-      slug: 'Slug',
-      description: 'Descrição',
-    },
-    hints: { slug: SLUG_HINT },
-  },
-  menu: {
-    schema: MenuSchema.omit({ id: true }),
-    segment: 'menus',
-    labels: {
-      key: 'Chave',
-      items: 'Itens',
-      'items.*': 'item',
-      'items.*.label': 'Rótulo',
-      'items.*.href': 'Link',
-    },
-    hints: {
-      key: 'Onde o menu aparece, ex.: principal, rodape.',
-      'items.*.href': 'Caminho iniciado por / ou URL http/https.',
-    },
-  },
-};
 
 /** Criação ou edição de autor, taxonomia ou menu; volta para a lista ao salvar. */
 export function EntityForm({
