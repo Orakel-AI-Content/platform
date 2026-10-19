@@ -11,9 +11,9 @@ import { FormItem } from '@/components/ui/Form';
 import { Input } from '@/components/ui/Input';
 
 // Link do rich text (#132), no lugar do `window.prompt`: um popover nativo ancorado ao botão
-// Link da barra, como o `ActionsMenu` (Popover API + anchor positioning). O endereço é
-// validado com o `HrefSchema`, a mesma regra do `isAllowedUri` da extensão. Sem `<form>`: o
-// campo de rich text já está dentro do formulário do editor, então o Enter é tratado aqui.
+// Link da barra (Popover API + anchor positioning). O endereço é validado com o `HrefSchema`,
+// a mesma regra do `isAllowedUri` da extensão. Sem `<form>`: o campo de rich text já está
+// dentro do formulário do editor, então o Enter é tratado aqui.
 // No Ecme (#275): `Button`, `Input` e `FormItem` do `ui/`, superfície do `Dropdown`
 // (`dropdown-menu`) e o botão ativo como o `ToolButton` do `shared/RichTextEditor`. O erro
 // fica no fluxo, depois da dica: a mensagem do `FormItem` (`form-explain`) é absoluta, sob o
