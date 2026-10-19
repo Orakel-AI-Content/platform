@@ -46,7 +46,12 @@ test('login pelo Access e registro de instâncias', async ({ page }) => {
   // Operação enfileira o build do site sem esperar a janela (12.0, L3). Espera a página
   // hidratar: um clique antes disso não chega ao onClick (a ação nem é chamada).
   await page.waitForLoadState('networkidle');
+  // Muda o site publicado: confirma num diálogo (#327).
   await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+  await page
+    .getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' })
+    .getByRole('button', { name: 'Publicar' })
+    .click();
   await expect(page.getByText('Build de exemplo-a enfileirado.')).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page })
@@ -227,6 +232,26 @@ for (const colorScheme of ['light', 'dark'] as const) {
         [],
       );
     }
+
+    // Remover recurso confirma num diálogo (#327), sem violação com ele aberto; Cancelar não
+    // remove e devolve o foco, "Remover" tira a linha. Nada é salvo.
+    await page.waitForLoadState('networkidle');
+    const flags = page.getByRole('group', { name: 'Recursos ligados' });
+    const names = flags.getByLabel(/^Nome do recurso/);
+    const count = await names.count();
+    await flags.getByRole('button', { name: 'Adicionar recurso' }).click();
+    await expect(names).toHaveCount(count + 1);
+    const remove = flags.getByRole('button', { name: `Remover recurso ${count + 1}` });
+    const dialog = page.getByRole('alertdialog', { name: `Remover recurso ${count + 1}?` });
+    await remove.click();
+    await expect(dialog).toBeVisible();
+    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(remove).toBeFocused();
+    await remove.click();
+    await dialog.getByRole('button', { name: 'Remover' }).click();
+    await expect(names).toHaveCount(count);
   });
 }
 
@@ -349,7 +374,21 @@ test('operação vê a publicação do site e o publica pela página', async ({ 
 
   // Mesma ação da lista; o sucesso vai para o toast e a seção fica sem erro (#324).
   await page.waitForLoadState('networkidle');
-  await publication.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+  // Confirma num diálogo (#327): Esc e Cancelar não publicam e devolvem o foco ao botão.
+  const publish = publication.getByRole('button', { name: 'Publicar agora exemplo-a' });
+  const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
+  await publish.click();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(publish).toBeFocused();
+  await publish.click();
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(publish).toBeFocused();
+  await expect(page.getByRole('status').filter({ hasText: 'enfileirado' })).toHaveCount(0);
+  await publish.click();
+  await dialog.getByRole('button', { name: 'Publicar' }).click();
   await expect(
     page.getByRole('status').filter({ hasText: 'Build de exemplo-a enfileirado.' }),
   ).toBeVisible();
@@ -438,6 +477,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
     ).not.toBeEmpty();
 
     await expectNoViolations(page);
+
+    // Com a confirmação de "Publicar agora" aberta (#327); Cancelar não publica.
+    await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
+    await expect(dialog).toBeVisible();
+    await expectNoViolations(page);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
   });
 }
 

@@ -131,6 +131,36 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Remover item de lista do SchemaForm confirma num diálogo (#327), nos dois temas: Esc não
+// remove e devolve o foco; "Remover" tira o item. Nada é salvo.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`remover item do menu confirma, sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a/menus');
+    await page.getByRole('link', { name: 'Editar principal' }).click();
+    await page.waitForLoadState('networkidle');
+    const labels = page.getByLabel('Rótulo');
+    const count = await labels.count();
+    await page.getByRole('button', { name: 'Adicionar item' }).click();
+    await expect(labels).toHaveCount(count + 1);
+
+    const remove = page.getByRole('button', { name: `Remover item ${count + 1}` });
+    const dialog = page.getByRole('alertdialog', { name: `Remover item ${count + 1}?` });
+    await remove.click();
+    await expect(dialog).toBeVisible();
+    await expectNoViolations(page);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(remove).toBeFocused();
+    await expect(labels).toHaveCount(count + 1);
+    await remove.click();
+    await dialog.getByRole('button', { name: 'Remover' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(labels).toHaveCount(count);
+  });
+}
+
 test('editor edita um item do menu e o vê na lista', async ({ page }) => {
   const label = `Guias ${Date.now()}`;
   await loginAs(page, 'editor@orakel.local');
