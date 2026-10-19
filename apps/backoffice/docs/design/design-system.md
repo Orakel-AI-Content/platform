@@ -146,6 +146,10 @@ Não negociável, em toda tela e todo componente portado:
   aberto; título ligado por `aria-labelledby`; foco preso no diálogo e devolvido ao botão de
   origem ao fechar. Os toasts ficam fora do contêiner, para continuarem anunciados.
 - **`react-select`** (Select): rótulo associado pelo `inputId` dentro de um `FormItem`.
+  Múltiplo (`isMulti`, #319): cada valor tem o botão "Remover <opção>"; pelo teclado, Enter
+  adiciona, Backspace remove o último e as setas para a esquerda e a direita focam um valor
+  (com anel primary) para o Backspace remover; a região viva anuncia seleção, remoção e guias
+  em pt-BR (`ariaLiveMessages` e `screenReaderStatus` do chamador vencem).
   Dropdown e Tooltip acessíveis por teclado (setas, Esc com o foco de volta).
 - **Auditoria:** a vitrine `/teste-de-componentes` (`src/app/(admin)/teste-de-componentes/`,
   só com `E2E_ERROR_ROUTE`, no compose local) é onde se audita cada componente: todo componente
