@@ -502,6 +502,22 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'bg-gray-50',
     minimum: 4.5,
   },
+  // Valor múltiplo em foco pelas setas (#319): borda e anel primary sobre o fundo do valor e,
+  // por fora, sobre o cartão (o controle em foco fica `bg-transparent`).
+  {
+    name: 'foco no valor múltiplo',
+    theme: 'claro',
+    text: 'ring-primary',
+    background: 'bg-gray-50',
+    minimum: 3,
+  },
+  {
+    name: 'foco no valor múltiplo, sobre o cartão',
+    theme: 'claro',
+    text: 'ring-primary',
+    background: 'bg-white',
+    minimum: 3,
+  },
   {
     name: 'opção do menu',
     theme: 'escuro',
@@ -529,6 +545,20 @@ const ECME_PAIRS: readonly EcmePair[] = [
     text: 'dark:text-gray-100',
     background: 'dark:bg-gray-800',
     minimum: 4.5,
+  },
+  {
+    name: 'foco no valor múltiplo',
+    theme: 'escuro',
+    text: 'ring-primary',
+    background: 'dark:bg-gray-800',
+    minimum: 3,
+  },
+  {
+    name: 'foco no valor múltiplo, sobre o cartão',
+    theme: 'escuro',
+    text: 'ring-primary',
+    background: 'dark:bg-gray-800',
+    minimum: 3,
   },
   // Dropdown (#210): item do menu (`_menu-item.css`) sobre o `dropdown-menu` (`_dropdown.css`).
   {

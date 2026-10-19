@@ -724,6 +724,65 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Select múltiplo (#319): botão "Remover <opção>" por valor, região viva em pt-BR, Enter
+// adiciona, Backspace remove o último e as setas levam aos valores escolhidos.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Select múltiplo pelo teclado: adiciona, remove e anuncia em pt-BR, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const selects = section(page, 'Select');
+    const multi = selects.locator('.select', { has: page.getByLabel('Categorias secundárias') });
+    const values = multi.locator('.select-multi-value-label');
+    const live = multi.locator('[role="log"]');
+
+    await expect(values).toHaveText(['Guias', 'Resenhas']);
+    await expect(multi.getByRole('button', { name: 'Remover Guias' })).toBeVisible();
+    await expect(multi.getByRole('button', { name: 'Remover Resenhas' })).toBeVisible();
+    await expect(multi.locator('[aria-label^="Remove "]')).toHaveCount(0);
+
+    const combobox = selects.getByLabel('Categorias secundárias');
+    await tabTo(page, combobox);
+    await page.keyboard.press('ArrowDown');
+    await expect(combobox).toHaveAttribute('aria-expanded', 'true');
+    await expect(multi.locator('.select-option-focused')).toHaveText('Notícias');
+
+    const accessibility = await audit(page);
+    expect(accessibility.violations).toEqual([]);
+
+    await page.keyboard.press('Enter');
+    await expect(values).toHaveText(['Guias', 'Resenhas', 'Notícias']);
+    await expect(combobox).toBeFocused();
+    await expect(live).toContainText('opção Notícias selecionada.');
+
+    await page.keyboard.press('Backspace');
+    await expect(values).toHaveText(['Guias', 'Resenhas']);
+    await expect(live).toContainText('opção Notícias removida.');
+
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await expect(live).toContainText('valor Guias em foco, 1 de 2.');
+    // O valor em foco tem anel visível; o outro, não.
+    const chip = (label: string) => multi.locator('.select-multi-value', { hasText: label });
+    await expect(chip('Guias')).toHaveClass(/select-multi-value-focused/);
+    const shadow = (locator: Locator) =>
+      locator.evaluate((element) => getComputedStyle(element).boxShadow);
+    expect(await shadow(chip('Guias'))).not.toBe(await shadow(chip('Resenhas')));
+    await page.keyboard.press('Backspace');
+    await expect(values).toHaveText(['Resenhas']);
+    await expect(live).not.toContainText(/selected|deselected|focused/);
+
+    const valuesAudit = await audit(page);
+    expect(valuesAudit.violations).toEqual([]);
+
+    expect(hydration).toEqual([]);
+  });
+}
+
 test('Select em FormItem inválido, async e creatable', async ({ page }) => {
   await login(page);
   await page.goto(SHOWCASE);

@@ -3,7 +3,11 @@
    - a opção em foco pelo teclado ganha fundo (`.select-option-focused`), que o Ecme não tinha:
      navegando por setas, nada indicava a opção ativa;
    - a opção tem cor de texto explícita (gray-600 e gray-300), como os pares "opção do menu"
-     do globals-contrast.test.ts; o Ecme herdava a do body. */
+     do globals-contrast.test.ts; o Ecme herdava a do body.
+   Adaptado (#319):
+   - o valor múltiplo em foco pelas setas ganha borda e anel primary (`.select-multi-value-focused`,
+     pares "foco no valor múltiplo" do globals-contrast.test.ts): no Ecme nada mostrava qual
+     valor o Backspace removeria. */
 @layer components {
   .select-control {
     @apply flex
@@ -47,6 +51,10 @@
 
   .select-multi-value {
     @apply flex rounded-lg mx-0.5 font-bold border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100;
+  }
+
+  .select-multi-value-focused {
+    @apply border-primary ring-1 ring-primary dark:border-primary;
   }
 
   .select-multi-value-label {
