@@ -3,7 +3,16 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Block } from '@orakel/content-model/v1';
 import { useRouter } from 'next/navigation';
-import { Fragment, useEffect, useId, useState, useTransition, type ComponentProps } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useEffectEvent,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type ComponentProps,
+} from 'react';
 import { PiArrowDown, PiArrowUp, PiCaretDown, PiCaretRight, PiPlus, PiTrash } from 'react-icons/pi';
 import { FormProvider, get, useFieldArray, useForm, type FieldValues } from 'react-hook-form';
 
@@ -25,15 +34,18 @@ import {
 import { richTextField } from '@/components/forms/RichTextField';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/SchemaForm';
 import { zonedDateTimeField } from '@/components/forms/ZonedDatetimeField';
+import { pushSuccess } from '@/components/shared/ActionFeedback.tsx';
 import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
+import { ErrorSummary } from '@/components/shared/ErrorSummary.tsx';
 import { BLOCK_TYPE_LABEL } from '@/components/shared/siteLabels.ts';
 import { blockSummary, blockText } from '@/components/contents/blockSummary.ts';
 import { IconButton } from '@/components/shared/IconButton';
 import StickyFooter from '@/components/shared/StickyFooter';
 import { Button } from '@/components/ui/Button';
 import Dropdown from '@/components/ui/Dropdown';
+import Notification from '@/components/ui/Notification';
+import toast from '@/components/ui/toast';
 import Tooltip from '@/components/ui/Tooltip';
-import classNames from '@/components/ui/utils/classNames';
 import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
 import { useLeaveGuard } from '@/components/shared/useLeaveGuard.ts';
 import type { ContentEdit } from '@/domain/content/contents.ts';
@@ -42,7 +54,8 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 // desenhados pelo gerador, e a lista de blocos (tipo, ordem, remoção) é daqui. O `n` de
 // bloco novo é do servidor; a permissão e as referências são conferidas no domínio. Salvar
 // fica numa barra fixa no rodapé e mantém a pessoa no editor (#109): a edição recomeça da
-// versão salva relida do servidor; a criação vai para a edição do conteúdo criado.
+// versão salva relida do servidor; a criação vai para a edição do conteúdo criado. O retorno
+// segue o padrão das ações: o sucesso vai para o toast e o resumo de erros para o Alert da barra.
 
 const META_LABELS: Record<string, string> = {
   kind: 'Tipo',
@@ -89,13 +102,11 @@ export type ContentEditorOptions = {
   taxonomies: readonly PickerOption[];
 };
 
-/** Por quanto tempo o "Desfazer" da remoção de bloco fica disponível (#112). */
+/** Por quanto tempo o "Desfazer" da remoção de bloco fica disponível no toast (#112). */
 export const UNDO_MS = 10_000;
 
 /** Campo que recebe o foco no bloco devolvido; sem ele (texto rico), o próprio bloco. */
 const FOCUSABLE_FIELD = 'input:not([type="hidden"]), textarea, select, [contenteditable="true"]';
-
-type RemovedBlock = { index: number; value: FieldValues; position: number };
 
 /** Mensagem de erro sob um caminho (para os erros de lista, como "ao menos um bloco"). */
 const errorAt = (errors: FieldValues, path: string): string | undefined => {
@@ -143,9 +154,8 @@ export function ContentEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [summary, setSummary] = useState<string[]>([]);
-  const [saved, setSaved] = useState('');
-  // Último bloco removido (#112): devolvido pelo "Desfazer" por 10 s, ou até salvar.
-  const [removed, setRemoved] = useState<RemovedBlock | null>(null);
+  // Toast do último bloco removido (#112): o "Desfazer" o devolve por 10 s, ou até salvar.
+  const undoToast = useRef<string | null>(null);
   const form = useForm<FieldValues>({
     resolver: zodResolver(
       ContentEditorSchema as unknown as Parameters<typeof zodResolver>[0],
@@ -201,19 +211,29 @@ export function ContentEditor({
     publishedAt: zonedDateTimeField(timeZone),
   };
 
-  useCreatedAnnouncement(created ? 'Conteúdo criado.' : undefined, setSaved);
+  useCreatedAnnouncement(created ? 'Conteúdo criado.' : undefined, pushSuccess);
 
-  useEffect(() => {
-    if (!removed) return;
-    const timer = setTimeout(() => setRemoved(null), UNDO_MS);
-    return () => clearTimeout(timer);
-  }, [removed]);
+  /** Tira o toast do "Desfazer", se ainda estiver na tela. */
+  const dropUndo = () => {
+    if (undoToast.current !== null) toast.remove(undoToast.current);
+    undoToast.current = null;
+  };
+  // Saindo do editor, o "Desfazer" não tem mais para onde devolver o bloco.
+  const onLeave = useEffectEvent(dropUndo);
+  useEffect(() => () => onLeave(), []);
 
   const removeBlock = (index: number) => {
     const value = form.getValues(`blocks.${index}`) as FieldValues;
     blocks.remove(index);
-    setSaved('');
-    setRemoved({ index, value, position: index + 1 });
+    dropUndo();
+    // Só a remoção mais recente se desfaz; o toast sai sozinho no prazo (`duration`).
+    undoToast.current = toast.push(
+      <Notification type="info" title={`Bloco ${index + 1} removido.`} duration={UNDO_MS}>
+        <Button type="button" size="sm" onClick={() => undoRemove(index, value)}>
+          Desfazer
+        </Button>
+      </Notification>,
+    );
   };
 
   /** Depois de desenhar: o primeiro campo do bloco, ou o próprio bloco (texto rico). */
@@ -224,12 +244,10 @@ export function ContentEditor({
       (field ?? block)?.focus();
     });
 
-  const undoRemove = () => {
-    if (!removed) return;
-    const { index, value, position } = removed;
+  const undoRemove = (index: number, value: FieldValues) => {
     blocks.insert(index, value, { shouldFocus: false });
-    setRemoved(null);
-    setSaved(`Bloco ${position} devolvido.`);
+    dropUndo();
+    pushSuccess(`Bloco ${index + 1} devolvido.`);
     focusBlock(index);
   };
 
@@ -242,7 +260,6 @@ export function ContentEditor({
   const onValid = (value: FieldValues) =>
     startTransition(async () => {
       setSummary([]);
-      setSaved('');
       // Valores crus da tela (o `value` do resolver já vem sem os vazios): base do reset.
       const sent = form.getValues();
       const result = await action(value as ContentEdit);
@@ -256,8 +273,8 @@ export function ContentEditor({
         );
         if (result.saved) form.reset(savedFormValues(result.saved, sent) as FieldValues);
         // O `n` do bloco removido não existe na versão salva: não há mais o que desfazer.
-        setRemoved(null);
-        setSaved(result.message);
+        dropUndo();
+        pushSuccess(result.message);
         router.refresh();
         return;
       }
@@ -473,24 +490,11 @@ export function ContentEditor({
               Ver prévia
             </Button>
           )}
-          {/* aria-live sem role: o `status` da barra é a confirmação do salvamento. */}
+          {/* aria-live sem role: o `status` é o do toast, que confirma o salvamento. */}
           <p id={`${id}-preview-note`} aria-live="polite" className="text-sm empty:hidden">
             {previewNote}
           </p>
-          {/* Uma região só: a confirmação do salvamento ou a remoção, a mais recente (#112). */}
-          <p role="status" className="text-sm">
-            {removed ? `Bloco ${removed.position} removido.` : saved}
-          </p>
-          {removed && (
-            <Button type="button" size="sm" onClick={undoRemove}>
-              Desfazer
-            </Button>
-          )}
-          <div role="alert" className={classNames(summary.length > 0 && 'text-sm text-error')}>
-            {summary.map((line) => (
-              <p key={line}>{line}</p>
-            ))}
-          </div>
+          <ErrorSummary lines={summary} />
         </StickyFooter>
       </form>
     </FormProvider>

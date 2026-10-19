@@ -5,12 +5,14 @@ import type { FieldValues } from 'react-hook-form';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { toast, ToastProvider } from '@/components/ui/toast';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
 import type { ContentFormResult } from './contentEditorValues.ts';
 import { ContentEditor, UNDO_MS, type ContentEditorOptions } from './ContentEditor.tsx';
 
-// Editor de conteúdo (#45): tipos da release, seletores do site, teclado e erros por campo.
+// Editor de conteúdo (#45): tipos da release, seletores do site, teclado e erros por campo. O
+// retorno é o padrão das ações (#326): sucesso e "Desfazer" no toast, resumo de erros no Alert.
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -26,7 +28,9 @@ afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  act(() => toast.removeAll());
+  await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
   cleanup();
   vi.clearAllMocks();
 });
@@ -84,16 +88,19 @@ function renderEditor({
 }: RenderProps = {}) {
   const action = vi.fn<(input: ContentEdit) => Promise<ContentFormResult>>(respond);
   render(
-    <ContentEditor
-      mode={mode}
-      siteId="exemplo-a"
-      timeZone="America/Sao_Paulo"
-      defaultValues={defaultValues}
-      options={{ ...options, blockTypes }}
-      action={action}
-      created={created}
-      previewUrl={previewUrl}
-    />,
+    <>
+      <ContentEditor
+        mode={mode}
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        defaultValues={defaultValues}
+        options={{ ...options, blockTypes }}
+        action={action}
+        created={created}
+        previewUrl={previewUrl}
+      />
+      <ToastProvider />
+    </>,
   );
   return action;
 }
@@ -146,9 +153,10 @@ describe('editor de conteúdo', () => {
       [2, 'B'],
       [1, 'A'],
     ]);
-    // Fica no editor (#109): confirmação na barra e o cabeçalho atualizado, sem navegar.
+    // Fica no editor (#109): confirmação no toast e o cabeçalho atualizado, sem navegar.
     expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
-    expect(screen.getByRole('status').textContent).toBe('Versão 2 salva.');
+    // Salvar também tira o toast do "Desfazer" da remoção.
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Versão 2 salva.'));
     expect(router.refresh).toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
   });
@@ -212,13 +220,28 @@ describe('editor de conteúdo', () => {
 });
 
 describe('barra de ações e continuar no editor (#109)', () => {
-  it('o botão e o resultado ficam juntos na barra do StickyFooter', () => {
+  it('o botão e o resumo de erros ficam juntos na barra do StickyFooter; o sucesso vai para o toast', () => {
     // A fixação no rodapé é visual: o E2E contents.spec.ts confere.
     renderEditor();
 
     const bar = screen.getByRole('button', { name: 'Salvar nova versão' }).parentElement;
-    expect(bar?.querySelector('[role="status"]')).toBeTruthy();
     expect(bar?.querySelector('[role="alert"]')).toBeTruthy();
+    expect(bar?.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('o resumo de validação usa o Alert do Ecme e o foco vai ao primeiro campo inválido', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.clear(screen.getByLabelText('Título', { exact: true }));
+    await save(user);
+
+    const alert = screen.getByRole('alert');
+    await waitFor(() => expect(alert.textContent).toBe('Corrija os campos destacados.'));
+    expect(alert.querySelector('.alert')).toBeTruthy();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByLabelText('Título', { exact: true })),
+    );
   });
 
   it('durante o salvamento, "Salvando…" e nenhum outro clique', async () => {
@@ -366,6 +389,7 @@ describe('aviso ao sair (#111)', () => {
 describe('desfazer a remoção de bloco (#112)', () => {
   const three = { ...meta, blocks: [toc(1, 'A'), toc(2, 'B'), toc(3, 'C')] };
   const status = () => screen.getByRole('status').textContent;
+  const undo = () => screen.queryByRole('button', { name: 'Desfazer' });
   const titles = () =>
     screen.getAllByLabelText<HTMLInputElement>('Título do sumário').map((input) => input.value);
   const remove = (user: ReturnType<typeof userEvent.setup>, position: number) =>
@@ -375,14 +399,14 @@ describe('desfazer a remoção de bloco (#112)', () => {
     vi.useRealTimers();
   });
 
-  it('remover mostra "Bloco N removido." em role="status", com o botão Desfazer', async () => {
+  it('remover mostra o toast "Bloco N removido." com o botão Desfazer, fora da barra', async () => {
     const user = userEvent.setup();
     renderEditor({ defaultValues: three });
 
     await remove(user, 2);
 
-    expect(status()).toBe('Bloco 2 removido.');
-    expect(screen.getByRole('button', { name: 'Desfazer' })).toBeTruthy();
+    expect(status()).toBe('Bloco 2 removido.Desfazer');
+    expect(screen.getByRole('status').contains(undo())).toBe(true);
     expect(titles()).toEqual(['A', 'C']);
   });
 
@@ -398,9 +422,10 @@ describe('desfazer a remoção de bloco (#112)', () => {
     expect(screen.getByRole('button', { name: 'Desfazer' })).toBeTruthy();
 
     act(() => {
-      vi.advanceTimersByTime(1);
+      // O prazo, e a saída do toast (50 ms) depois dele.
+      vi.advanceTimersByTime(1 + 100);
     });
-    expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull();
+    expect(undo()).toBeNull();
     expect(status()).toBe('');
     expect(UNDO_MS).toBeGreaterThanOrEqual(10_000);
   });
@@ -417,7 +442,7 @@ describe('desfazer a remoção de bloco (#112)', () => {
 
     expect(titles()).toEqual(['A', 'B editado', 'C']);
     expect(screen.getByRole('group', { name: 'Bloco 2: Sumário' })).toBeTruthy();
-    expect(status()).toBe('Bloco 2 devolvido.');
+    await waitFor(() => expect(status()).toBe('Bloco 2 devolvido.'));
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getAllByLabelText('Título do sumário')[1]),
     );
@@ -436,7 +461,7 @@ describe('desfazer a remoção de bloco (#112)', () => {
 
     await remove(user, 1);
     await remove(user, 2);
-    expect(status()).toBe('Bloco 2 removido.');
+    await waitFor(() => expect(status()).toBe('Bloco 2 removido.Desfazer'));
     expect(screen.getAllByRole('button', { name: 'Desfazer' })).toHaveLength(1);
 
     await user.click(screen.getByRole('button', { name: 'Desfazer' }));
@@ -451,7 +476,21 @@ describe('desfazer a remoção de bloco (#112)', () => {
     await save(user);
 
     expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Desfazer' })).toBeNull();
+    await waitFor(() => expect(undo()).toBeNull());
+  });
+
+  it('sair do editor tira o toast do Desfazer', async () => {
+    const user = userEvent.setup();
+    renderEditor({ defaultValues: three });
+    await remove(user, 1);
+    expect(undo()).toBeTruthy();
+
+    act(() => {
+      cleanup();
+    });
+    render(<ToastProvider />);
+
+    await waitFor(() => expect(undo()).toBeNull());
   });
 });
 
