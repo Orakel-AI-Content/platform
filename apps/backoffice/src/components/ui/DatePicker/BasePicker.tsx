@@ -5,10 +5,14 @@
 // - sem o `useClick`: o clique no campo é o `handleInputClick`, que passa pelo
 //   `getReferenceProps` com o `onKeyDown`; no Ecme, os do `useClick` os sobrescreviam (e, no
 //   campo de texto, ele ignora o Espaço);
-// - painel num `FloatingFocusManager` (não modal), como o DropdownMenu: aberto pelo teclado, o
-//   foco vai para o painel; Esc fecha e o foco volta ao campo (no Ecme ficava no `<body>`);
+// - painel num `FloatingFocusManager` (não modal), como o DropdownMenu: aberto, o foco vai para
+//   o painel (com `inputtable`, fica no campo, para digitar); Esc fecha e o foco volta ao campo
+//   (no Ecme ficava no `<body>`). Com o foco no campo, o gerenciador trataria o `combobox` como
+//   digitável e esconderia (`aria-hidden`) o resto da página, rótulo incluído;
 // - o painel (`role="dialog"`, do `useRole`) leva o nome de `dropdownLabel`: no Ecme, o
-//   `aria-labelledby` apontava para um id que não existia;
+//   `aria-labelledby` apontava para um id que não existia; o campo é um `combobox` (o "Date
+//   Picker Combobox" do APG), papel que admite o `aria-expanded` e o `aria-haspopup="dialog"` que
+//   o `useRole` põe nele (num `textbox`, o axe os recusa);
 // - o botão de limpar chama-se `clearLabel` (o CloseButton diria "Fechar") e o ícone do
 //   calendário fica `aria-hidden`;
 // - o painel não herda o FormItem: o TimeInput dentro dele leria o `controlId` do campo e
@@ -27,7 +31,6 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
-import { useState } from 'react';
 import { HiOutlineCalendar } from 'react-icons/hi';
 import { Input } from '../Input';
 import useMergedRef from '../hooks/useMergeRef';
@@ -105,11 +108,7 @@ const BasePicker = (props: BasePickerProps) => {
     type,
   } = props;
 
-  // Aberto pelo teclado, o foco vai para o painel; pelo clique, fica no campo.
-  const [openedByKeyboard, setOpenedByKeyboard] = useState(false);
-
   const handleInputClick = () => {
-    setOpenedByKeyboard(false);
     if (inputtable) {
       openDropdown();
     } else {
@@ -152,7 +151,6 @@ const BasePicker = (props: BasePickerProps) => {
     onKeyDown?.(event);
     if ((event.key === ' ' || event.key === 'Enter') && !inputtable) {
       event.preventDefault();
-      setOpenedByKeyboard(true);
       openDropdown();
     }
   };
@@ -214,6 +212,7 @@ const BasePicker = (props: BasePickerProps) => {
         type={type}
         disabled={disabled}
         asElement={'input'}
+        role="combobox"
         onChange={onChange}
         {...getReferenceProps({
           onBlur: handleInputBlur,
@@ -226,7 +225,7 @@ const BasePicker = (props: BasePickerProps) => {
         <FloatingFocusManager
           context={context}
           modal={false}
-          initialFocus={openedByKeyboard ? 0 : -1}
+          initialFocus={inputtable ? -1 : 0}
           returnFocus
         >
           <div

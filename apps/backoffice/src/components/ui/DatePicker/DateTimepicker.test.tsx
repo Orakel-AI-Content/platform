@@ -32,7 +32,7 @@ afterAll(() => {
 
 afterEach(cleanup);
 
-const field = () => screen.getByRole('textbox', { name: 'Publicação' });
+const field = () => screen.getByRole('combobox', { name: 'Publicação' });
 const panel = () => screen.queryByRole('dialog', { name: 'Escolher data e hora' });
 const lastIso = (onChange: ReturnType<typeof vi.fn>) =>
   (onChange.mock.lastCall?.[0] as Date | null)?.toISOString();
