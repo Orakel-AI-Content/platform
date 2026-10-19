@@ -2,7 +2,7 @@
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import {
   LIFECYCLE_LABEL,
@@ -13,11 +13,10 @@ import {
   LastBuildSummary,
   PendingCount,
   PublishNowButton,
-  PublishStatusRegion,
   StateTag,
   type PublishNow,
-  type PublishStatus,
 } from '@/components/sites/SiteStatus';
+import { ActionAlert, pushSuccess, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
 import Dropdown from '@/components/ui/Dropdown';
@@ -141,18 +140,18 @@ export function SitesTable({
   created?: string;
 }) {
   const table = useTable({ features, columns, data: rows });
-  const [status, setStatus] = useState<PublishStatus | null>(null);
+  const { error, report } = useActionResult();
   useCreatedAnnouncement(
     created === undefined ? undefined : `Site ${created} cadastrado.`,
-    (message) => setStatus({ ok: true, message }),
+    pushSuccess,
   );
   if (rows.length === 0) {
     return <EmptyState action={emptyAction}>Nenhum site cadastrado.</EmptyState>;
   }
   return (
     <div className="space-y-2">
-      {/* Uma região para a tabela inteira: o retorno de "Publicar agora" não cresce a linha. */}
-      <PublishStatusRegion status={status} />
+      {/* Um Alert para a tabela inteira: o erro de "Publicar agora" não cresce a linha. */}
+      <ActionAlert error={error} />
       <Table compact>
         <caption className="mt-4 caption-bottom text-sm">
           {rows.length === 1 ? '1 site' : `${rows.length} sites`}
@@ -188,7 +187,7 @@ export function SitesTable({
                       <PublishNowButton
                         siteId={siteId}
                         action={publishNow}
-                        onResult={setStatus}
+                        onResult={report}
                         size="xs"
                       />
                     )}

@@ -18,19 +18,25 @@ export function pushSuccess(message: string): void {
 /**
  * Roda a ação numa transição: o sucesso vai para o toast e o erro fica em `error`, para o
  * `ActionAlert` junto da ação. `fail` cobre a validação local; um novo `run` limpa o erro.
+ * `report` entrega um resultado obtido fora do `run` (botão com a própria transição, como o
+ * "Publicar agora" de cada linha da lista de sites).
  */
 export function useActionResult() {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const report = (result: ActionResult) => {
+    if (result.ok) {
+      setError(null);
+      pushSuccess(result.message);
+    } else {
+      setError(result.message);
+    }
+  };
   const run = (action: () => Promise<ActionResult>) => {
     setError(null);
-    startTransition(async () => {
-      const result = await action();
-      if (result.ok) pushSuccess(result.message);
-      else setError(result.message);
-    });
+    startTransition(async () => report(await action()));
   };
-  return { pending, error, run, fail: setError };
+  return { pending, error, run, report, fail: setError };
 }
 
 /**

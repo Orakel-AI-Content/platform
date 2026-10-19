@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition, type ReactNode } from 'react';
+import { useTransition, type ReactNode } from 'react';
 
 import {
   BUILD_STATUS_LABEL,
@@ -9,15 +9,15 @@ import {
   formatDateTime,
   type StateTagColor,
 } from '@/components/shared/siteLabels.ts';
+import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
+import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { Button } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Tag';
-import classNames from '@/components/ui/utils/classNames';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Estado de publicação de um site, igual na lista de sites e na página do site (#149).
 
-export type PublishStatus = { ok: boolean; message: string };
-export type PublishNow = (siteId: string) => Promise<PublishStatus>;
+export type PublishNow = (siteId: string) => Promise<ActionResult>;
 
 /**
  * Estado de site ou de build na `Tag` do Ecme: o ponto na cor do estado (`prefixClass`) e o
@@ -80,7 +80,10 @@ export function PendingCount({ siteId, count }: { siteId: string; count: number 
   );
 }
 
-/** Enfileira o build já; quem o usa decide onde fica a região `role="status"` do retorno. */
+/**
+ * Enfileira o build já, com a própria transição (cada linha da lista tem o seu "Enfileirando…");
+ * `onResult` é o `report` do `useActionResult` de quem decide onde fica o erro.
+ */
 export function PublishNowButton({
   siteId,
   action,
@@ -89,7 +92,7 @@ export function PublishNowButton({
 }: {
   siteId: string;
   action: PublishNow;
-  onResult: (status: PublishStatus) => void;
+  onResult: (result: ActionResult) => void;
   /** `xs` na lista, onde a linha tem pouca largura; `sm` na página do site. */
   size?: 'xs' | 'sm';
 }) {
@@ -107,22 +110,13 @@ export function PublishNowButton({
   );
 }
 
-/** Região `role="status"` do retorno de "Publicar agora". */
-export function PublishStatusRegion({ status }: { status: PublishStatus | null }) {
-  return (
-    <p role="status" className={classNames('text-sm', status?.ok === false && 'text-error')}>
-      {status?.message}
-    </p>
-  );
-}
-
-/** "Publicar agora" de um site só, com o retorno logo abaixo (página do site). */
+/** "Publicar agora" de um site só, com o erro logo abaixo (página do site). */
 export function PublishNowPanel({ siteId, action }: { siteId: string; action: PublishNow }) {
-  const [status, setStatus] = useState<PublishStatus | null>(null);
+  const { error, report } = useActionResult();
   return (
     <div className="space-y-2">
-      <PublishNowButton siteId={siteId} action={action} onResult={setStatus} />
-      <PublishStatusRegion status={status} />
+      <PublishNowButton siteId={siteId} action={action} onResult={report} />
+      <ActionAlert error={error} />
     </div>
   );
 }
