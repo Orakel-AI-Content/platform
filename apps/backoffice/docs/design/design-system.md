@@ -14,7 +14,8 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 - **Componentes:** as primitivas do Ecme em `src/components/ui/` (uma pasta por componente,
   como no template: Alert, Avatar, Badge, Button, Card, Checkbox, Dialog, Drawer, Dropdown,
   Form, Input, InputGroup, Menu, Notification, Pagination, Radio, Segment, Select, Skeleton,
-  Spinner, Switcher, Table, Tabs, Tag, TimeInput, toast, Tooltip) e as peças compostas em `src/components/shared/` (AdaptiveCard,
+  Spinner, Switcher, Table, Tabs, Tag, TimeInput, toast, Tooltip, e o Calendar, em `DatePicker/`
+  como no template, com a prop `timeZone` para mostrar os dias no fuso do site) e as peças compostas em `src/components/shared/` (AdaptiveCard,
   ConfirmDialog, DataTable, Loading, StickyFooter e o `IconButton`, que não tem equivalente no
   template). Componente que a tela precisa e ainda não foi portado: copie a fonte do Ecme,
   mantendo a API e a aparência, e mude só o que Next, acessibilidade e tipos pedem. Porte sob
@@ -39,21 +40,26 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   chegar: `PAIRS` com os tokens e `ECME_PAIRS` com as classes como os componentes os combinam.
   Onde a classe do Ecme não chega ao AA, o port usa a substituta:
 
-  | Uso                                    | No Ecme                              | No port                                    |
-  | -------------------------------------- | ------------------------------------ | ------------------------------------------ |
-  | Texto do body, claro                   | `text-gray-500` (4,35:1)             | `text-gray-600` (7,17:1)                   |
-  | Placeholder do campo, claro            | `placeholder:text-gray-400` (2,31:1) | `placeholder:text-gray-600`                |
-  | Placeholder do campo, escuro           | `placeholder:text-gray-400` (4,11:1) | `dark:placeholder:text-gray-300`           |
-  | `primary` como texto no cartão, escuro | `text-primary` (4,25:1)              | `dark:text-primary-mild`                   |
-  | Texto do Badge, escuro                 | `text-white` (2,82:1)                | `text-neutral dark:text-gray-950` (7,02:1) |
-  | Fundo das iniciais do Avatar, claro    | `bg-gray-400` (2,31:1)               | `bg-gray-600` (7,17:1)                     |
-  | Item ativo do Menu na barra, escuro    | `text-primary` (4,25:1)              | `dark:text-primary-mild`                   |
-  | Texto do Switcher desligado, claro     | `text-white` (1,26:1)                | `text-gray-900`                            |
-  | Texto do Switcher ligado, escuro       | `text-white` (3,56:1)                | `dark:text-gray-950` (5,56:1)              |
-  | Item do Segment, claro                 | `text-gray-500` (4,35:1)             | `text-gray-600`                            |
-  | Item do Segment, escuro                | `dark:text-gray-400` (4,11:1)        | `dark:text-gray-200`                       |
-  | Foco no Segment, escuro                | `outline-ring` (2,91:1)              | `dark:outline-primary-mild` (3,50:1)       |
-  | Foco no campo do TimeInput, escuro     | `outline-none` (ring: 2,91:1)        | `dark:outline-primary-mild` (3,50:1)       |
+  | Uso                                       | No Ecme                              | No port                                    |
+  | ----------------------------------------- | ------------------------------------ | ------------------------------------------ |
+  | Texto do body, claro                      | `text-gray-500` (4,35:1)             | `text-gray-600` (7,17:1)                   |
+  | Placeholder do campo, claro               | `placeholder:text-gray-400` (2,31:1) | `placeholder:text-gray-600`                |
+  | Placeholder do campo, escuro              | `placeholder:text-gray-400` (4,11:1) | `dark:placeholder:text-gray-300`           |
+  | `primary` como texto no cartão, escuro    | `text-primary` (4,25:1)              | `dark:text-primary-mild`                   |
+  | Texto do Badge, escuro                    | `text-white` (2,82:1)                | `text-neutral dark:text-gray-950` (7,02:1) |
+  | Fundo das iniciais do Avatar, claro       | `bg-gray-400` (2,31:1)               | `bg-gray-600` (7,17:1)                     |
+  | Item ativo do Menu na barra, escuro       | `text-primary` (4,25:1)              | `dark:text-primary-mild`                   |
+  | Texto do Switcher desligado, claro        | `text-white` (1,26:1)                | `text-gray-900`                            |
+  | Texto do Switcher ligado, escuro          | `text-white` (3,56:1)                | `dark:text-gray-950` (5,56:1)              |
+  | Item do Segment, claro                    | `text-gray-500` (4,35:1)             | `text-gray-600`                            |
+  | Item do Segment, escuro                   | `dark:text-gray-400` (4,11:1)        | `dark:text-gray-200`                       |
+  | Foco no Segment, escuro                   | `outline-ring` (2,91:1)              | `dark:outline-primary-mild` (3,50:1)       |
+  | Foco no campo do TimeInput, escuro        | `outline-none` (ring: 2,91:1)        | `dark:outline-primary-mild` (3,50:1)       |
+  | Dia de outro mês no Calendar, claro       | `text-gray-400` (2,52:1)             | `text-gray-600` (7,81:1), sem negrito      |
+  | Dia de outro mês no Calendar, escuro      | `dark:text-gray-600` (1,94:1)        | `dark:text-gray-400` (6,00:1), sem negrito |
+  | Dia, mês e ano ativos no Calendar, escuro | `text-white` (3,56:1)                | `dark:text-gray-950` (5,56:1)              |
+  | Mês e ano do cabeçalho no hover, escuro   | `hover:text-primary` (4,25:1)        | `dark:hover:text-primary-mild` (5,11:1)    |
+  | Mês e ano da grade no hover, escuro       | `hover:bg-gray-100` (1,00:1)         | `dark:hover:bg-gray-600` (7,17:1)          |
 
   Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS`, no tema em
   que aparece.
