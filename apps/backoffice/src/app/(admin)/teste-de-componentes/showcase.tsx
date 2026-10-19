@@ -42,6 +42,7 @@ import { Tag } from '@/components/ui/Tag';
 import { TimeInput } from '@/components/ui/TimeInput';
 import { toast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { Upload } from '@/components/ui/Upload';
 
 import { DataTableShowcase } from './data-table-showcase.tsx';
 import { MenuShowcase } from './menu-showcase.tsx';
@@ -119,6 +120,10 @@ function isoNoFuso(date: Date | null, timeZone: string) {
   );
 }
 
+/** Arquivo já escolhido no Upload da vitrine: mostra a lista desde o servidor. */
+const PAUTA = new File(['%PDF-1.7'], 'pauta-da-semana.pdf', { type: 'application/pdf' });
+const ANEXOS_INICIAIS = [PAUTA];
+
 const NEXT_SORT: Record<ThSort, ThSort> = { none: 'asc', asc: 'desc', desc: 'asc' };
 
 /** Seções da vitrine (#205, #206): cada componente portado nas variantes que as telas vão usar. */
@@ -137,6 +142,7 @@ export function Showcase({ linkPage }: { linkPage: number }) {
   const [canais, setCanais] = useState<SegmentValue>(['site']);
   const [horario, setHorario] = useState<Date | null>(HORARIO_INICIAL);
   const [publicacao, setPublicacao] = useState<Date | null>(PUBLICACAO_INICIAL);
+  const [anexos, setAnexos] = useState(0);
   const [pagina, setPagina] = useState(1);
   const [ordem, setOrdem] = useState<ThSort>('none');
   return (
@@ -399,6 +405,31 @@ export function Showcase({ linkPage }: { linkPage: number }) {
         <p role="status" className="text-sm">
           Valor devolvido: {isoNoFuso(publicacao, FUSO_DO_SITE)}.
         </p>
+      </section>
+
+      <section aria-labelledby="vitrine-upload" className="space-y-3">
+        <h2 id="vitrine-upload" className="text-lg font-semibold">
+          Upload
+        </h2>
+        <Upload
+          draggable
+          multiple
+          className="w-full form-width"
+          onChange={(files) => setAnexos(files.length)}
+          onFileRemove={(files) => setAnexos(files.length)}
+        />
+        <p role="status" className="text-sm">
+          Anexos escolhidos: {anexos}.
+        </p>
+        <Upload
+          fileList={ANEXOS_INICIAIS}
+          fileListClass="form-width"
+          tip={<p className="mt-2 text-sm">PDF ou imagem, um por vez.</p>}
+          uploadLimit={1}
+        />
+        <Upload draggable disabled className="w-full form-width">
+          <span>Envio bloqueado</span>
+        </Upload>
       </section>
 
       <section aria-labelledby="vitrine-select" className="space-y-3">

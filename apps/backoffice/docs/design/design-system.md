@@ -14,8 +14,8 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 - **Componentes:** as primitivas do Ecme em `src/components/ui/` (uma pasta por componente,
   como no template: Alert, Avatar, Badge, Button, Card, Checkbox, Dialog, Drawer, Dropdown,
   Form, Input, InputGroup, Menu, Notification, Pagination, Radio, Segment, Select, Skeleton,
-  Spinner, Switcher, Table, Tabs, Tag, TimeInput, toast, Tooltip, e o Calendar e o
-  DateTimepicker, em `DatePicker/` como no template, com a prop `timeZone` para mostrar os dias e
+  Spinner, Switcher, Table, Tabs, Tag, TimeInput, toast, Tooltip, Upload (com o `FileItem`), e o
+  Calendar e o DateTimepicker, em `DatePicker/` como no template, com a prop `timeZone` para mostrar os dias e
   a hora de parede no fuso do site e devolver o instante; na troca de horário, a hora repetida
   vale a primeira ocorrência e a inexistente avança pelo salto) e as peças compostas em
   `src/components/shared/` (AdaptiveCard,
@@ -63,6 +63,9 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   | Dia, mês e ano ativos no Calendar, escuro | `text-white` (3,56:1)                | `dark:text-gray-950` (5,56:1)              |
   | Mês e ano do cabeçalho no hover, escuro   | `hover:text-primary` (4,25:1)        | `dark:hover:text-primary-mild` (5,11:1)    |
   | Mês e ano da grade no hover, escuro       | `hover:bg-gray-100` (1,00:1)         | `dark:hover:bg-gray-600` (7,17:1)          |
+  | Tamanho do arquivo no Upload, claro       | `text-gray-500` (4,35:1)             | `text-gray-600` (7,17:1)                   |
+  | Tamanho do arquivo no Upload, escuro      | `dark:text-gray-400` (4,11:1)        | `dark:text-gray-300` (6,99:1)              |
+  | Foco no remover arquivo do Upload, escuro | `outline-ring` (2,91:1)              | `dark:outline-primary-mild` (3,50:1)       |
 
   Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS`, no tema em
   que aparece.
