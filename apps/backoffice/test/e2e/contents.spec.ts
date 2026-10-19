@@ -16,6 +16,8 @@ import { analyzeTables } from './statistics.ts';
 // conteúdos (#107): num site próprio, gravado direto no banco e removido no fim.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
+/** Região dos toasts (#212): o retorno das ações vai para ela, fora do main (#326). */
+const toastRegion = (page: Page) => page.locator('[data-toast-placement="top-end"]');
 
 async function loginAs(page: Page, email: string): Promise<void> {
   await page.goto('/sites');
@@ -155,10 +157,10 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await alt.fill('Mesa organizada');
   await page.getByRole('button', { name: 'Criar conteúdo' }).click();
 
-  // Fica no editor do conteúdo criado, com a confirmação na barra (#109).
+  // Fica no editor do conteúdo criado (#109), com a confirmação no toast, fora do main (#326).
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos\/\d+\/editar$/);
   await expect(page.getByRole('heading', { name: `Editar “${title}”` })).toBeVisible();
-  await expect(page.getByRole('main').getByRole('status')).toHaveText('Conteúdo criado.');
+  await expect(toastRegion(page)).toContainText('Conteúdo criado.');
 
   await page.goto('/sites/exemplo-a/conteudos');
   const row = page.getByRole('row', { name: new RegExp(title) });
@@ -490,19 +492,47 @@ test.describe('barra de ações do editor (#109)', () => {
       }, position);
       await expect(save).toBeInViewport();
     }
-    const status = page.getByRole('main').getByRole('status');
+    const toast = toastRegion(page);
 
     await save.click();
-    await expect(status).toHaveText('Versão 2 salva.');
+    await expect(toast).toContainText('Versão 2 salva.');
     await expect(page).toHaveURL(new RegExp(`${editPath}$`));
     await expect(page.getByText('Partindo da versão 2;')).toBeVisible();
 
     // Salvar de novo sem mudar nada: nova versão, os mesmos 20 blocos.
     await save.click();
-    await expect(status).toHaveText('Versão 3 salva.');
+    await expect(toast).toContainText('Versão 3 salva.');
     await expect(page.getByRole('group', { name: /^Bloco \d+:/ })).toHaveCount(20);
     await expect(page.getByRole('main').getByRole('alert')).toHaveText('');
   });
+
+  // Remover bloco se desfaz pelo toast (#112, #326): sem região nem botão no rodapé.
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`remover bloco mostra o toast com Desfazer, que o devolve (${colorScheme})`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await loginAs(page, 'editor@orakel.local');
+      await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+      const blocks = page.getByRole('group', { name: /^Bloco \d+:/ });
+      await expect(blocks).toHaveCount(20);
+
+      await page.getByRole('button', { name: 'Remover bloco 2', exact: true }).click();
+      const undo = toastRegion(page).getByRole('button', { name: 'Desfazer' });
+      await expect(toastRegion(page)).toContainText('Bloco 2 removido.');
+      await expect(blocks).toHaveCount(19);
+      await expect(page.getByRole('main').getByRole('button', { name: 'Desfazer' })).toHaveCount(0);
+      await page.mouse.move(0, 0);
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+
+      await undo.click();
+      await expect(blocks).toHaveCount(20);
+      await expect(page.getByLabel('Título do sumário').nth(1)).toBeFocused();
+      await expect(toastRegion(page)).toContainText('Bloco 2 devolvido.');
+      await expect(undo).toHaveCount(0);
+    });
+  }
 
   test('com alterações não salvas, sair pede confirmação; depois de salvar, não (#111)', async ({
     page,
@@ -529,7 +559,7 @@ test.describe('barra de ações do editor (#109)', () => {
 
     // Depois de salvar, nenhuma pergunta: o link navega direto.
     await page.getByRole('button', { name: 'Salvar nova versão' }).click();
-    await expect(page.getByRole('main').getByRole('status')).toHaveText(/Versão \d+ salva\./);
+    await expect(toastRegion(page)).toContainText(/Versão \d+ salva\./);
     page.on('dialog', (dialog) => {
       dialogs.push(`inesperado: ${dialog.type()}`);
       void dialog.dismiss();
