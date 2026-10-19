@@ -1,4 +1,6 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/ConfigProvider/ConfigProvider.ts
+// Adaptado (#317): locale padrão `pt-br` (nome do locale no dayjs), não `en`: o Backoffice é só
+// pt-BR e nenhum ConfigProvider é montado, então o calendário lê este padrão.
 'use client';
 
 import { createContext, useContext } from 'react';
@@ -23,7 +25,7 @@ export type Config = {
 export const defaultConfig: Config = {
   direction: 'ltr',
   mode: 'light',
-  locale: 'en',
+  locale: 'pt-br',
   controlSize: SIZES.MD,
 } as const;
 

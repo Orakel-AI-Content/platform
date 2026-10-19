@@ -1238,11 +1238,177 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 3,
     ecme: 'outline-ring',
   },
+  // Calendar (#317), sobre o cartão (bg-white e dark:bg-gray-800, o fundo mais claro em que ele
+  // aparece no escuro; o painel do DateTimepicker, dark:bg-gray-900, dá mais contraste). Os dias
+  // da semana herdam o texto do cartão; o foco é o do cartão; desabilitado (opacity-30) fica
+  // fora, como na WCAG.
+  {
+    name: 'dia do mês',
+    theme: 'claro',
+    text: 'text-gray-700',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'dia de outro mês',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+    ecme: 'text-gray-400',
+  },
+  {
+    name: 'dia no hover',
+    theme: 'claro',
+    text: 'text-gray-700',
+    background: 'hover:bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'dia de outro mês no hover',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'hover:bg-gray-100',
+    minimum: 4.5,
+    ecme: 'text-gray-400',
+  },
+  {
+    name: 'dia selecionado',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'bg-primary',
+    minimum: 4.5,
+  },
+  {
+    name: 'marca de hoje',
+    theme: 'claro',
+    text: 'ring-primary',
+    background: 'bg-white',
+    minimum: 3,
+  },
+  {
+    name: 'mês e ano do cabeçalho',
+    theme: 'claro',
+    text: 'text-gray-900',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês e ano do cabeçalho no hover',
+    theme: 'claro',
+    text: 'hover:text-primary',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês ou ano na grade',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês ou ano na grade no hover',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'hover:bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês ou ano ativo',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'bg-primary',
+    minimum: 4.5,
+  },
+  {
+    name: 'dia do mês',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'dia de outro mês',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+    ecme: 'dark:text-gray-600',
+  },
+  {
+    name: 'dia no hover',
+    theme: 'escuro',
+    text: 'dark:hover:text-gray-300',
+    background: 'dark:hover:bg-gray-600',
+    minimum: 4.5,
+  },
+  {
+    name: 'dia de outro mês no hover',
+    theme: 'escuro',
+    text: 'dark:hover:text-gray-300',
+    background: 'dark:hover:bg-gray-600',
+    minimum: 4.5,
+  },
+  {
+    name: 'dia selecionado',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-primary',
+    minimum: 4.5,
+    ecme: 'text-neutral',
+  },
+  {
+    name: 'marca de hoje',
+    theme: 'escuro',
+    text: 'ring-primary',
+    background: 'dark:bg-gray-800',
+    minimum: 3,
+  },
+  {
+    name: 'mês e ano do cabeçalho',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês e ano do cabeçalho no hover',
+    theme: 'escuro',
+    text: 'dark:hover:text-primary-mild',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+    ecme: 'hover:text-primary',
+  },
+  {
+    name: 'mês ou ano na grade',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'mês ou ano na grade no hover',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:hover:bg-gray-600',
+    minimum: 4.5,
+    ecmeBackground: 'hover:bg-gray-100',
+  },
+  {
+    name: 'mês ou ano ativo',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-primary',
+    minimum: 4.5,
+    ecme: 'text-neutral',
+  },
 ];
 
-/** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`. */
+/** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`.
+ *  `ring-` é a marca de "hoje" do Calendar (#317), um contorno como o `outline-`. */
 function token(className: string): string {
-  const name = className.replace(/^(?:[\w-]+:)*(?:text|bg|outline)-/, '');
+  const name = className.replace(/^(?:[\w-]+:)*(?:text|bg|outline|ring)-/, '');
   return name === 'white' ? 'neutral' : name;
 }
 
