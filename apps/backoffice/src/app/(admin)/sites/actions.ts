@@ -5,6 +5,7 @@ import type { SiteConfig } from '@orakel/content-model/v1';
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
+import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteFormResult } from '@/components/sites/siteConfigFormValues.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
@@ -17,10 +18,8 @@ import {
 import { registerPolicyTrigger } from '@/domain/sites/policy-triggers.ts';
 import { createSite, updateSiteConfig } from '@/domain/sites/sites.ts';
 
-export type ActionState = { ok: boolean; message: string };
-
 /** "Publicar agora": a regra (papel, site pausado) fica no domínio. */
-export async function publishNow(siteId: string): Promise<ActionState> {
+export async function publishNow(siteId: string): Promise<ActionResult> {
   const actor = await currentActor();
   if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
   const result = await getDb().db.transaction((tx) => requestBuildNow(tx, actor.value, siteId));
@@ -78,7 +77,7 @@ async function siteOperation(
   siteId: string,
   run: (tx: Executor, actor: Actor) => Promise<Result<void>>,
   success: string,
-): Promise<ActionState> {
+): Promise<ActionResult> {
   const actor = await currentActor();
   if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
   const result = await getDb().db.transaction((tx) => run(tx, actor.value));
@@ -99,7 +98,7 @@ const STEP_LABEL: Record<ManualLifecycleStep, string> = {
 export async function advanceLifecycleAction(
   siteId: string,
   step: ManualLifecycleStep,
-): Promise<ActionState> {
+): Promise<ActionResult> {
   return siteOperation(
     siteId,
     (tx, actor) => advanceLifecycle(tx, actor, siteId, step),
@@ -108,7 +107,7 @@ export async function advanceLifecycleAction(
 }
 
 /** Registro do G1 do site, com observação opcional. */
-export async function registerG1Action(siteId: string, note: string): Promise<ActionState> {
+export async function registerG1Action(siteId: string, note: string): Promise<ActionResult> {
   const trimmed = note.trim();
   return siteOperation(
     siteId,
@@ -121,7 +120,7 @@ export async function registerG1Action(siteId: string, note: string): Promise<Ac
 export async function setBuildWindowAction(
   siteId: string,
   seconds: number | null,
-): Promise<ActionState> {
+): Promise<ActionResult> {
   return siteOperation(
     siteId,
     (tx, actor) => setBuildWindow(tx, actor, siteId, seconds),

@@ -19,6 +19,10 @@ test.afterAll(async () => {
   await removeSites(created);
 });
 
+// O retorno das ações vai para o toast (#324): sem a entrada animada, o axe não mede o texto
+// ainda transparente no meio do fade.
+test.use({ reducedMotion: 'reduce' });
+
 test('login pelo Access e registro de instâncias', async ({ page }) => {
   await page.goto('/sites');
 
@@ -119,8 +123,10 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await page.keyboard.press('Enter');
 
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-  // A confirmação do cadastro aparece no topo da lista (#159).
-  await expect(page.getByRole('main').getByRole('status')).toHaveText(`Site ${siteId} cadastrado.`);
+  // A confirmação do cadastro aparece no toast (#324).
+  await expect(
+    page.getByRole('status').filter({ hasText: `Site ${siteId} cadastrado.` }),
+  ).toBeVisible();
   const row = page.getByRole('row').filter({ hasText: siteId });
   await expect(row.getByText('Cadastrado', { exact: true })).toBeVisible();
 
@@ -299,11 +305,19 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   await indexar();
   await expect(status(page, 'versão 2')).toBeVisible();
 
-  // Janela própria e volta à padrão.
+  // Janela própria e volta à padrão; valor inválido dá erro no Alert junto da ação (#324).
   await page.goto(`/sites/${siteId}`);
+  const windowSection = page.getByRole('region', { name: 'Janela de agrupamento' });
+  await page.getByLabel('Janela própria (segundos)').fill('');
+  await page.getByRole('button', { name: 'Salvar janela' }).click();
+  await expect(windowSection.getByRole('alert')).toHaveText(
+    'Informe um número inteiro de segundos, 0 ou mais.',
+  );
   await page.getByLabel('Janela própria (segundos)').fill('30');
   await page.getByRole('button', { name: 'Salvar janela' }).click();
+  await expect(status(page, 'Janela de 30 s salva.')).toBeVisible();
   await expect(page.getByText('Janela efetiva: 30 s, própria')).toBeVisible();
+  await expect(windowSection.getByRole('alert')).toBeEmpty();
   await page.getByRole('button', { name: 'Usar padrão' }).click();
   await expect(page.getByText(/Janela efetiva: \d+ s( \(.+\))?, padrão/)).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
@@ -333,10 +347,13 @@ test('operação vê a publicação do site e o publica pela página', async ({ 
   await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
   await expect(value('Último build')).toHaveText(/^(—|Publicado|Falhou)/);
 
-  // Mesma ação da lista; o retorno vai para a região de status da seção.
+  // Mesma ação da lista; o sucesso vai para o toast e a seção fica sem erro (#324).
   await page.waitForLoadState('networkidle');
   await publication.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
-  await expect(publication.getByRole('status')).toHaveText('Build de exemplo-a enfileirado.');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Build de exemplo-a enfileirado.' }),
+  ).toBeVisible();
+  await expect(publication.getByRole('alert')).toBeEmpty();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 });
 
@@ -413,6 +430,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
     }
     await expect(page.getByLabel('Janela própria (segundos)')).toBeVisible();
     await page.waitForLoadState('networkidle');
+    // O erro de uma ação no Alert do Ecme, validado no navegador (sem gravar nada).
+    await page.getByLabel('Janela própria (segundos)').fill('');
+    await page.getByRole('button', { name: 'Salvar janela' }).click();
+    await expect(
+      page.getByRole('region', { name: 'Janela de agrupamento' }).getByRole('alert'),
+    ).not.toBeEmpty();
 
     await expectNoViolations(page);
   });

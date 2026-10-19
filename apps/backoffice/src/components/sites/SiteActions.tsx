@@ -1,47 +1,17 @@
 'use client';
 
-import {
-  createContext,
-  use,
-  useId,
-  useState,
-  useTransition,
-  type FormEvent,
-  type ReactNode,
-} from 'react';
+import { createContext, use, useId, useState, type FormEvent, type ReactNode } from 'react';
 
+import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
+import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { Button } from '@/components/ui/Button';
 import { FormItem } from '@/components/ui/Form';
 import Input from '@/components/ui/Input';
-import classNames from '@/components/ui/utils/classNames';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
-// Ações da página do site, no padrão do "Publicar agora": a Server Action delega ao domínio
-// e o retorno é anunciado em role=status. A página só as mostra com site.configure.
-
-type ActionState = { ok: boolean; message: string };
-
-function useAction() {
-  const [pending, startTransition] = useTransition();
-  const [status, setStatus] = useState<ActionState | null>(null);
-  const run = (action: () => Promise<ActionState>) =>
-    startTransition(async () => setStatus(await action()));
-  return { pending, status, setStatus, run };
-}
-
-function Status({ status }: { status: ActionState | null }) {
-  return (
-    <p
-      role="status"
-      className={classNames(
-        'text-sm',
-        status?.ok === false ? 'text-error' : 'text-gray-600 dark:text-gray-400',
-      )}
-    >
-      {status?.message}
-    </p>
-  );
-}
+// Ações da página do site, no padrão do "Publicar agora": a Server Action delega ao domínio,
+// o sucesso vai para o toast e o erro para o Alert junto da ação. A página só as mostra com
+// site.configure.
 
 const NEXT_STEP = {
   cadastrado: { step: 'infra_aplicada', label: 'Marcar infra aplicada' },
@@ -50,19 +20,19 @@ const NEXT_STEP = {
 
 type Step = (typeof NEXT_STEP)[keyof typeof NEXT_STEP]['step'];
 
-const LifecycleActionContext = createContext<ReturnType<typeof useAction> | null>(null);
+const LifecycleActionContext = createContext<ReturnType<typeof useActionResult> | null>(null);
 
 /**
  * Guarda o estado da ação do ciclo de vida fora do item da etapa: ao avançar, a página
- * revalida e o botão passa ao item seguinte (remontado), mas o retorno continua em role=status
- * logo abaixo do stepper (#148).
+ * revalida e o botão passa ao item seguinte (remontado), mas o erro continua no Alert logo
+ * abaixo do stepper (#148).
  */
 export function LifecycleActionScope({ children }: { children: ReactNode }) {
-  const state = useAction();
+  const state = useActionResult();
   return (
     <LifecycleActionContext value={state}>
       {children}
-      <Status status={state.status} />
+      <ActionAlert error={state.error} />
     </LifecycleActionContext>
   );
 }
@@ -76,7 +46,7 @@ export function LifecycleAction({
   action,
 }: {
   lifecycle: SiteSummary['lifecycle'];
-  action: (step: Step) => Promise<ActionState>;
+  action: (step: Step) => Promise<ActionResult>;
 }) {
   const scope = use(LifecycleActionContext);
   if (scope === null) throw new Error('LifecycleAction fora de um LifecycleActionScope.');
@@ -95,10 +65,10 @@ export function LifecycleAction({
 }
 
 /** Registro do G1 com observação opcional. */
-export function RegisterG1Form({ action }: { action: (note: string) => Promise<ActionState> }) {
+export function RegisterG1Form({ action }: { action: (note: string) => Promise<ActionResult> }) {
   const id = useId();
   const [note, setNote] = useState('');
-  const { pending, status, run } = useAction();
+  const { pending, error, run } = useActionResult();
   const submit = (event: FormEvent) => {
     event.preventDefault();
     run(() => action(note));
@@ -117,7 +87,7 @@ export function RegisterG1Form({ action }: { action: (note: string) => Promise<A
       <Button type="submit" variant="solid" disabled={pending}>
         {pending ? 'Registrando…' : 'Registrar G1'}
       </Button>
-      <Status status={status} />
+      <ActionAlert error={error} />
     </form>
   );
 }
@@ -128,16 +98,16 @@ export function BuildWindowForm({
   action,
 }: {
   own: number | null;
-  action: (seconds: number | null) => Promise<ActionState>;
+  action: (seconds: number | null) => Promise<ActionResult>;
 }) {
   const id = useId();
   const [value, setValue] = useState(own === null ? '' : String(own));
-  const { pending, status, setStatus, run } = useAction();
+  const { pending, error, fail, run } = useActionResult();
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const seconds = Number(value);
     if (value.trim() === '' || !Number.isInteger(seconds) || seconds < 0) {
-      setStatus({ ok: false, message: 'Informe um número inteiro de segundos, 0 ou mais.' });
+      fail('Informe um número inteiro de segundos, 0 ou mais.');
       return;
     }
     run(() => action(seconds));
@@ -174,7 +144,7 @@ export function BuildWindowForm({
           Usar padrão
         </Button>
       </div>
-      <Status status={status} />
+      <ActionAlert error={error} />
     </form>
   );
 }

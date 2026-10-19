@@ -1,13 +1,27 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import type { ActionResult } from '@/components/shared/actionResult.ts';
+import { toast, ToastProvider } from '@/components/ui/toast';
 
 import { LastBuildSummary, PendingCount, PublishNowPanel } from './SiteStatus.tsx';
 
 // Estado de publicação compartilhado pela lista de sites e pela página do site (#149).
 
-afterEach(cleanup);
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
+afterEach(async () => {
+  act(() => toast.removeAll());
+  await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
+  cleanup();
+});
 
 describe('pendências', () => {
   it('0 fica sem link', () => {
@@ -51,19 +65,38 @@ describe('último build', () => {
 });
 
 describe('Publicar agora de um site', () => {
-  it('anuncia o retorno numa região de status própria', async () => {
+  it('mostra o erro num Alert logo abaixo do botão', async () => {
     const user = userEvent.setup();
-    const publishNow = vi.fn(() =>
+    const publishNow = vi.fn((): Promise<ActionResult> =>
       Promise.resolve({ ok: false, message: 'Site pausado: não publica.' }),
     );
     render(<PublishNowPanel siteId="exemplo-a" action={publishNow} />);
+    const region = screen.getByRole('alert');
+
+    await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-a' }));
+
+    await waitFor(() => expect(region.textContent).toBe('Site pausado: não publica.'));
+    expect(region.querySelector('.alert')).not.toBeNull();
+    expect(publishNow).toHaveBeenCalledWith('exemplo-a');
+  });
+
+  it('o sucesso vai para o toast, sem Alert', async () => {
+    const user = userEvent.setup();
+    const publishNow = vi.fn((): Promise<ActionResult> =>
+      Promise.resolve({ ok: true, message: 'Build de exemplo-a enfileirado.' }),
+    );
+    render(
+      <>
+        <PublishNowPanel siteId="exemplo-a" action={publishNow} />
+        <ToastProvider />
+      </>,
+    );
 
     await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-a' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('status').textContent).toBe('Site pausado: não publica.'),
+      expect(screen.getByRole('status').textContent).toBe('Build de exemplo-a enfileirado.'),
     );
-    expect(screen.getByRole('status').className).toContain('text-error');
-    expect(publishNow).toHaveBeenCalledWith('exemplo-a');
+    expect(screen.getByRole('alert').textContent).toBe('');
   });
 });

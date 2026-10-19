@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import type { ActionResult } from '@/components/shared/actionResult.ts';
+import { toast, ToastProvider } from '@/components/ui/toast';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { SitesTable } from './SitesTable.tsx';
@@ -12,7 +15,15 @@ import { SitesTable } from './SitesTable.tsx';
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => '/sites' }));
 
-afterEach(() => {
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
+afterEach(async () => {
+  act(() => toast.removeAll());
+  await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
   cleanup();
   vi.clearAllMocks();
 });
@@ -156,24 +167,49 @@ describe('tabela de sites', () => {
     ]);
   });
 
-  it('"Publicar agora" fica fora do menu e anuncia numa única região de status', async () => {
+  it('"Publicar agora" fica fora do menu e o sucesso vai para o toast', async () => {
     const user = userEvent.setup();
-    const publishNow = vi.fn((siteId: string) =>
+    const publishNow = vi.fn((siteId: string): Promise<ActionResult> =>
       Promise.resolve({ ok: true, message: `Build de ${siteId} enfileirado.` }),
     );
-    render(<SitesTable rows={[site, { ...site, id: 'exemplo-b' }]} publishNow={publishNow} />);
+    render(
+      <>
+        <SitesTable rows={[site, { ...site, id: 'exemplo-b' }]} publishNow={publishNow} />
+        <ToastProvider />
+      </>,
+    );
 
-    expect(screen.getAllByRole('status')).toHaveLength(1);
     await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-b' }));
 
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('Build de exemplo-b enfileirado.'),
     );
+    expect(screen.getByRole('alert').textContent).toBe('');
     expect(publishNow).toHaveBeenCalledWith('exemplo-b');
   });
 
+  it('o erro de "Publicar agora" vai para um único Alert acima da tabela, fora da linha', async () => {
+    const user = userEvent.setup();
+    const publishNow = vi.fn((): Promise<ActionResult> =>
+      Promise.resolve({ ok: false, message: 'Site pausado.' }),
+    );
+    render(<SitesTable rows={[site, { ...site, id: 'exemplo-b' }]} publishNow={publishNow} />);
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-b' }));
+
+    const region = screen.getByRole('alert');
+    await waitFor(() => expect(region.textContent).toBe('Site pausado.'));
+    expect(region.querySelector('.alert')).not.toBeNull();
+    expect(
+      region.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it('site pausado não tem "Publicar agora"; o ativo tem (#155)', () => {
-    const publishNow = vi.fn(() => Promise.resolve({ ok: true, message: '' }));
+    const publishNow = vi.fn((): Promise<ActionResult> =>
+      Promise.resolve({ ok: true, message: '' }),
+    );
     render(
       <SitesTable
         rows={[site, { ...site, id: 'exemplo-b', state: 'pausado', pausedReason: 'cota' }]}
@@ -185,22 +221,30 @@ describe('tabela de sites', () => {
     expect(screen.queryByRole('button', { name: 'Publicar agora exemplo-b' })).toBeNull();
   });
 
-  it('acabou de cadastrar: anuncia a confirmação na região do topo e tira a marca da URL', async () => {
-    render(<SitesTable rows={[site]} created="exemplo-a" />);
+  it('acabou de cadastrar: anuncia a confirmação no toast e tira a marca da URL', async () => {
+    render(
+      <>
+        <SitesTable rows={[site]} created="exemplo-a" />
+        <ToastProvider />
+      </>,
+    );
 
     const status = screen.getByRole('status');
     await waitFor(() => expect(status.textContent).toBe('Site exemplo-a cadastrado.'));
-    // No topo: a região vem antes da tabela.
-    expect(
-      status.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(status.querySelector('.notification')).not.toBeNull();
     expect(router.replace).toHaveBeenCalledWith('/sites', { scroll: false });
   });
 
-  it('sem a marca de cadastro a região começa vazia e a URL fica como está', () => {
-    render(<SitesTable rows={[site]} />);
+  it('sem a marca de cadastro nada é anunciado e a URL fica como está', () => {
+    render(
+      <>
+        <SitesTable rows={[site]} />
+        <ToastProvider />
+      </>,
+    );
 
     expect(screen.getByRole('status').textContent).toBe('');
+    expect(screen.getByRole('alert').textContent).toBe('');
     expect(router.replace).not.toHaveBeenCalled();
   });
 

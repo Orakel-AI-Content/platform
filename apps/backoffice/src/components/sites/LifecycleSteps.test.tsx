@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { LifecycleSteps } from './LifecycleSteps.tsx';
 import { LifecycleAction, LifecycleActionScope } from './SiteActions.tsx';
+import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Ciclo de vida como sequência de etapas (#148): ordem fixa, estado em texto, a atual com
@@ -18,7 +19,7 @@ const items = () => within(screen.getByRole('list')).getAllByRole('listitem');
 
 const withAction = (
   lifecycle: Lifecycle,
-  action = () => Promise.resolve({ ok: true, message: '' }),
+  action = (): Promise<ActionResult> => Promise.resolve({ ok: true, message: '' }),
 ) => (
   <LifecycleActionScope>
     <LifecycleSteps
@@ -84,17 +85,24 @@ describe('etapas do ciclo de vida', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('o retorno da ação continua em role=status quando o botão muda de etapa', async () => {
+  it('o erro da ação continua no Alert abaixo da lista quando o botão muda de etapa', async () => {
     const user = userEvent.setup();
-    const action = () => Promise.resolve({ ok: true, message: 'Infra aplicada marcada.' });
+    const action = (): Promise<ActionResult> =>
+      Promise.resolve({ ok: false, message: 'A etapa anterior não foi concluída.' });
     const { rerender } = render(withAction('cadastrado', action));
+    const region = screen.getByRole('alert');
 
     await user.click(screen.getByRole('button', { name: 'Marcar infra aplicada' }));
-    expect((await screen.findByRole('status')).textContent).toBe('Infra aplicada marcada.');
+    await waitFor(() => expect(region.textContent).toBe('A etapa anterior não foi concluída.'));
+    expect(region.querySelector('.alert')).not.toBeNull();
 
-    // A página revalidada traz a etapa seguinte: o botão remonta em outro item.
+    // Uma revalidação que traga a etapa seguinte remonta o botão em outro item.
     rerender(withAction('infra_aplicada', action));
-    expect(screen.getByRole('status').textContent).toBe('Infra aplicada marcada.');
+    expect(screen.getByRole('alert').textContent).toBe('A etapa anterior não foi concluída.');
+    expect(
+      screen.getByRole('list').compareDocumentPosition(screen.getByRole('alert')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(items()[2]?.contains(screen.getByRole('button', { name: 'Marcar zona ativa' }))).toBe(
       true,
     );

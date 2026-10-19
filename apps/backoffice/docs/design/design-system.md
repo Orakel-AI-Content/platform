@@ -208,6 +208,17 @@ Não negociável, em toda tela e todo componente portado:
   ("Identificador copiado."); a falha (sem contexto seguro, permissão negada) mostra o
   identificador na mesma região, em `text-error`. Esc, o fundo ou "Fechar" fecham, e o foco
   volta à imagem.
+- **Retorno das ações:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
+  `src/components/shared/actionResult.ts`, importável pela Server Action), e
+  `useActionResult` (`src/components/shared/ActionFeedback.tsx`) o mostra num lugar só: o
+  sucesso num toast `Notification type="success"` (`toast.push`, anunciado pela região
+  `role="status"` do `ToastProvider`, também com diálogo aberto) e o erro num `Alert` do Ecme
+  (`type="danger"`) junto da ação, pelo `ActionAlert`. O Alert não tem papel de região viva:
+  o `ActionAlert` é um contêiner `role="alert"` sempre montado, que recebe o Alert quando há
+  erro. `run(ação)` roda numa transição e limpa o erro anterior; `fail(mensagem)` mostra a
+  validação local no mesmo Alert; `report(resultado)` serve ao botão com a própria transição
+  (o "Publicar agora" de cada linha). Nenhuma tela cria `role="status"` próprio para o retorno
+  de uma ação.
 - **Tabelas:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (colunas
   com `createColumnHelper` e `tableFeatures`); a biblioteca traz skills em
   `node_modules/@tanstack/react-table/skills/`. Tabela sem interação (só leitura: fila de
@@ -218,9 +229,9 @@ Não negociável, em toda tela e todo componente portado:
   Linha de tabela densa (lista de sites): no máximo duas linhas por célula, a principal e a
   secundária em `text-xs` (ex.: nome com `id · domínio` embaixo); texto longo é cortado
   (`truncate` com `max-w-*`) com o inteiro em `title`, em vez de quebrar. A ação principal da
-  linha fica visível e as demais vão para o menu "Mais ações"; o retorno de uma ação vai para
-  uma região `role="status"` da tabela, nunca para a linha. A lista de sites não rola na
-  horizontal a 1280px, nem no contêiner da tabela.
+  linha fica visível e as demais vão para o menu "Mais ações"; o sucesso de uma ação vai para o
+  toast e o erro para um `ActionAlert` acima da tabela, nunca para a linha. A lista de sites
+  não rola na horizontal a 1280px, nem no contêiner da tabela.
 - **Lista filtrada:** busca, filtros, ordenação e paginação no cliente, com o estado na URL.
   `useListState` (`src/components/shared/useListState.ts`) lê e grava `q` (busca), um parâmetro por
   filtro, `ordem` (id da coluna, com `-` na frente se decrescente) e `pagina` com
@@ -258,8 +269,9 @@ Não negociável, em toda tela e todo componente portado:
   processo de ordem fixa (ciclo de vida do site), não tag: `<ol>` com número, rótulo e o
   estado em texto ("concluída", "atual", "pendente"), além do estilo; a atual leva
   `aria-current="step"`. A ordem vem de `LIFECYCLE_ORDER` em `siteLabels.ts`. A ação manual
-  fica no item da etapa que ela conclui e o retorno em `role="status"` abaixo da lista
-  (`LifecycleActionScope`), que sobrevive à revalidação que move o botão de item.
+  fica no item da etapa que ela conclui; o sucesso vai para o toast e o erro para o
+  `ActionAlert` abaixo da lista (`LifecycleActionScope`), que sobrevive à revalidação que move o
+  botão de item.
 - **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela sem
   linhas, nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
   permissão, a mesma ação principal do cabeçalho (`emptyAction` das tabelas). Com a lista
@@ -296,8 +308,8 @@ Não negociável, em toda tela e todo componente portado:
   "Criando…", "Aprovando…" por quem chama), sem segundo envio. Quem fica na tela confirma
   devolvendo `{ success: mensagem }`: o texto aparece ao lado do botão, numa região
   `role="status"` em `text-success`, e some no próximo envio. Quem sai da tela confirma no
-  destino: o cadastro de site vai para `/sites?cadastrado=<id>`, e a tabela anuncia na região
-  do topo depois de montar e tira a marca da URL (como o `?criado=1` do conteúdo).
+  destino: o cadastro de site vai para `/sites?cadastrado=<id>`, e a tabela anuncia no toast
+  depois de montar e tira a marca da URL (como o `?criado=1` do conteúdo).
   Dentro de um formulário maior (`FormProvider`), `SchemaFields` desenha um schema sob um
   prefixo (`blocks.2`), com os caminhos completos no registro (`blocks.*.content`): é como o
   editor de conteúdo monta cada bloco, com o rodapé de ações no `StickyFooter`. Referências do
