@@ -7,6 +7,8 @@
 //   texto da área (`aria-labelledby`), ou "Escolher arquivo". Com `draggable` ele cobre a área
 //   (transparente, como no Ecme) e é o alvo do clique, do Tab, de Enter/Espaço e de soltar —
 //   comportamento nativo do navegador; a folha desenha o foco na área;
+// - o clique que o próprio <input> dispara ao abrir o seletor sobe até a área e não chama
+//   `click()` de novo (no Ecme, só a trava de reentrada do navegador evitava o laço);
 // - o botão de remover tem o nome "Remover <arquivo>" (no Ecme, "Fechar" para todos);
 // - `hover:border-primary` literal: montada por template, o Tailwind 4 não gerava a classe;
 // - textos padrão em pt-BR.
@@ -146,7 +148,7 @@ const Upload = (props: UploadProps) => {
   };
 
   const triggerUpload = (e: MouseEvent<HTMLDivElement>) => {
-    if (!disabled) {
+    if (!disabled && e.target !== fileInputField.current) {
       fileInputField.current?.click();
     }
     e.stopPropagation();
