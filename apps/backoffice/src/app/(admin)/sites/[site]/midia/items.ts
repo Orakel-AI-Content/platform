@@ -1,7 +1,7 @@
 import type { Media } from '@orakel/content-model/v1';
 import { mediaUrl } from '@orakel/core/v1';
 
-import type { MediaItem } from '@/components/media-library';
+import type { MediaItem } from '@/components/media/MediaLibrary';
 
 /**
  * Mídias por página na grade do editor (#180). Fica fora de `actions.ts` porque um módulo

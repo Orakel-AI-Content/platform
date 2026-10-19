@@ -157,7 +157,7 @@ Não negociável, em toda tela e todo componente portado:
   `aria-hidden`. Ação indisponível que deve continuar focável (o foco fica no botão depois de
   mover) usa `aria-disabled`, desenhado como indisponível (opacidade e cursor), e o `onClick`
   confere a condição; `disabled` só quando o foco não precisa ficar no botão.
-- **Diálogo de grade de miniaturas:** `MediaPicker` (`src/components/media-picker.tsx`), no
+- **Diálogo de grade de miniaturas:** `MediaPicker` (`src/components/media/MediaPicker.tsx`), no
   `Dialog` do Ecme. Um `Button` (`type="button"`, porque fica dentro de formulários, com
   `aria-haspopup="dialog"`) abre o diálogo controlado. Dentro ficam o título "Escolher imagem"
   (`h2` em `aria-labelledby`, com `closable={false}` e o "Fechar" ao lado) e a página de
@@ -167,9 +167,9 @@ Não negociável, em toda tela e todo componente portado:
   erro e vazio). A paginação só aparece depois da primeira página lida. Enquanto a próxima
   carrega, a grade anterior continua na tela, para o foco não se perder, e só a resposta mais
   recente vale. Escolher chama `onSelect(id)` e fecha; Esc, o fundo e "Fechar" fecham sem
-  escolher. A miniatura é a `MediaThumbnail` (`src/components/media-library.tsx`), a mesma da
+  escolher. A miniatura é a `MediaThumbnail` (`src/components/media/MediaLibrary.tsx`), a mesma da
   biblioteca.
-- **Detalhes da imagem:** `MediaDetails` (`src/components/media-details.tsx`): na biblioteca,
+- **Detalhes da imagem:** `MediaDetails` (`src/components/media/MediaDetails.tsx`): na biblioteca,
   cada imagem é um botão (`aria-haspopup="dialog"`) com a miniatura e a legenda "<nome> ·
   <data>", que abre o `Dialog` do Ecme, como o `MediaPicker`: nome no `h2`, miniatura e um
   `<dl>` com dimensões, formatos disponíveis, identificador e data de envio. "Copiar
@@ -201,27 +201,27 @@ Não negociável, em toda tela e todo componente portado:
   (`src/components/shared/DataTable.tsx`) traz o seletor de tamanho: a lista que declara
   `pageSizes` na `ListConfig` grava o tamanho em `por-pagina` (padrão 25, fora da URL), e mudar
   o tamanho volta à página 1.
-- **Datas:** `formatDateTime(data, fuso)` de `src/components/site-labels.ts`, sempre com o fuso
+- **Datas:** `formatDateTime(data, fuso)` de `src/components/shared/siteLabels.ts`, sempre com o fuso
   do site (`SiteSummary.timeZone`, da configuração corrente), nunca o do navegador nem um fixo:
   "01/10/2026, 09:00 BRT" (dia, mês, ano, hora e minuto, com a sigla ou o deslocamento, como
   "GMT+1" em Lisboa). Telas de um site usam `site.timeZone`; a lista de sites mostra cada linha
   no fuso do próprio site. Componente cliente recebe o fuso por prop, para o texto sair igual
   no servidor e no navegador.
 - **Estados:** a `Tag` do Ecme com o texto do estado e um ponto na cor dele (`prefixClass`,
-  pelo `StateTag` de `src/components/site-status.tsx`), sem ícone; o texto fica no cinza da
+  pelo `StateTag` de `src/components/sites/SiteStatus.tsx`), sem ícone; o texto fica no cinza da
   Tag e é o que distingue os estados sem cor. O mapa fica ao lado dos rótulos, em
-  `src/components/site-labels.ts` (`CONTENT_STATUS_TAG`, `SITE_STATE_VARIANT`,
+  `src/components/shared/siteLabels.ts` (`CONTENT_STATUS_TAG`, `SITE_STATE_VARIANT`,
   `BUILD_STATUS_VARIANT`, tipados por `StateTagColor`); nunca escreva a cor de um estado na
-  tela. O `site-labels.test.ts` reprova dois estados do mesmo grupo com a mesma cor.
+  tela. O `siteLabels.test.ts` reprova dois estados do mesmo grupo com a mesma cor.
   - Conteúdo: rascunho `bg-gray-400`, em revisão `bg-warning`, aprovado `bg-info`, agendado
     `bg-primary-mild`, publicado `bg-success`, despublicado `bg-error`.
   - Site: ativo `bg-success`, promovendo `bg-info`, pausado `bg-warning` (com o motivo no texto
     e no `title`, sempre visível na lista de sites).
   - Build: publicado `bg-success`, falhou `bg-error`.
-- **Sequência de etapas:** `LifecycleSteps` (`src/components/lifecycle-steps.tsx`) para um
+- **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
   processo de ordem fixa (ciclo de vida do site), não tag: `<ol>` com número, rótulo e o
   estado em texto ("concluída", "atual", "pendente"), além do estilo; a atual leva
-  `aria-current="step"`. A ordem vem de `LIFECYCLE_ORDER` em `site-labels.ts`. A ação manual
+  `aria-current="step"`. A ordem vem de `LIFECYCLE_ORDER` em `siteLabels.ts`. A ação manual
   fica no item da etapa que ela conclui e o retorno em `role="status"` abaixo da lista
   (`LifecycleActionScope`), que sobrevive à revalidação que move o botão de item.
 - **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela sem
@@ -269,10 +269,10 @@ Não negociável, em toda tela e todo componente portado:
   pelo `MediaPicker` e, com `{ optional: true }` para capa e avatar, "Remover"; `source` são as
   actions da leitura paginada e por IDs ligadas ao site pela página) e
   `entityField(opções, aviso)` (caixas de seleção para `authorIds` e `taxonomyIds`), em
-  `src/components/forms/picker-fields.tsx`. Campos registrados recebem `ref` (ligue ao controle
+  `src/components/forms/PickerFields.tsx`. Campos registrados recebem `ref` (ligue ao controle
   focável, para o foco do erro chegar) e `readOnly` (caminhos em `readOnly`). Para listas de
   texto, feature flags e opções de `RESOURCES`: `linesField`, `flagsField` e `choiceField`
-  (`src/components/forms/site-fields.tsx`). Nenhum formulário é escrito à mão: o da
+  (`src/components/forms/SiteFields.tsx`). Nenhum formulário é escrito à mão: o da
   configuração do site também usa o gerador (#47).
 - **Rich text:** TipTap só com o que o `RichTextSchema` aceita (`src/components/forms/`).
   Registre `richTextField('richText')` para texto e textos institucionais, e

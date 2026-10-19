@@ -1,4 +1,4 @@
-import { ContentsTable } from '@/components/contents-table';
+import { ContentsTable } from '@/components/contents/ContentsTable';
 import { listContents } from '@/domain/content/contents.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';

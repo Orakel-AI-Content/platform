@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import { backToSite, ForbiddenScreen } from '@/components/shared/ForbiddenScreen';
-import { editValues } from '@/components/site-config-form-values.ts';
-import { SiteConfigForm } from '@/components/site-config-form';
+import { editValues } from '@/components/sites/siteConfigFormValues.ts';
+import { SiteConfigForm } from '@/components/sites/SiteConfigForm';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { currentConfig } from '@/domain/sites/sites.ts';

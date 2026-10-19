@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { ReviewPanel } from '@/components/review-panel';
+import { ReviewPanel } from '@/components/review/ReviewPanel';
 import { can } from '@/domain/access/rbac.ts';
 import { REVIEW_CHECKLIST, reviewIssues } from '@/domain/reviews/reviews.ts';
 import { getEnv } from '@/env.ts';

@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { ContentVersionView } from '@/components/content-version-view';
+import { ContentVersionView } from '@/components/contents/ContentVersionView';
 import {
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_TAG,
   formatDateTime,
-} from '@/components/site-labels.ts';
+} from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { StateTag } from '@/components/site-status';
 import { PageHeader } from '@/components/shared/PageHeader';

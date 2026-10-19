@@ -1,4 +1,4 @@
-import { EntityTable } from '@/components/entity-table';
+import { EntityTable } from '@/components/editorial/EntityTable';
 import { listAuthors } from '@/domain/content/authors.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';

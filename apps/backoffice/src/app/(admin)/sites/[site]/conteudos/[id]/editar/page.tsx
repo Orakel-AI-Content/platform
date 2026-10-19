@@ -2,7 +2,7 @@ import { contentPath } from '@orakel/core/v1';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { ContentEditor } from '@/components/content-editor';
+import { ContentEditor } from '@/components/contents/ContentEditor';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';

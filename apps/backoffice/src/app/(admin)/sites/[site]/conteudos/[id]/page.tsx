@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { ContentVersionsTable } from '@/components/content-versions-table';
-import { CONTENT_KIND_LABEL } from '@/components/site-labels.ts';
+import { ContentVersionsTable } from '@/components/contents/ContentVersionsTable';
+import { CONTENT_KIND_LABEL } from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { SubmitForReview } from '@/components/submit-for-review';
+import { SubmitForReview } from '@/components/contents/SubmitForReview';
 import { can } from '@/domain/access/rbac.ts';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';

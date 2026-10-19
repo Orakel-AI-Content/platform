@@ -35,6 +35,8 @@ src/components/
 │                ListControls, useListState, useLeaveGuard…)
 ├── template/    a moldura: cabeçalho, barra lateral, menu, SiteSwitcher, SideNavContext
 ├── layouts/     layouts de página (CollapsibleSide)
+├── forms/       infraestrutura do SchemaForm: campos, rich text, schemaWalk (usada por
+│                sites/, contents/ e editorial/)
 └── <área>/      componentes de uma tela ou de uma área só (sites/, contents/, media/,
                  review/, editorial/)
 ```
@@ -55,7 +57,8 @@ para um site, inclua a tabela em `EXPORTED_TABLES` e chame `recordPendingChange`
 (só aditivo) → `pnpm db:migrate`.
 
 **Uma tela:** `src/app/(admin)/<rota>/page.tsx` (Server Component chamando o domínio);
-interação em componente cliente em `src/components/<área>/`; peça genérica em `shared/`;
+interação em componente cliente em `src/components/<área>/` (`sites/SitesTable.tsx`,
+`contents/ContentEditor.tsx`); campo de formulário em `forms/`; peça genérica em `shared/`;
 peça portada do Ecme em `src/components/ui/`, `shared/`, `template/` ou `layouts/`
 (`docs/migration/ecme.md`).
 

@@ -4,7 +4,7 @@ import type { Issue } from '@orakel/content-model';
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import type { ContentFormResult } from '@/components/content-editor-values.ts';
+import type { ContentFormResult } from '@/components/contents/contentEditorValues.ts';
 import { getDb } from '@/db/client.ts';
 import {
   createContent,

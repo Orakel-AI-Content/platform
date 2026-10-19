@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import type { SchemaFormIssue } from '@/components/forms/schema-form';
+import type { SchemaFormIssue } from '@/components/forms/SchemaForm';
 import { getDb } from '@/db/client.ts';
 import { approveVersion } from '@/domain/reviews/reviews.ts';
 

@@ -1,4 +1,4 @@
-import { ReviewQueueTable } from '@/components/review-queue-table';
+import { ReviewQueueTable } from '@/components/review/ReviewQueueTable';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { listReviewQueue } from '@/domain/content/contents.ts';
 import { PageHeader } from '@/components/shared/PageHeader';

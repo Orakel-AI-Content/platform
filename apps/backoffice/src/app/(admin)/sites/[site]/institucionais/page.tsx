@@ -1,4 +1,4 @@
-import { InstitutionalTextsForm } from '@/components/entity-forms';
+import { InstitutionalTextsForm } from '@/components/editorial/EntityForms';
 import { getInstitutionalTexts } from '@/domain/sites/sites.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { PageHeader } from '@/components/shared/PageHeader';

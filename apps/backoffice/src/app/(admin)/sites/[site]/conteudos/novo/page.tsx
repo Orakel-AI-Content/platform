@@ -1,4 +1,4 @@
-import { ContentEditor } from '@/components/content-editor';
+import { ContentEditor } from '@/components/contents/ContentEditor';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';

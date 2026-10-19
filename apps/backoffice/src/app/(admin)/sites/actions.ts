@@ -5,7 +5,7 @@ import type { SiteConfig } from '@orakel/content-model/v1';
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import type { SiteFormResult } from '@/components/site-config-form-values.ts';
+import type { SiteFormResult } from '@/components/sites/siteConfigFormValues.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
 import { requestBuildNow } from '@/domain/builds/builds.ts';
