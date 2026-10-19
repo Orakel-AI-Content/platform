@@ -1947,3 +1947,92 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(collapsed.violations).toEqual([]);
   });
 }
+
+// EllipsisButton, Container e BottomStickyBar (#322): o botão de "mais ações" com nome e ícone
+// oculto, e a barra de ações do formulário presa ao fim da janela, encostada nas bordas do
+// `main` (margem negativa igual ao gutter) em cada breakpoint.
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`EllipsisButton e BottomStickyBar: alvo de 24 px, foco de 2px, barra nas bordas do main e sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const ring = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--ring)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+
+    const bar = section(page, 'BottomStickyBar');
+    const buttons = [
+      section(page, 'EllipsisButton').getByRole('button', { name: 'Mais ações do site' }),
+      section(page, 'EllipsisButton').getByRole('button', { name: 'Mais ações', exact: true }),
+      bar.getByRole('button', { name: 'Mais ações do formulário' }),
+      bar.getByRole('button', { name: 'Descartar' }),
+      bar.getByRole('button', { name: 'Publicar' }),
+    ];
+    for (const button of buttons) {
+      await tabTo(page, button);
+      const box = await button.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(24);
+      expect(box?.height).toBeGreaterThanOrEqual(24);
+      expect(
+        await button.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            color: style.outlineColor,
+            style: style.outlineStyle,
+            width: style.outlineWidth,
+          };
+        }),
+      ).toEqual({ color: ring, style: 'solid', width: '2px' });
+    }
+    for (const button of [buttons[0]!, buttons[2]!]) {
+      await expect(button).toHaveText('');
+      await expect(button.locator('[aria-hidden="true"] svg')).toHaveCount(1);
+    }
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-ellipsis-button"]')
+      .include('[aria-labelledby="vitrine-container"]')
+      .include('[aria-labelledby="vitrine-barra-de-acoes"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+    expect(hydration).toEqual([]);
+  });
+}
+
+// Larguras dos três gutters do `main` (`px-4 sm:px-6 md:px-8`): abaixo de `sm`, entre `sm` e
+// `md` e acima de `md`.
+for (const width of [375, 700, 1280]) {
+  test(`BottomStickyBar presa ao fim da janela e encostada nas bordas do main (${width} px)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const publish = section(page, 'BottomStickyBar').getByRole('button', { name: 'Publicar' });
+    const barElement = publish.locator('xpath=ancestor::div[contains(@class, "sticky")][1]');
+
+    // No meio do formulário longo, o fim da seção está abaixo da janela: a barra gruda embaixo.
+    await page.locator('[data-vitrine-rolagem-barra]').evaluate((element) => {
+      element.scrollIntoView({ block: 'center' });
+    });
+    await expect(publish).toBeInViewport();
+    const barBox = (await barElement.boundingBox())!;
+    expect(Math.abs(barBox.y + barBox.height - 800)).toBeLessThanOrEqual(1);
+
+    const mainBox = (await page.locator('main#conteudo').boundingBox())!;
+    expect(Math.abs(barBox.x - mainBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(barBox.width - mainBox.width)).toBeLessThanOrEqual(1);
+  });
+}
