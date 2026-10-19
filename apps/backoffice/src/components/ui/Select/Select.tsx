@@ -13,7 +13,8 @@
 // Adaptado (#319):
 // - no múltiplo, o botão de remover do valor se chama "Remover <opção>" (o react-select diz
 //   "Remove <opção>"), e a região viva anuncia em pt-BR (seleção, remoção, foco no valor,
-//   resultados e guias de teclado); quem passar `components.MultiValueRemove`,
+//   resultados e guias de teclado); o valor em foco pelas setas ganha
+//   `select-multi-value-focused` (o Ecme não o distinguia); quem passar `components.MultiValueRemove`,
 //   `ariaLiveMessages` ou `screenReaderStatus` vence o padrão.
 'use client';
 
@@ -252,7 +253,8 @@ function Select<
         placeholder: () => cn('select-placeholder', 'text-gray-600 dark:text-gray-300'),
         indicatorsContainer: () => 'select-indicators-container',
         singleValue: () => 'select-single-value',
-        multiValue: () => 'select-multi-value',
+        multiValue: ({ isFocused }) =>
+          cn('select-multi-value', isFocused && 'select-multi-value-focused'),
         multiValueLabel: () => 'select-multi-value-label',
         multiValueRemove: () => 'select-multi-value-remove',
         menu: () => 'select-menu',

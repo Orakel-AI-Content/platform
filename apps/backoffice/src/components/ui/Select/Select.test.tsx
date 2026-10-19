@@ -241,6 +241,12 @@ describe('Select', () => {
       expect(document.getElementById('aria-focused')?.textContent).toBe(
         'valor Notícias em foco, 1 de 2.',
       );
+      expect(screen.getByText('Notícias').closest('.select-multi-value')?.className).toContain(
+        'select-multi-value-focused',
+      );
+      expect(screen.getByText('Guias').closest('.select-multi-value')?.className).not.toContain(
+        'select-multi-value-focused',
+      );
       await userEvent.keyboard('{Backspace}');
       expect(onChange).toHaveBeenLastCalledWith(
         [OPCOES[1]],
