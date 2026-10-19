@@ -1,28 +1,24 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-
+import type { ActionResult } from '@/components/shared/actionResult.ts';
+import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import { Button } from '@/components/ui/Button';
-import classNames from '@/components/ui/utils/classNames';
 
-// Botão "Enviar para revisão" da página do conteúdo (#74), no padrão das ações da página do
-// site: a Server Action delega ao domínio e o retorno é anunciado em role=status. A página o
-// monta para quem tem content.write; o botão só aparece com a versão mais recente em
-// rascunho (`available`). Depois do envio a página revalida e `available` vira false, mas o
-// componente continua montado: a mensagem de sucesso não se perde.
-
-type SubmitResult = { ok: boolean; message: string };
+// Botão "Enviar para revisão" da página do conteúdo (#74), no retorno padrão das ações: a
+// Server Action delega ao domínio, o sucesso vai para o toast e a recusa para o Alert junto
+// do botão. A página o monta para quem tem content.write; o botão só aparece com a versão
+// mais recente em rascunho (`available`). Depois do envio a página revalida e `available`
+// vira false; o toast, no layout raiz, continua.
 
 export function SubmitForReview({
   available,
   action,
 }: {
   available: boolean;
-  action: () => Promise<SubmitResult>;
+  action: () => Promise<ActionResult>;
 }) {
-  const [pending, startTransition] = useTransition();
-  const [status, setStatus] = useState<SubmitResult | null>(null);
-  if (!available && status === null) return null;
+  const { pending, error, run } = useActionResult();
+  if (!available && error === null) return null;
   return (
     <div className="space-y-2">
       {available && (
@@ -31,14 +27,12 @@ export function SubmitForReview({
           variant="solid"
           size="sm"
           disabled={pending}
-          onClick={() => startTransition(async () => setStatus(await action()))}
+          onClick={() => run(action)}
         >
           {pending ? 'Enviando…' : 'Enviar para revisão'}
         </Button>
       )}
-      <p role="status" className={classNames('text-sm', status?.ok === false && 'text-error')}>
-        {status?.message}
-      </p>
+      <ActionAlert error={error} />
     </div>
   );
 }

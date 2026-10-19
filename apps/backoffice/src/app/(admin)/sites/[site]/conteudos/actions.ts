@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import type { ContentFormResult } from '@/components/contents/contentEditorValues.ts';
+import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { getDb } from '@/db/client.ts';
 import {
   createContent,
@@ -76,14 +77,11 @@ export async function updateContentAction(
   return { ok: true, message: `Versão ${result.value.version} salva.`, id: contentId, saved };
 }
 
-/** Retorno do botão Enviar para revisão, anunciado em `role="status"`. */
-export type SubmitForReviewResult = { ok: boolean; message: string };
-
 /** Envia a versão mais recente (em rascunho) para revisão; a regra é do domínio. */
 export async function submitForReviewAction(
   siteId: string,
   contentId: number,
-): Promise<SubmitForReviewResult> {
+): Promise<ActionResult> {
   const actor = await currentActor();
   if (!actor.ok) return { ok: false, message: noSession.message };
   const result = await getDb().db.transaction((tx) =>

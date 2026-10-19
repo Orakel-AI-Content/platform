@@ -13,6 +13,7 @@ import * as z from 'zod';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
 import { clean, emptyValue } from '@/components/forms/schemaWalk.ts';
+import type { FormActionResult } from '@/components/shared/actionResult.ts';
 
 // Valores do editor de conteúdo (#45): metadados pelo schema do conteúdo e cada bloco pelo
 // schema do seu tipo. Bloco novo vai com `new: true` e sem `n` (o servidor numera).
@@ -117,12 +118,11 @@ export function savedFormValues(saved: unknown, sent: unknown): unknown {
 
 /** Retorno das Server Actions do editor (serializável; `path` aponta o campo). */
 export type ContentFormIssue = { path: (string | number)[]; message: string };
+type ContentForm = FormActionResult<ContentFormIssue>;
 export type ContentFormResult =
-  | {
-      ok: true;
-      message: string;
+  | (Extract<ContentForm, { ok: true }> & {
       id: number;
       /** Na edição, a versão recém-salva relida do servidor (blocos novos com o `n` dele). */
       saved?: Omit<Content, 'id'>;
-    }
-  | { ok: false; message: string; issues: ContentFormIssue[] };
+    })
+  | Extract<ContentForm, { ok: false }>;
