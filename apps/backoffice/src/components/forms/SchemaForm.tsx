@@ -16,6 +16,7 @@ import {
 } from 'react-hook-form';
 import * as z from 'zod';
 
+import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Checkbox from '@/components/ui/Checkbox';
@@ -618,22 +619,7 @@ export function SchemaForm<T>({
                 setSuccess(outcome.success);
                 return;
               }
-              const issues = outcome ?? [];
-              const top: string[] = [];
-              let focused = false;
-              for (const issue of issues) {
-                if (issue.path.length === 0) {
-                  top.push(issue.message);
-                  continue;
-                }
-                form.setError(
-                  issue.path.join('.'),
-                  { type: 'server', message: issue.message },
-                  { shouldFocus: !focused },
-                );
-                focused = true;
-              }
-              setGeneral(top);
+              setGeneral(applyServerIssues(form.setError, outcome ?? []));
             },
             () => {
               setSuccess('');

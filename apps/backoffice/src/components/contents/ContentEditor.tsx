@@ -25,6 +25,7 @@ import {
 import { richTextField } from '@/components/forms/RichTextField';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/SchemaForm';
 import { zonedDateTimeField } from '@/components/forms/ZonedDatetimeField';
+import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
 import { BLOCK_TYPE_LABEL } from '@/components/shared/siteLabels.ts';
 import { blockSummary, blockText } from '@/components/contents/blockSummary.ts';
 import { IconButton } from '@/components/shared/IconButton';
@@ -267,25 +268,12 @@ export function ContentEditor({
         router.refresh();
         return;
       }
-      const top: string[] = [];
-      let focused = false;
       revealErrors(
         result.issues.flatMap((issue) =>
           issue.path[0] === 'blocks' && typeof issue.path[1] === 'number' ? [issue.path[1]] : [],
         ),
       );
-      for (const issue of result.issues) {
-        if (issue.path.length === 0) {
-          top.push(issue.message);
-          continue;
-        }
-        form.setError(
-          issue.path.join('.'),
-          { type: 'server', message: issue.message },
-          { shouldFocus: !focused },
-        );
-        focused = true;
-      }
+      const top = applyServerIssues(form.setError, result.issues);
       setSummary(top.length > 0 ? top : [result.message]);
     });
 
