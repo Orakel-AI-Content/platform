@@ -35,6 +35,7 @@
 @import './styles/time-input.css';
 @import './styles/toast.css';
 @import './styles/tooltip.css';
+@import './styles/upload.css';
 
 /* Tema por classe no <html>, como no Ecme (#203): `dark` ou `light`, do cookie de tema ou, no
    modo sistema, do script inline do layout raiz (src/configs/theme.config.ts). */

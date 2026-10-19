@@ -1,0 +1,73 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_upload.css
+   Adaptado (#320), pela acessibilidade:
+   - com `draggable`, o <input> transparente que cobre a área recebe o foco; a área desenha o
+     contorno --ring de 2px da regra global quando ele tem foco de teclado;
+   - o tamanho do arquivo tem cor própria, `text-gray-600 dark:text-gray-300`: no Ecme herdava o
+     texto do body (`text-gray-500`, 4,35:1 sobre o `bg-gray-100` do item; `dark:text-gray-400`,
+     abaixo de 4,5:1 sobre o `dark:bg-gray-700`);
+   - o foco do botão de remover, no escuro, é `dark:outline-primary-mild`: o --ring sobre o
+     `dark:bg-gray-700` do item dá 2,91:1. */
+@layer components {
+  .upload {
+    @apply relative inline-block;
+
+    &.disabled {
+      @apply cursor-not-allowed opacity-60;
+
+      .upload-input {
+        @apply cursor-not-allowed;
+      }
+    }
+  }
+
+  .upload-input {
+    @apply absolute inset-0 hidden;
+
+    &.draggable {
+      @apply block opacity-0 w-full cursor-pointer;
+    }
+  }
+
+  .upload-draggable {
+    min-height: 7rem;
+    @apply border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer flex items-center justify-center;
+
+    &:has(.upload-input:focus-visible) {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+    }
+  }
+
+  .upload-file-list {
+    @apply mt-4;
+  }
+
+  .upload-file-info {
+    min-height: 4rem;
+    @apply flex flex-col justify-center ltr:ml-3 rtl:mr-3;
+  }
+
+  .upload-file {
+    @apply flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg mb-2 justify-between;
+  }
+
+  .upload-file-thumbnail {
+    @apply p-2 flex justify-center items-center min-h-16 w-16;
+  }
+
+  .upload-file-image {
+    @apply max-w-full;
+  }
+
+  .upload-file-size {
+    @apply text-gray-600 dark:text-gray-300;
+  }
+
+  .upload-file-remove {
+    @apply p-3 mx-2;
+
+    &:focus-visible {
+      @apply dark:outline-primary-mild;
+    }
+  }
+}
