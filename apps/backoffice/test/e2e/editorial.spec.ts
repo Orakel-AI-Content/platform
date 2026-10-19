@@ -45,6 +45,8 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await expectNoViolations(page);
   await page.getByRole('button', { name: 'Criar' }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/autores$/);
+  // O sucesso vai para o toast do template (#325), fora do main, e continua na lista.
+  await expect(page.getByRole('status').filter({ hasText: 'Autor criado.' })).toBeVisible();
   await page.getByLabel('Buscar por nome').fill(author.toUpperCase());
   await expect(page.getByRole('row', { name: new RegExp(author) })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
@@ -112,6 +114,23 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Resumo de validação do SchemaForm no Alert do Ecme (#325), nos dois temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`resumo de validação no Alert, sem violação do axe (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a/autores/novo');
+    await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+    await page.getByRole('button', { name: 'Criar' }).click();
+
+    const summary = page.getByRole('alert').filter({ hasText: 'Corrija os campos destacados:' });
+    await expect(summary.locator('.alert')).toBeVisible();
+    await summary.getByRole('button', { name: /^Nome:/ }).click();
+    await expect(page.getByLabel('Nome', { exact: true })).toBeFocused();
+    await expectNoViolations(page);
+  });
+}
+
 test('editor edita um item do menu e o vê na lista', async ({ page }) => {
   const label = `Guias ${Date.now()}`;
   await loginAs(page, 'editor@orakel.local');
@@ -148,7 +167,8 @@ test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   await expectNoViolations(page);
   await page.getByRole('button', { name: 'Salvar textos' }).click();
 
-  await expect(page.getByRole('main').getByRole('status')).toHaveText('Textos salvos.');
+  await expect(page.getByRole('status').filter({ hasText: 'Textos salvos.' })).toBeVisible();
+  await expectNoViolations(page);
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Sobre' })).toHaveText(text);
 });
