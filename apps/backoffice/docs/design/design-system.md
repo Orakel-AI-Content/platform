@@ -94,7 +94,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   listando os sites visíveis (`readVisibleSites`, uma leitura por requisição), cada um levando à
   mesma área (`sameAreaIn`: item, criar e editar caem na lista); o atual com
   `aria-current="true"`. Recolhida, a barra mostra as iniciais, com o nome na dica.
-- **Cabeçalho de página:** `PageHeader` (`src/app/(admin)/sites/[site]/editorial-page.tsx`),
+- **Cabeçalho de página:** `PageHeader` (`src/components/shared/PageHeader.tsx`),
   em toda tela de lista: trilha (`nav` "Trilha de navegação", com `aria-current="page"` no item
   atual; opcional, Sites é a raiz), título (`h1`) à esquerda e a ação principal à direita
   (`action`), que quebra para baixo em tela estreita. A página monta a ação no servidor e só a
