@@ -62,6 +62,13 @@ interação em componente cliente em `src/components/<área>/` (`sites/SitesTabl
 peça portada do Ecme em `src/components/ui/`, `shared/`, `template/` ou `layouts/`
 (`docs/migration/ecme.md`).
 
+**Uma entidade editorial (como autores, taxonomias e menus):** a configuração do tipo
+(schema, rótulos, títulos, lista) em `ENTITY_CONFIG` (`src/components/editorial/entityConfig.ts`,
+sem `'use client'`: o servidor lê); leitura e Server Actions no mapa `ROUTES` de
+`src/app/(admin)/sites/[site]/editorial-pages.tsx`. As rotas de lista, `novo/` e `[id]/` só
+chamam a fábrica (`editorialListPage`, `editorialCreatePage`, `editorialEditPage`) e
+exportam `default`, `generateMetadata` e o `export const dynamic`.
+
 **Uma rota da API:** `src/app/api/<…>/route.ts`, fina; token interno com `hasBearer`;
 erros com `problem()`. Rota interna nova: bloqueie o prefixo no `Caddyfile` e no Tunnel.
 

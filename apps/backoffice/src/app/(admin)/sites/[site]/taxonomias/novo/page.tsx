@@ -1,37 +1,7 @@
-import { EntityForm } from '@/components/editorial/EntityForms';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { siteTrail } from '@/components/shared/trail.ts';
+import { editorialCreatePage } from '../../editorial-pages.tsx';
 
-import { createTaxonomyAction } from '../../editorial-actions.ts';
-import { noWrite, sitePageContext } from '../../editorial-page.tsx';
+const page = editorialCreatePage('taxonomy');
 
+export default page.default;
+export const generateMetadata = page.generateMetadata;
 export const dynamic = 'force-dynamic';
-
-export const metadata = { title: 'Criar taxonomia' };
-
-export default async function NewTaxonomyPage({ params }: { params: Promise<{ site: string }> }) {
-  const { site: siteId } = await params;
-  const context = await sitePageContext(siteId);
-  if (!context.ok) return context.render;
-  const { site, canWrite } = context.value;
-  if (!canWrite) return noWrite(site.id);
-
-  return (
-    <section aria-labelledby="new-taxonomy-title" className="form-width space-y-4">
-      <PageHeader
-        id="new-taxonomy-title"
-        trail={siteTrail(site, { label: 'Taxonomias', segment: 'taxonomias' }, [
-          { label: 'Criar taxonomia' },
-        ])}
-        title="Criar taxonomia"
-      />
-      <EntityForm
-        kind="taxonomy"
-        mode="create"
-        siteId={site.id}
-        defaultValues={{ kind: 'category', slug: '', name: '' }}
-        action={createTaxonomyAction.bind(null, site.id)}
-      />
-    </section>
-  );
-}
