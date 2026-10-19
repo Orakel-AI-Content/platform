@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react';
+import {
+  useCallback,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+} from 'react';
 
 import { ListPagination, ListToolbar } from '@/components/shared/ListControls.tsx';
 import { MediaDetails } from '@/components/media/MediaDetails';
@@ -108,6 +116,7 @@ export function MediaLibrary({
   const [total, setTotal] = useState(initialTotal);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const fileId = useId();
 
   // Imagem pronta: relê a página atual para ela aparecer na grade.
   const reload = useCallback(() => {
@@ -163,11 +172,11 @@ export function MediaLibrary({
       {canWrite && (
         <form onSubmit={upload} className="flex flex-wrap items-end gap-3">
           <FormItem
-            htmlFor="media-file"
+            htmlFor={fileId}
             label="Imagens (JPEG, PNG, WebP ou AVIF, até 25 MB cada; ou solte aqui)"
             className="mb-0"
           >
-            <Input id="media-file" ref={fileInput} type="file" accept={ACCEPT} multiple required />
+            <Input id={fileId} ref={fileInput} type="file" accept={ACCEPT} multiple required />
           </FormItem>
           <Button type="submit" variant="solid">
             Enviar imagens
