@@ -126,11 +126,12 @@ describe('TimeInput', () => {
     expect(screen.getByRole('textbox', { name: 'Segundo' })).toHaveProperty('value', '00');
   });
 
-  it('desabilitado: os campos ficam desabilitados', () => {
-    render(<TimeInput disabled />);
+  it('desabilitado: os campos ficam desabilitados e não há como limpar', () => {
+    render(<TimeInput disabled defaultValue={at(10, 0)} />);
 
     expect(screen.getByRole('textbox', { name: 'Hora' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('textbox', { name: 'Minuto' })).toHaveProperty('disabled', true);
+    expect(screen.queryByRole('button', { name: 'Limpar horário' })).toBeNull();
   });
 
   it('no FormItem, o rótulo nomeia o campo de hora e o erro fica ligado aos campos', () => {

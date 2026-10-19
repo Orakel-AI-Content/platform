@@ -37,6 +37,7 @@ import { Switcher } from '@/components/ui/Switcher';
 import { Table, type ThSort } from '@/components/ui/Table';
 import { Tabs } from '@/components/ui/Tabs';
 import { Tag } from '@/components/ui/Tag';
+import { TimeInput } from '@/components/ui/TimeInput';
 import { toast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -75,6 +76,14 @@ const ARTIGOS = [
 ];
 
 /** Próxima ordenação do cabeçalho: sem ordem → ascendente → descendente → ascendente. */
+/** Horário fixo da vitrine (hora local dos dois lados): o servidor e o navegador desenham o mesmo. */
+const HORARIO_INICIAL = new Date(2026, 0, 1, 9, 30);
+
+function formatarHorario(date: Date | null) {
+  if (!date) return 'nenhum';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 const NEXT_SORT: Record<ThSort, ThSort> = { none: 'asc', asc: 'desc', desc: 'asc' };
 
 /** Seções da vitrine (#205, #206): cada componente portado nas variantes que as telas vão usar. */
@@ -91,6 +100,7 @@ export function Showcase({ linkPage }: { linkPage: number }) {
   const [tema, setTema] = useState<RadioValue>('claro');
   const [visualizacao, setVisualizacao] = useState<SegmentValue>('lista');
   const [canais, setCanais] = useState<SegmentValue>(['site']);
+  const [horario, setHorario] = useState<Date | null>(HORARIO_INICIAL);
   const [pagina, setPagina] = useState(1);
   const [ordem, setOrdem] = useState<ThSort>('none');
   return (
@@ -311,6 +321,29 @@ export function Showcase({ linkPage }: { linkPage: number }) {
         <p role="status" className="text-sm">
           Visualização: {String(visualizacao)}. Canais:{' '}
           {canais.length === 0 ? 'nenhum' : [canais].flat().join(', ')}.
+        </p>
+      </section>
+
+      <section aria-labelledby="vitrine-time-input" className="space-y-3">
+        <h2 id="vitrine-time-input" className="text-lg font-semibold">
+          TimeInput
+        </h2>
+        <FormContainer className="form-width">
+          <FormItem label="Horário de publicação">
+            <TimeInput value={horario} onChange={setHorario} />
+          </FormItem>
+          <FormItem label="Horário do lembrete" invalid errorMessage="Informe o horário">
+            <TimeInput />
+          </FormItem>
+          <FormItem label="Horário em 12 h">
+            <TimeInput format="12" showSeconds defaultValue={HORARIO_INICIAL} />
+          </FormItem>
+          <FormItem label="Horário bloqueado">
+            <TimeInput disabled defaultValue={HORARIO_INICIAL} />
+          </FormItem>
+        </FormContainer>
+        <p role="status" className="text-sm">
+          Horário de publicação: {formatarHorario(horario)}.
         </p>
       </section>
 

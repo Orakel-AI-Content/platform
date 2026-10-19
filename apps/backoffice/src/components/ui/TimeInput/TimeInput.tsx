@@ -8,7 +8,8 @@
 // - nomes dos campos em pt-BR ("Hora", "Minuto", "Segundo", "Período"); no FormItem, o campo de
 //   hora leva o nome do rótulo, que um `aria-label` encobriria;
 // - o botão de limpar chama-se "Limpar horário" (o CloseButton diria "Fechar") e o ícone do
-//   relógio fica `aria-hidden`.
+//   relógio fica `aria-hidden`;
+// - desabilitado, o botão de limpar não aparece: no Ecme ele seguia ativo e apagava o valor.
 'use client';
 
 import { useState, useRef } from 'react';
@@ -179,7 +180,7 @@ const TimeInput = (props: TimeInputProps) => {
   };
 
   const suffixSlot =
-    clearable && _value ? (
+    clearable && _value && !disabled ? (
       <CloseButton aria-label="Limpar horário" onClick={handleClear} />
     ) : (
       suffix
