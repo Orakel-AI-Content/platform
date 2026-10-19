@@ -9,7 +9,7 @@ apps/backoffice/
 │   ├── app/                     App Router: telas e route handlers
 │   │   ├── (admin)/             área autenticada (layout confere o Access)
 │   │   └── api/                 export/v1 (rede interna), health
-│   ├── components/              ui/, shared/, template/ e layouts/ (Ecme) e componentes de tela
+│   ├── components/              ver "Componentes" abaixo
 │   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, media, export, import, builds)
 │   ├── db/                      client.ts, schema/, site-ids.ts
 │   ├── auth/                    access-jwt.ts, internal-tokens.ts, request-actor.ts
@@ -24,6 +24,27 @@ apps/backoffice/
 
 Testes unitários ao lado do código (`src/**/*.test.ts`).
 
+## Componentes
+
+A organização e os nomes seguem o Ecme (`docs/migration/ecme.md`):
+
+```
+src/components/
+├── ui/          primitivos do Ecme, um por pasta (Button/, Table/, …), com hooks/ e utils/
+├── shared/      peças genéricas usadas por mais de uma área (EmptyState, StatusScreen,
+│                ListControls, useListState, useLeaveGuard…)
+├── template/    a moldura: cabeçalho, barra lateral, menu, SiteSwitcher, SideNavContext
+├── layouts/     layouts de página (CollapsibleSide)
+└── <área>/      componentes de uma tela ou de uma área só (sites/, contents/, media/,
+                 review/, editorial/)
+```
+
+Nomes de arquivo: PascalCase para componente e contexto (`EmptyState.tsx`,
+`SideNavContext.tsx`), camelCase para hook (`useListState.ts`, com o nome do hook) e para
+utilitário (`listQuery.ts`, `navigationTarget.ts`). O teste leva o nome do arquivo
+(`EmptyState.test.tsx`). Um componente que passa a ser usado por outra área sobe para
+`shared/`.
+
 ## Como acrescentar
 
 **Um módulo de domínio:** `src/domain/<módulo>/` com funções `(executor, actor, …) →
@@ -34,8 +55,9 @@ para um site, inclua a tabela em `EXPORTED_TABLES` e chame `recordPendingChange`
 (só aditivo) → `pnpm db:migrate`.
 
 **Uma tela:** `src/app/(admin)/<rota>/page.tsx` (Server Component chamando o domínio);
-interação em componente cliente em `src/components/`; peça portada do Ecme em
-`src/components/ui/`, `shared/`, `template/` ou `layouts/` (`docs/migration/ecme.md`).
+interação em componente cliente em `src/components/<área>/`; peça genérica em `shared/`;
+peça portada do Ecme em `src/components/ui/`, `shared/`, `template/` ou `layouts/`
+(`docs/migration/ecme.md`).
 
 **Uma rota da API:** `src/app/api/<…>/route.ts`, fina; token interno com `hasBearer`;
 erros com `problem()`. Rota interna nova: bloqueie o prefixo no `Caddyfile` e no Tunnel.

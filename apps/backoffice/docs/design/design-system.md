@@ -71,7 +71,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 ## Moldura
 
 - **Moldura e barra lateral:** o `(admin)/layout.tsx` usa o `CollapsibleSide` do Ecme
-  (`src/components/layouts/collapsible-side.tsx`), o único layout do template que entra.
+  (`src/components/layouts/CollapsibleSide.tsx`), o único layout do template que entra.
   `SideNav` à esquerda (290px, 80px recolhida pelo `SideNavToggle`; medidas em
   `src/components/template/constants.ts`) com a marca "Orakel Backoffice", `nav "Principal"`
   com os itens globais e, dentro de um site que a pessoa vê, o seletor de site e
@@ -85,7 +85,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   (`filterNavigation`, com `can()`; Textos institucionais só com `content.write`). A barra marca
   o item pelo endereço (`activeNavigationKey`, por `usePathname`), com `aria-current="page"`,
   também nas telas de item; Configuração e Pendências marcam a Visão geral. O seletor
-  (`SiteSwitcher`, `src/components/site-switcher.tsx`) é o `Dropdown` do Ecme com o nome do site,
+  (`SiteSwitcher`, `src/components/template/SiteSwitcher.tsx`) é o `Dropdown` do Ecme com o nome do site,
   listando os sites visíveis (`readVisibleSites`, uma leitura por requisição), cada um levando à
   mesma área (`sameAreaIn`: item, criar e editar caem na lista); o atual com
   `aria-current="true"`. Recolhida, a barra mostra as iniciais, com o nome na dica.
@@ -181,13 +181,13 @@ Não negociável, em toda tela e todo componente portado:
   uma região `role="status"` da tabela, nunca para a linha. A lista de sites não rola na
   horizontal a 1280px, nem no contêiner da tabela.
 - **Lista filtrada:** busca, filtros, ordenação e paginação no cliente, com o estado na URL.
-  `useListState` (`src/components/list-state.ts`) lê e grava `q` (busca), um parâmetro por
+  `useListState` (`src/components/shared/useListState.ts`) lê e grava `q` (busca), um parâmetro por
   filtro, `ordem` (id da coluna, com `-` na frente se decrescente) e `pagina` com
   `router.replace` (sem entrada no histórico por tecla); valor padrão não aparece na URL e
   parâmetro inválido cai no padrão. A tabela usa `listFeatures` e recebe `list.table` no
   `useTable`. A busca ignora maiúsculas e acentos (`normalizeText`) e só olha as colunas com
   `enableGlobalFilter`; mudar a busca ou um filtro volta à página 1. Controles de
-  `src/components/list-controls.tsx`, nos componentes do Ecme: `ListToolbar` acima da tabela
+  `src/components/shared/ListControls.tsx`, nos componentes do Ecme: `ListToolbar` acima da tabela
   (busca no `Input` com rótulo visível do que procura, um `Select` por filtro com "Todos", e
   "Limpar filtros" só com algo ativo); `SortableHead` no lugar do `Th` de coluna ordenável
   (`aria-sort` no `th` e o sentido no nome do botão); e `ListPagination` abaixo, com a contagem
@@ -219,11 +219,11 @@ Não negociável, em toda tela e todo componente portado:
   `aria-current="step"`. A ordem vem de `LIFECYCLE_ORDER` em `site-labels.ts`. A ação manual
   fica no item da etapa que ela conclui e o retorno em `role="status"` abaixo da lista
   (`LifecycleActionScope`), que sobrevive à revalidação que move o botão de item.
-- **Estado vazio:** `EmptyState` (`src/components/empty-state.tsx`) no lugar da tabela sem
+- **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela sem
   linhas, nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
   permissão, a mesma ação principal do cabeçalho (`emptyAction` das tabelas). Com a lista
   vazia, a ação aparece duas vezes; no E2E, clique na primeira (a do cabeçalho).
-- **Telas de estado:** `StatusScreen` (`src/components/status-screen.tsx`), com título (`h1`),
+- **Telas de estado:** `StatusScreen` (`src/components/shared/StatusScreen.tsx`), com título (`h1`),
   uma frase do que aconteceu e o que fazer, e a ação de saída (link de volta ou "Tentar de
   novo"). "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo
   catch-all `(admin)/[...rest]` e para o site inexistente), erro (`(admin)/error.tsx` e
