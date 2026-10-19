@@ -604,6 +604,82 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// DateTimepicker (#318): o site em Lisboa e o navegador em São Paulo; o campo, o calendário e o
+// horário mostram a hora de parede de Lisboa e o valor devolvido é o instante dela (ISO com o
+// offset de Lisboa). Enter e Espaço abrem o painel, Esc fecha e devolve o foco ao campo.
+test.describe('DateTimepicker no fuso do site', () => {
+  test.use({ timezoneId: 'America/Sao_Paulo' });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`DateTimepicker pelo teclado, sem violação do axe com o painel aberto (${colorScheme})`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme });
+      await login(page);
+      const hydration = hydrationMessages(page);
+      await page.goto(SHOWCASE);
+      await page.waitForLoadState('networkidle');
+      expect(await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone)).toBe(
+        'America/Sao_Paulo',
+      );
+
+      const pickers = section(page, 'DateTimepicker');
+      const status = pickers.getByRole('status');
+      const field = pickers.getByRole('combobox', { name: 'Data de publicação' });
+      const panel = page.getByRole('dialog', { name: 'Escolher data e hora' });
+      await expect(field).toHaveValue('15/07/2026 13:00');
+      await expect(status).toHaveText('Valor devolvido: 2026-07-15T13:00:00+01:00.');
+      await expect(pickers.getByRole('combobox', { name: 'Data bloqueada' })).toBeDisabled();
+
+      // Enter abre o painel com o foco nele; Esc fecha e devolve o foco ao campo.
+      await tabTo(page, field);
+      await page.keyboard.press('Enter');
+      await expect(panel).toBeVisible();
+      await expect(field).toHaveAttribute('aria-expanded', 'true');
+      await expect
+        .poll(() => panel.evaluate((element) => element.contains(document.activeElement)))
+        .toBe(true);
+      await expect(
+        panel.getByRole('button', { name: '15 de julho de 2026', pressed: true }),
+      ).toBeVisible();
+      await expect(panel.getByRole('textbox', { name: 'Hora' })).toHaveValue('13');
+
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(WCAG)
+        .include('[aria-labelledby="vitrine-date-time-picker"]')
+        .exclude('[data-floating-ui-focus-guard]')
+        .analyze();
+      expect(accessibility.violations).toEqual([]);
+
+      await page.keyboard.press('Escape');
+      await expect(panel).toBeHidden();
+      await expect(field).toBeFocused();
+
+      // Espaço também abre; o dia e a hora escolhidos voltam como hora de parede de Lisboa.
+      await page.keyboard.press('Space');
+      await expect(panel).toBeVisible();
+      await panel.getByRole('button', { name: '20 de julho de 2026' }).click();
+      await expect(status).toHaveText('Valor devolvido: 2026-07-20T13:00:00+01:00.');
+      await panel.getByRole('textbox', { name: 'Hora' }).click();
+      await page.keyboard.type('09');
+      await expect(status).toHaveText('Valor devolvido: 2026-07-20T09:00:00+01:00.');
+      await panel.getByRole('button', { name: 'OK' }).click();
+      await expect(panel).toBeHidden();
+      await expect(field).toHaveValue('20/07/2026 09:00');
+      await expect(field).toBeFocused();
+
+      // Limpar pelo teclado.
+      const clear = pickers.getByRole('button', { name: 'Limpar data e hora' });
+      await tabTo(page, clear);
+      await page.keyboard.press('Enter');
+      await expect(field).toHaveValue('');
+      await expect(status).toHaveText('Valor devolvido: nenhum.');
+
+      expect(hydration).toEqual([]);
+    });
+  }
+});
+
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`Select pelo teclado: rótulo, setas, Enter e Esc, sem violação do axe com o menu aberto (${colorScheme})`, async ({
     page,

@@ -14,8 +14,11 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 - **Componentes:** as primitivas do Ecme em `src/components/ui/` (uma pasta por componente,
   como no template: Alert, Avatar, Badge, Button, Card, Checkbox, Dialog, Drawer, Dropdown,
   Form, Input, InputGroup, Menu, Notification, Pagination, Radio, Segment, Select, Skeleton,
-  Spinner, Switcher, Table, Tabs, Tag, TimeInput, toast, Tooltip, e o Calendar, em `DatePicker/`
-  como no template, com a prop `timeZone` para mostrar os dias no fuso do site) e as peças compostas em `src/components/shared/` (AdaptiveCard,
+  Spinner, Switcher, Table, Tabs, Tag, TimeInput, toast, Tooltip, e o Calendar e o
+  DateTimepicker, em `DatePicker/` como no template, com a prop `timeZone` para mostrar os dias e
+  a hora de parede no fuso do site e devolver o instante; na troca de horário, a hora repetida
+  vale a primeira ocorrência e a inexistente avança pelo salto) e as peças compostas em
+  `src/components/shared/` (AdaptiveCard,
   ConfirmDialog, DataTable, Loading, StickyFooter e o `IconButton`, que não tem equivalente no
   template). Componente que a tela precisa e ainda não foi portado: copie a fonte do Ecme,
   mantendo a API e a aparência, e mude só o que Next, acessibilidade e tipos pedem. Porte sob

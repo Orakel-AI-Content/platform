@@ -61,9 +61,18 @@ export function toZonedDate(date: Date, timeZone?: string): Date {
   );
 }
 
+/** Offset do fuso no instante, em milissegundos (hora de parede − UTC). */
+function offsetAt(instant: number, timeZone: string): number {
+  return wallAsUtc(instant, timeZone) - instant;
+}
+
+const HALF_DAY = 12 * 3_600_000;
+
 /**
- * `Date` local com a hora de parede do fuso → instante. O offset é medido duas vezes porque o da
- * primeira estimativa pode ser o do outro lado de uma troca de horário de verão.
+ * `Date` local com a hora de parede do fuso → instante. Na troca de horário (#318), a regra
+ * `compatible` do Temporal: hora repetida (atraso) vale a primeira ocorrência, o offset de antes,
+ * como o `localToIso` do `ZonedDatetimeField` grava; hora inexistente (adiantamento) avança pelo
+ * tamanho do salto (01:30 de Lisboa no fim de março vira 02:30 de verão).
  */
 export function fromZonedDate(date: Date, timeZone?: string): Date {
   if (!timeZone) return date;
@@ -76,6 +85,10 @@ export function fromZonedDate(date: Date, timeZone?: string): Date {
     date.getSeconds(),
     date.getMilliseconds(),
   );
-  const firstGuess = wall - (wallAsUtc(wall, timeZone) - wall);
-  return new Date(wall - (wallAsUtc(firstGuess, timeZone) - firstGuess));
+  // Os offsets possíveis são o de antes e o de depois de uma eventual troca (12 h de folga).
+  const before = offsetAt(wall - HALF_DAY, timeZone);
+  const after = offsetAt(wall + HALF_DAY, timeZone);
+  const fits = [before, after].filter((offset) => offsetAt(wall - offset, timeZone) === offset);
+  // Nenhum serve: hora inexistente, lida com o offset de antes, cai depois do salto.
+  return new Date(wall - (fits[0] ?? before));
 }

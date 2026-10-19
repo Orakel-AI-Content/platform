@@ -20,6 +20,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Checkbox, type CheckboxGroupValue } from '@/components/ui/Checkbox';
+import { DateTimepicker } from '@/components/ui/DatePicker';
+import { toZonedDate } from '@/components/ui/DatePicker/utils';
 import { Dialog } from '@/components/ui/Dialog';
 import { Drawer } from '@/components/ui/Drawer';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -84,6 +86,39 @@ function formatarHorario(date: Date | null) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/** Fuso do site na vitrine do DateTimepicker (#318): outro que o do navegador e o do servidor. */
+const FUSO_DO_SITE = 'Europe/Lisbon';
+
+/** Instante fixo da vitrine: 13:00 de 15/07/2026 em Lisboa (verão, UTC+1). */
+const PUBLICACAO_INICIAL = new Date('2026-07-15T12:00:00Z');
+
+/** Instante → ISO com o offset do fuso naquele instante, como o `IsoDateTimeSchema` grava. */
+function isoNoFuso(date: Date | null, timeZone: string) {
+  if (!date) return 'nenhum';
+  const wall = toZonedDate(date, timeZone);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const seconds = Math.floor(date.getTime() / 1000) * 1000;
+  const offset = Math.round(
+    (Date.UTC(
+      wall.getFullYear(),
+      wall.getMonth(),
+      wall.getDate(),
+      wall.getHours(),
+      wall.getMinutes(),
+      wall.getSeconds(),
+    ) -
+      seconds) /
+      60_000,
+  );
+  const sign = offset < 0 ? '-' : '+';
+  const abs = Math.abs(offset);
+  return (
+    `${wall.getFullYear()}-${pad(wall.getMonth() + 1)}-${pad(wall.getDate())}` +
+    `T${pad(wall.getHours())}:${pad(wall.getMinutes())}:${pad(wall.getSeconds())}` +
+    `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
+  );
+}
+
 const NEXT_SORT: Record<ThSort, ThSort> = { none: 'asc', asc: 'desc', desc: 'asc' };
 
 /** Seções da vitrine (#205, #206): cada componente portado nas variantes que as telas vão usar. */
@@ -101,6 +136,7 @@ export function Showcase({ linkPage }: { linkPage: number }) {
   const [visualizacao, setVisualizacao] = useState<SegmentValue>('lista');
   const [canais, setCanais] = useState<SegmentValue>(['site']);
   const [horario, setHorario] = useState<Date | null>(HORARIO_INICIAL);
+  const [publicacao, setPublicacao] = useState<Date | null>(PUBLICACAO_INICIAL);
   const [pagina, setPagina] = useState(1);
   const [ordem, setOrdem] = useState<ThSort>('none');
   return (
@@ -344,6 +380,24 @@ export function Showcase({ linkPage }: { linkPage: number }) {
         </FormContainer>
         <p role="status" className="text-sm">
           Horário de publicação: {formatarHorario(horario)}.
+        </p>
+      </section>
+
+      <section aria-labelledby="vitrine-date-time-picker" className="space-y-3">
+        <h2 id="vitrine-date-time-picker" className="text-lg font-semibold">
+          DateTimepicker
+        </h2>
+        <p className="text-sm">Fuso do site: {FUSO_DO_SITE}.</p>
+        <FormContainer className="form-width">
+          <FormItem label="Data de publicação">
+            <DateTimepicker value={publicacao} timeZone={FUSO_DO_SITE} onChange={setPublicacao} />
+          </FormItem>
+          <FormItem label="Data bloqueada">
+            <DateTimepicker disabled defaultValue={PUBLICACAO_INICIAL} timeZone={FUSO_DO_SITE} />
+          </FormItem>
+        </FormContainer>
+        <p role="status" className="text-sm">
+          Valor devolvido: {isoNoFuso(publicacao, FUSO_DO_SITE)}.
         </p>
       </section>
 
