@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { toast, ToastProvider } from '@/components/ui/toast';
+import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { LastBuildSummary, PendingCount, PublishNowPanel } from './SiteStatus.tsx';
 
@@ -17,10 +19,25 @@ beforeAll(() => {
 afterAll(() => {
   MotionGlobalConfig.skipAnimations = false;
 });
+// "Publicar agora" confirma num diálogo (#327), que esconde o contêiner da app.
+let app: HTMLElement;
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
+
+/** Confirma no diálogo de "Publicar agora". */
+async function confirmPublish(user: ReturnType<typeof userEvent.setup>, siteId: string) {
+  const dialog = await screen.findByRole('alertdialog', { name: `Publicar ${siteId} agora?` });
+  await user.click(within(dialog).getByRole('button', { name: 'Publicar' }));
+}
 afterEach(async () => {
   act(() => toast.removeAll());
   await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
   cleanup();
+  app.remove();
 });
 
 describe('pendências', () => {
@@ -74,6 +91,7 @@ describe('Publicar agora de um site', () => {
     const region = screen.getByRole('alert');
 
     await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-a' }));
+    await confirmPublish(user, 'exemplo-a');
 
     await waitFor(() => expect(region.textContent).toBe('Site pausado: não publica.'));
     expect(region.querySelector('.alert')).not.toBeNull();
@@ -93,10 +111,36 @@ describe('Publicar agora de um site', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-a' }));
+    await confirmPublish(user, 'exemplo-a');
 
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('Build de exemplo-a enfileirado.'),
     );
     expect(screen.getByRole('alert').textContent).toBe('');
+  });
+
+  it('pede confirmação na cor de erro; Cancelar e Esc não publicam e devolvem o foco', async () => {
+    const user = userEvent.setup();
+    const publishNow = vi.fn((): Promise<ActionResult> =>
+      Promise.resolve({ ok: true, message: 'Build de exemplo-a enfileirado.' }),
+    );
+    render(<PublishNowPanel siteId="exemplo-a" action={publishNow} />);
+    const button = screen.getByRole('button', { name: 'Publicar agora exemplo-a' });
+    expect(button.className).toContain('text-error');
+
+    await user.click(button);
+    const dialog = screen.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
+    expect(within(dialog).getByRole('button', { name: 'Publicar' }).className).toContain(
+      'bg-error',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(document.activeElement).toBe(button);
+    await user.keyboard('{Enter}');
+    await screen.findByRole('alertdialog');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(document.activeElement).toBe(button);
+    expect(publishNow).not.toHaveBeenCalled();
   });
 });
