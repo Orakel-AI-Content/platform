@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Block } from '@orakel/content-model/v1';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Fragment, useEffect, useId, useState, useTransition, type ComponentProps } from 'react';
 import { PiArrowDown, PiArrowUp, PiCaretDown, PiCaretRight, PiPlus, PiTrash } from 'react-icons/pi';
 import { FormProvider, get, useFieldArray, useForm, type FieldValues } from 'react-hook-form';
@@ -25,6 +25,7 @@ import {
 import { richTextField } from '@/components/forms/RichTextField';
 import { SchemaFields, type FieldRenderer } from '@/components/forms/SchemaForm';
 import { zonedDateTimeField } from '@/components/forms/ZonedDatetimeField';
+import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
 import { BLOCK_TYPE_LABEL } from '@/components/shared/siteLabels.ts';
 import { blockSummary, blockText } from '@/components/contents/blockSummary.ts';
 import { IconButton } from '@/components/shared/IconButton';
@@ -33,6 +34,7 @@ import { Button } from '@/components/ui/Button';
 import Dropdown from '@/components/ui/Dropdown';
 import Tooltip from '@/components/ui/Tooltip';
 import classNames from '@/components/ui/utils/classNames';
+import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
 import { useLeaveGuard } from '@/components/shared/useLeaveGuard.ts';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
@@ -139,7 +141,6 @@ export function ContentEditor({
 }) {
   const id = useId();
   const router = useRouter();
-  const pathname = usePathname();
   const [pending, startTransition] = useTransition();
   const [summary, setSummary] = useState<string[]>([]);
   const [saved, setSaved] = useState('');
@@ -200,14 +201,7 @@ export function ContentEditor({
     publishedAt: zonedDateTimeField(timeZone),
   };
 
-  // No quadro seguinte à montagem: texto já presente quando a região `role="status"` aparece
-  // não é anunciado; a mudança depois de montar é.
-  useEffect(() => {
-    if (!created) return;
-    const frame = requestAnimationFrame(() => setSaved('Conteúdo criado.'));
-    router.replace(pathname, { scroll: false });
-    return () => cancelAnimationFrame(frame);
-  }, [created, pathname, router]);
+  useCreatedAnnouncement(created ? 'Conteúdo criado.' : undefined, setSaved);
 
   useEffect(() => {
     if (!removed) return;
@@ -267,25 +261,12 @@ export function ContentEditor({
         router.refresh();
         return;
       }
-      const top: string[] = [];
-      let focused = false;
       revealErrors(
         result.issues.flatMap((issue) =>
           issue.path[0] === 'blocks' && typeof issue.path[1] === 'number' ? [issue.path[1]] : [],
         ),
       );
-      for (const issue of result.issues) {
-        if (issue.path.length === 0) {
-          top.push(issue.message);
-          continue;
-        }
-        form.setError(
-          issue.path.join('.'),
-          { type: 'server', message: issue.message },
-          { shouldFocus: !focused },
-        );
-        focused = true;
-      }
+      const top = applyServerIssues(form.setError, result.issues);
       setSummary(top.length > 0 ? top : [result.message]);
     });
 

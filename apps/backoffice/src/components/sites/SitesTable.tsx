@@ -2,8 +2,7 @@
 
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import {
   LIFECYCLE_LABEL,
@@ -20,6 +19,7 @@ import {
   type PublishStatus,
 } from '@/components/sites/SiteStatus';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
 import Dropdown from '@/components/ui/Dropdown';
 import Table from '@/components/ui/Table';
 import classNames from '@/components/ui/utils/classNames';
@@ -141,20 +141,11 @@ export function SitesTable({
   created?: string;
 }) {
   const table = useTable({ features, columns, data: rows });
-  const router = useRouter();
-  const pathname = usePathname();
   const [status, setStatus] = useState<PublishStatus | null>(null);
-
-  // No quadro seguinte à montagem: texto já presente quando a região `role="status"` aparece
-  // não é anunciado; a mudança depois de montar é (mesmo mecanismo do #109).
-  useEffect(() => {
-    if (created === undefined) return;
-    const frame = requestAnimationFrame(() =>
-      setStatus({ ok: true, message: `Site ${created} cadastrado.` }),
-    );
-    router.replace(pathname, { scroll: false });
-    return () => cancelAnimationFrame(frame);
-  }, [created, pathname, router]);
+  useCreatedAnnouncement(
+    created === undefined ? undefined : `Site ${created} cadastrado.`,
+    (message) => setStatus({ ok: true, message }),
+  );
   if (rows.length === 0) {
     return <EmptyState action={emptyAction}>Nenhum site cadastrado.</EmptyState>;
   }
