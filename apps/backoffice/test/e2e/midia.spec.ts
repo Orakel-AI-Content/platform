@@ -265,6 +265,36 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
     await expect(page.getByText('foto-24.jpg ·', { exact: false })).toHaveCount(0);
   });
 
+  // "Copiar identificador" no retorno padrão (#326): o toast fica fora da app que o diálogo
+  // deixa inerte e é anunciado com ele aberto; nos dois temas.
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`copiar o identificador com o diálogo aberto confirma no toast (${colorScheme})`, async ({
+      page,
+      context,
+    }) => {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await loginAs(page, 'editor@orakel.local');
+      await page.goto(`/sites/${LIBRARY_SITE}/midia`);
+      await page.getByRole('button', { name: /^foto-1\.jpg ·/ }).click();
+      const details = page.getByRole('dialog', { name: 'foto-1.jpg' });
+      await expect(details).toBeVisible();
+
+      await details.getByRole('button', { name: 'Copiar identificador' }).click();
+      const toast = page.locator('[data-toast-placement="top-end"]');
+      await expect(toast).toHaveAttribute('role', 'status');
+      await expect(toast).toContainText('Identificador copiado.');
+      await expect(details).toBeVisible();
+      await expect(details.getByRole('alert')).toHaveText('');
+      const copied = await page.evaluate(() => navigator.clipboard.readText());
+      await expect(details.locator('dd.tabular-nums')).toHaveText(copied);
+
+      await page.mouse.move(0, 0);
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+    });
+  }
+
   // Busca, contagem e paginação nos controles do Ecme (#269), nos dois temas.
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`lista sem violação do axe (${colorScheme})`, async ({ page }) => {

@@ -3,13 +3,16 @@
 import { useId, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media/MediaLibrary';
+import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import { formatDateTime } from '@/components/shared/siteLabels.ts';
 import Button from '@/components/ui/Button';
 import Dialog from '@/components/ui/Dialog';
 
 // Detalhes de uma imagem da biblioteca (#187): a imagem da grade é um botão que abre o Dialog
 // do Ecme (#279), com nome, dimensões, formatos, identificador e data de envio, e "Copiar
-// identificador" pela área de transferência. Esc, o fundo ou "Fechar" fecham, e o react-modal
+// identificador" pela área de transferência, no retorno padrão: o sucesso vai para o toast (o
+// ToastProvider fica fora da app e continua anunciado com o diálogo aberto) e a falha para o
+// Alert dentro do diálogo. Esc, o fundo ou "Fechar" fecham, e o react-modal
 // devolve o foco à imagem. O "Fechar" é o botão explícito ao lado do `h2` (`closable={false}`,
 // para não haver dois), e o título fica no corpo em `h2`, em vez do `h5` do `title` do Dialog.
 
@@ -37,31 +40,28 @@ const FORMAT_LABEL: Record<string, string> = {
   png: 'PNG',
 };
 
-type Copy = { kind: 'ok' | 'error'; text: string } | null;
-
 export function MediaDetails({ item, timeZone }: { item: MediaItem; timeZone: string }) {
   const id = useId();
   const [open, setOpen] = useState(false);
-  const [copy, setCopy] = useState<Copy>(null);
+  const copy = useActionResult();
   const formats = (item.formats ?? []).map((format) => FORMAT_LABEL[format] ?? format);
 
-  // Ao fechar, a mensagem da cópia some.
+  // Ao fechar, o erro da cópia some.
   function close() {
     setOpen(false);
-    setCopy(null);
+    copy.fail(null);
   }
 
-  async function copyId() {
-    try {
-      // `navigator.clipboard` só existe em contexto seguro; sem ele, a falha vira mensagem.
-      await navigator.clipboard.writeText(String(item.id));
-      setCopy({ kind: 'ok', text: 'Identificador copiado.' });
-    } catch {
-      setCopy({
-        kind: 'error',
-        text: `Não foi possível copiar; o identificador é ${item.id}.`,
-      });
-    }
+  function copyId() {
+    copy.run(async () => {
+      try {
+        // `navigator.clipboard` só existe em contexto seguro; sem ele, a falha vira mensagem.
+        await navigator.clipboard.writeText(String(item.id));
+        return { ok: true, message: 'Identificador copiado.' };
+      } catch {
+        return { ok: false, message: `Não foi possível copiar; o identificador é ${item.id}.` };
+      }
+    });
   }
 
   return (
@@ -102,13 +102,11 @@ export function MediaDetails({ item, timeZone }: { item: MediaItem; timeZone: st
             <dt className="text-gray-600 dark:text-gray-400">Enviada em</dt>
             <dd>{mediaUploadedAt(item, timeZone)}</dd>
           </dl>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button size="sm" onClick={() => void copyId()}>
+          <div className="space-y-3">
+            <Button size="sm" onClick={copyId}>
               Copiar identificador
             </Button>
-            <p role="status" className={copy?.kind === 'error' ? 'text-sm text-error' : 'text-sm'}>
-              {copy?.text}
-            </p>
+            <ActionAlert error={copy.error} />
           </div>
         </div>
       </Dialog>

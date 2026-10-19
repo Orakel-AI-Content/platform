@@ -204,9 +204,10 @@ Não negociável, em toda tela e todo componente portado:
   cada imagem é um botão (`aria-haspopup="dialog"`) com a miniatura e a legenda "<nome> ·
   <data>", que abre o `Dialog` do Ecme, como o `MediaPicker`: nome no `h2`, miniatura e um
   `<dl>` com dimensões, formatos disponíveis, identificador e data de envio. "Copiar
-  identificador" usa `navigator.clipboard.writeText` e confirma em `role="status"`
-  ("Identificador copiado."); a falha (sem contexto seguro, permissão negada) mostra o
-  identificador na mesma região, em `text-error`. Esc, o fundo ou "Fechar" fecham, e o foco
+  identificador" usa `navigator.clipboard.writeText` no retorno padrão (ver "Retorno das
+  ações"): o sucesso vai para o toast ("Identificador copiado."), anunciado com o diálogo
+  aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
+  `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o fundo ou "Fechar" fecham, e o foco
   volta à imagem.
 - **Retorno das ações:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
   `src/components/shared/actionResult.ts`, importável pela Server Action), e
@@ -219,6 +220,12 @@ Não negociável, em toda tela e todo componente portado:
   validação local no mesmo Alert; `report(resultado)` serve ao botão com a própria transição
   (o "Publicar agora" de cada linha). Nenhuma tela cria `role="status"` próprio para o retorno
   de uma ação.
+  O editor de conteúdo segue o mesmo padrão: salvar e criar confirmam no toast, e o resumo de
+  validação da barra do rodapé é o `ErrorSummary` do `SchemaForm` (o foco vai ao primeiro
+  campo inválido). Remover bloco é imediato e se desfaz (#112): um toast `Notification
+type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`UNDO_MS`)
+  devolve o bloco na mesma posição; só a remoção mais recente se desfaz, e salvar ou sair do
+  editor tiram o toast.
 - **Tabelas:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (colunas
   com `createColumnHelper` e `tableFeatures`); a biblioteca traz skills em
   `node_modules/@tanstack/react-table/skills/`. Tabela sem interação (só leitura: fila de
