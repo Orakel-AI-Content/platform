@@ -200,9 +200,9 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
     await reviewer.keyboard.press('Space');
   }
   await reviewer.getByRole('button', { name: 'Aprovar' }).click();
-  // A tela tem dois status (o do formulário do checklist e o do painel): o do resultado.
+  // O "aprovado" vai para o toast do template (#325), fora do painel.
   await expect(
-    reviewer.getByRole('main').getByRole('status').filter({ hasText: 'Versão 1 aprovada.' }),
+    reviewer.getByRole('status').filter({ hasText: 'Versão 1 aprovada.' }),
   ).toBeVisible();
   await expect(reviewer.getByRole('button', { name: 'Aprovar' })).toHaveCount(0);
 

@@ -5,6 +5,7 @@ import { useId, useState } from 'react';
 import * as z from 'zod';
 
 import { SchemaForm, type SchemaFormIssue } from '@/components/forms/SchemaForm';
+import type { FormActionResult } from '@/components/shared/actionResult.ts';
 import { CONTENT_STATUS_LABEL } from '@/components/shared/siteLabels.ts';
 import { SECTION_HINT_CLASS, SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import Card from '@/components/ui/Card';
@@ -17,8 +18,6 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 // cores do `@theme`; o `<aside>` fica por fora para manter o landmark.
 
 export type ChecklistItem = { key: string; label: string };
-
-type ApproveOutcome = { ok: true; message: string } | { ok: false; issues: SchemaFormIssue[] };
 
 function checklistSchema(items: readonly ChecklistItem[]) {
   return z.object(
@@ -48,10 +47,11 @@ export function ReviewPanel({
   /** `content.publish`, decidido no servidor. */
   canApprove: boolean;
   previewUrl: string;
-  approve: (checklist: string[]) => Promise<ApproveOutcome>;
+  approve: (checklist: string[]) => Promise<FormActionResult<SchemaFormIssue>>;
 }) {
   const id = useId();
-  const [approved, setApproved] = useState<string | null>(null);
+  // Aprovada nesta tela: o formulário sai e o "aprovado" vai para o toast (pelo SchemaForm).
+  const [approved, setApproved] = useState(false);
   const inReview = status === 'em_revisao';
   const blocked = issues.length > 0;
 
@@ -91,7 +91,7 @@ export function ReviewPanel({
           <h3 id={`${id}-checklist`} className={SECTION_TITLE_CLASS}>
             Checklist
           </h3>
-          {canApprove && inReview && approved === null ? (
+          {canApprove && inReview && !approved ? (
             <>
               {blocked && (
                 <p id={`${id}-blocked`} className="text-sm text-error">
@@ -112,7 +112,8 @@ export function ReviewPanel({
                     .map(([key]) => key);
                   const outcome = await approve(marked);
                   if (!outcome.ok) return outcome.issues;
-                  setApproved(outcome.message);
+                  setApproved(true);
+                  return { success: outcome.message };
                 }}
               />
             </>
@@ -123,7 +124,7 @@ export function ReviewPanel({
                   <li key={item.key}>{item.label}</li>
                 ))}
               </ul>
-              {!inReview && approved === null && (
+              {!inReview && !approved && (
                 <p className={SECTION_HINT_CLASS}>
                   Esta versão está {CONTENT_STATUS_LABEL[status].toLowerCase()}: só uma versão em
                   revisão pode ser aprovada.
@@ -131,9 +132,6 @@ export function ReviewPanel({
               )}
             </>
           )}
-          <p role="status" className={SECTION_HINT_CLASS}>
-            {approved}
-          </p>
         </section>
       </Card>
     </aside>

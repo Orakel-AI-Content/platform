@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import type { MediaSource } from '@/components/forms/PickerFields';
 import { richTextField } from '@/components/forms/RichTextField';
 import { SchemaForm, type SchemaFormIssue } from '@/components/forms/SchemaForm';
+import { pushSuccess } from '@/components/shared/ActionFeedback.tsx';
+import type { FormActionResult } from '@/components/shared/actionResult.ts';
 
 import { ENTITY_CONFIG, type EntityKind } from './entityConfig.ts';
 
@@ -14,8 +16,7 @@ import { ENTITY_CONFIG, type EntityKind } from './entityConfig.ts';
 // no domínio e voltam pelo campo.
 
 /** Retorno das Server Actions das entidades (serializável; `path` aponta o campo). */
-export type EntityFormResult =
-  { ok: true; message: string } | { ok: false; message: string; issues: SchemaFormIssue[] };
+export type EntityFormResult = FormActionResult<SchemaFormIssue>;
 
 /** Criação ou edição de autor, taxonomia ou menu; volta para a lista ao salvar. */
 export function EntityForm({
@@ -50,6 +51,8 @@ export function EntityForm({
         if (!result.ok) {
           return result.issues.length > 0 ? result.issues : [{ path: [], message: result.message }];
         }
+        // O toast vive no layout raiz: o aviso continua na lista para onde a tela volta.
+        pushSuccess(result.message);
         router.push(`/sites/${siteId}/${config.segment}`);
         router.refresh();
       }}
