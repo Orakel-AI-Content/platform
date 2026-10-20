@@ -1,19 +1,15 @@
 'use client';
 
-import { useId, useRef, useState, type ComponentProps } from 'react';
+import { useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/Button';
 import { FormItem } from '@/components/ui/Form';
 import Input from '@/components/ui/Input';
-import Pagination from '@/components/ui/Pagination';
 import Select from '@/components/ui/Select';
-import Table from '@/components/ui/Table';
 
-// Controles das listas filtradas no cliente (#106): busca e filtros, cabeçalho ordenável e
-// paginação. O estado é de `useListState` (URL); aqui só a interface, nos componentes do Ecme
-// (#269).
-
-const { Th, Sorter } = Table;
+// Toolbar das listas filtradas no cliente (#106): busca e filtros. O estado é de
+// `useListState` (URL); aqui só a interface, nos componentes do Ecme (#269). Cabeçalho
+// ordenável, contagem e paginação são do `DataTable` (#367).
 
 export type ListFilterControl = {
   column: string;
@@ -114,77 +110,5 @@ export function ListToolbar({
         </div>
       )}
     </form>
-  );
-}
-
-const SORT_TEXT = { asc: 'ordem crescente', desc: 'ordem decrescente' } as const;
-
-/**
- * Cabeçalho ordenável: `aria-sort` no `th` (o `sort` do `Th`) e um botão (clique, Enter ou
- * Espaço) que alterna o sentido. O sentido também vai no nome do botão, para o leitor de tela
- * anunciar a troca; o `Sorter` é só o ícone.
- */
-export function SortableHead({
-  label,
-  direction,
-  onToggle,
-  className,
-  ...props
-}: Omit<ComponentProps<'th'>, 'children'> & {
-  label: string;
-  direction: false | 'asc' | 'desc';
-  onToggle: () => void;
-}) {
-  return (
-    <Th
-      sort={direction || 'none'}
-      className={className ?? 'h-10 px-3 text-left align-middle font-medium whitespace-nowrap'}
-      {...props}
-    >
-      <button
-        type="button"
-        className="-mx-1 inline-flex min-h-6 items-center gap-1 rounded px-1 font-medium"
-        onClick={onToggle}
-      >
-        {label}
-        <Sorter sort={direction || true} />
-        <span className="sr-only">{direction ? `, ${SORT_TEXT[direction]}` : ', sem ordem'}</span>
-      </button>
-    </Th>
-  );
-}
-
-const count = new Intl.NumberFormat('pt-BR');
-
-/**
- * Contagem de resultados (anunciada em `role="status"`), "Página X de Y" e a `Pagination` do
- * Ecme, que já é o `nav "Paginação"` (Página anterior e Próxima página desabilitados nas
- * pontas, `aria-current="page"` na atual). `page` começa em 1.
- */
-export function ListPagination({
-  total,
-  page,
-  pageCount,
-  onPageChange,
-}: {
-  total: number;
-  page: number;
-  pageCount: number;
-  onPageChange: (page: number) => void;
-}) {
-  const pages = Math.max(pageCount, 1);
-  const current = Math.min(page, pages);
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p role="status" className="text-sm tabular-nums">
-        {total === 1 ? '1 resultado' : `${count.format(total)} resultados`}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm tabular-nums">
-          Página {current} de {pages}
-        </span>
-        <Pagination total={pages} pageSize={1} currentPage={current} onChange={onPageChange} />
-      </div>
-    </div>
   );
 }
