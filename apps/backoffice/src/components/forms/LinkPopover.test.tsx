@@ -103,7 +103,11 @@ describe('popover de link', () => {
 
     expect(input.getAttribute('aria-invalid')).toBe('true');
     const error = within(popover).getByText('Use um caminho iniciado por / ou uma URL http(s)');
-    expect(input.getAttribute('aria-describedby')?.split(' ')).toContain(error.id);
+    // Dica e erro do FormItem (#329), nessa ordem, ligados ao campo.
+    const hint = within(popover).getByText('Caminho iniciado por / ou URL http(s).');
+    expect(hint.className).toContain('form-hint');
+    expect(error.className).toContain('form-explain');
+    expect(input.getAttribute('aria-describedby')?.split(' ')).toEqual([hint.id, error.id]);
     expect(hide).not.toHaveBeenCalled();
     expect(editor.querySelector('a')).toBeNull();
     expect(onSubmit).not.toHaveBeenCalled();

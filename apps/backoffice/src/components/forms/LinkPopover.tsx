@@ -19,9 +19,9 @@ import { Input } from '@/components/ui/Input';
 // a mesma regra do `isAllowedUri` da extensão. Sem `<form>`: o campo de rich text já está
 // dentro do formulário do editor, então o Enter é tratado aqui.
 // No Ecme (#275): `Button`, `Input` e `FormItem` do `ui/`, superfície do `Dropdown`
-// (`dropdown-menu`) e o botão ativo como o `ToolButton` do `shared/RichTextEditor`. O erro
-// fica no fluxo, depois da dica: a mensagem do `FormItem` (`form-explain`) é absoluta, sob o
-// campo, e cobriria a dica.
+// (`dropdown-menu`) e o botão ativo como o `ToolButton` do `shared/RichTextEditor`. Dica e erro
+// são os do `FormItem` (#329), como em todo formulário: a dica (`hint`) no fluxo e a mensagem
+// (`form-explain`) sob ela, na margem do item, ambas ligadas ao campo pelo contexto.
 
 /**
  * Botão ativo da barra (`aria-pressed`), como o `active` do `ToolButton` do Ecme. No escuro, o
@@ -33,8 +33,6 @@ export function LinkPopover({ editor, pressed }: { editor: Editor; pressed: bool
   const id = useId();
   const popoverId = `${id}-link`;
   const anchor = `--link-${id}`;
-  const hintId = `${id}-link-hint`;
-  const errorId = `${id}-link-error`;
   const popoverRef = useRef<HTMLDivElement>(null);
   const linkButtonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -135,14 +133,18 @@ export function LinkPopover({ editor, pressed }: { editor: Editor; pressed: bool
         style={{ positionAnchor: anchor }}
         className="w-80 rounded-2xl border border-gray-100 bg-white p-3 text-gray-600 shadow-[0px_48px_64px_-16px_rgba(0,0,0,0.25)] dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 supports-[position-anchor:--a]:inset-auto supports-[position-anchor:--a]:m-0 supports-[position-anchor:--a]:mt-1 supports-[position-anchor:--a]:[position-area:bottom_span-right] supports-[position-anchor:--a]:[position-try-fallbacks:flip-block]"
       >
-        <FormItem htmlFor={`${id}-href`} label="Endereço do link" className="mb-3">
+        <FormItem
+          htmlFor={`${id}-href`}
+          label="Endereço do link"
+          hint="Caminho iniciado por / ou URL http(s)."
+          invalid={error !== undefined}
+          errorMessage={error}
+        >
           <Input
             ref={inputRef}
             id={`${id}-href`}
             size="sm"
             value={href}
-            invalid={error !== undefined}
-            aria-describedby={error ? `${hintId} ${errorId}` : hintId}
             onChange={(event) => {
               setHref(event.target.value);
               setError(undefined);
@@ -154,14 +156,6 @@ export function LinkPopover({ editor, pressed }: { editor: Editor; pressed: bool
               apply();
             }}
           />
-          <p id={hintId} className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Caminho iniciado por / ou URL http(s).
-          </p>
-          {error && (
-            <p id={errorId} className="mt-1 text-sm font-semibold text-error">
-              {error}
-            </p>
-          )}
         </FormItem>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="solid" size="sm" onClick={apply}>
