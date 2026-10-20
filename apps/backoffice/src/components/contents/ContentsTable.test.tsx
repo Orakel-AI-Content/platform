@@ -283,18 +283,47 @@ describe('busca, filtros, ordem e paginação (#107)', () => {
     expect(screen.getByRole('status').textContent).toBe('14 resultados');
   });
 
-  it('busca sem resultado mostra a mensagem e "Limpar busca" volta a lista inteira', async () => {
+  it('busca sem resultado mantém a tabela com 0 resultados; "Limpar filtros" volta tudo', async () => {
     const user = userEvent.setup();
     renderMany();
 
     await user.type(screen.getByLabelText('Buscar por título'), 'inexistente');
 
-    expect(screen.queryByRole('table')).toBeNull();
-    expect(screen.getByText('Nenhum conteúdo encontrado.')).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: 'Limpar busca' }));
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText('Nenhum conteúdo encontrado.')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('0 resultados');
+    // A única ação de limpar é a da toolbar (#361).
+    expect(screen.queryByRole('button', { name: 'Limpar busca' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Limpar filtros' }));
 
     expect(navigation.get()).toBe('');
     expect(screen.getByLabelText<HTMLInputElement>('Buscar por título').value).toBe('');
     expect(screen.getAllByRole('row')).toHaveLength(26);
+  });
+
+  it('o seletor de tamanho troca os itens por página e vai para a URL (#362)', async () => {
+    const user = userEvent.setup();
+    renderMany();
+
+    await choose(user, 'Itens por página', '10 / página');
+
+    expect(screen.getAllByRole('row')).toHaveLength(11);
+    expect(navigation.get()).toBe('por-pagina=10');
+  });
+
+  it('título longo fica numa linha cortada, com o texto inteiro em title (#362)', () => {
+    const title = 'Um título de conteúdo bem comprido, que não cabe na coluna da lista';
+    render(
+      <ContentsTable
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        rows={[{ ...rows[0]!, title }]}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: `${title} (versões)` });
+    const text = within(link).getByText(title);
+    expect(text.getAttribute('title')).toBe(title);
+    expect(text.className).toContain('truncate');
   });
 });

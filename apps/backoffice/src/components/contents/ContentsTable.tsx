@@ -1,12 +1,15 @@
 'use client';
 
-import { createColumnHelper, useTable, type Row } from '@tanstack/react-table';
 import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
 
-import { EmptyState } from '@/components/shared/EmptyState';
-import { ListPagination, ListToolbar, SortableHead } from '@/components/shared/ListControls.tsx';
-import { listFeatures, useListState, type ListConfig } from '@/components/shared/useListState.ts';
+import DataTable, { type ColumnDef, type Row } from '@/components/shared/DataTable';
+import { EmptyState, NoResults } from '@/components/shared/EmptyState';
+import { ListToolbar } from '@/components/shared/ListControls.tsx';
+import { ROW_LINK_CLASS } from '@/components/shared/rowLink';
+import { Truncated } from '@/components/shared/Truncated';
+import { useListTable } from '@/components/shared/useListTable';
+import type { ListConfig } from '@/components/shared/useListState.ts';
 
 import {
   CONTENT_KIND_LABEL,
@@ -15,18 +18,13 @@ import {
   formatDateTime,
 } from '@/components/shared/siteLabels.ts';
 import { StateTag } from '@/components/sites/SiteStatus';
-import { Button } from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
-import Table from '@/components/ui/Table';
 import type { ContentListItem } from '@/domain/content/contents.ts';
-
-const column = createColumnHelper<typeof listFeatures, ContentListItem>();
-const { THead, TBody, Tr, Th, Td } = Table;
 
 const KINDS = Object.keys(CONTENT_KIND_LABEL) as ContentListItem['kind'][];
 const STATUSES = Object.keys(CONTENT_STATUS_LABEL) as ContentListItem['status'][];
 
-/** Busca por título, filtros por tipo e status, mais recente primeiro (#107). */
+/** Busca por título, filtros por tipo e status, mais recente primeiro (#107); tamanhos (#362). */
 const LIST: ListConfig = {
   filters: [
     { column: 'kind', param: 'tipo', values: KINDS },
@@ -34,66 +32,81 @@ const LIST: ListConfig = {
   ],
   sortable: ['title', 'kind', 'status', 'updatedAt'],
   defaultSort: { id: 'updatedAt', desc: true },
+  pageSizes: [10, 25, 50, 100],
 };
 
 /** Ordena pelo texto exibido em pt-BR (rótulo de tipo e status, título), não pelo valor. */
 function byText(text: (item: ContentListItem) => string) {
-  return (
-    a: Row<typeof listFeatures, ContentListItem>,
-    b: Row<typeof listFeatures, ContentListItem>,
-  ) => text(a.original).localeCompare(text(b.original), 'pt-BR');
+  return (a: Row<ContentListItem>, b: Row<ContentListItem>) =>
+    text(a.original).localeCompare(text(b.original), 'pt-BR');
 }
 
-function columnsFor(siteId: string, timeZone: string) {
-  return column.columns([
-    column.accessor('kind', {
+function columnsFor(
+  siteId: string,
+  timeZone: string,
+  canWrite: boolean,
+): ColumnDef<ContentListItem>[] {
+  const columns: ColumnDef<ContentListItem>[] = [
+    {
       header: 'Tipo',
+      accessorKey: 'kind',
       enableGlobalFilter: false,
       filterFn: 'equalsString',
       sortFn: byText((item) => CONTENT_KIND_LABEL[item.kind]),
-      cell: (info) => CONTENT_KIND_LABEL[info.getValue()],
-    }),
-    column.accessor('title', {
+      cell: ({ row }) => CONTENT_KIND_LABEL[row.original.kind],
+    },
+    {
       header: 'Título',
+      accessorKey: 'title',
       sortFn: byText((item) => item.title),
-      cell: (info) => (
-        <Link
-          href={`/sites/${siteId}/conteudos/${info.row.original.id}`}
-          className="font-semibold text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
-        >
-          {info.getValue()}
+      cell: ({ row }) => (
+        <Link href={`/sites/${siteId}/conteudos/${row.original.id}`} className={ROW_LINK_CLASS}>
+          <Truncated text={row.original.title} className="max-w-xs" />
           <span className="sr-only"> (versões)</span>
         </Link>
       ),
-    }),
-    column.accessor('status', {
+    },
+    {
       header: 'Status',
+      accessorKey: 'status',
       enableGlobalFilter: false,
       filterFn: 'equalsString',
       sortFn: byText((item) => CONTENT_STATUS_LABEL[item.status]),
-      cell: (info) => (
-        <StateTag color={CONTENT_STATUS_TAG[info.getValue()]}>
-          {CONTENT_STATUS_LABEL[info.getValue()]}
+      cell: ({ row }) => (
+        <StateTag color={CONTENT_STATUS_TAG[row.original.status]}>
+          {CONTENT_STATUS_LABEL[row.original.status]}
         </StateTag>
       ),
-    }),
-    column.accessor('version', {
-      header: 'Versão',
-      enableGlobalFilter: false,
-      enableSorting: false,
-    }),
-    column.accessor('updatedAt', {
+    },
+    { header: 'Versão', accessorKey: 'version', enableGlobalFilter: false, enableSorting: false },
+    {
       header: 'Última alteração',
+      accessorKey: 'updatedAt',
       enableGlobalFilter: false,
       sortFn: 'datetime',
-      cell: (info) => formatDateTime(info.getValue(), timeZone),
-    }),
-  ]);
+      cell: ({ row }) => formatDateTime(row.original.updatedAt, timeZone),
+    },
+  ];
+  if (!canWrite) return columns;
+  return [
+    ...columns,
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">Ações</span>,
+      cell: ({ row }) => (
+        <ButtonLink href={`/sites/${siteId}/conteudos/${row.original.id}/editar`} size="xs">
+          Editar
+          <span className="sr-only"> {row.original.title}</span>
+        </ButtonLink>
+      ),
+    },
+  ];
 }
 
 /**
  * Conteúdos de um site com a versão mais recente de cada um, com busca por título, filtros
- * por tipo e status, ordenação e paginação no cliente e o estado na URL (#107). Editar só
+ * por tipo e status, ordenação e paginação no cliente e o estado na URL (#107), no DataTable
+ * do template (#362): toolbar e tabela vão no cartão da página, abaixo do `ListHeader`. Editar só
  * aparece com `canWrite` (content.write, decidido no servidor); criar é a ação do cabeçalho
  * da página, repetida no estado vazio. As rotas são do editor (#45).
  */
@@ -103,6 +116,7 @@ export function ContentsTable({
   rows,
   canWrite = false,
   emptyAction,
+  labelledBy,
 }: {
   siteId: string;
   /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
@@ -111,16 +125,19 @@ export function ContentsTable({
   canWrite?: boolean;
   /** Ação principal da tela (criar conteúdo), repetida no estado vazio; só com permissão. */
   emptyAction?: ReactNode;
+  /** Id do título da lista, que dá nome à tabela. */
+  labelledBy?: string;
 }) {
-  const list = useListState(LIST);
-  const columns = useMemo(() => columnsFor(siteId, timeZone), [siteId, timeZone]);
-  const table = useTable({ features: listFeatures, columns, data: rows, ...list.table });
+  const columns = useMemo(
+    () => columnsFor(siteId, timeZone, canWrite),
+    [siteId, timeZone, canWrite],
+  );
+  const { list, tableProps } = useListTable({ config: LIST, columns, data: rows });
   if (rows.length === 0) {
     return <EmptyState action={emptyAction}>Nenhum conteúdo cadastrado.</EmptyState>;
   }
-  const found = table.getPrePaginatedRowModel().rows.length;
   return (
-    <div className="space-y-4">
+    <>
       <ListToolbar
         search={list.state.search}
         searchLabel="Buscar por título"
@@ -145,74 +162,13 @@ export function ContentsTable({
         onFilterChange={list.setFilter}
         onClear={list.clearFilters}
       />
-      {found === 0 ? (
-        <EmptyState
-          action={
-            <Button type="button" onClick={list.clearFilters}>
-              Limpar busca
-            </Button>
-          }
-        >
-          Nenhum conteúdo encontrado.
-        </EmptyState>
-      ) : (
-        <Table compact>
-          <THead>
-            {table.getHeaderGroups().map((group) => (
-              <Tr key={group.id}>
-                {group.headers.map((header) =>
-                  header.column.getCanSort() ? (
-                    <SortableHead
-                      key={header.id}
-                      scope="col"
-                      label={String(header.column.columnDef.header)}
-                      direction={header.column.getIsSorted()}
-                      onToggle={() => header.column.toggleSorting()}
-                    />
-                  ) : (
-                    <Th key={header.id} scope="col">
-                      <table.FlexRender header={header} />
-                    </Th>
-                  ),
-                )}
-                {canWrite && (
-                  <Th scope="col">
-                    <span className="sr-only">Ações</span>
-                  </Th>
-                )}
-              </Tr>
-            ))}
-          </THead>
-          <TBody>
-            {table.getRowModel().rows.map((row) => (
-              <Tr key={row.id}>
-                {row.getAllCells().map((cell) => (
-                  <Td key={cell.id}>
-                    <table.FlexRender cell={cell} />
-                  </Td>
-                ))}
-                {canWrite && (
-                  <Td>
-                    <ButtonLink
-                      href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
-                      size="xs"
-                    >
-                      Editar
-                      <span className="sr-only"> {row.original.title}</span>
-                    </ButtonLink>
-                  </Td>
-                )}
-              </Tr>
-            ))}
-          </TBody>
-        </Table>
-      )}
-      <ListPagination
-        total={found}
-        page={list.state.page}
-        pageCount={table.getPageCount()}
-        onPageChange={list.setPage}
+      <DataTable
+        aria-labelledby={labelledBy}
+        instanceId="contents-table"
+        columns={columns}
+        customNoDataIcon={<NoResults>Nenhum conteúdo encontrado.</NoResults>}
+        {...tableProps}
       />
-    </div>
+    </>
   );
 }
