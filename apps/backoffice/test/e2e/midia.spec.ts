@@ -36,6 +36,9 @@ test.afterAll(async () => {
   await getDb().pool.end();
 });
 
+// Com a biblioteca vazia, "Enviar imagens" aparece no cabeçalho e no `EmptyState` (#377): o E2E
+// usa o primeiro, o do cabeçalho.
+
 async function loginAs(page: Page, email: string): Promise<void> {
   await page.goto('/sites');
   await page.getByRole('link', { name: email }).click();
@@ -77,7 +80,7 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
   await page.goto(`/sites/${SITE}/midia`);
   // Soltar na área do diálogo (#376): o arrasto destaca a área, e o arquivo solto cai no campo
   // que a cobre (o Playwright não solta arquivos do sistema; `setInputFiles` faz a parte dele).
-  await page.getByRole('button', { name: 'Enviar imagens' }).click();
+  await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
   const upload = uploadDialog(page);
   const dragged = await page.evaluateHandle(() => {
     const transfer = new DataTransfer();
@@ -357,7 +360,7 @@ test('envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com
   // Só com teclado (#376): Enter no botão abre o diálogo; Tab passa pelo X "Fechar" e chega ao
   // campo que cobre a área; Enter nele abre o seletor de arquivos do navegador. Escolher fecha o
   // diálogo e o foco volta ao botão.
-  const trigger = page.getByRole('button', { name: 'Enviar imagens' });
+  const trigger = page.getByRole('button', { name: 'Enviar imagens' }).first();
   await trigger.focus();
   await page.keyboard.press('Enter');
   const upload = uploadDialog(page);
@@ -400,7 +403,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await loginAs(page, 'editor@orakel.local');
     await page.goto(`/sites/${SITE}/midia`);
 
-    await page.getByRole('button', { name: 'Enviar imagens' }).click();
+    await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
     const upload = uploadDialog(page);
     await expect(upload.dialog).toBeVisible();
     const dialogAccessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
