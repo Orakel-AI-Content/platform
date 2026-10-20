@@ -325,8 +325,19 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   (`n`, `type`). O que o schema sozinho não descreve (rich text, seletor de mídia ou de
   entidade) entra por `fields`, um campo registrado por caminho, com `*` no lugar dos
   índices, que recebe `id`, `label`, `value`, `onChange`, `invalid` e `describedBy` (ligue
-  esses dois ao controle). Nó sem desenho e sem campo registrado aparece como aviso, num
-  `Alert type="warning"` do Ecme.
+  esses dois ao controle) e `required` (ponha `aria-required` se o papel do controle admitir:
+  campo de texto, `select`, `radiogroup`; `group` não). Nó sem desenho e sem campo registrado
+  aparece como aviso, num `Alert type="warning"` do Ecme.
+  **Erro, dica e obrigatório só no `FormItem`** (#329), em todo formulário: a dica é a prop
+  `hint` (`.form-hint`, no fluxo sob o controle), o erro é a mensagem `.form-explain`, e os
+  dois entram no `aria-describedby` do campo pelo contexto do `FormItem` (o `Input` os soma
+  sozinho; os outros controles os recebem em `describedBy`). Nunca `<p>` de dica ou de erro à
+  mão. Caixa de seleção fica num `FormItem` sem rótulo (o rótulo é o do `Checkbox`); lista
+  (do `SchemaForm` e os blocos do editor) fica no `FieldGroup`, um `FormItem` sem rótulo cujo
+  erro vai ao `aria-describedby` do `fieldset` ou da `section`. Campo não opcional no schema
+  (`optional` do `schemaWalk`) leva o asterisco do `FormItem` (oculto do leitor de tela) e
+  `aria-required`; caixa de seleção e lista não levam (`false` e lista vazia são valores do
+  campo, e a regra mínima aparece no erro).
   O `onSubmit` pode devolver a recusa do servidor (`{ path, message }[]`): com `path`, vira
   erro do campo; sem, vai para o resumo. Lista vazia em campo opcional (rich text apagado) é
   enviada como ausente. O resumo é o `ErrorSummary` (`src/components/shared/`): um `Alert`
