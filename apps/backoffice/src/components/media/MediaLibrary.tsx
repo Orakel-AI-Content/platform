@@ -1,18 +1,11 @@
 'use client';
 
-import {
-  useCallback,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-  type FormEvent,
-} from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { ListPagination, ListToolbar } from '@/components/shared/ListControls.tsx';
 import { MediaDetails } from '@/components/media/MediaDetails';
 import { MediaGrid } from '@/components/media/MediaGrid';
+import { MediaUpload } from '@/components/media/MediaUpload';
 import {
   UploadList,
   useUploadQueue,
@@ -22,17 +15,12 @@ import {
 } from '@/components/media/UploadQueue';
 import { useListState, type ListConfig } from '@/components/shared/useListState.ts';
 import type { MediaPickerPage } from '@/components/media/MediaPicker';
-import { Button } from '@/components/ui/Button';
-import { FormItem } from '@/components/ui/Form';
-import Input from '@/components/ui/Input';
-import classNames from '@/components/ui/utils/classNames';
 
-// Biblioteca de mídia do site (#52, #186, #188): envio de várias imagens pela fila (escolher
-// no campo ou soltar sobre a biblioteca), com o resultado de cada arquivo, e a grade paginada
-// no servidor, com busca por nome, nome e data de envio de cada imagem e as miniaturas de
-// media.<domínio>. Busca e página ficam na URL (`q`, `pagina`). Envio no FormItem, Input e
-// Button do Ecme (#281); a área de soltar destaca a borda em `primary`, como o `ui/Upload`
-// arrastável do Ecme, sem usá-lo (ele envia ao escolher e tem lista própria).
+// Biblioteca de mídia do site (#52, #186, #188): envio de várias imagens pela fila, com o
+// resultado de cada arquivo, e a grade paginada no servidor, com busca por nome, nome e data de
+// envio de cada imagem e as miniaturas de media.<domínio>. Busca e página ficam na URL (`q`,
+// `pagina`). O envio é o diálogo com o Upload arrastável do Ecme (#376, `MediaUpload`): escolher
+// ou soltar na área do diálogo põe os arquivos na fila, que fica à vista na biblioteca.
 
 /** Mídia na grade: a miniatura já resolvida para o endereço de mídia do site. */
 export type MediaItem = {
@@ -115,9 +103,6 @@ export function MediaLibrary({
   const list = useListState(MEDIA_LIST);
   const [items, setItems] = useState(initialItems);
   const [total, setTotal] = useState(initialTotal);
-  const [dragging, setDragging] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const fileId = useId();
 
   // Imagem pronta: relê a página atual para ela aparecer na grade.
   const reload = useCallback(() => {
@@ -136,54 +121,9 @@ export function MediaLibrary({
   );
   const queue = useUploadQueue({ send: sendFile, status, onReady: reload, pollMs, timeoutMs });
 
-  function upload(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    queue.add([...(fileInput.current?.files ?? [])]);
-    event.currentTarget.reset();
-  }
-
-  // Soltar arquivos sobre a biblioteca envia como o campo; o destaque marca a área de soltar.
-  const dropProps = canWrite
-    ? {
-        onDragOver: (event: DragEvent<HTMLDivElement>) => {
-          if (!event.dataTransfer.types.includes('Files')) return;
-          event.preventDefault();
-          setDragging(true);
-        },
-        onDragLeave: (event: DragEvent<HTMLDivElement>) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
-        },
-        onDrop: (event: DragEvent<HTMLDivElement>) => {
-          event.preventDefault();
-          setDragging(false);
-          queue.add([...event.dataTransfer.files]);
-        },
-      }
-    : {};
-
   return (
-    <div
-      {...dropProps}
-      data-dragging={dragging || undefined}
-      className={classNames(
-        'space-y-6 rounded-lg border-2 border-dashed border-transparent',
-        dragging && 'border-primary',
-      )}
-    >
-      {canWrite && (
-        <form onSubmit={upload} className="flex flex-wrap items-end gap-3">
-          <FormItem
-            htmlFor={fileId}
-            label="Imagens (JPEG, PNG, WebP ou AVIF, até 25 MB cada; ou solte aqui)"
-            className="mb-0"
-          >
-            <Input id={fileId} ref={fileInput} type="file" accept={ACCEPT} multiple required />
-          </FormItem>
-          <Button type="submit" variant="solid">
-            Enviar imagens
-          </Button>
-        </form>
-      )}
+    <div className="space-y-6">
+      {canWrite && <MediaUpload accept={ACCEPT} onAdd={queue.add} />}
       <UploadList entries={queue.entries} notice={queue.notice} />
       <ListToolbar
         search={search}
