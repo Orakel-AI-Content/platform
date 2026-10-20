@@ -70,7 +70,7 @@ const SideNav = ({
       <Link
         href="/sites"
         className={classNames(
-          'side-nav-header flex flex-col justify-center text-xl font-bold text-gray-900 dark:text-gray-100',
+          'side-nav-header flex flex-col justify-center text-lg font-bold text-gray-900 dark:text-gray-100',
           collapsed ? `${SIDE_NAV_CONTENT_GUTTER} items-center` : LOGO_X_GUTTER,
         )}
         style={{ height: HEADER_HEIGHT }}

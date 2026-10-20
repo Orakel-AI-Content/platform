@@ -19,13 +19,10 @@ const SideNavToggle = ({ className }: CommonProps) => {
       aria-label="Navegação lateral"
       aria-expanded={!collapsed}
       aria-controls={SIDE_NAV_ID}
-      className={classNames(
-        'header-action-item header-action-item-hoverable text-gray-600 dark:text-gray-400',
-        className,
-      )}
+      className={classNames('header-action-item header-action-item-hoverable', className)}
       onClick={() => setCollapsed(!collapsed)}
     >
-      <NavToggle className="text-2xl" toggled={collapsed} />
+      <NavToggle toggled={collapsed} />
     </button>
   );
 };

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { TbSelector } from 'react-icons/tb';
+import { PiCaretUpDownDuotone } from 'react-icons/pi';
 
 import Dropdown from '@/components/ui/Dropdown';
 import Tooltip from '@/components/ui/Tooltip';
@@ -64,7 +64,7 @@ export function SiteSwitcher({
             {collapsed ? siteInitials(current.name) : current.name}
           </span>
           <span className="sr-only">{name}</span>
-          {!collapsed && <TbSelector aria-hidden className="shrink-0 text-lg" />}
+          {!collapsed && <PiCaretUpDownDuotone aria-hidden className="shrink-0 text-lg" />}
         </>
       }
       placement={collapsed ? 'right-start' : 'bottom-start'}
