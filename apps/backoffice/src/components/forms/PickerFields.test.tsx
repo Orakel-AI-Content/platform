@@ -10,6 +10,7 @@ import type { MediaItem } from '@/components/media/MediaLibrary.tsx';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp.ts';
 import { entityField, mediaField, type MediaSource } from './PickerFields.tsx';
 import { SchemaForm } from './SchemaForm.tsx';
+import { fieldLabel } from '@/test/fieldLabel.ts';
 
 // Seletores de mídia e de entidades no gerador (#45): só o que existe no site, por teclado. A
 // mídia é escolhida pela grade de miniaturas (#182), com a miniatura do valor atual por ID.
@@ -129,9 +130,15 @@ describe('seletores', () => {
     const change = within(field).getByRole('button', { name: 'Trocar' });
     expect(document.activeElement).toBe(change);
 
-    const group = screen.getByRole('group', { name: 'Autores' });
-    within(group).getByRole('checkbox', { name: 'Ana' }).focus();
-    await user.keyboard(' ');
+    const authorsSelect = screen.getByRole('combobox', { name: fieldLabel('Autores') });
+    expect(screen.getByText('Caio')).toBeTruthy();
+    authorsSelect.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Ana',
+      'Bia',
+    ]);
+    await user.keyboard('{Enter}');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
@@ -203,6 +210,20 @@ describe('seletores', () => {
         name: 'Escolher imagem',
       }),
     );
+  });
+
+  it('autores (#330): remover pelo teclado entrega os IDs restantes na ordem das opções', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderForm(vi.fn(), authors, { mediaId: 1, authorIds: [3, 1, 2] });
+
+    expect(screen.getByRole('button', { name: 'Remover Bia' })).toBeTruthy();
+    screen.getByRole('combobox', { name: fieldLabel('Autores') }).focus();
+    // Backspace remove o último valor; a ordem segue a das opções, não a de escolha.
+    await user.keyboard('{Backspace}');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({ mediaId: 1, authorIds: [1, 2] });
   });
 
   it('sem entidades cadastradas mostra o aviso', () => {

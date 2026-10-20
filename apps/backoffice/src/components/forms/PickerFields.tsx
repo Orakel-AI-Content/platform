@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { SelectInstance } from 'react-select';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media/MediaLibrary';
 import { MediaPicker, type MediaPickerPage } from '@/components/media/MediaPicker';
@@ -9,13 +10,13 @@ import ConfirmDialog, {
   dangerConfirmButtonProps,
 } from '@/components/shared/ConfirmDialog.tsx';
 import Button from '@/components/ui/Button';
-import Checkbox from '@/components/ui/Checkbox';
+import Select from '@/components/ui/Select';
 
-import type { FieldProps, FieldRenderer } from './SchemaForm.tsx';
+import { selectInFormItem, type FieldProps, type FieldRenderer } from './SchemaForm.tsx';
 
 // Seletores do gerador para referências do site: mídia (um ID, pela grade de miniaturas) e
 // entidades (lista de IDs). Só escolhem entre o que já existe; criar é de outras telas. Visual
-// do Ecme (#272): `Button` e `Checkbox` de `ui/`; o diálogo `MediaPicker` fica para a #50.
+// do Ecme (#272): `Button` e `Select` (#330) de `ui/`; o diálogo `MediaPicker` fica para a #50.
 
 export type PickerOption = { id: number; label: string };
 
@@ -147,9 +148,12 @@ function MediaField({
   );
 }
 
-/** Várias entidades do site (`authorIds`, `taxonomyIds`) por caixas de seleção nativas. */
+/**
+ * Várias entidades do site (`authorIds`, `taxonomyIds`) no `Select` múltiplo do Ecme (#330):
+ * entrega os IDs na ordem das opções, como a grade de caixas de seleção de antes.
+ */
 export function entityField(options: readonly PickerOption[], empty: string): FieldRenderer {
-  function EntityField({ id, label, value, onChange, invalid, describedBy }: FieldProps) {
+  function EntityField({ id, name, value, onChange, required, ref }: FieldProps) {
     const selected = new Set(Array.isArray(value) ? (value as number[]) : []);
     if (options.length === 0) {
       return (
@@ -159,31 +163,26 @@ export function entityField(options: readonly PickerOption[], empty: string): Fi
       );
     }
     return (
-      <div
-        id={id}
-        role="group"
-        aria-label={label}
-        aria-invalid={invalid}
-        aria-describedby={describedBy}
-        className="flex flex-wrap gap-x-6 gap-y-2"
-      >
-        {options.map((option) => (
-          <Checkbox
-            key={option.id}
-            className="min-h-6 text-sm"
-            checked={selected.has(option.id)}
-            onChange={(checked) => {
-              const next = new Set(selected);
-              if (checked) next.add(option.id);
-              else next.delete(option.id);
-              // Ordem estável: a das opções.
-              onChange(options.map((o) => o.id).filter((optionId) => next.has(optionId)));
-            }}
-          >
-            {option.label}
-          </Checkbox>
-        ))}
-      </div>
+      <Select<PickerOption, true>
+        isMulti
+        // O foco do erro (inclusive do servidor) cai no campo de texto do combobox.
+        field={{
+          ref: (select: SelectInstance<PickerOption, true> | null) => ref(select?.inputRef ?? null),
+        }}
+        name={name}
+        options={options}
+        getOptionValue={(option) => String(option.id)}
+        value={options.filter((option) => selected.has(option.id))}
+        onChange={(chosen) => {
+          const next = new Set(chosen.map((option) => option.id));
+          // Ordem estável: a das opções.
+          onChange(options.map((o) => o.id).filter((optionId) => next.has(optionId)));
+        }}
+        required={required}
+        placeholder="Escolha"
+        noOptionsMessage={() => 'Nenhuma opção'}
+        components={selectInFormItem}
+      />
     );
   }
   return EntityField;
