@@ -55,7 +55,7 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
   // Editor envia: o retorno aparece em role=status e o botão some (versão em revisão).
   await page.getByRole('button', { name: 'Enviar para revisão' }).click();
   // O status global (indicador de navegação) também é role=status: só o do conteúdo.
-  await expect(page.getByRole('main').getByRole('status')).toHaveText('Enviado para revisão.');
+  await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Em revisão');
@@ -102,7 +102,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await loginAs(page, 'editor@orakel.local');
     await createDraft(page, title, slug);
     await page.getByRole('button', { name: 'Enviar para revisão' }).click();
-    await expect(page.getByRole('main').getByRole('status')).toHaveText('Enviado para revisão.');
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Enviado para revisão.' }),
+    ).toBeVisible();
 
     await page.goto('/sites/exemplo-a/revisao');
     expect(page.viewportSize()?.width).toBe(1280);
@@ -165,7 +167,7 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
   await loginAs(page, 'editor@orakel.local');
   await createDraft(page, title, slug);
   await page.getByRole('button', { name: 'Enviar para revisão' }).click();
-  await expect(page.getByRole('main').getByRole('status')).toHaveText('Enviado para revisão.');
+  await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
 
   // Editor abre a revisão: vê a visualização e o checklist, sem a ação de aprovar.
   await page.goto('/sites/exemplo-a/revisao');
@@ -220,7 +222,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await loginAs(page, 'editor@orakel.local');
     await createDraft(page, title, slug);
     await page.getByRole('button', { name: 'Enviar para revisão' }).click();
-    await expect(page.getByRole('main').getByRole('status')).toHaveText('Enviado para revisão.');
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Enviado para revisão.' }),
+    ).toBeVisible();
 
     const context = await browser.newContext({ ignoreHTTPSErrors: true, colorScheme });
     const reviewer = await context.newPage();
@@ -236,6 +240,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
     ).toBeVisible();
     await expect(panel.getByRole('checkbox')).toHaveCount(5);
     await expect(panel.getByRole('button', { name: 'Aprovar' })).toBeEnabled();
+    // O checklist em cartão próprio, com "Aprovar" no rodapé dele (#333).
+    await expect(
+      panel.locator('.card-footer').getByRole('button', { name: 'Aprovar' }),
+    ).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page: reviewer })
       .withTags(WCAG)

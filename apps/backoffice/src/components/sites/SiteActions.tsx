@@ -1,16 +1,24 @@
 'use client';
 
-import { createContext, use, useId, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, use, type ReactNode } from 'react';
 
+import { SchemaForm } from '@/components/forms/SchemaForm';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { Button } from '@/components/ui/Button';
-import { FormItem } from '@/components/ui/Form';
-import Input from '@/components/ui/Input';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
+import type { SiteFormResult } from './siteConfigFormValues.ts';
+import {
+  BuildWindowSchema,
+  RegisterG1Schema,
+  type BuildWindowValue,
+  type RegisterG1Value,
+} from './siteOperationForms.ts';
+
 // Ações da página do site, no padrão do "Publicar agora": a Server Action delega ao domínio,
-// o sucesso vai para o toast e o erro para o Alert junto da ação. A página só as mostra com
+// o sucesso vai para o toast e o erro para o Alert junto da ação. G1 e janela são formulários
+// gerados do schema, em cartão com os botões no rodapé (#333). A página só as mostra com
 // site.configure.
 
 const NEXT_STEP = {
@@ -64,87 +72,64 @@ export function LifecycleAction({
   );
 }
 
-/** Registro do G1 com observação opcional. */
-export function RegisterG1Form({ action }: { action: (note: string) => Promise<ActionResult> }) {
-  const id = useId();
-  const [note, setNote] = useState('');
-  const { pending, error, run } = useActionResult();
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    run(() => action(note));
-  };
+/** Recusa do formulário: as issues com `path` vão ao campo; sem nenhuma, a mensagem vai ao resumo. */
+function outcome(result: SiteFormResult) {
+  if (result.ok) return { success: result.message };
+  return result.issues.length > 0 ? result.issues : [{ path: [], message: result.message }];
+}
+
+/**
+ * Registro do G1 com observação opcional, gerado do schema (#333): o cartão inteiro da seção,
+ * com `intro` (título, dica e estado) e "Registrar G1" no rodapé.
+ */
+export function RegisterG1Form({
+  intro,
+  action,
+}: {
+  intro: ReactNode;
+  action: (value: RegisterG1Value) => Promise<SiteFormResult>;
+}) {
   return (
-    <form onSubmit={submit} className="space-y-3">
-      <FormItem htmlFor={`${id}-note`} label="Observação do G1" className="mb-0">
-        <Input
-          id={`${id}-note`}
-          textArea
-          rows={2}
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-        />
-      </FormItem>
-      <Button type="submit" variant="solid" disabled={pending}>
-        {pending ? 'Registrando…' : 'Registrar G1'}
-      </Button>
-      <ActionAlert error={error} />
-    </form>
+    <SchemaForm
+      schema={RegisterG1Schema}
+      defaultValues={{ note: '' }}
+      labels={{ note: 'Observação do G1' }}
+      card={{ intro }}
+      submitLabel="Registrar G1"
+      pendingLabel="Registrando…"
+      onSubmit={async (value) => outcome(await action(value))}
+    />
   );
 }
 
-/** Janela própria em segundos; "Usar padrão" volta a BUILD_WINDOW_SECONDS. */
+/**
+ * Janela própria em segundos, gerada do schema (#333); "Usar padrão" (ação secundária do
+ * rodapé, sem passar pelo schema) volta a BUILD_WINDOW_SECONDS.
+ */
 export function BuildWindowForm({
+  intro,
   own,
   action,
 }: {
+  intro: ReactNode;
   own: number | null;
-  action: (seconds: number | null) => Promise<ActionResult>;
+  action: (value: BuildWindowValue | null) => Promise<SiteFormResult>;
 }) {
-  const id = useId();
-  const [value, setValue] = useState(own === null ? '' : String(own));
-  const { pending, error, fail, run } = useActionResult();
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const seconds = Number(value);
-    if (value.trim() === '' || !Number.isInteger(seconds) || seconds < 0) {
-      fail('Informe um número inteiro de segundos, 0 ou mais.');
-      return;
-    }
-    run(() => action(seconds));
-  };
   return (
-    <form onSubmit={submit} className="space-y-3">
-      <FormItem
-        htmlFor={`${id}-seconds`}
-        label="Janela própria (segundos)"
-        className="mb-0 max-w-xs"
-      >
-        <Input
-          id={`${id}-seconds`}
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-        />
-      </FormItem>
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="solid" disabled={pending}>
-          Salvar janela
-        </Button>
-        <Button
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            setValue('');
-            run(() => action(null));
-          }}
-        >
-          Usar padrão
-        </Button>
-      </div>
-      <ActionAlert error={error} />
-    </form>
+    <SchemaForm
+      schema={BuildWindowSchema}
+      defaultValues={{ buildWindowSeconds: own ?? '' }}
+      labels={{ buildWindowSeconds: 'Janela própria (segundos)' }}
+      card={{
+        intro,
+        extra: {
+          label: 'Usar padrão',
+          resetTo: { buildWindowSeconds: '' },
+          run: async () => outcome(await action(null)),
+        },
+      }}
+      submitLabel="Salvar janela"
+      onSubmit={async (value) => outcome(await action(value))}
+    />
   );
 }

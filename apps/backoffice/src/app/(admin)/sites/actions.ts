@@ -3,10 +3,17 @@
 import type { Issue, Result } from '@orakel/content-model';
 import type { SiteConfig } from '@orakel/content-model/v1';
 import { revalidatePath } from 'next/cache';
+import type * as z from 'zod';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteFormResult } from '@/components/sites/siteConfigFormValues.ts';
+import {
+  BuildWindowSchema,
+  RegisterG1Schema,
+  type BuildWindowValue,
+  type RegisterG1Value,
+} from '@/components/sites/siteOperationForms.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
 import { requestBuildNow } from '@/domain/builds/builds.ts';
@@ -30,10 +37,13 @@ export async function publishNow(siteId: string): Promise<ActionResult> {
 }
 
 /** Issues do domínio no formato serializável do formulário (o `path` aponta o campo). */
-function refused(issues: readonly Issue[]): SiteFormResult {
+function refused(
+  issues: readonly Issue[],
+  message = 'Não foi possível salvar a configuração.',
+): SiteFormResult {
   return {
     ok: false,
-    message: 'Não foi possível salvar a configuração.',
+    message,
     issues: issues.map((issue) => ({
       path: issue.path.map((key) => (typeof key === 'number' ? key : String(key))),
       message: issue.message,
@@ -106,24 +116,71 @@ export async function advanceLifecycleAction(
   );
 }
 
+/**
+ * Formulário de operação da página do site (#333): valida o valor pelo schema do formulário
+ * (chega do cliente sem tipo garantido), o domínio decide, e a recusa com `path` volta ao campo.
+ */
+async function siteFormOperation<T>(
+  siteId: string,
+  schema: z.ZodType<T>,
+  value: unknown,
+  run: (tx: Executor, actor: Actor, value: T) => Promise<Result<void>>,
+  success: (value: T) => string,
+): Promise<SiteFormResult> {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    return refused(
+      parsed.error.issues.map((issue) => ({
+        code: `schema.${issue.code}`,
+        message: issue.message,
+        path: issue.path,
+      })),
+      'Não foi possível concluir.',
+    );
+  }
+  const actor = await currentActor();
+  if (!actor.ok) return noSession;
+  const result = await getDb().db.transaction((tx) => run(tx, actor.value, parsed.data));
+  if (!result.ok) return refused(result.issues, 'Não foi possível concluir.');
+  revalidatePath('/sites');
+  revalidatePath(`/sites/${siteId}`);
+  return { ok: true, message: success(parsed.data) };
+}
+
 /** Registro do G1 do site, com observação opcional. */
-export async function registerG1Action(siteId: string, note: string): Promise<ActionResult> {
-  const trimmed = note.trim();
-  return siteOperation(
+export async function registerG1Action(
+  siteId: string,
+  value: RegisterG1Value,
+): Promise<SiteFormResult> {
+  return siteFormOperation(
     siteId,
-    (tx, actor) => registerPolicyTrigger(tx, actor, siteId, 'G1', trimmed === '' ? null : trimmed),
-    'G1 registrado.',
+    RegisterG1Schema,
+    value,
+    (tx, actor, { note }) =>
+      registerPolicyTrigger(
+        tx,
+        actor,
+        siteId,
+        'G1',
+        note === undefined || note === '' ? null : note,
+      ),
+    () => 'G1 registrado.',
   );
 }
 
-/** Janela de agrupamento do site em segundos; `null` volta à padrão. */
+/** Janela de agrupamento do site em segundos; `null` ("Usar padrão") volta à padrão. */
 export async function setBuildWindowAction(
   siteId: string,
-  seconds: number | null,
-): Promise<ActionResult> {
-  return siteOperation(
+  value: BuildWindowValue | null,
+): Promise<SiteFormResult> {
+  return siteFormOperation(
     siteId,
-    (tx, actor) => setBuildWindow(tx, actor, siteId, seconds),
-    seconds === null ? 'Janela padrão restaurada.' : `Janela de ${seconds} s salva.`,
+    BuildWindowSchema.nullable(),
+    value,
+    (tx, actor, window) => setBuildWindow(tx, actor, siteId, window?.buildWindowSeconds ?? null),
+    (window) =>
+      window === null
+        ? 'Janela padrão restaurada.'
+        : `Janela de ${window.buildWindowSeconds} s salva.`,
   );
 }

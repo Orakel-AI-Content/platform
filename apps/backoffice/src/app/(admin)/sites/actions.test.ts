@@ -111,8 +111,10 @@ describe('Server Actions da página do site', () => {
       ok: false,
       message: 'Sessão inválida; entre de novo.',
     });
-    expect(await registerG1Action('exemplo-a', '')).toMatchObject({ ok: false });
-    expect(await setBuildWindowAction('exemplo-a', 30)).toMatchObject({ ok: false });
+    expect(await registerG1Action('exemplo-a', {})).toMatchObject({ ok: false });
+    expect(await setBuildWindowAction('exemplo-a', { buildWindowSeconds: 30 })).toMatchObject({
+      ok: false,
+    });
     expect(mocks.advanceLifecycle).not.toHaveBeenCalled();
     expect(mocks.registerPolicyTrigger).not.toHaveBeenCalled();
     expect(mocks.setBuildWindow).not.toHaveBeenCalled();
@@ -155,7 +157,7 @@ describe('Server Actions da página do site', () => {
       'infra_aplicada',
     );
 
-    expect(await registerG1Action('exemplo-a', '  Políticas publicadas ')).toEqual({
+    expect(await registerG1Action('exemplo-a', { note: '  Políticas publicadas ' })).toEqual({
       ok: true,
       message: 'G1 registrado.',
     });
@@ -166,7 +168,7 @@ describe('Server Actions da página do site', () => {
       'G1',
       'Políticas publicadas',
     );
-    await registerG1Action('exemplo-a', '   ');
+    await registerG1Action('exemplo-a', { note: '   ' });
     expect(mocks.registerPolicyTrigger).toHaveBeenLastCalledWith(
       {},
       operacao,
@@ -175,7 +177,7 @@ describe('Server Actions da página do site', () => {
       null,
     );
 
-    expect(await setBuildWindowAction('exemplo-a', 30)).toEqual({
+    expect(await setBuildWindowAction('exemplo-a', { buildWindowSeconds: 30 })).toEqual({
       ok: true,
       message: 'Janela de 30 s salva.',
     });
@@ -188,5 +190,42 @@ describe('Server Actions da página do site', () => {
 
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('formulário de operação (#333): valor fora do schema volta como issue do campo, sem chamar o domínio', async () => {
+    for (const buildWindowSeconds of [-1, 1.5, 'x']) {
+      expect(await setBuildWindowAction('exemplo-a', { buildWindowSeconds } as never)).toEqual({
+        ok: false,
+        message: 'Não foi possível concluir.',
+        issues: [
+          {
+            path: ['buildWindowSeconds'],
+            message: 'Informe um número inteiro de segundos, 0 ou mais.',
+          },
+        ],
+      });
+    }
+    expect(mocks.setBuildWindow).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('formulário de operação (#333): a recusa do domínio volta com o path do campo', async () => {
+    mocks.setBuildWindow.mockResolvedValue({
+      ok: false,
+      issues: [
+        {
+          code: 'site.build_window_invalid',
+          message: 'Janela recusada',
+          path: ['buildWindowSeconds'],
+        },
+      ],
+    });
+
+    expect(await setBuildWindowAction('exemplo-a', { buildWindowSeconds: 30 })).toEqual({
+      ok: false,
+      message: 'Não foi possível concluir.',
+      issues: [{ path: ['buildWindowSeconds'], message: 'Janela recusada' }],
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });

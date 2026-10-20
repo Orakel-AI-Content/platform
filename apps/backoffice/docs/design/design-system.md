@@ -371,9 +371,16 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   `CustomerEdit`. `href` é o nível anterior da trilha (a lista, a página do site), nunca
   `history.back()`. Campos curtos relacionados ficam lado a lado a partir de `md` por
   `sideBySide` (grupos de caminhos com `*`, em `grid md:grid-cols-2 gap-4`): ID e nome, idioma
-  e fuso, nome e slug, rótulo e link do item de menu. Formulário dentro de outra tela
-  (checklist da revisão) não passa `actionBar`: sem barra e sem cartão próprio, porque quem o
-  contém já é o cartão. Durante o envio o botão fica desabilitado e mostra `pendingLabel` ("Salvando…" por padrão; "Cadastrando…",
+  e fuso, nome e slug, rótulo e link do item de menu. **Formulário dentro de outra tela**
+  (#333: registro do G1 e janela de agrupamento na página do site, checklist da revisão) passa
+  `card` em vez de `actionBar`, sem barra fixa (ela é só das telas que são um formulário
+  inteiro): o `SchemaForm` monta um `Card` com `card.intro` (título, dica e estado da seção) e
+  os campos no corpo, e os botões no rodapé (`footer` com borda), à direita, todos do mesmo
+  tamanho e a ação principal `solid`. A ação secundária (`card.extra`, ex.: "Usar padrão" da
+  janela) fica à esquerda do envio, não passa pelo schema e tem o mesmo retorno do envio (toast,
+  erro de campo ou resumo). O cartão é o da seção inteira: sem permissão para o formulário, a
+  página mostra a mesma introdução num `Card` só de leitura; na revisão, o checklist tem o seu
+  próprio cartão, separado do da validação. Durante o envio o botão fica desabilitado e mostra `pendingLabel` ("Salvando…" por padrão; "Cadastrando…",
   "Criando…", "Aprovando…" por quem chama), sem segundo envio. Quem fica na tela confirma
   devolvendo `{ success: mensagem }`, que vai para o toast do retorno padrão (`pushSuccess`,
   ver "Retorno das ações"), como a aprovação na revisão. Quem sai da tela também confirma no

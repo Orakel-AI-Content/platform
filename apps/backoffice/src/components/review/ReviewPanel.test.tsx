@@ -10,7 +10,8 @@ import { toast, ToastProvider } from '@/components/ui/toast';
 import { ReviewPanel } from './ReviewPanel.tsx';
 
 // Painel da revisão (#75): erros da release, checklist com os rótulos recebidos, bloqueio,
-// permissão e a mensagem de aprovação (no toast, #325). No Ecme (#277), o conteúdo fica num Card.
+// permissão e a mensagem de aprovação (no toast, #325). No Ecme (#277), o conteúdo fica em Cards;
+// o checklist tem o seu, com "Aprovar" no rodapé (#333).
 
 beforeAll(() => {
   MotionGlobalConfig.skipAnimations = true;
@@ -69,19 +70,23 @@ describe('painel de revisão', () => {
     expect(screen.getByText('Nenhum problema de validação.')).toBeTruthy();
   });
 
-  it('fica num Card dentro do complementar rotulado pela versão', () => {
+  it('fica em Cards dentro do complementar; o checklist tem cartão próprio com Aprovar no rodapé', () => {
     renderPanel();
 
     const panel = screen.getByRole('complementary', { name: 'Revisão da versão 2' });
-    const card = panel.querySelector(':scope > .card');
-    expect(card).toBeTruthy();
-    expect(card?.contains(screen.getByRole('button', { name: 'Aprovar' }))).toBe(true);
-    expect(card?.contains(screen.getByRole('heading', { name: 'Validação da release' }))).toBe(
+    const [main, ...rest] = panel.querySelectorAll('.card');
+    expect(main?.contains(screen.getByRole('heading', { name: 'Validação da release' }))).toBe(
       true,
     );
-    // O checklist fica no cartão do painel: sem a barra fixa nem cartão próprio (#328).
+    // O checklist num cartão próprio, com "Aprovar" (solid) no rodapé, sem barra fixa (#333).
+    expect(rest).toHaveLength(1);
+    const checklistCard = rest[0];
+    expect(checklistCard?.contains(screen.getByRole('heading', { name: 'Checklist' }))).toBe(true);
+    const approve = screen.getByRole('button', { name: 'Aprovar' });
+    expect(checklistCard?.querySelector('.card-footer')?.contains(approve)).toBe(true);
+    expect(approve.className).toContain('bg-primary');
+    expect(main?.contains(approve)).toBe(false);
     expect(panel.querySelector('.sticky')).toBeNull();
-    expect(card?.querySelectorAll('.card')).toHaveLength(0);
     expect(screen.queryByRole('button', { name: 'Descartar' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Voltar' })).toBeNull();
   });
