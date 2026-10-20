@@ -2,7 +2,12 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import { ListPagination, ListToolbar } from '@/components/shared/ListControls.tsx';
+import AdaptiveCard from '@/components/shared/AdaptiveCard';
+import { resultCount } from '@/components/shared/DataTable';
+import { EmptyState, NoResults } from '@/components/shared/EmptyState';
+import { ListToolbar } from '@/components/shared/ListControls.tsx';
+import { ListHeader } from '@/components/shared/PageHeader';
+import Pagination from '@/components/ui/Pagination';
 import { MediaDetails } from '@/components/media/MediaDetails';
 import { MediaGrid } from '@/components/media/MediaGrid';
 import { MediaUpload } from '@/components/media/MediaUpload';
@@ -20,7 +25,11 @@ import type { MediaPickerPage } from '@/components/media/MediaPicker';
 // resultado de cada arquivo, e a grade paginada no servidor, com busca por nome, nome e data de
 // envio de cada imagem e as miniaturas de media.<domínio>. Busca e página ficam na URL (`q`,
 // `pagina`). O envio é o diálogo com o Upload arrastável do Ecme (#376, `MediaUpload`): escolher
-// ou soltar na área do diálogo põe os arquivos na fila, que fica à vista na biblioteca.
+// ou soltar na área do diálogo põe os arquivos na fila, que fica à vista na biblioteca. No
+// padrão de lista do template (#377): título, envio, fila, toolbar, grade, contagem e paginação
+// num cartão; a regra única de estado vazio do `EmptyState` (#361); e o rodapé do `DataTable`
+// (`Pagination` e "N resultados" em `role="status"`), sem o `DataTable`, porque é uma grade
+// paginada no servidor, com tamanho fixo.
 
 /** Mídia na grade: a miniatura já resolvida para o endereço de mídia do site. */
 export type MediaItem = {
@@ -67,6 +76,8 @@ const ACCEPT = 'image/jpeg,image/png,image/webp,image/avif';
 const MEDIA_LIST: ListConfig = { filters: [], sortable: [] };
 
 export function MediaLibrary({
+  titleId,
+  title,
   siteId,
   timeZone,
   items: initialItems,
@@ -81,6 +92,9 @@ export function MediaLibrary({
   pollMs = 2000,
   timeoutMs = 120_000,
 }: {
+  /** `id` do título, para o `aria-labelledby` da página. */
+  titleId: string;
+  title: string;
   siteId: string;
   /** Fuso IANA do site: a data de envio aparece nele. */
   timeZone: string;
@@ -121,34 +135,53 @@ export function MediaLibrary({
   );
   const queue = useUploadQueue({ send: sendFile, status, onReady: reload, pollMs, timeoutMs });
 
+  const upload = canWrite ? <MediaUpload accept={ACCEPT} onAdd={queue.add} /> : undefined;
+  // Vazia é a biblioteca sem imagem nenhuma; com busca, é só a busca sem resultado. Pelo total
+  // local, para a grade aparecer quando o primeiro envio fica pronto.
+  const empty = total === 0 && search === '';
+
   return (
-    <div className="space-y-6">
-      {canWrite && <MediaUpload accept={ACCEPT} onAdd={queue.add} />}
-      <UploadList entries={queue.entries} notice={queue.notice} />
-      <ListToolbar
-        search={search}
-        searchLabel="Buscar por nome do arquivo"
-        onSearchChange={list.setSearch}
-        onClear={list.clearFilters}
-      />
-      <MediaGrid label="Imagens do site">
-        {items.map((item) => (
-          <li key={item.id}>
-            <MediaDetails item={item} timeZone={timeZone} />
-          </li>
-        ))}
-      </MediaGrid>
-      {items.length === 0 && (
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {search === '' ? 'Nenhuma imagem na biblioteca.' : 'Nenhuma imagem com esse nome.'}
-        </p>
-      )}
-      <ListPagination
-        total={total}
-        page={page}
-        pageCount={Math.ceil(total / pageSize)}
-        onPageChange={list.setPage}
-      />
-    </div>
+    <AdaptiveCard>
+      <div className="flex flex-col gap-4">
+        <ListHeader id={titleId} title={title} action={upload} />
+        <UploadList entries={queue.entries} notice={queue.notice} />
+        {empty ? (
+          <EmptyState action={upload}>Nenhuma imagem na biblioteca.</EmptyState>
+        ) : (
+          <>
+            <ListToolbar
+              search={search}
+              searchLabel="Buscar por nome do arquivo"
+              onSearchChange={list.setSearch}
+              onClear={list.clearFilters}
+            />
+            {items.length > 0 ? (
+              <MediaGrid label="Imagens do site">
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <MediaDetails item={item} timeZone={timeZone} />
+                  </li>
+                ))}
+              </MediaGrid>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-4">
+                <NoResults>Nenhuma imagem encontrada.</NoResults>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Pagination
+                pageSize={pageSize}
+                currentPage={page}
+                total={total}
+                onChange={list.setPage}
+              />
+              <p role="status" className="text-sm tabular-nums">
+                {resultCount(total)}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+    </AdaptiveCard>
   );
 }

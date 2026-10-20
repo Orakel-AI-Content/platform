@@ -3,7 +3,7 @@ import { parseListState } from '@/components/shared/listQuery.ts';
 import { MediaLibrary } from '@/components/media/MediaLibrary';
 import { listMediaPage } from '@/domain/content/media.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { PageTrail } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 
 import { sitePageContext } from '../editorial-page.tsx';
@@ -18,7 +18,8 @@ type SearchParams = { searchParams: Promise<Record<string, string | string[] | u
 
 /**
  * Biblioteca de mídia do site, paginada no servidor com busca por nome (#186): `q` e `pagina`
- * vêm da URL. Enviar imagem só com content.write (a rota confere de novo).
+ * vêm da URL. Enviar imagem só com content.write (a rota confere de novo). Lista no padrão do
+ * template (#377): a trilha acima do cartão, que o `MediaLibrary` desenha.
  */
 export default async function MediaPage({
   params,
@@ -42,8 +43,10 @@ export default async function MediaPage({
 
   return (
     <section aria-labelledby="media-title" className="list-width space-y-4">
-      <PageHeader id="media-title" trail={siteTrail(site, 'Mídia')} title="Mídia" />
+      <PageTrail items={siteTrail(site, 'Mídia')} />
       <MediaLibrary
+        titleId="media-title"
+        title="Mídia"
         // Busca ou página nova: a biblioteca recomeça com a página lida no servidor.
         key={`${search}|${page}`}
         siteId={site.id}
