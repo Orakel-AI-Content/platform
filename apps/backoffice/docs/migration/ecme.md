@@ -93,6 +93,10 @@ ThemeConfigurator completo.
   | ✓ da etapa concluída do Steps, escuro                        | `text-white` (3,56:1)                            | `dark:text-gray-950` (5,56:1)              |
   | Hover do título da etapa clicável do Steps no cartão, escuro | `text-primary` (4,25:1)                          | `dark:hover:text-primary-mild`             |
   | Título e ícone da etapa com erro do Steps                    | `text-red-500`/`border-red-500` (fora da paleta) | `text-error`/`border-error`                |
+  | Hover do Button `plain`, claro                               | `hover:text-primary-mild` (4,14:1)               | `hover:text-primary-deep` (6,21:1)         |
+
+  O `plainColor` do Button do Ecme tem ainda `dark:primary-mild` e `dark:active:primary-mild`,
+  que não são utilities e não geram estilo; o port as tira (#396).
 
   Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS` do
   `globals-contrast.test.ts` (#217), no tema em que aparece.

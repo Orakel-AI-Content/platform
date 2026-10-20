@@ -1864,6 +1864,128 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-gray-800',
     minimum: 4.5,
   },
+  // Hover do botão `plain` (#396), o "Voltar" do editor e o da versão do conteúdo, no body e no
+  // cartão. O `hover:text-primary-mild` do Ecme dá 4,14:1 sobre `gray-100`
+  // no claro: o Button usa o `primary-deep` no claro e mantém o `primary-mild` no escuro.
+  {
+    name: 'hover do botão plain no body',
+    theme: 'claro',
+    text: 'hover:text-primary-deep',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+    ecme: 'hover:text-primary-mild',
+  },
+  {
+    name: 'hover do botão plain no cartão',
+    theme: 'claro',
+    text: 'hover:text-primary-deep',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'hover do botão plain no body',
+    theme: 'escuro',
+    text: 'dark:hover:text-primary-mild',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'hover do botão plain no cartão',
+    theme: 'escuro',
+    text: 'dark:hover:text-primary-mild',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  // Fila de envio da mídia no cartão da biblioteca (#396): o envio pronto em `success` (o
+  // recusado já está em "mensagem de erro no cartão"); e o aviso do SchemaForm fora do Card.
+  {
+    name: 'envio pronto na fila, no cartão',
+    theme: 'claro',
+    text: 'text-success',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'aviso no body',
+    theme: 'claro',
+    text: 'text-warning',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'envio pronto na fila, no cartão',
+    theme: 'escuro',
+    text: 'dark:text-success',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'aviso no body',
+    theme: 'escuro',
+    text: 'dark:text-warning',
+    background: 'dark:bg-gray-950',
+    minimum: 4.5,
+  },
+  // NavigationIndicator (#396): o aviso de navegação em `bg-primary`, com o texto do `solid`.
+  {
+    name: 'indicador de navegação',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'bg-primary',
+    minimum: 4.5,
+  },
+  {
+    name: 'indicador de navegação',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-primary',
+    minimum: 4.5,
+  },
+  // Skip link do (admin)/layout.tsx (#396): visível só com foco, com o texto do body sobre o
+  // fundo próprio e o contorno de foco sobre o mesmo fundo (o da página).
+  {
+    name: 'skip link com foco',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'focus:bg-neutral',
+    minimum: 4.5,
+  },
+  {
+    name: 'foco no skip link',
+    theme: 'claro',
+    text: 'outline-ring',
+    background: 'focus:bg-neutral',
+    minimum: 3,
+  },
+  {
+    name: 'skip link com foco',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:focus:bg-gray-950',
+    minimum: 4.5,
+  },
+  {
+    name: 'foco no skip link',
+    theme: 'escuro',
+    text: 'outline-ring',
+    background: 'dark:focus:bg-gray-950',
+    minimum: 3,
+  },
+  // Legenda da MediaTile no hover (#396), na grade da biblioteca e no seletor do editor.
+  {
+    name: 'legenda da miniatura no hover',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'hover:bg-gray-200',
+    minimum: 4.5,
+  },
+  {
+    name: 'legenda da miniatura no hover',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:hover:bg-gray-800',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`.

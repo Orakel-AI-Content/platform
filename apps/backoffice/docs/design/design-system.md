@@ -68,6 +68,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   | Tamanho do arquivo no Upload, claro       | `text-gray-500` (4,35:1)             | `text-gray-600` (7,17:1)                   |
   | Tamanho do arquivo no Upload, escuro      | `dark:text-gray-400` (4,11:1)        | `dark:text-gray-300` (6,99:1)              |
   | Foco no remover arquivo do Upload, escuro | `outline-ring` (2,91:1)              | `dark:outline-primary-mild` (3,50:1)       |
+  | Hover do Button `plain`, claro            | `hover:text-primary-mild` (4,14:1)   | `hover:text-primary-deep` (6,21:1)         |
 
   Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS`, no tema em
   que aparece.

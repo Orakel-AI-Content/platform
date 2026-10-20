@@ -30,7 +30,10 @@ describe('Button', () => {
 
     const plain = screen.getByRole('button', { name: 'Cancelar' });
     expect(plain.className).not.toContain('bg-primary');
-    expect(plain.className).toContain('hover:text-primary-mild');
+    // Hover: substituta AA no claro (#396), o primary-mild do Ecme no escuro.
+    expect(plain.className).toContain('hover:text-primary-deep');
+    expect(plain.className).toContain('dark:hover:text-primary-mild');
+    expect(plain.className).not.toMatch(/(?:^|\s)dark:(?:active:)?primary-mild(?:\s|$)/);
 
     const fallback = screen.getByRole('button', { name: 'Voltar' });
     expect(fallback.className).toContain('bg-white');
