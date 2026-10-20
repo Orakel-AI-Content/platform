@@ -128,6 +128,10 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   `SchemaForm`), para o `BottomStickyBar` encostar nas bordas do `main`. `list-width` (largura
   cheia do `main`) para as listas e tabelas: sites, conteúdos, versões, autores, taxonomias,
   menus e mídia. O componente de formulário não define largura; quem define é a página.
+- **Espaçamento:** a `section` (ou `article`) de topo de toda página usa `space-y-4` entre os
+  blocos (cabeçalho, cartões, tabelas), o mesmo passo do `gap-4` das colunas e grades; nenhuma
+  tela usa outro. Vale também para a coluna `form-width` dos formulários de tela. Fica de fora
+  o espaçamento interno dos cartões (`bodyClass`), que é de cada cartão.
 - **Carregamento:** `NavigationIndicator` no layout `(admin)`. Acende "Carregando…" numa região
   `role="status"` persistente no clique de um link interno e apaga quando o endereço muda. Não
   use `loading.tsx` nem `Suspense` acima das páginas: o fallback só aparece quando muda o
@@ -444,9 +448,8 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   **Estrutura:** a tela que é um formulário inteiro tem os campos em `Card`s e a barra fixa
   (`BottomStickyBar`, com "Descartar" ou "Voltar" e o envio); o formulário dentro de outra
   tela (G1, janela, checklist da revisão) é a exceção: um `Card` só, com os botões no rodapé
-  dele e sem barra fixa (ver o `SchemaForm` acima). **Espaçamento:** a `section` da tela de
-  formulário e a coluna `form-width` usam `space-y-4`, o mesmo passo do `gap-4` da coluna de
-  cartões; nenhuma tela de formulário usa outro.
+  dele e sem barra fixa (ver o `SchemaForm` acima). O espaçamento entre os blocos segue a
+  regra da Moldura (`space-y-4`), também na coluna `form-width`.
 - **Rich text:** TipTap só com o que o `RichTextSchema` aceita (`src/components/forms/`).
   Registre `richTextField('richText')` para texto e textos institucionais, e
   `richTextField('inlines')` (um parágrafo, sem intertítulo nem lista) para citação, resposta
