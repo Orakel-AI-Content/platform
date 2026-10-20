@@ -308,7 +308,18 @@ test('editor não cadastra nem edita a configuração', async ({ page }) => {
   }
 });
 
-// Página do site (#30): ciclo de vida, G1 e janela de agrupamento.
+// Página do site (#30): ciclo de vida, G1 e janela de agrupamento, nas abas do detalhe (#370).
+
+/** O resumo do site (#370): o único cartão da página com a lista de dados. */
+const siteSummary = (page: Page) => page.locator('.card').filter({ has: page.locator('dl') });
+
+/** Abre a aba `name` da página do site e devolve o painel dela. */
+async function openTab(page: Page, name: string): Promise<Locator> {
+  await page.getByRole('tab', { name }).click();
+  const panel = page.getByRole('tabpanel', { name });
+  await expect(panel).toBeVisible();
+  return panel;
+}
 
 async function newSite(page: Page, siteId: string): Promise<void> {
   await page.goto('/sites/novo');
@@ -332,7 +343,8 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
   // Ciclo de vida: quatro etapas em ordem; só o próximo passo manual, no item que ele conclui.
-  const steps = page.getByRole('region', { name: 'Ciclo de vida' }).getByRole('list');
+  // A aba aberta ao entrar é a do ciclo de vida.
+  const steps = page.getByRole('tabpanel', { name: 'Ciclo de vida' }).getByRole('list');
   const currentStep = steps.locator('[aria-current="step"]');
   await expect(steps.getByRole('listitem')).toHaveCount(4);
   await expect(currentStep).toContainText('Cadastrado (atual)');
@@ -364,18 +376,21 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
     /só pode ficar indexável depois do G1 registrado/,
   );
   await page.goto(`/sites/${siteId}`);
-  await page.getByLabel('Observação do G1').fill('Políticas publicadas');
-  await page.getByRole('button', { name: 'Registrar G1' }).click();
+  await expect(siteSummary(page).getByText('Não registrado', { exact: true })).toBeVisible();
+  const g1Panel = await openTab(page, 'G1 (indexação)');
+  await g1Panel.getByLabel('Observação do G1').fill('Políticas publicadas');
+  await g1Panel.getByRole('button', { name: 'Registrar G1' }).click();
   await expect(
-    page.getByText(/Registrado por operacao@orakel\.local em .* — Políticas publicadas/),
+    g1Panel.getByText(/Registrado por operacao@orakel\.local em .* — Políticas publicadas/),
   ).toBeVisible();
+  await expect(siteSummary(page).getByText('Registrado', { exact: true })).toBeVisible();
   await indexar();
   await expect(status(page, 'versão 2')).toBeVisible();
 
   // Janela própria e volta à padrão; valor vazio, negativo ou não inteiro dá erro no campo,
   // pelo schema do formulário gerado (#333).
   await page.goto(`/sites/${siteId}`);
-  const windowSection = page.getByRole('region', { name: 'Janela de agrupamento' });
+  const windowSection = await openTab(page, 'Janela de agrupamento');
   const windowInput = windowSection.getByLabel('Janela própria (segundos)');
   for (const value of ['', '-1', '1.5']) {
     await windowInput.fill(value);
@@ -404,21 +419,26 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
 test('operação vê a publicação do site e o publica pela página', async ({ page }) => {
   await loginAs(page, 'operacao@orakel.local');
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
-  const publication = page.getByRole('region', { name: 'Publicação' });
-  const value = (term: string) =>
-    publication
-      .getByRole('definition')
-      .nth(['Estado', 'Release', 'Mudanças pendentes', 'Último build'].indexOf(term));
-  await expect(publication.getByRole('term')).toHaveText([
+  // O resumo ao lado das abas (#370): os dados de publicação e "Publicar agora".
+  const publication = siteSummary(page);
+  const terms = [
+    'Domínio',
+    'Indexável',
     'Estado',
     'Release',
     'Mudanças pendentes',
     'Último build',
-  ]);
+    'G1',
+  ];
+  const value = (term: string) => publication.getByRole('definition').nth(terms.indexOf(term));
+  await expect(publication.getByRole('term')).toHaveText(terms);
+  await expect(value('Domínio')).not.toBeEmpty();
+  await expect(value('Indexável')).toHaveText(/^(Sim|Não)$/);
   await expect(value('Estado')).toHaveText('Ativo');
   await expect(value('Release')).not.toBeEmpty();
   await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
   await expect(value('Último build')).toHaveText(/^(—|Publicado|Falhou)/);
+  await expect(value('G1')).toHaveText(/^(Registrado|Não registrado)$/);
 
   // Mesma ação da lista; o sucesso vai para o toast e a seção fica sem erro (#324).
   await page.waitForLoadState('networkidle');
@@ -440,7 +460,7 @@ test('operação vê a publicação do site e o publica pela página', async ({ 
   await expect(
     page.getByRole('status').filter({ hasText: 'Build de exemplo-a enfileirado.' }),
   ).toBeVisible();
-  await expect(publication.getByRole('alert')).toBeEmpty();
+  await expect(publish.locator('xpath=..').getByRole('alert')).toBeEmpty();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 });
 
@@ -477,7 +497,7 @@ test('operação vê o site pausado com o motivo e sem Publicar agora', async ({
 
   await loginAs(page, 'operacao@orakel.local');
   await page.goto(`/sites/${siteId}`);
-  const publication = page.getByRole('region', { name: 'Publicação' });
+  const publication = siteSummary(page);
   await expect(publication.getByText('Pausado', { exact: true })).toBeVisible();
   // Motivo inteiro, sem corte: é o que a operação precisa para retomar o site.
   await expect(publication.getByText(reason, { exact: true })).toBeVisible();
@@ -489,28 +509,43 @@ test('operação vê o site pausado com o motivo e sem Publicar agora', async ({
 test('editor vê a página do site sem as ações', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
-  await expect(page.getByRole('heading', { name: 'Ciclo de vida' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Publicação' })).toBeVisible();
-  for (const name of [/^Marcar/, /^Publicar agora/, 'Registrar G1', /^Salvar$/, 'Usar padrão']) {
-    await expect(page.getByRole('button', { name })).toHaveCount(0);
-  }
+  await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
+  // Cada aba mostra o mesmo que para a operação, só de leitura (#370).
+  const noActions = async () => {
+    for (const name of [/^Marcar/, /^Publicar agora/, 'Registrar G1', /^Salvar$/, 'Usar padrão']) {
+      await expect(page.getByRole('button', { name })).toHaveCount(0);
+    }
+    await expect(page.locator('form')).toHaveCount(0);
+  };
+  const lifecycle = page.getByRole('tabpanel', { name: 'Ciclo de vida' });
+  await expect(lifecycle.getByRole('listitem')).toHaveCount(4);
+  await noActions();
+  const g1 = await openTab(page, 'G1 (indexação)');
+  await expect(
+    g1.getByText('Registro que libera a indexação do site', { exact: false }),
+  ).toBeVisible();
+  await expect(g1.getByText(/^(Registrado por .+|G1 não registrado: .+)$/)).toBeVisible();
+  await noActions();
+  const buildWindow = await openTab(page, 'Janela de agrupamento');
+  await expect(buildWindow.getByText(/^Janela efetiva: /)).toBeVisible();
+  await noActions();
   await expect(page.getByRole('link', { name: 'Editar configuração' })).toHaveCount(0);
 });
 
 // Visão geral do site em Card e nos campos do Ecme (#246), com as ações da operação, nos dois
-// temas.
+// temas, em cada aba (#370).
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`página do site sem violação do axe (${colorScheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await loginAs(page, 'operacao@orakel.local');
     await page.goto('/sites/exemplo-a');
-    for (const name of ['Ciclo de vida', 'Publicação', 'G1 (indexação)', 'Janela de agrupamento']) {
-      await expect(
-        page.getByRole('region', { name }).getByRole('heading', { level: 2, name }),
-      ).toBeVisible();
-    }
+    await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
+    await expect(page.getByRole('tabpanel', { name: 'Ciclo de vida' })).toBeVisible();
+    await expectNoViolations(page);
+    await openTab(page, 'G1 (indexação)');
+    await expectNoViolations(page);
     // G1 e janela gerados do schema, em cartão com os botões no rodapé, sem barra fixa (#333).
-    const windowSection = page.getByRole('region', { name: 'Janela de agrupamento' });
+    const windowSection = await openTab(page, 'Janela de agrupamento');
     const footer = windowSection.locator('.card-footer');
     await expect(footer.getByRole('button', { name: 'Salvar', exact: true })).toBeVisible();
     await expect(footer.getByRole('button', { name: 'Usar padrão' })).toBeVisible();
@@ -533,6 +568,50 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await expect(dialog).toHaveCount(0);
   });
 }
+
+// Detalhe do template (#370): a 1280 px o resumo fica à esquerda das abas; a 1024 e a 375 px,
+// um sobre o outro, sem rolagem horizontal. As ações da tela são todas `sm`, e a do cabeçalho,
+// solid.
+test('página do site: resumo ao lado das abas só a partir de xl, ações em sm', async ({ page }) => {
+  await loginAs(page, 'operacao@orakel.local');
+  for (const [width, sideBySide] of [
+    [1280, true],
+    [1024, false],
+    [375, false],
+  ] as const) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/sites/exemplo-a');
+    const summary = await siteSummary(page).boundingBox();
+    const tabs = await page
+      .locator('.card')
+      .filter({ has: page.getByRole('tablist', { name: 'Seções do site' }) })
+      .boundingBox();
+    if (!summary || !tabs) throw new Error('resumo ou abas sem caixa');
+    if (sideBySide) {
+      expect(tabs.x).toBeGreaterThanOrEqual(summary.x + summary.width);
+      expect(Math.abs(tabs.y - summary.y)).toBeLessThan(1);
+    } else {
+      expect(tabs.y).toBeGreaterThanOrEqual(summary.y + summary.height);
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBe(0);
+  }
+
+  const sm = /(^| )h-10( |$)/;
+  const edit = page.getByRole('link', { name: 'Editar configuração' });
+  await expect(edit).toHaveClass(sm);
+  await expect(edit).toHaveClass(/bg-primary/);
+  await expect(page.getByRole('button', { name: 'Publicar agora exemplo-a' })).toHaveClass(sm);
+  for (const tab of ['G1 (indexação)', 'Janela de agrupamento']) {
+    const panel = await openTab(page, tab);
+    for (const button of await panel.locator('.card-footer').getByRole('button').all()) {
+      await expect(button).toHaveClass(sm);
+    }
+  }
+});
 
 // Mudanças pendentes no DataTable do template (#249, #365), nos dois temas: a 1280 px nada rola
 // na horizontal, nenhuma célula passa de duas linhas e o axe não acha violação. O cadastro
