@@ -291,33 +291,41 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
 
 - **Tabelas:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (colunas
   com `createColumnHelper` e `tableFeatures`); a biblioteca traz skills em
-  `node_modules/@tanstack/react-table/skills/`. Tabela sem interação (só leitura: fila de
-  revisão, pendências, versões) é Server Component, sem `'use client'`: monta a instância com
-  `constructTable` e `coreReactivityFeature: storeReactivityBindings()` (de
-  `@tanstack/table-core/store-reactivity-bindings`) e desenha com `flexRender`. Tabela com
-  busca, filtro, ordem, paginação ou ação na linha é cliente e usa `useTable`.
-  Linha de tabela densa (lista de sites): no máximo duas linhas por célula, a principal e a
-  secundária em `text-xs` (ex.: nome com `id · domínio` embaixo); texto longo é cortado
-  (`truncate` com `max-w-*`) com o inteiro em `title`, em vez de quebrar. A ação principal da
-  linha fica visível e as demais vão para o menu "Mais ações"; o sucesso de uma ação vai para o
-  toast e o erro para um `ActionAlert` acima da tabela, nunca para a linha. A lista de sites
-  não rola na horizontal a 1280px, nem no contêiner da tabela.
-- **Lista filtrada:** busca, filtros, ordenação e paginação no cliente, com o estado na URL.
-  `useListState` (`src/components/shared/useListState.ts`) lê e grava `q` (busca), um parâmetro por
-  filtro, `ordem` (id da coluna, com `-` na frente se decrescente) e `pagina` com
-  `router.replace` (sem entrada no histórico por tecla); valor padrão não aparece na URL e
-  parâmetro inválido cai no padrão. A tabela usa `listFeatures` e recebe `list.table` no
-  `useTable`. A busca ignora maiúsculas e acentos (`normalizeText`) e só olha as colunas com
-  `enableGlobalFilter`; mudar a busca ou um filtro volta à página 1. Controles de
-  `src/components/shared/ListControls.tsx`, nos componentes do Ecme: `ListToolbar` acima da tabela
-  (busca no `Input` com rótulo visível do que procura, um `Select` por filtro com "Todos", e
-  "Limpar filtros" só com algo ativo); `SortableHead` no lugar do `Th` de coluna ordenável
-  (`aria-sort` no `th` e o sentido no nome do botão); e `ListPagination` abaixo, com a contagem
-  em `role="status"` ("N resultados") e a `Pagination` do Ecme. Nas listas atuais, a página tem
-  25 itens fixos (`PAGE_SIZE`), sem seletor. O `DataTable` do Ecme
-  (`src/components/shared/DataTable.tsx`) traz o seletor de tamanho: a lista que declara
-  `pageSizes` na `ListConfig` grava o tamanho em `por-pagina` (padrão 25, fora da URL), e mudar
-  o tamanho volta à página 1.
+  `node_modules/@tanstack/react-table/skills/`. As tabelas de lista são todas cliente, pelo
+  `DataTable` (abaixo); a página continua Server Component e passa as linhas já carregadas.
+- **Lista:** o padrão do `CustomerList` do Ecme (#361), em todas as listas (conteúdos, autores,
+  taxonomias, menus, sites, revisão, pendências, versões):
+  - Moldura: a trilha (`PageTrail`) acima do cartão; no `AdaptiveCard`, um
+    `div.flex.flex-col.gap-4` com o `ListHeader` (título e a ação principal, só com
+    permissão), a `ListToolbar` e o `DataTable` (`conteudos/page.tsx`).
+  - Toolbar: `ListToolbar` (`src/components/shared/ListControls.tsx`), em coluna abaixo de `md`
+    e em linha a partir dele: a busca no `Input` com rótulo visível do que procura, um `Select`
+    por filtro com "Todos", e "Limpar filtros" só com algo ativo, que devolve o foco à busca.
+    Busca em toda lista que pode crescer; filtro só onde o dado tem estado ou categoria.
+  - Linhas: `useListTable` (`src/components/shared/useListTable.ts`) recebe as colunas, a
+    `ListConfig` e as linhas carregadas, e aplica a busca, os filtros e a ordem do
+    `useListState` e corta a página; devolve `list` (para a toolbar), `found` e `tableProps`.
+    O `DataTable` (`src/components/shared/DataTable.tsx`) fica manual, como no Ecme: desenha a
+    página recebida, o cabeçalho ordenável (botão no `Th`, com `aria-sort`) e o rodapé com a
+    `Pagination`, a contagem "N resultados" em `role="status"` (`resultCount`) e o seletor de
+    tamanho (`pageSizes` da `ListConfig`).
+  - Estado na URL: `useListState` (`src/components/shared/useListState.ts`) lê e grava `q`
+    (busca), um parâmetro por filtro, `ordem` (id da coluna, com `-` na frente se decrescente),
+    `pagina` e `por-pagina` (padrão 25) com `router.replace` (sem entrada no histórico por
+    tecla); valor padrão não aparece na URL e parâmetro inválido cai no padrão. A busca ignora
+    maiúsculas e acentos (`normalizeText`) e só olha as colunas com `enableGlobalFilter`; mudar
+    a busca, um filtro ou o tamanho volta à página 1, e página além da última mostra a última.
+    Recarregar mantém a mesma visão.
+  - Estados vazios: ver "Estado vazio".
+  - Células: no máximo duas linhas por célula, `TwoLines` (`src/components/shared/TwoLines.tsx`)
+    com a principal e a secundária em `text-xs` (ex.: nome com `id · domínio` embaixo); texto
+    longo é cortado pelo `Truncated` (`truncate` com `max-w-*` de quem usa) com o inteiro em
+    `title`, em vez de quebrar. O link principal da linha usa `ROW_LINK_CLASS`
+    (`src/components/shared/rowLink.ts`). Nenhuma lista rola na horizontal a 1280px, nem no
+    contêiner da tabela.
+  - Ações da linha: a principal fica visível e as demais vão para o menu "Mais ações" (abaixo);
+    o sucesso de uma ação vai para o toast e o erro para um `ActionAlert` acima da tabela,
+    nunca para a linha (ver "Retorno das ações").
 - **Datas:** `formatDateTime(data, fuso)` de `src/components/shared/siteLabels.ts`, sempre com o fuso
   do site (`SiteSummary.timeZone`, da configuração corrente), nunca o do navegador nem um fixo:
   "01/10/2026, 09:00 BRT" (dia, mês, ano, hora e minuto, com a sigla ou o deslocamento, como
@@ -369,10 +377,15 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
     item), então slug e URL longos não rolam a página no celular. As colunas ficam com quem
     usa: a grade do `ProfileSection` (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1`) no resumo,
     uma coluna no diálogo. Nunca a grade `grid-cols-[auto_1fr]`, que estoura a 375 px.
-- **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela
-  sem linhas (ou da grade da mídia sem imagens), nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
-  permissão, a mesma ação principal do cabeçalho (`emptyAction` das tabelas). Com a lista
-  vazia, a ação aparece duas vezes; no E2E, clique na primeira (a do cabeçalho).
+- **Estado vazio:** dois casos, de `src/components/shared/EmptyState.tsx`, nunca uma tabela só
+  com cabeçalho:
+  - lista vazia (nada cadastrado): `EmptyState` no lugar da toolbar e da tabela (ou da grade da
+    mídia), com a mensagem ("Nenhum autor cadastrado.") e, com permissão, a mesma ação
+    principal do cabeçalho (`emptyAction` das tabelas). A ação aparece duas vezes; no E2E,
+    clique na primeira (a do cabeçalho);
+  - busca ou filtro sem resultado: a tabela fica, com "0 resultados", e o `NoResults`
+    ("Nenhum autor encontrado.") vai no `customNoDataIcon` do `DataTable`. Só a mensagem: a
+    única ação de limpar é a "Limpar filtros" da toolbar.
 - **Telas de estado:** `StatusScreen` (`src/components/shared/StatusScreen.tsx`), a tela vazia
   do template (o `AccessDenied` e o "No user found" do `CustomerEdit`): coluna centrada, com a
   ilustração decorativa em 280 × 280 por cima, o título (`h1`) na cor de heading, uma frase do
