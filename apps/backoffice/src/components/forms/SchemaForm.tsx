@@ -28,7 +28,7 @@ import ConfirmDialog, {
 } from '@/components/shared/ConfirmDialog.tsx';
 import { ErrorSummary } from '@/components/shared/ErrorSummary.tsx';
 import Alert from '@/components/ui/Alert';
-import Button from '@/components/ui/Button';
+import Button, { type ButtonProps } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Checkbox from '@/components/ui/Checkbox';
 import { Form, FormItem } from '@/components/ui/Form';
@@ -104,9 +104,15 @@ export type SchemaFormExtraAction = {
 
 /**
  * Formulário dentro de outra tela (#333): um `Card` com `intro` (título, dica, estado) e os
- * campos no corpo, e os botões no rodapé, todos do mesmo tamanho; sem barra fixa.
+ * campos no corpo, e os botões no rodapé, todos do mesmo tamanho; sem barra fixa. `size` é o
+ * tamanho dos botões, para acompanhar as outras ações da tela (`sm` na página do site, #370);
+ * sem ele, o padrão do `ConfigProvider`.
  */
-export type SchemaFormCard = { intro?: ReactNode; extra?: SchemaFormExtraAction };
+export type SchemaFormCard = {
+  intro?: ReactNode;
+  extra?: SchemaFormExtraAction;
+  size?: ButtonProps['size'];
+};
 
 export type SchemaFormProps<T> = {
   schema: z.ZodType<T>;
@@ -761,6 +767,7 @@ export function SchemaForm<T>({
     <Button
       type="submit"
       variant="solid"
+      size={card?.size}
       disabled={submitDisabled || pending}
       aria-describedby={submitDescribedBy}
     >
@@ -809,6 +816,7 @@ export function SchemaForm<T>({
                   {card.extra && (
                     <Button
                       type="button"
+                      size={card.size}
                       disabled={pending}
                       onClick={() => {
                         const extra = card.extra;

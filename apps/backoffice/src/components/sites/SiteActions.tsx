@@ -88,7 +88,8 @@ function outcome(result: SiteFormResult) {
 
 /**
  * Registro do G1 com observação opcional, gerado do schema (#333): o cartão inteiro da seção,
- * com `intro` (título, dica e estado) e "Registrar G1" no rodapé.
+ * com `intro` (título, dica e estado) e "Registrar G1" no rodapé, em `sm` como as outras ações
+ * da página do site (#370).
  */
 export function RegisterG1Form({
   intro,
@@ -102,7 +103,7 @@ export function RegisterG1Form({
       schema={RegisterG1Schema}
       defaultValues={{ note: '' }}
       labels={{ note: 'Observação do G1' }}
-      card={{ intro }}
+      card={{ intro, size: 'sm' }}
       submitLabel="Registrar G1"
       pendingLabel="Registrando G1…"
       onSubmit={async (value) => outcome(await action(value))}
@@ -112,7 +113,7 @@ export function RegisterG1Form({
 
 /**
  * Janela própria em segundos, gerada do schema (#333); "Usar padrão" (ação secundária do
- * rodapé, sem passar pelo schema) volta a BUILD_WINDOW_SECONDS.
+ * rodapé, sem passar pelo schema) volta a BUILD_WINDOW_SECONDS. Botões em `sm` (#370).
  */
 export function BuildWindowForm({
   intro,
@@ -130,6 +131,7 @@ export function BuildWindowForm({
       labels={{ buildWindowSeconds: 'Janela própria (segundos)' }}
       card={{
         intro,
+        size: 'sm',
         extra: {
           label: 'Usar padrão',
           pendingLabel: 'Usando padrão…',
