@@ -199,7 +199,7 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await expect(row).toContainText('Rascunho');
 });
 
-// Campos de imagem, de entidades e de data no Ecme (#272): com o seletor aberto (#280) e com a
+// Campos de imagem, de entidades e de data no Ecme (#272, #331): com os seletores abertos (#280) e com a
 // capa escolhida (miniatura, "Trocar" e "Remover" na tela), sem violação do axe nos dois temas.
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`campos de imagem, entidades e data sem violação do axe (${colorScheme})`, async ({
@@ -228,7 +228,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const authors = page.getByRole('combobox', { name: fieldLabel('Autores') });
     await expect(authors).toBeVisible();
     await expect(page.getByRole('combobox', { name: fieldLabel('Taxonomias') })).toBeVisible();
-    await expect(page.getByLabel('Data de publicação')).toBeVisible();
+    const date = page.getByRole('combobox', { name: 'Data de publicação' });
+    await expect(date).toBeVisible();
 
     await page.mouse.move(0, 0);
     const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -241,6 +242,18 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(withMenu.violations).toEqual([]);
     await page.keyboard.press('Escape');
     await expect(page.getByRole('listbox')).toHaveCount(0);
+
+    // A data é o DateTimepicker do Ecme (#331): o painel aberto, sem violação; Esc fecha e
+    // devolve o foco ao campo.
+    await date.focus();
+    await page.keyboard.press('Enter');
+    const datePanel = page.getByRole('dialog', { name: 'Escolher data e hora' });
+    await expect(datePanel).toBeVisible();
+    await page.mouse.move(0, 0);
+    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(datePanel).toBeHidden();
+    await expect(date).toBeFocused();
 
     // "Remover" da capa confirma num diálogo (#327), sem violação com ele aberto: Cancelar
     // mantém a imagem; "Remover" esvazia o campo e leva o foco a "Escolher imagem".
