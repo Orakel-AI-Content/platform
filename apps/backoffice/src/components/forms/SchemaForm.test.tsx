@@ -15,6 +15,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as z from 'zod';
 
 import { toast, ToastProvider } from '@/components/ui/toast';
+import { CONTROL_SIZES } from '@/components/ui/utils/constants';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { SchemaFields, SchemaForm, type FieldProps } from './SchemaForm.tsx';
@@ -902,6 +903,32 @@ describe('SchemaForm: formulário em cartão (#333)', () => {
     expect(size(extra)).toEqual(size(save));
     expect(save.className).toContain('bg-primary');
     expect(extra.className).not.toContain('bg-primary');
+  });
+
+  it('size leva os dois botões do rodapé ao mesmo tamanho pedido (#370)', () => {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ seconds: 30 }}
+        labels={labels}
+        card={{
+          size: 'sm',
+          extra: {
+            label: 'Usar padrão',
+            pendingLabel: 'Usando padrão…',
+            run: vi.fn(() => Promise.resolve({ success: 'ok' })),
+          },
+        }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    for (const name of ['Salvar', 'Usar padrão']) {
+      expect(screen.getByRole('button', { name }).className.split(' ')).toContain(
+        CONTROL_SIZES.sm.h,
+      );
+    }
   });
 
   it('a ação secundária não passa pelo schema, limpa o campo e mostra o retorno no toast', async () => {
