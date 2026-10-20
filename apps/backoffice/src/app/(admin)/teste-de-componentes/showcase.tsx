@@ -54,6 +54,7 @@ import { Upload } from '@/components/ui/Upload';
 
 import { DataTableShowcase } from './data-table-showcase.tsx';
 import { MenuShowcase } from './menu-showcase.tsx';
+import { StatesShowcase } from './states-showcase.tsx';
 
 /** Imagem do Avatar sem rede: um quadrado na cor primária. */
 const AVATAR_IMAGE =
@@ -882,6 +883,8 @@ export function Showcase({ linkPage }: { linkPage: number }) {
       <DataTableShowcase />
 
       <MenuShowcase />
+
+      <StatesShowcase />
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">
         <h2 id="vitrine-movimento" className="text-lg font-semibold">
