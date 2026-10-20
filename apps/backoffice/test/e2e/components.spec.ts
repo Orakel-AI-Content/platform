@@ -2108,3 +2108,50 @@ for (const width of [375, 700, 1280]) {
     expect(Math.abs(barBox.width - mainBox.width)).toBeLessThanOrEqual(1);
   });
 }
+
+// Lista de dados e linha de metadados (#368): o `CustomerInfoField` do Ecme, com o rótulo em
+// cima e o valor embaixo. A 375 px, o valor de 120 caracteres sem espaço nem hífen quebra dentro
+// do cartão, sem rolagem horizontal da página; o axe passa nos dois temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`lista de dados quebra o valor longo a 375 px, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.emulateMedia({ colorScheme });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const showcase = section(page, 'Lista de dados e linha de metadados');
+
+    const terms = showcase.getByRole('term');
+    await expect(terms).toHaveText(['Domínio', 'Identificador', 'Slug', 'Estado']);
+    await expect(showcase.getByText('Publicado')).toBeVisible();
+
+    // O valor longo ocupa várias linhas, dentro da largura do cartão.
+    const value = showcase.locator('[data-vitrine-valor-longo]');
+    await expect(value).toHaveText('guiacompleto'.repeat(10));
+    const valueBox = (await value.boundingBox())!;
+    const cardBox = (await showcase
+      .getByRole('term', { name: 'Slug' })
+      .locator('xpath=ancestor::dl[1]')
+      .boundingBox())!;
+    expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 1);
+    const lineHeight = await value.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).lineHeight),
+    );
+    expect(valueBox.height).toBeGreaterThan(lineHeight * 1.5);
+    const viewport = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-lista-de-dados"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+    expect(hydration).toEqual([]);
+  });
+}
