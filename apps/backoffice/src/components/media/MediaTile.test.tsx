@@ -7,7 +7,8 @@ import type { MediaItem } from './MediaLibrary.tsx';
 import { MediaTile } from './MediaTile.tsx';
 
 // Miniatura clicável (#374): a legenda é o nome do botão, a imagem é decorativa, o clique chega
-// a quem usa e o botão nunca envia o formulário em volta.
+// a quem usa e o botão nunca envia o formulário em volta. No escuro, o hover sobe um degrau sobre
+// a superfície gray-800 do cartão e do diálogo e clareia a legenda (#397).
 
 afterEach(cleanup);
 
@@ -47,5 +48,17 @@ describe('miniatura clicável', () => {
 
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('no escuro, o hover sai da superfície gray-800 e clareia a legenda', () => {
+    render(<MediaTile item={item}>Mídia 7 · 800×600</MediaTile>);
+
+    const tile = screen.getByRole('button', { name: 'Mídia 7 · 800×600' });
+    expect(tile.classList).toContain('group');
+    expect(tile.classList).toContain('dark:hover:bg-gray-700');
+    expect(tile.classList).not.toContain('dark:hover:bg-gray-800');
+    expect(screen.getByText('Mídia 7 · 800×600').classList).toContain(
+      'dark:group-hover:text-gray-100',
+    );
   });
 });
