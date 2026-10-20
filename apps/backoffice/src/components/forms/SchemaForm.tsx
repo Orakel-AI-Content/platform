@@ -1,7 +1,10 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useId, useState, type ReactNode } from 'react';
+import { TbArrowNarrowLeft, TbTrash } from 'react-icons/tb';
 import {
   Controller,
   FormProvider,
@@ -27,10 +30,12 @@ import Alert from '@/components/ui/Alert';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Checkbox from '@/components/ui/Checkbox';
-import { FormItem } from '@/components/ui/Form';
+import { Form, FormItem } from '@/components/ui/Form';
 import { useFormItem } from '@/components/ui/Form/context';
 import Input from '@/components/ui/Input';
 import classNames from '@/components/ui/utils/classNames';
+import BottomStickyBar from '@/components/template/BottomStickyBar';
+import { PAGE_CONTAINER_GUTTER_X } from '@/components/template/constants';
 
 import { clean, describe, emptyValue, pattern, type FieldNode } from './schemaWalk.ts';
 
@@ -42,6 +47,12 @@ import { clean, describe, emptyValue, pattern, type FieldNode } from './schemaWa
 // controle), texto e número no `Input`, booleano no `Checkbox`, botões no `Button` e as seções em
 // `Card`, como os formulários do template (ProductForm). O enum continua `<select>` nativo, com
 // as classes do `Input`.
+// Formulário de tela (#328), como o `CustomerForm` do Ecme: `Form` → coluna de `Card`s (um por
+// seção, ou um só) → `BottomStickyBar` com "Descartar" (criação, confirmado num diálogo, como o
+// `CustomerCreate`) ou "Voltar" (edição, como o `CustomerEdit`) e a ação principal. Os campos
+// curtos relacionados ficam lado a lado a partir de `md` (`sideBySide`). Formulário dentro de
+// outra tela (checklist da revisão) não liga a barra nem cria cartão: quem o contém já é o
+// cartão.
 
 /** Props de um campo registrado: valor e mudança vêm do react-hook-form (Controller). */
 export type FieldProps = {
@@ -63,6 +74,12 @@ export type FieldRenderer = (props: FieldProps) => ReactNode;
 /** Grupo de chaves de topo do schema, com título; `id` vira a âncora `#secao-<id>`. */
 export type SchemaFormSection = { id: string; title: string; paths: string[] };
 
+/**
+ * Barra de ações da tela (`BottomStickyBar`): na criação, "Descartar" pede confirmação e vai
+ * para `href`; na edição, "Voltar" é um link para `href` (o nível anterior da trilha).
+ */
+export type SchemaFormActionBar = { kind: 'create' | 'edit'; href: string };
+
 export type SchemaFormProps<T> = {
   schema: z.ZodType<T>;
   defaultValues: Record<string, unknown>;
@@ -80,6 +97,15 @@ export type SchemaFormProps<T> = {
    * delas, sem título; sem seções, o desenho é uma coluna só.
    */
   sections?: SchemaFormSection[];
+  /**
+   * Grupos de campos curtos relacionados, lado a lado a partir de `md` (`grid md:grid-cols-2`),
+   * por caminho com `*` no lugar dos índices (`['name', 'slug']`, `['items.*.label', ...]`).
+   */
+  sideBySide?: string[][];
+  /** Formulário de tela: campos em `Card` e a barra fixa com Descartar/Voltar e o envio. */
+  actionBar?: SchemaFormActionBar;
+  /** Largura da coluna de cartões e da barra (`form-width`); quem decide é a página. */
+  contentClassName?: string;
   submitLabel: string;
   /** Rótulo do botão durante o envio (desabilitado até a resposta); padrão "Salvando…". */
   pendingLabel?: string;
@@ -110,6 +136,7 @@ type Ctx = {
   hidden: ReadonlySet<string>;
   readOnly: ReadonlySet<string>;
   fields: Record<string, FieldRenderer>;
+  sideBySide: readonly string[][];
 };
 
 /** `<select>` nativo com a aparência do `Input` do Ecme (tamanho `md`). */
@@ -443,11 +470,27 @@ function Children({
   shape: Record<string, z.ZodType>;
   prefix: string;
 }) {
+  const join = (key: string) => (prefix === '' ? key : `${prefix}.${key}`);
+  const node = ([key, child]: [string, z.ZodType]) => (
+    <Node key={join(key)} ctx={ctx} schema={child} path={join(key)} name={key} />
+  );
+  const entries = Object.entries(shape);
+  const grouped = new Set<string>();
   return (
     <>
-      {Object.entries(shape).map(([key, child]) => {
-        const path = prefix === '' ? key : `${prefix}.${key}`;
-        return <Node key={path} ctx={ctx} schema={child} path={path} name={key} />;
+      {entries.map((entry) => {
+        const [key] = entry;
+        if (grouped.has(key)) return null;
+        const group = ctx.sideBySide.find((paths) => paths.includes(pattern(join(key))));
+        if (group === undefined) return node(entry);
+        // Campos curtos relacionados lado a lado a partir de `md`, como no `CustomerForm`.
+        const members = entries.filter(([other]) => group.includes(pattern(join(other))));
+        for (const [other] of members) grouped.add(other);
+        return (
+          <div key={`grupo-${join(key)}`} className="grid md:grid-cols-2 gap-4">
+            {members.map(node)}
+          </div>
+        );
       })}
     </>
   );
@@ -527,6 +570,10 @@ export type SchemaFieldsProps = {
   fields?: Record<string, FieldRenderer>;
   /** Só na raiz (`prefix` vazio): agrupa as chaves de topo em seções com `h2`. */
   sections?: SchemaFormSection[];
+  /** Grupos de campos lado a lado a partir de `md` (ver `SchemaFormProps`). */
+  sideBySide?: string[][];
+  /** Chaves de topo fora de seção também num `Card` (formulário de tela). */
+  carded?: boolean;
 };
 
 /**
@@ -544,6 +591,8 @@ export function SchemaFields({
   readOnly = [],
   fields = {},
   sections,
+  sideBySide = [],
+  carded = false,
 }: SchemaFieldsProps) {
   const id = useId();
   const {
@@ -562,24 +611,30 @@ export function SchemaFields({
     hidden: new Set(hidden),
     readOnly: new Set(readOnly),
     fields,
+    sideBySide,
   };
   if (root.kind !== 'object') {
     return <p className="text-sm text-warning">O gerador espera um schema de objeto.</p>;
   }
-  if (sections === undefined || prefix !== '') {
+  if (prefix !== '') {
     return <Children ctx={ctx} shape={root.shape} prefix={prefix} />;
   }
   const pick = (keys: string[]) =>
     Object.fromEntries(Object.entries(root.shape).filter(([key]) => keys.includes(key)));
-  const inSection = new Set(sections.flatMap((section) => section.paths));
+  const inSection = new Set((sections ?? []).flatMap((section) => section.paths));
+  // Chave de topo fora de todas as seções: depois delas, nunca omitida. No formulário de tela,
+  // num `Card` sem título (o único, sem seções), se alguma for visível.
+  const rest = Object.keys(root.shape).filter((key) => !inSection.has(key));
+  const restFields = <Children ctx={ctx} shape={pick(rest)} prefix="" />;
   return (
     <>
-      {sections.map((section) => (
+      {(sections ?? []).map((section) => (
         <section key={section.id} aria-labelledby={`secao-${section.id}`}>
           <Card>
+            {/* O `h4 mb-6` do Ecme no visual, `h2` na estrutura (o `h1` é o da tela). */}
             <h2
               id={`secao-${section.id}`}
-              className="mb-6 text-lg font-semibold text-gray-900 dark:text-gray-100"
+              className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100"
             >
               {section.title}
             </h2>
@@ -587,12 +642,7 @@ export function SchemaFields({
           </Card>
         </section>
       ))}
-      {/* Chave de topo fora de todas as seções: depois delas, nunca omitida. */}
-      <Children
-        ctx={ctx}
-        shape={pick(Object.keys(root.shape).filter((key) => !inSection.has(key)))}
-        prefix=""
-      />
+      {carded && rest.some((key) => !ctx.hidden.has(key)) ? <Card>{restFields}</Card> : restFields}
     </>
   );
 }
@@ -607,6 +657,9 @@ export function SchemaForm<T>({
   readOnly,
   fields,
   sections,
+  sideBySide,
+  actionBar,
+  contentClassName,
   submitLabel,
   pendingLabel = 'Salvando…',
   submitDisabled = false,
@@ -625,11 +678,22 @@ export function SchemaForm<T>({
   const { isSubmitting, errors } = form.formState;
   const items = errorItems(errors, schema, new Set(Object.keys(fields ?? {})));
 
+  const submit = (
+    <Button
+      type="submit"
+      variant="solid"
+      disabled={submitDisabled || isSubmitting}
+      aria-describedby={submitDescribedBy}
+    >
+      {isSubmitting ? pendingLabel : submitLabel}
+    </Button>
+  );
+
   return (
     <FormProvider {...form}>
-      <form
+      <Form
         noValidate
-        className="space-y-4"
+        containerClassName="flex flex-col"
         onSubmit={(event) => {
           // Um envio por vez: Enter num campo durante o envio também não dispara outro.
           if (isSubmitting) {
@@ -650,45 +714,109 @@ export function SchemaForm<T>({
           )(event);
         }}
       >
-        {sections && (
-          <nav aria-label="Seções do formulário">
-            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              {sections.map((section) => (
-                <li key={section.id}>
-                  <a href={`#secao-${section.id}`} className="underline underline-offset-4">
-                    {section.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+        <div className={classNames('flex flex-col gap-4', contentClassName)}>
+          {sections && (
+            <nav aria-label="Seções do formulário">
+              <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                {sections.map((section) => (
+                  <li key={section.id}>
+                    <a href={`#secao-${section.id}`} className="underline underline-offset-4">
+                      {section.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+          <ErrorSummary
+            lines={general}
+            items={items.map((item) => ({
+              key: item.path,
+              text: `${summaryLabel(labels ?? {}, item.path)}: ${item.message}`,
+              onFocus: item.focusable ? () => form.setFocus(item.path) : undefined,
+            }))}
+          />
+          <SchemaFields
+            schema={schema}
+            labels={labels}
+            hints={hints}
+            hidden={hidden}
+            readOnly={readOnly}
+            fields={fields}
+            sections={sections}
+            sideBySide={sideBySide}
+            carded={actionBar !== undefined}
+          />
+          {actionBar === undefined && <div>{submit}</div>}
+        </div>
+        {actionBar && (
+          <FormActionBar
+            {...actionBar}
+            contentClassName={contentClassName}
+            pending={isSubmitting}
+            submit={submit}
+          />
         )}
-        <ErrorSummary
-          lines={general}
-          items={items.map((item) => ({
-            key: item.path,
-            text: `${summaryLabel(labels ?? {}, item.path)}: ${item.message}`,
-            onFocus: item.focusable ? () => form.setFocus(item.path) : undefined,
-          }))}
-        />
-        <SchemaFields
-          schema={schema}
-          labels={labels}
-          hints={hints}
-          hidden={hidden}
-          readOnly={readOnly}
-          fields={fields}
-          sections={sections}
-        />
-        <Button
-          type="submit"
-          variant="solid"
-          disabled={submitDisabled || isSubmitting}
-          aria-describedby={submitDescribedBy}
-        >
-          {isSubmitting ? pendingLabel : submitLabel}
-        </Button>
-      </form>
+      </Form>
     </FormProvider>
+  );
+}
+
+/**
+ * Barra fixa do formulário de tela, como a do `CustomerCreate`/`CustomerEdit`: a ação
+ * secundária à esquerda ("Voltar") ou ao lado do envio ("Descartar"), o envio à direita. O
+ * conteúdo acompanha os gutters do `main` e a largura da coluna de cartões.
+ */
+function FormActionBar({
+  kind,
+  href,
+  contentClassName,
+  pending,
+  submit,
+}: SchemaFormActionBar & { contentClassName?: string; pending: boolean; submit: ReactNode }) {
+  const router = useRouter();
+  const [discarding, setDiscarding] = useState(false);
+  return (
+    <BottomStickyBar>
+      <div className={PAGE_CONTAINER_GUTTER_X}>
+        <div className={classNames('flex items-center justify-between gap-3', contentClassName)}>
+          {kind === 'edit' ? (
+            <Button asElement={Link} href={href} variant="plain" icon={<TbArrowNarrowLeft />}>
+              Voltar
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex items-center gap-3">
+            {kind === 'create' && (
+              <Button
+                type="button"
+                customColorClass={dangerButtonClass}
+                icon={<TbTrash />}
+                disabled={pending}
+                onClick={() => setDiscarding(true)}
+              >
+                Descartar
+              </Button>
+            )}
+            {submit}
+          </div>
+        </div>
+      </div>
+      <ConfirmDialog
+        isOpen={discarding}
+        type="danger"
+        title="Descartar o que foi preenchido?"
+        confirmText="Descartar"
+        confirmButtonProps={dangerConfirmButtonProps}
+        onCancel={() => setDiscarding(false)}
+        onConfirm={() => {
+          setDiscarding(false);
+          router.push(href);
+        }}
+      >
+        <p>Nada é salvo, e você volta para a tela anterior.</p>
+      </ConfirmDialog>
+    </BottomStickyBar>
   );
 }
