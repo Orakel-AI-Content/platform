@@ -2,11 +2,13 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import type { ContentData } from '@/db/schema/index.ts';
 
 import { ContentVersionView } from './ContentVersionView.tsx';
 
-// Leitura de uma versão (#44): os cinco tipos de bloco, sem nenhum controle de edição.
+// Leitura de uma versão (#44): os cinco tipos de bloco, sem nenhum controle de edição; em
+// cartões, com a hierarquia de títulos das outras telas (#372).
 
 afterEach(cleanup);
 
@@ -72,5 +74,57 @@ describe('visualização de versão', () => {
       expect(screen.queryAllByRole(role)).toEqual([]);
     }
     expect(container.querySelector('form, input, textarea, select, [contenteditable]')).toBeNull();
+  });
+
+  it('põe "Dados" e cada bloco num cartão, sem a grade rótulo/valor antiga', () => {
+    const { container } = render(<ContentVersionView data={data} />);
+
+    expect(container.querySelectorAll('.card')).toHaveLength(1 + data.blocks.length);
+    expect(
+      container.querySelector('.rounded-xl.border, [class*="grid-cols-[auto_1fr]"]'),
+    ).toBeNull();
+  });
+
+  it('não pula nível de título, com a classe de título das outras telas', () => {
+    const { container } = render(
+      <>
+        <h1>Versão 1</h1>
+        <ContentVersionView
+          data={{
+            ...data,
+            blocks: [
+              {
+                n: 1,
+                type: 'text',
+                content: [
+                  { type: 'heading', level: 3, children: [{ type: 'text', text: 'Solto' }] },
+                  { type: 'heading', level: 2, children: [{ type: 'text', text: 'Seção' }] },
+                  { type: 'heading', level: 3, children: [{ type: 'text', text: 'Subseção' }] },
+                ],
+              },
+              ...data.blocks.slice(1),
+            ],
+          }}
+        />
+      </>,
+    );
+
+    const levels = [...container.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((heading) =>
+      Number(heading.tagName[1]),
+    );
+    levels.forEach((level, index) => {
+      if (index > 0) expect(level - levels[index - 1]!).toBeLessThanOrEqual(1);
+    });
+    expect(screen.getByRole('heading', { name: 'Solto' }).tagName).toBe('H4');
+    expect(screen.getByRole('heading', { name: 'Seção' }).tagName).toBe('H4');
+    expect(screen.getByRole('heading', { name: 'Subseção' }).tagName).toBe('H5');
+
+    const sections = screen.getAllByRole('heading', { level: 2 });
+    const blocks = screen.getAllByRole('heading', { level: 3 });
+    expect(sections.map((h) => h.textContent)).toEqual(['Dados', 'Blocos']);
+    expect(blocks).toHaveLength(data.blocks.length);
+    for (const heading of [...sections, ...blocks]) {
+      expect(heading.className).toBe(SECTION_TITLE_CLASS);
+    }
   });
 });
