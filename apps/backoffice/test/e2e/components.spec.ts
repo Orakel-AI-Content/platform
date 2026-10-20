@@ -1758,7 +1758,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 // carregando, o esqueleto.
 
 const dataTable = (page: Page, name: string) =>
-  section(page, 'DataTable').getByRole('table', { name });
+  section(page, 'DataTable').getByRole('table', { name, exact: true });
 
 const materias = (page: Page) => dataTable(page, 'Matérias');
 
@@ -1865,9 +1865,11 @@ test('DataTable: busca sem acento e filtro na URL; sem resultado, só a mensagem
   await expect(page).toHaveURL(/\?q=materia\+1&situacao=revisao$/);
   await expect.poll(() => firstCells(table)).toEqual(['Matéria 12', 'Matéria 15', 'Matéria 18']);
 
+  // Recarregar mantém busca e filtro (a URL é a fonte). Espera pela contagem: aqui o
+  // `networkidle` não chegava dentro do tempo do teste.
   await page.reload();
-  await page.waitForLoadState('networkidle');
   await expect(resultCount(page)).toHaveText('3 resultados');
+  await expect(search).toHaveValue('materia 1');
 
   await search.fill('nada por aqui');
   await expect(table.getByText('Nenhuma matéria encontrada.')).toBeVisible();
