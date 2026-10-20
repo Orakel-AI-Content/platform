@@ -30,8 +30,10 @@ const ALL: FilterOption = { value: '', label: 'Todos' };
 /**
  * Busca e filtros da lista. A busca guarda o texto digitado localmente (a URL chega depois
  * de cada `router.replace`) e esvazia quando a busca da URL volta a vazia, venha a limpeza
- * daqui ou de fora (o "Limpar busca" do estado sem resultado). "Limpar filtros" só aparece
- * com busca ou filtro ativo e devolve o foco à busca.
+ * daqui ou de fora. "Limpar filtros" só aparece com busca ou filtro ativo, é a única ação de
+ * limpar da lista (o estado sem resultado não a repete, #361) e devolve o foco à busca. Layout
+ * do `CustomersListTableTools` do Ecme: em coluna abaixo de `md`, em linha a partir dele, com
+ * a busca à esquerda e filtros e limpar à direita.
  */
 export function ListToolbar({
   search,
@@ -62,10 +64,10 @@ export function ListToolbar({
   return (
     <form
       role="search"
-      className="flex flex-wrap items-end gap-3"
+      className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
       onSubmit={(event) => event.preventDefault()}
     >
-      <FormItem htmlFor={`${id}-search`} label={searchLabel} className="mb-0 min-w-56 flex-1">
+      <FormItem htmlFor={`${id}-search`} label={searchLabel} className="mb-0 w-full md:max-w-xs">
         <Input
           ref={searchRef}
           id={`${id}-search`}
@@ -77,35 +79,39 @@ export function ListToolbar({
           }}
         />
       </FormItem>
-      {filters.map((filter) => {
-        const options = [ALL, ...filter.options];
-        return (
-          <FormItem
-            key={filter.column}
-            htmlFor={`${id}-${filter.column}`}
-            label={filter.label}
-            className="mb-0 min-w-44"
-          >
-            <Select<FilterOption>
-              inputId={`${id}-${filter.column}`}
-              isSearchable={false}
-              options={options}
-              value={options.find((option) => option.value === (filter.value ?? '')) ?? ALL}
-              onChange={(option) => onFilterChange?.(filter.column, option?.value || undefined)}
-            />
-          </FormItem>
-        );
-      })}
-      {active && (
-        <Button
-          type="button"
-          onClick={() => {
-            onClear();
-            requestAnimationFrame(() => searchRef.current?.focus());
-          }}
-        >
-          Limpar filtros
-        </Button>
+      {(filters.length > 0 || active) && (
+        <div className="flex flex-col gap-2 md:flex-row md:items-end">
+          {filters.map((filter) => {
+            const options = [ALL, ...filter.options];
+            return (
+              <FormItem
+                key={filter.column}
+                htmlFor={`${id}-${filter.column}`}
+                label={filter.label}
+                className="mb-0 md:w-44"
+              >
+                <Select<FilterOption>
+                  inputId={`${id}-${filter.column}`}
+                  isSearchable={false}
+                  options={options}
+                  value={options.find((option) => option.value === (filter.value ?? '')) ?? ALL}
+                  onChange={(option) => onFilterChange?.(filter.column, option?.value || undefined)}
+                />
+              </FormItem>
+            );
+          })}
+          {active && (
+            <Button
+              type="button"
+              onClick={() => {
+                onClear();
+                requestAnimationFrame(() => searchRef.current?.focus());
+              }}
+            >
+              Limpar filtros
+            </Button>
+          )}
+        </div>
       )}
     </form>
   );

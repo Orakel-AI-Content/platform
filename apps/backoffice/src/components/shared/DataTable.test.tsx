@@ -114,6 +114,35 @@ describe('DataTable', () => {
     expect(screen.queryByText('Nenhum dado encontrado!')).toBeNull();
   });
 
+  it('mostra a contagem em role="status" com tabular-nums, junto da paginação (#361)', () => {
+    const { rerender } = render(
+      <DataTable columns={COLUNAS} data={ARTIGOS} pagingData={{ ...paging, total: 1250 }} />,
+    );
+
+    const status = screen.getByRole('status');
+    expect(status.textContent).toBe('1.250 resultados');
+    expect(status.className).toContain('tabular-nums');
+    const footer = status.closest('div.mt-4');
+    expect(footer?.querySelector('nav[aria-label="Paginação"]')).toBeTruthy();
+    expect(within(footer as HTMLElement).getByLabelText('Itens por página')).toBeTruthy();
+
+    rerender(<DataTable columns={COLUNAS} data={ARTIGOS} pagingData={{ ...paging, total: 1 }} />);
+    expect(screen.getByRole('status').textContent).toBe('1 resultado');
+
+    rerender(<DataTable columns={COLUNAS} data={[]} noData pagingData={{ ...paging, total: 0 }} />);
+    expect(screen.getByRole('status').textContent).toBe('0 resultados');
+  });
+
+  it('carregando sem dados, a contagem fica vazia', () => {
+    render(
+      <DataTable columns={COLUNAS} loading pagingData={{ total: 0, pageIndex: 1, pageSize: 5 }} />,
+    );
+
+    expect(
+      screen.getAllByRole('status').find((element) => element.tagName === 'P')?.textContent,
+    ).toBe('');
+  });
+
   it('a Pagination usa pagingData e avisa onPaginationChange', async () => {
     const user = userEvent.setup();
     const onPaginationChange = vi.fn();
@@ -167,7 +196,9 @@ describe('DataTable', () => {
       />,
     );
 
-    expect(screen.getByRole('status').textContent).toBe('Carregando…');
+    expect(screen.getAllByRole('status').map((element) => element.textContent)).toContain(
+      'Carregando…',
+    );
     expect(rowTexts()).toHaveLength(3);
     await user.click(screen.getByRole('button', { name: 'Página 2' }));
     expect(onPaginationChange).not.toHaveBeenCalled();

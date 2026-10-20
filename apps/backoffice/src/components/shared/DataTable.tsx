@@ -9,7 +9,12 @@
 //   tamanho e nas caixas de seleção; o `IndeterminateCheckbox` usa o `indeterminate` do
 //   Checkbox portado (#208), que já liga a propriedade nativa;
 // - a tabela fica com `aria-busy` enquanto carrega (o esqueleto é `aria-hidden`, #206);
-// - `ref` só com o `DataTableResetHandle` (o Ecme aceitava também o da <table>, que não usava).
+// - `ref` só com o `DataTableResetHandle` (o Ecme aceitava também o da <table>, que não usava);
+// - as features incluem as de `listFeatures` (busca global, `sortFns` e o filtro
+//   `equalsString`), exportadas como `dataTableFeatures`: a mesma `ColumnDef` serve ao
+//   `useListTable`, que filtra, ordena e corta, e ao DataTable, que só desenha (#361);
+// - contagem "N resultados" em `role="status"` no rodapé, junto da paginação e do seletor, e o
+//   rodapé quebra linha em tela estreita (#361).
 'use client';
 
 import { useImperativeHandle, useMemo, useState } from 'react';
@@ -33,8 +38,11 @@ import {
   createFilteredRowModel,
   createPaginatedRowModel,
   createSortedRowModel,
+  filterFn_equalsString,
   flexRender,
   functionalUpdate,
+  globalFilteringFeature,
+  sortFns,
 } from '@tanstack/react-table';
 import type {
   ColumnDef as BaseColumnDef,
@@ -49,9 +57,10 @@ import type { CheckboxProps } from '@/components/ui/Checkbox';
 import type { ChangeEvent, ReactNode, Ref } from 'react';
 
 // Ordenação e paginação são controladas por quem usa (manualSorting / manualPagination); as
-// features registradas cobrem as APIs usadas no render.
-const dataTableFeatures = tableFeatures({
+// features registradas cobrem as APIs usadas no render e as do cálculo do `useListTable`.
+export const dataTableFeatures = tableFeatures({
   columnFilteringFeature,
+  globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
   rowSelectionFeature,
@@ -60,9 +69,11 @@ const dataTableFeatures = tableFeatures({
   filteredRowModel: createFilteredRowModel(),
   sortedRowModel: createSortedRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
+  sortFns,
+  filterFns: { equalsString: filterFn_equalsString },
 });
 
-type DataTableFeatures = typeof dataTableFeatures;
+export type DataTableFeatures = typeof dataTableFeatures;
 
 export type ColumnDef<T extends RowData, TValue = unknown> = BaseColumnDef<
   DataTableFeatures,
@@ -141,6 +152,13 @@ const IndeterminateCheckbox = (props: IndeterminateCheckboxProps) => {
     />
   );
 };
+
+const count = new Intl.NumberFormat('pt-BR');
+
+/** "1 resultado", "1.250 resultados". */
+function resultCount(total: number): string {
+  return total === 1 ? '1 resultado' : `${count.format(total)} resultados`;
+}
 
 /** `OnSortParam` → `SortingState` do TanStack (ordem vazia: sem ordenação). */
 function toSorting(sort: OnSortParam): SortingState {
@@ -376,24 +394,30 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
           </TBody>
         )}
       </Table>
-      <div className="flex items-center justify-between mt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
         <Pagination
           pageSize={pageSize}
           currentPage={pageIndex}
           total={total}
           onChange={handlePaginationChange}
         />
-        <div style={{ minWidth: 130 }}>
-          <Select
-            instanceId={instanceId}
-            aria-label="Itens por página"
-            size="sm"
-            menuPlacement="top"
-            isSearchable={false}
-            value={pageSizeOption.filter((option) => option.value === pageSize)}
-            options={pageSizeOption}
-            onChange={(option) => handleSelectChange(option?.value)}
-          />
+        <div className="flex items-center gap-3">
+          {/* Sempre na página, para o leitor de tela anunciar a troca; vazio no esqueleto. */}
+          <p role="status" className="text-sm tabular-nums">
+            {loading && data.length === 0 ? '' : resultCount(total)}
+          </p>
+          <div style={{ minWidth: 130 }}>
+            <Select
+              instanceId={instanceId}
+              aria-label="Itens por página"
+              size="sm"
+              menuPlacement="top"
+              isSearchable={false}
+              value={pageSizeOption.filter((option) => option.value === pageSize)}
+              options={pageSizeOption}
+              onChange={(option) => handleSelectChange(option?.value)}
+            />
+          </div>
         </div>
       </div>
     </Loading>

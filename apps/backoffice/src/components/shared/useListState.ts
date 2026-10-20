@@ -18,6 +18,7 @@ import {
   type Row,
   type RowData,
   type SortingState,
+  type TableFeatures,
   type Updater,
 } from '@tanstack/react-table';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -30,9 +31,12 @@ export function normalizeText(value: string): string {
   return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }
 
-/** Busca da lista: contém o texto, ignorando maiúsculas e acentos. */
-export function searchFilterFn<TData extends RowData>(
-  row: Row<typeof listFeatures, TData>,
+/**
+ * Busca da lista: contém o texto, ignorando maiúsculas e acentos. Genérica nas features: serve
+ * ao `listFeatures` e às do DataTable (`useListTable`, #361).
+ */
+export function searchFilterFn<TFeatures extends TableFeatures, TData extends RowData>(
+  row: Row<TFeatures, TData>,
   columnId: string,
   value: unknown,
 ): boolean {
