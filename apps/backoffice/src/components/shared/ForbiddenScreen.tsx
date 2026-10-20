@@ -1,3 +1,4 @@
+import SpaceSignBoard from '@/assets/svg/SpaceSignBoard';
 import { StatusScreen } from '@/components/shared/StatusScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import type { Role } from '@/db/schema/index.ts';
@@ -42,6 +43,7 @@ export function ForbiddenScreen({
   return (
     <StatusScreen
       title="Sem permissão"
+      illustration={<SpaceSignBoard height={280} width={280} />}
       action={<ButtonLink href={back.href}>{back.label}</ButtonLink>}
     >
       {/* Anunciado como o alerta que esta tela substitui: a aba mantém o título da página. */}

@@ -350,13 +350,23 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   linhas, nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
   permissão, a mesma ação principal do cabeçalho (`emptyAction` das tabelas). Com a lista
   vazia, a ação aparece duas vezes; no E2E, clique na primeira (a do cabeçalho).
-- **Telas de estado:** `StatusScreen` (`src/components/shared/StatusScreen.tsx`), com título (`h1`),
-  uma frase do que aconteceu e o que fazer, e a ação de saída (link de volta ou "Tentar de
-  novo"). "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo
-  catch-all `(admin)/[...rest]` e para o site inexistente), erro (`(admin)/error.tsx` e
-  `global-error.tsx`, pelo `ErrorScreen`) e falta de permissão (`ForbiddenScreen`) a usam,
-  mudando só o conteúdo, sem variante visual. A tela de erro nunca mostra a mensagem da
-  exceção, só o `digest`.
+- **Telas de estado:** `StatusScreen` (`src/components/shared/StatusScreen.tsx`), a tela vazia
+  do template (o `AccessDenied` e o "No user found" do `CustomerEdit`): coluna centrada, com a
+  ilustração decorativa em 280 × 280 por cima, o título (`h1`) na cor de heading, uma frase do
+  que aconteceu e o que fazer em `text-sm` no cinza do body e a ação de saída (link de volta
+  ou "Tentar de novo") centrada. Sem `max-w-*` nem `space-y-*`: o espaçamento é por margens,
+  como no template. A ilustração vem por prop (`illustration`), de `src/assets/svg/`, sempre
+  `aria-hidden`, e cada tela escolhe a sua:
+  - "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo catch-all
+    `(admin)/[...rest]` e para o site inexistente, e `sites/[site]/not-found.tsx`) →
+    `FileNotFound`;
+  - falta de permissão (`ForbiddenScreen`) → `SpaceSignBoard`;
+  - erro (`(admin)/error.tsx` e `global-error.tsx`, pelo `ErrorScreen`) → `NoDataFound`.
+
+  Fora a ilustração, as telas mudam só o conteúdo, sem variante visual. A tela de erro nunca
+  mostra a mensagem da exceção, só o `digest`. Não confunda com o `EmptyState`, o vazio de
+  lista com borda tracejada.
+
 - **Formulários:** gerados do schema Zod com `SchemaForm` (`src/components/forms/`), sobre
   react-hook-form + zodResolver; a validação é só a do schema. Visual do Ecme: cada campo num
   `FormItem` (rótulo e erro ligados ao controle), texto e número no `Input`, booleano no
