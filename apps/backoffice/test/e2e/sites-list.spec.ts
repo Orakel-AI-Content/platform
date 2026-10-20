@@ -118,7 +118,10 @@ test('com 20 sites em 1280 px, página e tabela sem rolagem horizontal e linhas 
   page,
 }) => {
   await loginAsAdmin(page);
-  const table = page.getByRole('table');
+  // Todos os sites numa página só (o padrão é 25, e o banco local pode ter outros sites).
+  await page.goto('/sites?por-pagina=100');
+  await page.waitForLoadState('networkidle');
+  const table = page.getByRole('table', { name: 'Sites', exact: true });
   const rows = table.locator('tbody tr');
   expect(await rows.count()).toBeGreaterThanOrEqual(20);
 
@@ -220,6 +223,37 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await expect(publish).toBeFocused();
   });
 }
+
+// Lista no cartão do template (#364): busca, filtro por estado, ordem e tamanho na URL;
+// recarregar mantém a mesma visão.
+test('busca e filtro por estado ficam na URL e recarregar mantém a mesma visão', async ({
+  page,
+}) => {
+  await loginAsAdmin(page);
+  const table = page.getByRole('table', { name: 'Sites', exact: true });
+  const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
+
+  await page.getByLabel('Buscar por nome, ID ou domínio').fill(`e2e-lista-${stamp}`);
+  await expect(page).toHaveURL(new RegExp(`q=e2e-lista-${stamp}`));
+  await expect(count).toHaveText('18 resultados');
+
+  await page.getByRole('combobox', { name: 'Estado' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await page.getByRole('option', { name: 'Pausado' }).click();
+  await expect(page).toHaveURL(/estado=pausado/);
+  await expect(count).toHaveText('1 resultado');
+  await expect(table.getByText(`${created[1]} · `, { exact: false })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel('Buscar por nome, ID ou domínio')).toHaveValue(`e2e-lista-${stamp}`);
+  await expect(count).toHaveText('1 resultado');
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+
+  // Busca sem resultado: a tabela fica, com a mensagem e "0 resultados".
+  await page.goto('/sites?q=nada-com-isso');
+  await expect(table.getByText('Nenhum site encontrado.')).toBeVisible();
+  await expect(count).toHaveText('0 resultados');
+});
 
 // "Mais ações" no Dropdown do Ecme (#248): `menu` com `menuitem`, aberto pelo mouse ou pelo
 // teclado; ao abrir, o foco vai ao primeiro item e as setas o levam aos outros.
