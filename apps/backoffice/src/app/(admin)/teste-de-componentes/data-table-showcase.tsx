@@ -1,98 +1,150 @@
 'use client';
 
-import { useMemo } from 'react';
+import Link from 'next/link';
 
-import { useListState, type ListConfig } from '@/components/shared/useListState';
-import DataTable, { type ColumnDef, type OnSortParam } from '@/components/shared/DataTable';
+import AdaptiveCard from '@/components/shared/AdaptiveCard';
+import DataTable, { type ColumnDef } from '@/components/shared/DataTable';
+import { EmptyState, NoResults } from '@/components/shared/EmptyState';
+import { ListToolbar } from '@/components/shared/ListControls';
+import { ROW_LINK_CLASS } from '@/components/shared/rowLink';
+import { Truncated } from '@/components/shared/Truncated';
+import { TwoLines } from '@/components/shared/TwoLines';
+import { useListTable } from '@/components/shared/useListTable';
+import type { ListConfig } from '@/components/shared/useListState';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { Card } from '@/components/ui/Card';
 
-// Seção do DataTable na vitrine (#215), com nomes que não colidem com os da Table: dados fixos paginados e ordenados por quem usa, como
-// no Ecme (manual), com página, ordem e tamanho na URL pelo `useListState`; e os estados de
-// carregamento (TableRowSkeleton) e de lista vazia.
+// Seção do DataTable na vitrine (#215, #361), com nomes que não colidem com os da Table: a lista
+// completa no padrão do template (`CustomerList` do Ecme) — cartão com título e ação principal,
+// toolbar, tabela, contagem e paginação —, calculada no cliente pelo `useListTable` com busca,
+// filtro, ordem, página e tamanho na URL; a lista vazia (com a ação principal) e o esqueleto
+// de carregamento. Busca sem resultado é a própria lista com uma busca que não acha nada.
 
-type Materia = { id: number; titulo: string; visitas: number; status: string };
+type Status = 'publicado' | 'rascunho' | 'revisao';
 
-const STATUS = ['Publicado', 'Rascunho', 'Em revisão'];
+type Materia = { id: number; titulo: string; resumo: string; visitas: number; status: Status };
+
+const STATUS_LABEL: Record<Status, string> = {
+  publicado: 'Publicado',
+  rascunho: 'Rascunho',
+  revisao: 'Em revisão',
+};
+
+const STATUSES = Object.keys(STATUS_LABEL) as Status[];
 
 /** 32 matérias fixas: duas páginas no tamanho 25 e quatro no 10. */
 const MATERIAS: Materia[] = Array.from({ length: 32 }, (_, i) => ({
   id: i + 1,
   titulo: `Matéria ${String(i + 1).padStart(2, '0')}`,
+  resumo: `Resumo longo da matéria ${i + 1}, cortado na célula com o texto inteiro no title`,
   visitas: ((i * 37) % 97) * 10,
-  status: STATUS[i % STATUS.length] ?? 'Rascunho',
+  status: STATUSES[i % STATUSES.length] ?? 'rascunho',
 }));
 
 const COLUNAS: ColumnDef<Materia>[] = [
-  { header: 'Manchete', accessorKey: 'titulo' },
-  { header: 'Visitas', accessorKey: 'visitas' },
-  { header: 'Situação', accessorKey: 'status', enableSorting: false },
+  {
+    header: 'Manchete',
+    accessorKey: 'titulo',
+    sortFn: (a, b) => a.original.titulo.localeCompare(b.original.titulo, 'pt-BR'),
+    cell: ({ row }) => (
+      <TwoLines secondary={<Truncated text={row.original.resumo} className="max-w-48" />}>
+        <Link href="#vitrine-data-table" className={ROW_LINK_CLASS}>
+          {row.original.titulo}
+        </Link>
+      </TwoLines>
+    ),
+  },
+  { header: 'Visitas', accessorKey: 'visitas', enableGlobalFilter: false },
+  {
+    header: 'Situação',
+    accessorKey: 'status',
+    enableSorting: false,
+    enableGlobalFilter: false,
+    filterFn: 'equalsString',
+    cell: ({ row }) => STATUS_LABEL[row.original.status],
+  },
 ];
 
-const PAGE_SIZES = [10, 25, 50];
-
 const LIST: ListConfig = {
-  filters: [],
+  filters: [{ column: 'status', param: 'situacao', values: STATUSES }],
   sortable: ['titulo', 'visitas'],
   defaultSort: { id: 'titulo', desc: false },
-  pageSizes: PAGE_SIZES,
+  pageSizes: [10, 25, 50],
 };
 
-const DEFAULT_SORT = { id: 'titulo', desc: false };
+const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABEL[value] }));
 
-function compare(a: Materia, b: Materia, column: string): number {
-  return column === 'visitas' ? a.visitas - b.visitas : a.titulo.localeCompare(b.titulo, 'pt-BR');
+const NOVA = (
+  <ButtonLink variant="solid" href="#vitrine-data-table">
+    Nova matéria
+  </ButtonLink>
+);
+
+/** Cabeçalho do cartão da lista: título e ação principal, em linha a partir de `md`. */
+function ListHeader({ id, title }: { id: string; title: string }) {
+  return (
+    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <h3 id={id} className="text-lg font-semibold">
+        {title}
+      </h3>
+      {NOVA}
+    </div>
+  );
+}
+
+function MateriasList() {
+  const { list, tableProps } = useListTable({ config: LIST, columns: COLUNAS, data: MATERIAS });
+  return (
+    <AdaptiveCard>
+      <div className="flex flex-col gap-4">
+        <ListHeader id="vitrine-data-table-materias" title="Matérias" />
+        <ListToolbar
+          search={list.state.search}
+          searchLabel="Buscar por manchete"
+          onSearchChange={list.setSearch}
+          filters={[
+            {
+              column: 'status',
+              label: 'Situação',
+              value: list.state.filters.status,
+              options: STATUS_OPTIONS,
+            },
+          ]}
+          onFilterChange={list.setFilter}
+          onClear={list.clearFilters}
+        />
+        <DataTable
+          aria-labelledby="vitrine-data-table-materias"
+          instanceId="vitrine-data-table"
+          columns={COLUNAS}
+          customNoDataIcon={<NoResults>Nenhuma matéria encontrada.</NoResults>}
+          {...tableProps}
+        />
+      </div>
+    </AdaptiveCard>
+  );
 }
 
 export function DataTableShowcase() {
-  const list = useListState(LIST);
-  const { page, pageSize } = list.state;
-  const sort = list.state.sort ?? DEFAULT_SORT;
-
-  const rows = useMemo(() => {
-    const sorted = [...MATERIAS].sort((a, b) => (sort.desc ? -1 : 1) * compare(a, b, sort.id));
-    return sorted.slice((page - 1) * pageSize, page * pageSize);
-  }, [sort.id, sort.desc, page, pageSize]);
-
-  const onSort = ({ order, key }: OnSortParam) =>
-    list.setSort(order ? { id: String(key), desc: order === 'desc' } : DEFAULT_SORT);
-
   return (
     <section aria-labelledby="vitrine-data-table" className="space-y-3">
       <h2 id="vitrine-data-table" className="text-lg font-semibold">
         DataTable
       </h2>
-      <Card>
-        <DataTable
-          aria-label="Matérias paginadas"
-          instanceId="vitrine-data-table"
-          columns={COLUNAS}
-          data={rows}
-          sort={{ order: sort.desc ? 'desc' : 'asc', key: sort.id }}
-          pageSizes={PAGE_SIZES}
-          pagingData={{ total: MATERIAS.length, pageIndex: page, pageSize }}
-          onSort={onSort}
-          onPaginationChange={list.setPage}
-          onSelectChange={list.setPageSize}
-        />
-      </Card>
+      <MateriasList />
+      <AdaptiveCard>
+        <div className="flex flex-col gap-4">
+          <ListHeader id="vitrine-data-table-rascunhos" title="Rascunhos" />
+          <EmptyState action={NOVA}>Nenhum rascunho cadastrado.</EmptyState>
+        </div>
+      </AdaptiveCard>
       <Card>
         <DataTable
           aria-label="Matérias carregando"
           instanceId="vitrine-data-table-carregando"
           columns={COLUNAS}
           loading
-          pageSizes={PAGE_SIZES}
-          pagingData={{ total: 0, pageIndex: 1, pageSize: 10 }}
-        />
-      </Card>
-      <Card>
-        <DataTable
-          aria-label="Matérias vazias"
-          instanceId="vitrine-data-table-vazio"
-          columns={COLUNAS}
-          data={[]}
-          noData
-          pageSizes={PAGE_SIZES}
+          pageSizes={[10, 25, 50]}
           pagingData={{ total: 0, pageIndex: 1, pageSize: 10 }}
         />
       </Card>
