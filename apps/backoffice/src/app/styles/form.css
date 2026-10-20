@@ -28,6 +28,11 @@
     @apply text-error absolute font-semibold;
   }
 
+  /* Dica do campo (#329, fora do Ecme): sob o controle, com o par "texto no cartão" do contraste. */
+  .form-hint {
+    @apply mt-1 text-sm text-gray-600 dark:text-gray-400;
+  }
+
   .form-container {
     &.inline {
       @apply md:flex! items-center;

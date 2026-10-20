@@ -178,6 +178,7 @@ export function RichTextEditor({
   onChange,
   invalid,
   describedBy,
+  required,
 }: FieldProps & { mode: RichTextMode }) {
   const editor = useEditor({
     extensions: richTextExtensions(mode),
@@ -191,6 +192,7 @@ export function RichTextEditor({
         'aria-multiline': mode === 'richText' ? 'true' : 'false',
         'aria-label': label,
         'aria-invalid': invalid ? 'true' : 'false',
+        ...(required ? { 'aria-required': 'true' } : {}),
         ...(describedBy ? { 'aria-describedby': describedBy } : {}),
         class: CONTENT_CLASS,
       },

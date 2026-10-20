@@ -11,6 +11,12 @@
 //   transform e layout);
 // - o asterisco usa `text-error` (o Ecme usava o vermelho padrão do Tailwind, fora do
 //   `@theme`) e fica oculto do leitor de tela, que já anuncia o `required` do campo.
+// Adaptado (#329), para um só desenho de dica e erro em todo formulário:
+// - `hint` é a dica do campo, no fluxo sob o controle e antes da mensagem de erro; o id dela
+//   (`hintId`) vai no contexto, e o Input o soma ao `aria-describedby` (o Ecme não tinha dica;
+//   o `extra` fica no rótulo e entraria no nome acessível);
+// - sem `label`, o FormItem não desenha `<label>`: envolve um grupo (lista, caixa de seleção com
+//   o rótulo próprio), que lê o `errorId` do contexto.
 'use client';
 
 import classNames from '../utils/classNames';
@@ -26,6 +32,8 @@ export interface FormItemProps extends CommonProps {
   asterisk?: boolean;
   errorMessage?: string;
   extra?: string | ReactNode;
+  /** Dica do campo, sob o controle; o Input a liga pelo `aria-describedby` (via contexto). */
+  hint?: ReactNode;
   htmlFor?: string;
   invalid?: boolean;
   label?: string;
@@ -43,6 +51,7 @@ const FormItem = (props: FormItemProps) => {
     className,
     errorMessage,
     extra,
+    hint,
     htmlFor,
     invalid,
     label,
@@ -61,6 +70,7 @@ const FormItem = (props: FormItemProps) => {
 
   const controlId = htmlFor ?? `${generatedId}-control`;
   const errorId = `${generatedId}-error`;
+  const hintId = hint ? `${generatedId}-hint` : undefined;
   const describedByError = Boolean(invalid && errorMessage);
 
   const formItemLabelHeight = size || formContext?.size || controlSize;
@@ -105,19 +115,21 @@ const FormItem = (props: FormItemProps) => {
 
   return (
     <FormItemContextProvider
-      value={{ invalid, controlId, errorId: describedByError ? errorId : undefined }}
+      value={{ invalid, controlId, errorId: describedByError ? errorId : undefined, hintId }}
     >
       <div ref={ref} className={formItemClass}>
-        <label htmlFor={controlId} className={formLabelClass} style={formLabelStyle()}>
-          {asterisk && (
-            <span aria-hidden className="text-error ltr:mr-1 rtl:ml-1">
-              *
-            </span>
-          )}
-          {label}
-          {extra && <span>{extra}</span>}
-          {label && formItemLayout !== 'vertical' && ':'}
-        </label>
+        {label !== undefined && (
+          <label htmlFor={controlId} className={formLabelClass} style={formLabelStyle()}>
+            {asterisk && (
+              <span aria-hidden className="text-error ltr:mr-1 rtl:ml-1">
+                *
+              </span>
+            )}
+            {label}
+            {extra && <span>{extra}</span>}
+            {label && formItemLayout !== 'vertical' && ':'}
+          </label>
+        )}
         <div
           className={
             formItemLayout === LAYOUT.HORIZONTAL
@@ -126,6 +138,11 @@ const FormItem = (props: FormItemProps) => {
           }
         >
           {children}
+          {hint && (
+            <div id={hintId} className="form-hint">
+              {hint}
+            </div>
+          )}
           <AnimatePresence mode="wait">
             {invalid && (
               <motion.div

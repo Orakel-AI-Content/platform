@@ -4,6 +4,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { Input } from '../Input/index.tsx';
+import { useFormItem } from './context.ts';
 import { Form, FormContainer, FormItem } from './index.tsx';
 
 // Form do Ecme (#207): só layout e contexto (rótulo, mensagem, tamanho). O rótulo e a mensagem
@@ -94,6 +95,47 @@ describe('FormItem', () => {
     expect(asterisk.className).toContain('text-error');
     expect(asterisk.getAttribute('aria-hidden')).toBe('true');
     expect(screen.getByLabelText(/Nome/)).toHaveProperty('required', true);
+  });
+
+  it('dica: no FormItem, ligada ao Input, antes do erro no aria-describedby', () => {
+    const { rerender } = render(
+      <FormItem label="Slug" hint="Só minúsculas e hífen.">
+        <Input />
+      </FormItem>,
+    );
+
+    const input = screen.getByLabelText('Slug');
+    const hint = screen.getByText('Só minúsculas e hífen.');
+    expect(hint.className).toContain('form-hint');
+    expect(input.getAttribute('aria-describedby')).toBe(hint.id);
+
+    rerender(
+      <FormItem label="Slug" hint="Só minúsculas e hífen." invalid errorMessage="Slug inválido">
+        <Input aria-describedby={hint.id} />
+      </FormItem>,
+    );
+    const [first, second, ...rest] = input.getAttribute('aria-describedby')!.split(' ');
+    expect(first).toBe(hint.id);
+    expect(document.getElementById(second!)?.textContent).toBe('Slug inválido');
+    expect(rest).toEqual([]);
+  });
+
+  it('sem label, não desenha <label> e publica o id do erro no contexto', () => {
+    function Group() {
+      const errorId = useFormItem()?.errorId;
+      return <fieldset aria-describedby={errorId}>grupo</fieldset>;
+    }
+    render(
+      <FormItem invalid errorMessage="Inclua pelo menos um item">
+        <Group />
+      </FormItem>,
+    );
+
+    expect(document.querySelector('label')).toBeNull();
+    const group = screen.getByRole('group');
+    expect(document.getElementById(group.getAttribute('aria-describedby')!)?.textContent).toBe(
+      'Inclua pelo menos um item',
+    );
   });
 
   it('layout horizontal: dois-pontos no rótulo e largura mínima do contexto', () => {

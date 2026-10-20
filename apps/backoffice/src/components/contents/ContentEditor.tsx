@@ -32,7 +32,7 @@ import {
   type PickerOption,
 } from '@/components/forms/PickerFields';
 import { richTextField } from '@/components/forms/RichTextField';
-import { SchemaFields, type FieldRenderer } from '@/components/forms/SchemaForm';
+import { FieldGroup, SchemaFields, type FieldRenderer } from '@/components/forms/SchemaForm';
 import { zonedDateTimeField } from '@/components/forms/ZonedDatetimeField';
 import { pushSuccess } from '@/components/shared/ActionFeedback.tsx';
 import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
@@ -333,7 +333,13 @@ export function ContentEditor({
           />
         </fieldset>
 
-        <section aria-labelledby={`${id}-blocks`} className="space-y-4">
+        {/* O erro da lista ("ao menos um bloco") é a mensagem do `FormItem` (#329). */}
+        <FieldGroup
+          as="section"
+          message={blocksError}
+          aria-labelledby={`${id}-blocks`}
+          className="space-y-4"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <h2 id={`${id}-blocks`} className="mr-auto text-lg font-semibold">
               Blocos
@@ -436,7 +442,6 @@ export function ContentEditor({
               </Fragment>
             );
           })}
-          {blocksError && <p className="text-sm text-error">{blocksError}</p>}
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1.5">
               <label htmlFor={`${id}-new-type`} className="text-sm font-medium">
@@ -466,7 +471,7 @@ export function ContentEditor({
               Adicionar bloco
             </Button>
           </div>
-        </section>
+        </FieldGroup>
 
         <StickyFooter
           className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-200 bg-white py-3 dark:border-gray-700 dark:bg-gray-800"

@@ -8,6 +8,7 @@ import { pauseSite } from '../../src/domain/builds/site-state.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getDatabaseUrl } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
+import { fieldLabel } from './fieldLabel.ts';
 
 // E2E contra o ambiente local (pnpm local:up && pnpm local:seed): Caddy + access-mock +
 // backoffice-web. O fluxo completo (site → autor → imagem → artigo → revisão → build)
@@ -117,8 +118,8 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Cadastrar site' })).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
-  await typeInto(page, page.getByLabel('ID', { exact: true }), siteId);
-  await typeInto(page, page.getByLabel('Nome', { exact: true }), 'Site do E2E');
+  await typeInto(page, page.getByLabel(fieldLabel('ID')), siteId);
+  await typeInto(page, page.getByLabel(fieldLabel('Nome')), 'Site do E2E');
   await typeInto(page, page.getByRole('textbox', { name: 'Domínios' }), `${siteId}.example.com`);
   // Tema (#163): escolhido no grupo, pelo nome legível, só com o teclado.
   await tabTo(page, page.getByRole('radio', { name: /Editorial claro/ }));
@@ -149,7 +150,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await page.keyboard.press('ArrowDown');
   await expect(edit).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByLabel('ID', { exact: true })).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel(fieldLabel('ID'))).toHaveAttribute('readonly', '');
   // Seções com índice (#161): o item do índice leva à seção, e o Tab seguinte entra nela.
   const sections = page.getByRole('navigation', { name: 'Seções do formulário' });
   await expect(page.getByRole('heading', { level: 2 })).toHaveText([
@@ -188,8 +189,8 @@ test('preset fora dos recursos é recusado com a mensagem do domínio', async ({
   created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
   await page.goto('/sites/novo');
-  await page.getByLabel('ID', { exact: true }).fill(siteId);
-  await page.getByLabel('Nome', { exact: true }).fill('Preset forçado');
+  await page.getByLabel(fieldLabel('ID')).fill(siteId);
+  await page.getByLabel(fieldLabel('Nome')).fill('Preset forçado');
   await page.getByRole('textbox', { name: 'Domínios' }).fill(`${siteId}.example.com`);
   await page.getByRole('radio', { name: /Editorial claro/ }).check();
   // Valor forçado: uma opção que RESOURCES não lista.
@@ -269,8 +270,8 @@ test('configuração: pares lado a lado, barra na largura do main e Voltar', asy
     ['ID', 'Nome'],
     ['Idioma', 'Fuso horário'],
   ] as const) {
-    const a = await identity.getByLabel(first, { exact: true }).boundingBox();
-    const b = await identity.getByLabel(second, { exact: true }).boundingBox();
+    const a = await identity.getByLabel(fieldLabel(first)).boundingBox();
+    const b = await identity.getByLabel(fieldLabel(second)).boundingBox();
     expect(a?.y).toBe(b?.y);
   }
   const bar = page
@@ -281,7 +282,7 @@ test('configuração: pares lado a lado, barra na largura do main e Voltar', asy
   expect(barBox?.x).toBe(main?.x);
   expect(barBox?.width).toBe(main?.width);
 
-  await identity.getByLabel('Nome', { exact: true }).fill('Nome que não fica');
+  await identity.getByLabel(fieldLabel('Nome')).fill('Nome que não fica');
   await bar.getByRole('link', { name: 'Voltar' }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a$/);
   await expect(page.getByText('Nome que não fica')).toHaveCount(0);
@@ -306,8 +307,8 @@ test('editor não cadastra nem edita a configuração', async ({ page }) => {
 
 async function newSite(page: Page, siteId: string): Promise<void> {
   await page.goto('/sites/novo');
-  await page.getByLabel('ID', { exact: true }).fill(siteId);
-  await page.getByLabel('Nome', { exact: true }).fill(`Site ${siteId}`);
+  await page.getByLabel(fieldLabel('ID')).fill(siteId);
+  await page.getByLabel(fieldLabel('Nome')).fill(`Site ${siteId}`);
   await page.getByRole('textbox', { name: 'Domínios' }).fill(`${siteId}.example.com`);
   await page.getByRole('radio', { name: /Editorial claro/ }).check();
   await page.getByRole('button', { name: 'Cadastrar site' }).click();

@@ -10,6 +10,7 @@ import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
 import { analyzeTables } from './statistics.ts';
+import { fieldLabel } from './fieldLabel.ts';
 
 // Editor de conteúdo (#45) contra o ambiente local semeado: o editor cria um artigo com
 // texto, imagem e FAQ e o acha na lista; o revisor não grava nada. Lista com 2.000
@@ -39,7 +40,7 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await page.getByRole('link', { name: 'Criar conteúdo' }).first().click();
   await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
 
-  await page.getByLabel('Título', { exact: true }).fill(title);
+  await page.getByLabel(fieldLabel('Título')).fill(title);
   await page.getByLabel('Slug').fill(slug);
   const authors = page.getByRole('group', { name: 'Autores' });
   await authors.getByRole('checkbox', { name: 'Ana Souza' }).check();
@@ -134,19 +135,19 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
 
   await addBlock(page, 'FAQ');
   await page.getByRole('button', { name: 'Adicionar pergunta' }).click();
-  await page.getByLabel('Pergunta', { exact: true }).fill('Funciona offline?');
+  await page.getByLabel(fieldLabel('Pergunta')).fill('Funciona offline?');
   await page.getByRole('textbox', { name: 'Resposta' }).click();
   await page.keyboard.type('Não, precisa de conexão.');
   // Remover pergunta confirma num diálogo (#327).
   await page.getByRole('button', { name: 'Adicionar pergunta' }).click();
-  await expect(page.getByLabel('Pergunta', { exact: true })).toHaveCount(2);
+  await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveCount(2);
   await page.getByRole('button', { name: 'Remover pergunta 2' }).click();
   await page
     .getByRole('alertdialog', { name: 'Remover pergunta 2?' })
     .getByRole('button', { name: 'Remover' })
     .click();
-  await expect(page.getByLabel('Pergunta', { exact: true })).toHaveCount(1);
-  await expect(page.getByLabel('Pergunta', { exact: true })).toHaveValue('Funciona offline?');
+  await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveCount(1);
+  await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveValue('Funciona offline?');
 
   // Sem texto alternativo nem decorativa: recusado com a mensagem junto do campo.
   await page.getByRole('button', { name: 'Criar conteúdo' }).click();
@@ -586,7 +587,7 @@ test.describe('barra de ações do editor (#109)', () => {
     await loginAs(page, 'editor@orakel.local');
     const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
     await page.goto(editPath);
-    const titleField = page.getByLabel('Título', { exact: true });
+    const titleField = page.getByLabel(fieldLabel('Título'));
     // O conteúdo na trilha (#174) leva às versões; pelo destino, porque o título muda ao salvar.
     const versions = page
       .getByRole('navigation', { name: 'Trilha de navegação' })

@@ -18,6 +18,7 @@ import { toast, ToastProvider } from '@/components/ui/toast';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { SchemaFields, SchemaForm, type FieldProps } from './SchemaForm.tsx';
+import { fieldLabel } from '@/test/fieldLabel.ts';
 
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -84,11 +85,11 @@ describe('SchemaForm', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Citação')).toHaveProperty('value', 'Frase');
-    expect(screen.getByLabelText('Autoria')).toBeTruthy();
-    expect(screen.getByLabelText('Fonte')).toBeTruthy();
-    expect(screen.queryByLabelText('n')).toBeNull();
-    expect(screen.queryByLabelText('type')).toBeNull();
+    expect(screen.getByLabelText(fieldLabel('Citação'))).toHaveProperty('value', 'Frase');
+    expect(screen.getByLabelText(fieldLabel('Autoria'))).toBeTruthy();
+    expect(screen.getByLabelText(fieldLabel('Fonte'))).toBeTruthy();
+    expect(screen.queryByLabelText(fieldLabel('n'))).toBeNull();
+    expect(screen.queryByLabelText(fieldLabel('type'))).toBeNull();
     expect(screen.queryByText(/sem editor/)).toBeNull();
   });
 
@@ -112,18 +113,18 @@ describe('SchemaForm', () => {
       />,
     );
 
-    expect(screen.getAllByLabelText('Pergunta')).toHaveLength(1);
+    expect(screen.getAllByLabelText(fieldLabel('Pergunta'))).toHaveLength(1);
     const add = screen.getByRole('button', { name: 'Adicionar pergunta' });
     add.focus();
     await user.keyboard('{Enter}');
-    expect(screen.getAllByLabelText('Pergunta')).toHaveLength(2);
+    expect(screen.getAllByLabelText(fieldLabel('Pergunta'))).toHaveLength(2);
 
     // Preenche a nova pergunta só com Tab e digitação.
-    await user.click(screen.getAllByLabelText('Pergunta')[0] as HTMLElement);
+    await user.click(screen.getAllByLabelText(fieldLabel('Pergunta'))[0] as HTMLElement);
     await user.tab();
     await user.tab();
     await user.tab();
-    expect(document.activeElement).toBe(screen.getAllByLabelText('Pergunta')[1]);
+    expect(document.activeElement).toBe(screen.getAllByLabelText(fieldLabel('Pergunta'))[1]);
     await user.keyboard('P2');
     await user.tab();
     await user.keyboard('R2');
@@ -141,7 +142,7 @@ describe('SchemaForm', () => {
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(document.activeElement).toBe(removeFirst);
-    expect(screen.getAllByLabelText('Pergunta')).toHaveLength(2);
+    expect(screen.getAllByLabelText(fieldLabel('Pergunta'))).toHaveLength(2);
 
     await user.keyboard('{Enter}');
     const confirm = within(screen.getByRole('alertdialog')).getByRole('button', {
@@ -150,7 +151,7 @@ describe('SchemaForm', () => {
     expect(confirm.className).toContain('bg-error');
     await user.click(confirm);
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-    expect(screen.getAllByLabelText('Pergunta')).toHaveLength(1);
+    expect(screen.getAllByLabelText(fieldLabel('Pergunta'))).toHaveLength(1);
 
     screen.getByRole('button', { name: 'Salvar' }).focus();
     await user.keyboard('{Enter}');
@@ -176,11 +177,11 @@ describe('SchemaForm', () => {
     );
 
     for (const label of ['slug', 'name', 'bio', 'expertise', 'avatarMediaId']) {
-      expect(screen.getByLabelText(label)).toBeTruthy();
+      expect(screen.getByLabelText(fieldLabel(label))).toBeTruthy();
     }
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    const name = screen.getByLabelText('name');
+    const name = screen.getByLabelText(fieldLabel('name'));
     await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'));
     const describedBy = name.getAttribute('aria-describedby') ?? '';
     expect(document.getElementById(describedBy)?.textContent).toMatch(/\S/);
@@ -191,7 +192,7 @@ describe('SchemaForm', () => {
     expect(document.activeElement).toBe(name);
     expect(onSubmit).not.toHaveBeenCalled();
     // Opcionais vazios não acusam erro.
-    expect(screen.getByLabelText('bio').getAttribute('aria-invalid')).toBe('false');
+    expect(screen.getByLabelText(fieldLabel('bio')).getAttribute('aria-invalid')).toBe('false');
   });
 
   it('imagem: a regra cruzada (alt ou decorativa) aparece no campo alt', async () => {
@@ -210,14 +211,14 @@ describe('SchemaForm', () => {
 
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    const alt = screen.getByLabelText('alt');
+    const alt = screen.getByLabelText(fieldLabel('alt'));
     await waitFor(() => expect(alt.getAttribute('aria-invalid')).toBe('true'));
     expect(document.getElementById(alt.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
       'Informe o texto alternativo ou marque a imagem como decorativa',
     );
 
     // Marcar decorativa resolve.
-    await user.click(screen.getByLabelText('decorative'));
+    await user.click(screen.getByLabelText(fieldLabel('decorative')));
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith({ n: 2, type: 'image', mediaId: 1, decorative: true }),
@@ -244,7 +245,7 @@ describe('SchemaForm', () => {
       />,
     );
 
-    expect(screen.getByLabelText('Mídia (seletor)').tagName).toBe('SELECT');
+    expect(screen.getByLabelText(fieldLabel('Mídia (seletor)')).tagName).toBe('SELECT');
     expect(screen.queryByRole('spinbutton')).toBeNull();
   });
 
@@ -305,8 +306,8 @@ describe('SchemaFields', () => {
     const onSubmit = vi.fn();
     render(<Outer onSubmit={onSubmit} />);
 
-    expect(screen.getByLabelText<HTMLInputElement>('Autoria 1').value).toBe('Ana');
-    await user.type(screen.getByLabelText('Autoria 2'), 'Bia');
+    expect(screen.getByLabelText<HTMLInputElement>(fieldLabel('Autoria 1')).value).toBe('Ana');
+    await user.type(screen.getByLabelText(fieldLabel('Autoria 2')), 'Bia');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
@@ -339,7 +340,7 @@ describe('SchemaForm com o servidor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    const slug = screen.getByLabelText('Slug');
+    const slug = screen.getByLabelText(fieldLabel('Slug'));
     await waitFor(() => expect(slug.getAttribute('aria-invalid')).toBe('true'));
     expect(document.getElementById(slug.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
       'Já existe um autor com o slug ana neste site',
@@ -376,7 +377,7 @@ describe('SchemaForm com o servidor', () => {
     const pending = await screen.findByRole('button', { name: 'Criando…' });
     expect(pending).toHaveProperty('disabled', true);
     await user.click(pending);
-    await user.type(screen.getByLabelText('Nome'), '{Enter}');
+    await user.type(screen.getByLabelText(fieldLabel('Nome')), '{Enter}');
     expect(onSubmit).toHaveBeenCalledTimes(1);
 
     finish({ success: 'Autor salvo.' });
@@ -431,7 +432,7 @@ describe('SchemaForm com o servidor', () => {
       />,
     );
 
-    await user.clear(screen.getByLabelText('Sobre'));
+    await user.clear(screen.getByLabelText(fieldLabel('Sobre')));
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
@@ -474,7 +475,7 @@ describe('SchemaForm: foco, dica do boolean e só leitura', () => {
 
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    const preset = screen.getByLabelText('Preset');
+    const preset = screen.getByLabelText(fieldLabel('Preset'));
     await waitFor(() => expect(document.activeElement).toBe(preset));
     expect(preset.getAttribute('aria-invalid')).toBe('true');
   });
@@ -495,7 +496,7 @@ describe('SchemaForm: foco, dica do boolean e só leitura', () => {
 
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    const preset = screen.getByLabelText('Preset');
+    const preset = screen.getByLabelText(fieldLabel('Preset'));
     await waitFor(() => expect(preset.getAttribute('aria-invalid')).toBe('true'));
     const described = (preset.getAttribute('aria-describedby') ?? '')
       .split(' ')
@@ -542,11 +543,11 @@ describe('SchemaForm: foco, dica do boolean e só leitura', () => {
       />,
     );
 
-    const indexavel = screen.getByLabelText('Indexável');
+    const indexavel = screen.getByLabelText(fieldLabel('Indexável'));
     expect(
       document.getElementById(indexavel.getAttribute('aria-describedby') ?? '')?.textContent,
     ).toBe('Ligar exige o G1 registrado.');
-    expect(screen.getByLabelText('SITE_ID').hasAttribute('readonly')).toBe(true);
+    expect(screen.getByLabelText(fieldLabel('SITE_ID')).hasAttribute('readonly')).toBe(true);
   });
 });
 
@@ -597,11 +598,11 @@ describe('SchemaForm: resumo de erros', () => {
     // Campo nativo dentro da lista.
     items[0]?.focus();
     await user.keyboard('{Enter}');
-    expect(document.activeElement).toBe(screen.getAllByLabelText('Pergunta')[1]);
+    expect(document.activeElement).toBe(screen.getAllByLabelText(fieldLabel('Pergunta'))[1]);
 
     // Campo registrado dentro da lista.
     await user.click(items[1] as HTMLElement);
-    expect(document.activeElement).toBe(screen.getAllByLabelText('Resposta')[1]);
+    expect(document.activeElement).toBe(screen.getAllByLabelText(fieldLabel('Resposta'))[1]);
   });
 
   it('o resumo acompanha a correção: o campo corrigido sai da lista', async () => {
@@ -612,7 +613,7 @@ describe('SchemaForm: resumo de erros', () => {
     const item = await within(screen.getByRole('alert')).findByRole('button');
     expect(item.textContent).toMatch(/^Pergunta \(pergunta 1\): /);
 
-    await user.type(screen.getByLabelText('Pergunta'), 'P1');
+    await user.type(screen.getByLabelText(fieldLabel('Pergunta')), 'P1');
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(''));
   });
 
@@ -660,13 +661,13 @@ describe('SchemaForm: seções com índice', () => {
     const headings = screen.getAllByRole('heading', { level: 2 });
     expect(headings.map((heading) => heading.textContent)).toEqual(['Identidade', 'Aparência']);
     const identity = screen.getByRole('region', { name: 'Identidade' });
-    expect(within(identity).getByLabelText('Nome')).toBeTruthy();
-    expect(within(identity).queryByLabelText('Tema')).toBeNull();
+    expect(within(identity).getByLabelText(fieldLabel('Nome'))).toBeTruthy();
+    expect(within(identity).queryByLabelText(fieldLabel('Tema'))).toBeNull();
     const look = screen.getByRole('region', { name: 'Aparência' });
-    expect(within(look).getByLabelText('Tema')).toBeTruthy();
-    expect(within(look).getByLabelText('Indexável')).toBeTruthy();
+    expect(within(look).getByLabelText(fieldLabel('Tema'))).toBeTruthy();
+    expect(within(look).getByLabelText(fieldLabel('Indexável'))).toBeTruthy();
     // Fora de toda seção: aparece, depois da última.
-    const extra = screen.getByLabelText('Extra');
+    const extra = screen.getByLabelText(fieldLabel('Extra'));
     expect(look.contains(extra)).toBe(false);
     expect(look.compareDocumentPosition(extra) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -684,7 +685,8 @@ describe('SchemaForm: seções com índice', () => {
     }
     // No topo: antes do primeiro campo.
     expect(
-      nav.compareDocumentPosition(screen.getByLabelText('Nome')) & Node.DOCUMENT_POSITION_FOLLOWING,
+      nav.compareDocumentPosition(screen.getByLabelText(fieldLabel('Nome'))) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -726,14 +728,14 @@ describe('SchemaForm: formulário de tela (#328)', () => {
     const cards = document.querySelectorAll('.card');
     expect(cards).toHaveLength(1);
     for (const label of ['Nome', 'Slug', 'Biografia']) {
-      expect(cards[0]?.contains(screen.getByLabelText(label))).toBe(true);
+      expect(cards[0]?.contains(screen.getByLabelText(fieldLabel(label)))).toBe(true);
     }
-    const pair = screen.getByLabelText('Nome').closest('.grid');
+    const pair = screen.getByLabelText(fieldLabel('Nome')).closest('.grid');
     expect(pair?.className.split(' ')).toEqual(
       expect.arrayContaining(['grid', 'md:grid-cols-2', 'gap-4']),
     );
-    expect(pair?.contains(screen.getByLabelText('Slug'))).toBe(true);
-    expect(pair?.contains(screen.getByLabelText('Biografia'))).toBe(false);
+    expect(pair?.contains(screen.getByLabelText(fieldLabel('Slug')))).toBe(true);
+    expect(pair?.contains(screen.getByLabelText(fieldLabel('Biografia')))).toBe(false);
     // A coluna de cartões leva a largura que a página deu.
     expect(cards[0]?.closest('.form-width')).not.toBeNull();
   });
@@ -757,8 +759,8 @@ describe('SchemaForm: formulário de tela (#328)', () => {
       />,
     );
 
-    const pair = screen.getByLabelText('Rótulo').closest('.grid');
-    expect(pair?.contains(screen.getByLabelText('Link'))).toBe(true);
+    const pair = screen.getByLabelText(fieldLabel('Rótulo')).closest('.grid');
+    expect(pair?.contains(screen.getByLabelText(fieldLabel('Link')))).toBe(true);
   });
 
   it('edição: Voltar é um link para a tela anterior e o envio fica na barra', () => {
@@ -794,7 +796,7 @@ describe('SchemaForm: formulário de tela (#328)', () => {
         onSubmit={onSubmit}
       />,
     );
-    await user.type(screen.getByLabelText('Nome'), 'Ana');
+    await user.type(screen.getByLabelText(fieldLabel('Nome')), 'Ana');
     const discard = screen.getByRole('button', { name: 'Descartar' });
     expect(discard.className).toContain('text-error');
     expect(screen.queryByRole('link', { name: 'Voltar' })).toBeNull();
@@ -803,7 +805,7 @@ describe('SchemaForm: formulário de tela (#328)', () => {
     const dialog = screen.getByRole('alertdialog', { name: 'Descartar o que foi preenchido?' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-    expect(screen.getByLabelText<HTMLInputElement>('Nome').value).toBe('Ana');
+    expect(screen.getByLabelText<HTMLInputElement>(fieldLabel('Nome')).value).toBe('Ana');
     expect(router.push).not.toHaveBeenCalled();
 
     await user.click(discard);
@@ -833,7 +835,7 @@ describe('SchemaForm: formulário de tela (#328)', () => {
     await user.click(screen.getByRole('button', { name: 'Criar' }));
     const pending = await screen.findByRole('button', { name: 'Criando…' });
     await user.click(pending);
-    await user.type(screen.getByLabelText('Nome'), '{Enter}');
+    await user.type(screen.getByLabelText(fieldLabel('Nome')), '{Enter}');
     expect(onSubmit).toHaveBeenCalledTimes(1);
     await act(async () => {
       finish();
@@ -857,5 +859,112 @@ describe('SchemaForm: formulário de tela (#328)', () => {
     expect(document.querySelector('.sticky')).toBeNull();
     expect(document.querySelector('.card')).toBeNull();
     expect(screen.getByRole('button', { name: 'Aprovar' })).toBeTruthy();
+  });
+});
+
+describe('SchemaForm: erro, dica e obrigatório no FormItem (#329)', () => {
+  const schema = z.object({
+    titulo: z.string().min(1, 'Informe o título'),
+    apelido: z.string().optional(),
+    ordem: z.number().min(1, 'Ordem a partir de 1'),
+    tipo: z.enum(['a', 'b']),
+    aceito: z.boolean().refine((value) => value, 'Marque para continuar'),
+    itens: z.array(z.object({ nome: z.string() })).min(1, 'Inclua pelo menos um item'),
+  });
+  const labels = {
+    titulo: 'Título',
+    apelido: 'Apelido',
+    ordem: 'Ordem',
+    tipo: 'Tipo',
+    aceito: 'Aceito',
+    itens: 'Itens',
+    'itens.*': 'item',
+  };
+
+  function renderForm(onSubmit = vi.fn()) {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ titulo: '', ordem: 0, tipo: 'a', aceito: false, itens: [] }}
+        labels={labels}
+        hints={{ titulo: 'Aparece no topo da página.', aceito: 'Obrigatório para publicar.' }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+  }
+
+  /** Ids do `aria-describedby` do elemento e os textos que eles apontam. */
+  const described = (element: Element) =>
+    (element.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .filter(Boolean)
+      .map((id) => document.getElementById(id));
+
+  it('cada tipo de campo mostra o erro na mensagem do FormItem, ligada ao campo', async () => {
+    const user = userEvent.setup();
+    renderForm();
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    const cases: [Element, string][] = [
+      [screen.getByLabelText(fieldLabel('Título')), 'Informe o título'],
+      [screen.getByLabelText(fieldLabel('Ordem')), 'Ordem a partir de 1'],
+      [screen.getByRole('checkbox', { name: 'Aceito' }), 'Marque para continuar'],
+      [screen.getByRole('group', { name: 'Itens' }), 'Inclua pelo menos um item'],
+    ];
+    for (const [control, message] of cases) {
+      await waitFor(() => {
+        const error = described(control).find((element) => element?.textContent === message);
+        expect(error?.className).toContain('form-explain');
+      });
+    }
+    expect(document.querySelector('.font-semibold.text-error:not(.form-explain)')).toBeNull();
+  });
+
+  it('a escolha (enum) com erro do servidor também fica ligada à mensagem do FormItem', async () => {
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        schema={z.object({ tipo: z.enum(['a', 'b']) })}
+        defaultValues={{ tipo: 'a' }}
+        labels={{ tipo: 'Tipo' }}
+        submitLabel="Salvar"
+        onSubmit={() => [{ path: ['tipo'], message: 'Tipo indisponível' }]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    const select = screen.getByLabelText(fieldLabel('Tipo'));
+    await waitFor(() =>
+      expect(described(select).map((element) => element?.className)).toContain('form-explain'),
+    );
+  });
+
+  it('a dica sai do FormItem e fica ligada ao campo, inclusive na caixa de seleção', () => {
+    renderForm();
+
+    for (const [control, hint] of [
+      [screen.getByLabelText(fieldLabel('Título')), 'Aparece no topo da página.'],
+      [screen.getByRole('checkbox', { name: 'Aceito' }), 'Obrigatório para publicar.'],
+    ] as const) {
+      const [element] = described(control);
+      expect(element?.textContent).toBe(hint);
+      expect(element?.className).toContain('form-hint');
+    }
+  });
+
+  it('não opcional leva asterisco e aria-required; opcional e caixa de seleção não', () => {
+    renderForm();
+
+    for (const name of ['Título', 'Ordem', 'Tipo']) {
+      const control = screen.getByLabelText(fieldLabel(name));
+      expect(control.getAttribute('aria-required')).toBe('true');
+      expect(document.querySelector(`label[for="${control.id}"]`)?.textContent).toBe(`*${name}`);
+    }
+    const optional = screen.getByLabelText('Apelido');
+    expect(optional.hasAttribute('aria-required')).toBe(false);
+    const checkbox = screen.getByRole('checkbox', { name: 'Aceito' });
+    expect(checkbox.closest('label')?.textContent).toBe('Aceito');
+    expect(checkbox.hasAttribute('aria-required')).toBe(false);
   });
 });
