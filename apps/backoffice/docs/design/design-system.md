@@ -103,6 +103,16 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   o `UserProfileDropdown`, com o e-mail e os papéis no nome do gatilho e "Sair" no menu. O
   `main` (`#conteudo`) tem o fundo do body do Ecme (`bg-gray-100 dark:bg-gray-950`) e os
   gutters do `PageContainer`.
+- **Ícones e marca:** os gatilhos do cabeçalho (toggle da barra, menu móvel, tema e perfil)
+  levam o tamanho e o cinza das classes `header-action-item` de `src/app/styles/header.css`:
+  `text-2xl` e o texto secundário (`text-gray-600 dark:text-gray-400`), escurecido no hover pelo
+  `header-action-item-hoverable`. Os ícones herdam pelo `1em` do `react-icons`, sem `text-*` por
+  componente. Exceção: o perfil mostra o `Avatar` de 32 px do template, com o tamanho e a cor
+  do próprio `Avatar` (`avatar.css`). Os ícones dos itens dos menus do cabeçalho (tema e "Sair")
+  ficam em `text-xl`, como no Ecme. Os ícones da moldura são do conjunto `react-icons/pi`, em
+  Duotone (o seletor de site usa o `PiCaretUpDownDuotone`), exceto o `NavToggle`, peça do Ecme
+  com os ícones originais. A marca "Orakel Backoffice" fica em `text-lg font-bold`, o tamanho de
+  seção da escala tipográfica.
 - **Navegação:** os itens vêm de `src/configs/navigation.config.ts` (`NavigationTree` do Ecme,
   com `authority` como lista de permissões de `rbac.ts`), filtrados no servidor pelo RBAC
   (`filterNavigation`, com `can()`; Textos institucionais só com `content.write`). A barra marca
