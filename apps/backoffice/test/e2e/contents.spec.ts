@@ -287,7 +287,7 @@ test('revisor não tem editor nem link para criar ou editar', async ({ page }) =
     await expect(page.getByText('Editar conteúdo exige o papel admin ou editor.')).toBeVisible();
     await expect(page.getByRole('button', { name: /Salvar/ })).toHaveCount(0);
   }
-  await page.getByRole('link', { name: 'Ir para o site exemplo-a' }).click();
+  await page.getByRole('link', { name: 'Ir para o site Exemplo A — Guias' }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a$/);
 });
 

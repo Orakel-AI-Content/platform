@@ -24,7 +24,7 @@ export default async function InstitutionalTextsPage({
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
-  if (!canWrite) return noWrite(site.id);
+  if (!canWrite) return noWrite(site);
   const texts = await getInstitutionalTexts(db, actor, site.id);
   if (!texts.ok) return noRead;
 

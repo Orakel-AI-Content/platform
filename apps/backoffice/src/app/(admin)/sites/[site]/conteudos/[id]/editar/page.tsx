@@ -54,7 +54,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
     return noRead;
   }
   if (!can(actor, 'content.write')) {
-    return noWrite(siteId);
+    return noWrite(site);
   }
   const options = await editorOptions(db, actor, siteId);
   if (options === undefined) return noRead;

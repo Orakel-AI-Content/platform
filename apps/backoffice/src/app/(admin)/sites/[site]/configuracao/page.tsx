@@ -3,7 +3,7 @@ import { THEME_SUMMARIES } from '@orakel/tokens';
 import { notFound } from 'next/navigation';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import { backToSite, ForbiddenScreen } from '@/components/shared/ForbiddenScreen';
+import { backToSite, ForbiddenScreen, noRead } from '@/components/shared/ForbiddenScreen';
 import { editValues } from '@/components/sites/siteConfigFormValues.ts';
 import { SiteConfigForm } from '@/components/sites/SiteConfigForm';
 import { getDb } from '@/db/client.ts';
@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 
 import { updateSiteConfigAction } from '../../actions.ts';
+import { lookupSite } from '../editorial-page.tsx';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,10 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
   const { site } = await params;
   if (!actor.ok) return null;
   if (!can(actor.value, 'site.configure')) {
-    return <ForbiddenScreen action="site.configure" back={backToSite(site)} />;
+    // A saída cita o site pelo nome: a mesma busca do layout (em `cache`), sem consulta a mais.
+    const lookup = await lookupSite(site);
+    if (lookup.kind !== 'found') return noRead;
+    return <ForbiddenScreen action="site.configure" back={backToSite(lookup.site)} />;
   }
   const config = await currentConfig(getDb().db, site);
   if (config === undefined) notFound();
@@ -49,7 +53,7 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
           variants: RESOURCES.variants,
           themes: THEME_SUMMARIES,
         }}
-        backHref={backToSite(site).href}
+        backHref={backToSite({ id: site, name: config.name }).href}
         contentClassName="form-width"
         action={updateSiteConfigAction.bind(null, site)}
       />

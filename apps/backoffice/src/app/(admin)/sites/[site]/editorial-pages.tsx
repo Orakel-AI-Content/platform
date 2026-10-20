@@ -138,7 +138,7 @@ export function editorialCreatePage<K extends EntityKind>(kind: K): EditorialPag
     const context = await sitePageContext(siteId);
     if (!context.ok) return context.render;
     const { site, canWrite } = context.value;
-    if (!canWrite) return noWrite(site.id);
+    if (!canWrite) return noWrite(site);
     const titleId = `new-${config.htmlId.one}-title`;
 
     return (
@@ -196,7 +196,7 @@ export function editorialEditPage<K extends EntityKind>(kind: K): EditorialPage<
     const context = await sitePageContext(siteId);
     if (!context.ok) return context.render;
     const { site, canWrite } = context.value;
-    if (!canWrite) return noWrite(site.id);
+    if (!canWrite) return noWrite(site);
     const items = await routes.read(site.id);
     if (!items?.ok) return noRead;
     const item = items.value.find((entry) => entry.id === itemId);

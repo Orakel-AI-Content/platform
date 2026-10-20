@@ -3,11 +3,13 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { lookupSite } from './editorial-page.tsx';
+import { SiteProvider } from './site-context.tsx';
 
 // Layout do site (#78, workspace#42): título da aba com o nome do site e 404 de site
 // inexistente. A barra lateral das áreas e o seletor de site moram na moldura do layout do
 // admin (#237). Sem loading.tsx nem Suspense aqui, para o "não encontrado" continuar
 // respondendo 404 (design-system.md). Sem sessão ou sem site.read, quem decide é a página.
+// Com o site achado, o id e o nome vão a um contexto cliente: o not-found cita o site (#381).
 
 type Params = { params: Promise<{ site: string }> };
 
@@ -26,5 +28,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function SiteLayout({ children, params }: Params & { children: ReactNode }) {
   const lookup = await lookupSite((await params).site);
   if (lookup.kind === 'missing') notFound();
-  return children;
+  if (lookup.kind !== 'found') return children;
+  const { id, name } = lookup.site;
+  return <SiteProvider site={{ id, name }}>{children}</SiteProvider>;
 }

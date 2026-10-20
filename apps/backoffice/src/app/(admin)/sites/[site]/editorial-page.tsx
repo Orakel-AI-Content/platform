@@ -85,6 +85,6 @@ export async function sitePageContext(
 }
 
 /** Tela de permissão sem `content.write`, com a volta para o site. */
-export function noWrite(siteId: string): ReactNode {
-  return <ForbiddenScreen action="content.write" back={backToSite(siteId)} />;
+export function noWrite(site: Pick<SiteSummary, 'id' | 'name'>): ReactNode {
+  return <ForbiddenScreen action="content.write" back={backToSite(site)} />;
 }

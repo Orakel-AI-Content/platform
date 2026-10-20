@@ -32,7 +32,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Desmontar aberto agenda a remoção do portal para depois do `closeTimeoutMS`; com timers
+  // falsos ela roda aqui, e não depois que o arquivo acaba e o happy-dom some (#381).
+  vi.useFakeTimers();
   cleanup();
+  vi.runAllTimers();
+  vi.useRealTimers();
   app.remove();
 });
 

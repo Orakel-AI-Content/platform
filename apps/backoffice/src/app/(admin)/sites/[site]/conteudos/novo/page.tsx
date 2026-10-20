@@ -18,7 +18,7 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
   if (!canWrite) {
-    return noWrite(site.id);
+    return noWrite(site);
   }
   const options = await editorOptions(db, actor, siteId);
   if (options === undefined) return noRead;
