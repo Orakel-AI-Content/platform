@@ -158,8 +158,65 @@
   }
 }
 
-/* Fundo e texto da página nos tokens do Ecme, por tema. */
-body {
-  @apply bg-neutral text-gray-900 dark:bg-gray-950 dark:text-gray-100;
-  font-family: var(--font-sans);
+/* Camada base do Ecme (#395), portada do @layer base de src/assets/styles/tailwind/index.css do
+   design-reference (e5f9a1d): o texto sem classe própria, a escala dos títulos (os de Dialog,
+   Drawer e Card vêm daqui), o cursor dos botões e o hr. Em @layer base, para uma utility da tela
+   ainda vencer. Diferenças em relação ao template:
+   - o texto do body é gray-600 no claro, a substituta AA do gray-500 do Ecme (4,35:1 sobre
+     gray-100; docs/migration/ecme.md);
+   - o fundo fica neutral no body (o main pinta gray-100), em vez do gray-100 do template;
+   - a regra de border-color em * não vem: era um contorno do @config do Tailwind 3, e a
+     preflight do Tailwind 4 já usa currentColor. */
+@layer base {
+  button,
+  [role='button'] {
+    cursor: pointer;
+  }
+
+  body {
+    @apply bg-neutral text-sm leading-normal font-medium text-gray-600 dark:bg-gray-950 dark:text-gray-400;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  .h1 {
+    @apply text-4xl font-bold text-gray-900 dark:text-gray-100;
+  }
+
+  h2,
+  .h2 {
+    @apply text-3xl font-bold text-gray-900 dark:text-gray-100;
+  }
+
+  h3,
+  .h3 {
+    @apply text-2xl font-bold text-gray-900 dark:text-gray-100;
+  }
+
+  h4,
+  .h4 {
+    @apply text-xl font-bold text-gray-900 dark:text-gray-100;
+  }
+
+  h5,
+  .h5 {
+    @apply text-lg font-bold text-gray-900 dark:text-gray-100;
+  }
+
+  h6,
+  .h6 {
+    @apply text-base font-semibold text-gray-900 dark:text-gray-100;
+  }
+
+  hr {
+    @apply border-gray-200 dark:border-gray-600;
+  }
+}
+
+/* Cor de título do template para texto que não é um h1–h6. Em @layer components, como no Ecme. */
+@layer components {
+  .heading-text {
+    @apply text-gray-900 dark:text-gray-100;
+  }
 }
