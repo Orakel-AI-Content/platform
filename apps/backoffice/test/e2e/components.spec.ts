@@ -1629,7 +1629,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.goto(SHOWCASE);
     await page.waitForLoadState('networkidle');
 
-    await page.getByRole('button', { name: 'Título' }).click();
+    await page.getByRole('button', { name: 'Título', exact: true }).click();
     await page.getByRole('tab', { name: 'Tema' }).click();
     await page.getByRole('tab', { name: 'Publicados' }).click();
     await expect(page.getByRole('tab', { name: 'Publicados' })).toHaveAttribute(
