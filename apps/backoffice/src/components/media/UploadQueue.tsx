@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { Progress } from '@/components/ui/Progress';
+
 // Fila de envio da biblioteca (#188): até 20 imagens por vez, 3 subindo ao mesmo tempo por
 // XHR (o `fetch` não dá progresso de upload) para a rota de envio, e o resultado de cada uma
 // pela leitura dos envios por chave (`media_uploads`, #185): enviando N% → processando →
 // pronta ou recusada com o motivo, seja a recusa da rota ou do job. Cores de estado nos tokens
-// do Ecme (#281).
+// do Ecme (#281). O envio mostra o `Progress` do template, e a fila tem um anúncio só (#375).
 
 /** Mais que isso num lote: aviso, e só as primeiras sobem. */
 export const MAX_FILES = 20;
@@ -213,13 +215,43 @@ export function useUploadQueue({
   return { entries, notice, add };
 }
 
+/** Rótulo de cada estado no resumo da fila (singular e plural), na ordem em que aparece. */
+const SUMMARY_LABELS: readonly [EntryState['kind'], string, string][] = [
+  ['aguardando', 'aguardando', 'aguardando'],
+  ['enviando', 'enviando', 'enviando'],
+  ['processando', 'processando', 'processando'],
+  ['pronta', 'pronta', 'prontas'],
+  ['recusada', 'recusada', 'recusadas'],
+  ['demorando', 'ainda processando', 'ainda processando'],
+];
+
+/**
+ * Resumo da fila por estado ("3 envios: 1 enviando, 2 prontas"), vazio sem envio. Só conta
+ * arquivos: o percentual fica na barra de cada um, para o anúncio não mudar a cada progresso.
+ */
+export function queueSummary(entries: readonly UploadEntry[]): string {
+  if (entries.length === 0) return '';
+  const counts = new Map<EntryState['kind'], number>();
+  for (const entry of entries) {
+    counts.set(entry.state.kind, (counts.get(entry.state.kind) ?? 0) + 1);
+  }
+  const parts = SUMMARY_LABELS.flatMap(([kind, one, many]) => {
+    const count = counts.get(kind) ?? 0;
+    return count === 0 ? [] : [`${count} ${count === 1 ? one : many}`];
+  });
+  return `${entries.length} ${entries.length === 1 ? 'envio' : 'envios'}: ${parts.join(', ')}`;
+}
+
 /** Cor de estado do arquivo: recusada e pronta se destacam; o resto é texto secundário. */
 const STATE_COLOR: Partial<Record<EntryState['kind'], string>> = {
   recusada: 'text-error',
   pronta: 'text-success',
 };
 
-/** Lista dos envios: um arquivo por linha, com o estado em `role="status"`. */
+/**
+ * Lista dos envios: um arquivo por linha, com o estado em texto e, enquanto sobe, a barra de
+ * progresso. Um único `role="status"` anuncia o aviso de limite e o resumo da fila.
+ */
 export function UploadList({
   entries,
   notice,
@@ -227,22 +259,29 @@ export function UploadList({
   entries: readonly UploadEntry[];
   notice: string;
 }) {
+  const summary = queueSummary(entries);
   return (
     <div className="space-y-2">
       <p role="status" className="text-sm">
-        {notice}
+        {[notice, summary].filter(Boolean).join(' ')}
       </p>
       {entries.length > 0 && (
         <ul aria-label="Envios" className="space-y-1 text-sm">
           {entries.map((entry) => (
-            <li key={entry.id} className="flex flex-wrap gap-x-2">
+            <li key={entry.id} className="flex flex-wrap items-center gap-x-2">
               <span className="font-medium break-all">{entry.name}</span>
-              <span
-                role="status"
-                className={STATE_COLOR[entry.state.kind] ?? 'text-gray-600 dark:text-gray-400'}
-              >
+              <span className={STATE_COLOR[entry.state.kind] ?? 'text-gray-600 dark:text-gray-400'}>
                 {entryLabel(entry.state)}
               </span>
+              {entry.state.kind === 'enviando' && (
+                <Progress
+                  className="basis-full"
+                  percent={entry.state.percent}
+                  size="sm"
+                  showInfo={false}
+                  aria-label={`Envio de ${entry.name}`}
+                />
+              )}
             </li>
           ))}
         </ul>
