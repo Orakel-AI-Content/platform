@@ -192,8 +192,9 @@ describe('seções da configuração do site', () => {
         expect(regions.some((region) => region.contains(control))).toBe(true);
       }
       expect(within(regions[2] as HTMLElement).getByLabelText(fieldLabel('Tema'))).toBeTruthy();
+      // Indexável no Switcher (#331), sem asterisco: `false` é valor válido.
       expect(
-        within(regions[4] as HTMLElement).getByLabelText(fieldLabel('Indexável')),
+        within(regions[4] as HTMLElement).getByRole('switch', { name: 'Indexável' }),
       ).toBeTruthy();
     },
   );

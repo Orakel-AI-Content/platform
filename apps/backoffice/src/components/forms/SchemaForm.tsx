@@ -344,8 +344,11 @@ function Node({
 }) {
   if (ctx.hidden.has(pattern(path))) return null;
   const label = labelOf(ctx, path, name);
-  // Não opcional no schema: asterisco no rótulo e `aria-required` no controle.
-  const required = !describe(schema).optional;
+  // Não opcional no schema: asterisco no rótulo e `aria-required` no controle. Booleano nunca:
+  // `false` é valor válido, "não opcional" não quer dizer "precisa ligar" (vale também para o
+  // campo registrado, como o `Switcher` de "indexável").
+  const described = describe(schema);
+  const required = !described.optional && described.node.kind !== 'boolean';
 
   const registered = ctx.fields[pattern(path)];
   if (registered) {
@@ -377,7 +380,7 @@ function Node({
     );
   }
 
-  const { node } = describe(schema);
+  const { node } = described;
   switch (node.kind) {
     case 'literal':
       return null;
