@@ -237,6 +237,17 @@ Não negociável, em toda tela e todo componente portado:
   aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
   `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o fundo ou o X fecham, e o foco volta
   à imagem.
+- **Biblioteca de mídia:** `MediaLibrary` (`src/components/media/MediaLibrary.tsx`) no padrão de
+  lista do template (#377, `CustomerList` do Ecme): a trilha (`PageTrail`) acima do cartão; no
+  `AdaptiveCard` (`flex flex-col gap-4`), o `ListHeader` com "Mídia" e "Enviar imagens" (o
+  `MediaUpload`, só com content.write), a fila de envio, a `ListToolbar`, a grade e o rodapé do
+  `DataTable` copiado: a `Pagination` do Ecme (`ui/Pagination`) e "N resultados" em
+  `role="status"` com `tabular-nums` (`resultCount`). O cabeçalho fica no componente cliente
+  porque o botão alimenta a fila dele. Sem `DataTable` nem `useListTable`: é grade paginada no
+  servidor (`q` e `pagina` na URL), com tamanho fixo (`MEDIA_PAGE_SIZE`), sem seletor. Biblioteca
+  vazia (total zero sem busca): só o `EmptyState` "Nenhuma imagem na biblioteca.", com "Enviar
+  imagens" quando há permissão, sem toolbar, grade nem contagem. Busca sem resultado: o
+  `NoResults` "Nenhuma imagem encontrada." no lugar da grade, com "0 resultados".
 - **Retorno das ações:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
   `src/components/shared/actionResult.ts`, importável pela Server Action), e
   `useActionResult` (`src/components/shared/ActionFeedback.tsx`) o mostra num lugar só: o
@@ -358,8 +369,8 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
     item), então slug e URL longos não rolam a página no celular. As colunas ficam com quem
     usa: a grade do `ProfileSection` (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1`) no resumo,
     uma coluna no diálogo. Nunca a grade `grid-cols-[auto_1fr]`, que estoura a 375 px.
-- **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela sem
-  linhas, nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
+- **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela
+  sem linhas (ou da grade da mídia sem imagens), nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
   permissão, a mesma ação principal do cabeçalho (`emptyAction` das tabelas). Com a lista
   vazia, a ação aparece duas vezes; no E2E, clique na primeira (a do cabeçalho).
 - **Telas de estado:** `StatusScreen` (`src/components/shared/StatusScreen.tsx`), a tela vazia
