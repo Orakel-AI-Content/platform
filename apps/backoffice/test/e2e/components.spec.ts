@@ -2306,3 +2306,231 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(accessibility.violations).toEqual([]);
   });
 }
+
+// Formulário e moldura (#390): o `SchemaForm` de tela e em cartão, o rich text com o popover de
+// link e a data no fuso do site (registrados pelo `fields`, como nas telas) e o `SiteSwitcher`
+// aberto e recolhido. Cada seção pelo teclado e com o axe nos dois temas, no estado aberto. O
+// foco começa no controle (`focus()`): com tantas seções antes, o Tab passaria do `tabTo`.
+
+/** Axe só numa seção da vitrine, e no menu ou painel que ela abriu num portal. */
+const auditSection = (page: Page, id: string, ...extra: string[]) => {
+  const builder = new AxeBuilder({ page })
+    .withTags(WCAG)
+    .include(`[aria-labelledby="${id}"]`)
+    .exclude('[data-floating-ui-focus-guard]');
+  for (const selector of extra) builder.include(selector);
+  return builder.analyze();
+};
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`SchemaForm de tela e em cartão pelo teclado: erro no campo, resumo e toast, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const forms = section(page, 'SchemaForm');
+
+    // De tela: título obrigatório vazio; Enter no envio marca o campo, leva o foco a ele e
+    // lista o erro no resumo, que leva de volta ao campo.
+    const create = forms.getByRole('button', { name: 'Criar matéria' });
+    await expect(forms.getByRole('button', { name: 'Descartar' })).toBeVisible();
+    await create.focus();
+    await page.keyboard.press('Enter');
+    const title = forms.getByRole('textbox', { name: 'Título' }).first();
+    await expect(title).toHaveAttribute('aria-invalid', 'true');
+    await expect(title).toHaveAccessibleDescription('Informe o título');
+    await expect(title).toBeFocused();
+    const summary = forms.getByRole('button', { name: 'Título: Informe o título' });
+    await summary.focus();
+    await page.keyboard.press('Enter');
+    await expect(title).toBeFocused();
+
+    expect((await auditSection(page, 'vitrine-schema-form')).violations).toEqual([]);
+
+    await page.keyboard.type('Nova matéria');
+    await create.focus();
+    await page.keyboard.press('Enter');
+    await expect(toastRegion(page).getByText('Matéria criada.')).toBeVisible();
+    await expect(title).toHaveAttribute('aria-invalid', 'false');
+
+    // Em cartão: apagar o título e enviar com Enter no próprio campo.
+    const cardTitle = forms.getByRole('textbox', { name: 'Título' }).last();
+    await expect(cardTitle).toHaveValue('Matéria de exemplo');
+    await expect(forms.getByRole('checkbox', { name: 'Destaque na capa' }).last()).toBeChecked();
+    await cardTitle.focus();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Enter');
+    await expect(cardTitle).toHaveAttribute('aria-invalid', 'true');
+    await expect(cardTitle).toBeFocused();
+    await page.keyboard.type('Outra matéria');
+    await page.keyboard.press('Enter');
+    await expect(toastRegion(page).getByText('Matéria salva.')).toBeVisible();
+
+    expect(hydration).toEqual([]);
+  });
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`rich text: o popover de link aplica o endereço pelo teclado e o Esc volta ao editor, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const rich = section(page, 'Rich text e link');
+    const editor = rich.getByRole('textbox', { name: 'Corpo do texto' });
+    const toolbar = rich.getByRole('toolbar', { name: 'Formatação: Corpo do texto' });
+    const linkButton = toolbar.getByRole('button', { name: 'Link', exact: true });
+    const address = rich.getByRole('textbox', { name: 'Endereço do link' });
+
+    // Seleciona a palavra "link" pelo teclado e abre o popover pelo botão da barra. O link fica
+    // dentro da frase (alvo em linha, exceção do 2.5.8).
+    await expect(editor).toHaveText('Texto de exemplo para o link.');
+    await editor.focus();
+    // Fim do texto sem o End (no macOS ele só rola): seleciona tudo e recolhe para a direita.
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowLeft');
+    for (let step = 0; step < 4; step += 1) await page.keyboard.press('Shift+ArrowLeft');
+    await linkButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(address).toBeVisible();
+    await expect(address).toBeFocused();
+    await expect(address).toHaveValue('');
+
+    // Endereço inválido: o erro fica no campo do popover, que continua aberto.
+    await page.keyboard.type('exemplo');
+    await page.keyboard.press('Enter');
+    await expect(address).toHaveAttribute('aria-invalid', 'true');
+    await expect(address).toBeVisible();
+    expect((await auditSection(page, 'vitrine-rich-text')).violations).toEqual([]);
+
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('https://exemplo.com/guia');
+    await page.keyboard.press('Enter');
+    await expect(address).toBeHidden();
+    await expect(editor).toBeFocused();
+    await expect(editor.getByRole('link', { name: 'link', exact: true })).toHaveAttribute(
+      'href',
+      'https://exemplo.com/guia',
+    );
+    await expect(linkButton).toHaveAttribute('aria-pressed', 'true');
+
+    // Com o cursor no link, o popover reabre com o endereço e "Remover link"; Esc fecha e
+    // devolve o foco ao editor.
+    await linkButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(address).toHaveValue('https://exemplo.com/guia');
+    await expect(rich.getByRole('button', { name: 'Remover link' })).toBeVisible();
+    expect((await auditSection(page, 'vitrine-rich-text')).violations).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(address).toBeHidden();
+    await expect(editor).toBeFocused();
+
+    await rich.getByRole('button', { name: 'Salvar texto' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(toastRegion(page).getByText('Texto salvo.')).toBeVisible();
+
+    expect(hydration).toEqual([]);
+  });
+}
+
+test.describe('data com fuso no SchemaForm', () => {
+  // Navegador em UTC: o campo mostra a hora de parede de São Paulo, o fuso do site.
+  test.use({ timezoneId: 'UTC' });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`data com fuso pelo teclado, sem violação do axe com o painel aberto (${colorScheme})`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await login(page);
+      const hydration = hydrationMessages(page);
+      await page.goto(SHOWCASE);
+      await page.waitForLoadState('networkidle');
+      const agenda = section(page, 'Data com fuso');
+      const field = agenda.getByRole('combobox', { name: 'Publicar em' });
+      const panel = page.getByRole('dialog', { name: 'Escolher data e hora' });
+      await expect(field).toHaveValue('15/07/2026 13:00');
+      await expect(field).toHaveAccessibleDescription('Hora de São Paulo, o fuso do site.');
+
+      await field.focus();
+      await page.keyboard.press('Enter');
+      await expect(panel).toBeVisible();
+      await expect
+        .poll(() => panel.evaluate((element) => element.contains(document.activeElement)))
+        .toBe(true);
+      await expect(
+        panel.getByRole('button', { name: '15 de julho de 2026', pressed: true }),
+      ).toBeVisible();
+      expect((await auditSection(page, 'vitrine-data-fuso')).violations).toEqual([]);
+
+      await page.keyboard.press('Escape');
+      await expect(panel).toBeHidden();
+      await expect(field).toBeFocused();
+
+      await agenda.getByRole('button', { name: 'Agendar' }).focus();
+      await page.keyboard.press('Enter');
+      await expect(toastRegion(page).getByText('Publicação agendada.')).toBeVisible();
+
+      expect(hydration).toEqual([]);
+    });
+  }
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`SiteSwitcher aberto e recolhido pelo teclado: setas, site atual e Esc, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const switchers = section(page, 'SiteSwitcher');
+    const menu = page.getByRole('menu');
+
+    for (const current of ['Receitas da Vó', 'Viagem Leve']) {
+      const button = switchers.getByRole('button', { name: `${current}, trocar de site` });
+      await button.focus();
+      await page.keyboard.press('Enter');
+      await expect(menu).toBeVisible();
+      await expect(menu.getByRole('menuitem')).toHaveText([
+        'Receitas da Vó',
+        'Viagem Leve',
+        'Casa e Jardim',
+      ]);
+      await expect(menu.locator('[aria-current="true"]')).toHaveText(current);
+      // Como nos outros menus da moldura, o foco abre no primeiro item e anda pelas setas.
+      await expect(menu.getByRole('menuitem').first()).toBeFocused();
+      await page.keyboard.press('ArrowDown');
+      const viagem = menu.getByRole('menuitem', { name: 'Viagem Leve' });
+      await expect(viagem).toBeFocused();
+      await expect(viagem).toHaveAttribute('href', '/sites/viagem-leve');
+
+      // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
+      // opacidade sobe; o axe roda depois dela.
+      await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+      expect(
+        (await auditSection(page, 'vitrine-site-switcher', '[role="menu"]')).violations,
+      ).toEqual([]);
+
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+      await expect(button).toBeFocused();
+    }
+
+    // Recolhido: as iniciais na tela, o nome na dica do foco.
+    const collapsed = switchers.getByRole('button', { name: 'Viagem Leve, trocar de site' });
+    await expect(collapsed).toHaveText(/^VL/);
+    await expect(page.getByRole('tooltip')).toHaveText('Viagem Leve');
+
+    expect(hydration).toEqual([]);
+  });
+}
