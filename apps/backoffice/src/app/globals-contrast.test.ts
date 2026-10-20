@@ -1816,6 +1816,54 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-error',
     minimum: 4.5,
   },
+  // Envio de imagens (#376): o texto da área do Upload arrastável no diálogo, sobre o
+  // `bg-gray-100` da área no claro e o `dark:bg-gray-800` do diálogo no escuro (a área é
+  // `dark:bg-transparent`). O `text-blue-500` do Ecme, fora da paleta, vira `primary`; a segunda
+  // linha troca o `opacity-60` do Ecme pela cor própria. O foco da área fica sobre o diálogo, já
+  // nos pares "foco no cartão".
+  {
+    name: 'texto da área de envio',
+    theme: 'claro',
+    text: 'text-gray-800',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'escolher na área de envio',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'formatos na área de envio',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto da área de envio',
+    theme: 'escuro',
+    text: 'dark:text-white',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'escolher na área de envio',
+    theme: 'escuro',
+    text: 'dark:text-primary-mild',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+    ecme: 'text-primary',
+  },
+  {
+    name: 'formatos na área de envio',
+    theme: 'escuro',
+    text: 'dark:text-gray-300',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`.
