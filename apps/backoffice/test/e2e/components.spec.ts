@@ -1752,19 +1752,29 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
-// DataTable (#215): dados fixos paginados e ordenados pela vitrine (manual, como no Ecme), com
-// página, ordem e tamanho na URL; recarregar mantém a mesma visão. Carregando, o esqueleto;
-// vazio, a mensagem.
+// DataTable (#215, #361): a lista completa no padrão do template, calculada pelo `useListTable`,
+// com busca, filtro, ordem, página e tamanho na URL; recarregar mantém a mesma visão. Lista vazia
+// com a ação principal; busca sem resultado só com a mensagem (a ação de limpar é a da toolbar);
+// carregando, o esqueleto.
 
 const dataTable = (page: Page, name: string) =>
   section(page, 'DataTable').getByRole('table', { name });
 
-/** Texto da primeira célula de cada linha do corpo. */
+const materias = (page: Page) => dataTable(page, 'Matérias');
+
+/** Texto do link principal de cada linha do corpo (a manchete, sem o resumo). */
 async function firstCells(table: Locator): Promise<string[]> {
   return table
     .locator('tbody tr')
-    .evaluateAll((rows) => rows.map((row) => row.querySelector('td')?.textContent ?? ''));
+    .evaluateAll((rows) =>
+      rows.map((row) => row.querySelector('td a')?.textContent ?? row.textContent ?? ''),
+    );
 }
+
+const resultCount = (page: Page) =>
+  section(page, 'DataTable')
+    .getByRole('status')
+    .filter({ hasText: /resultado/ });
 
 test('DataTable pagina e ordena pela URL, por teclado, e recarregar mantém a visão', async ({
   page,
@@ -1772,13 +1782,15 @@ test('DataTable pagina e ordena pela URL, por teclado, e recarregar mantém a vi
   await login(page);
   await page.goto(SHOWCASE);
   await page.waitForLoadState('networkidle');
-  const table = dataTable(page, 'Matérias paginadas');
+  const table = materias(page);
   const nav = section(page, 'DataTable').getByRole('navigation', { name: 'Paginação' }).first();
   const manchete = table.getByRole('columnheader', { name: 'Manchete' });
 
-  // Sem parâmetros: 25 por página, na ordem padrão (título crescente).
+  // Sem parâmetros: 25 por página, na ordem padrão (manchete crescente), com a contagem.
   expect(await firstCells(table)).toHaveLength(25);
   expect((await firstCells(table))[0]).toBe('Matéria 01');
+  await expect(resultCount(page)).toHaveText('32 resultados');
+  await expect(resultCount(page)).toHaveClass(/tabular-nums/);
   await expect(manchete).toHaveAttribute('aria-sort', 'ascending');
   await expect(table.getByRole('columnheader', { name: 'Situação' })).not.toHaveAttribute(
     'aria-sort',
@@ -1813,7 +1825,7 @@ test('DataTable: o seletor grava ?por-pagina=, volta à página 1 e sobrevive ao
   await login(page);
   await page.goto(`${SHOWCASE}?pagina=2`);
   await page.waitForLoadState('networkidle');
-  const table = dataTable(page, 'Matérias paginadas');
+  const table = materias(page);
   const select = section(page, 'DataTable')
     .getByRole('combobox', { name: 'Itens por página' })
     .first();
@@ -1831,34 +1843,91 @@ test('DataTable: o seletor grava ?por-pagina=, volta à página 1 e sobrevive ao
   await expect(section(page, 'DataTable').getByText('10 / página').first()).toBeVisible();
 });
 
-test('DataTable carregando mostra o esqueleto com aria-busy; vazio mostra a mensagem', async ({
+test('DataTable: busca sem acento e filtro na URL; sem resultado, só a mensagem e um "Limpar filtros"', async ({
   page,
 }) => {
   await login(page);
   await page.goto(SHOWCASE);
   await page.waitForLoadState('networkidle');
+  const card = section(page, 'DataTable');
+  const table = materias(page);
+  const search = card.getByRole('searchbox', { name: 'Buscar por manchete' });
+  const clear = card.getByRole('button', { name: 'Limpar filtros' });
+
+  await expect(clear).toHaveCount(0);
+  await search.fill('materia 1');
+  await expect(page).toHaveURL(/\?q=materia\+1$/);
+  await expect(resultCount(page)).toHaveText('10 resultados');
+
+  await card.getByLabel('Situação').focus();
+  await page.keyboard.press('ArrowDown');
+  await page.getByRole('option', { name: 'Em revisão' }).click();
+  await expect(page).toHaveURL(/\?q=materia\+1&situacao=revisao$/);
+  await expect.poll(() => firstCells(table)).toEqual(['Matéria 12', 'Matéria 15', 'Matéria 18']);
+
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  await expect(resultCount(page)).toHaveText('3 resultados');
+
+  await search.fill('nada por aqui');
+  await expect(table.getByText('Nenhuma matéria encontrada.')).toBeVisible();
+  await expect(resultCount(page)).toHaveText('0 resultados');
+  await expect(table.locator('tbody').getByRole('button')).toHaveCount(0);
+  await expect(clear).toHaveCount(1);
+
+  await clear.click();
+  await expect(page).toHaveURL(new RegExp(`${SHOWCASE}$`));
+  await expect(resultCount(page)).toHaveText('32 resultados');
+  await expect(clear).toHaveCount(0);
+  await expect(search).toBeFocused();
+});
+
+test('DataTable: toolbar em coluna abaixo de md e em linha a partir de md', async ({ page }) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const toolbar = section(page, 'DataTable').getByRole('search');
+  const direction = () => toolbar.evaluate((element) => getComputedStyle(element).flexDirection);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  expect(await direction()).toBe('row');
+  await page.setViewportSize({ width: 600, height: 800 });
+  expect(await direction()).toBe('column');
+});
+
+test('DataTable: lista vazia mostra a ação principal; carregando, o esqueleto com aria-busy', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const card = section(page, 'DataTable');
+
+  await expect(card.getByText('Nenhum rascunho cadastrado.')).toBeVisible();
+  // A ação do cabeçalho e a repetida no estado vazio, nos dois cartões: 3 no total.
+  await expect(card.getByRole('link', { name: 'Nova matéria' })).toHaveCount(3);
 
   const loading = dataTable(page, 'Matérias carregando');
   await expect(loading).toHaveAttribute('aria-busy', 'true');
   await expect(loading.locator('tbody tr')).toHaveCount(10);
   await expect(loading.locator('tbody .skeleton').first()).toBeVisible();
-
-  const empty = dataTable(page, 'Matérias vazias');
-  await expect(empty.getByText('Nenhum dado encontrado!')).toBeVisible();
 });
 
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`DataTable sem violação do axe (${colorScheme})`, async ({ page }) => {
+  test(`DataTable sem violação do axe, com e sem resultado (${colorScheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await login(page);
-    await page.goto(`${SHOWCASE}?pagina=2&ordem=-visitas`);
-    await page.waitForLoadState('networkidle');
+    for (const query of ['?pagina=2&ordem=-visitas', '?q=nada+por+aqui&situacao=rascunho']) {
+      await page.goto(`${SHOWCASE}${query}`);
+      await page.waitForLoadState('networkidle');
 
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .include('[aria-labelledby="vitrine-data-table"]')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(WCAG)
+        .include('[aria-labelledby="vitrine-data-table"]')
+        .exclude('[data-floating-ui-focus-guard]')
+        .analyze();
+      expect(accessibility.violations).toEqual([]);
+    }
   });
 }
 
