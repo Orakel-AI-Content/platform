@@ -24,7 +24,7 @@ export default async function ComponentsShowcasePage({ searchParams }: SearchPar
   const linkPage = Number.parseInt(typeof pagina === 'string' ? pagina : '', 10);
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">Teste de componentes</h1>
+      <h1 className="text-2xl font-bold">Teste de componentes</h1>
       <Showcase linkPage={Number.isNaN(linkPage) ? 1 : linkPage} />
     </div>
   );
