@@ -373,9 +373,16 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
     `(admin)/[...rest]` e para o site inexistente, e `sites/[site]/not-found.tsx`) →
     `FileNotFound`;
   - falta de permissão (`ForbiddenScreen`) → `SpaceSignBoard`;
-  - erro (`(admin)/error.tsx` e `global-error.tsx`, pelo `ErrorScreen`) → `NoDataFound`.
+  - "Sem acesso" (`NoAccessScreen`, do layout de `(admin)` quando a identidade não tem
+    cadastro nem papel) → `SpaceSignBoard`. Sem a moldura, o `<main>` do layout dá a altura
+    (`min-h-screen`) e os gutters (`PAGE_CONTAINER_GUTTER_X`/`_Y`); a saída é "Sair", um `<a>`
+    para o `LOGOUT_PATH` do Access (`Button asElement="a"`, nunca `ButtonLink`);
+  - erro (`(admin)/error.tsx` e `global-error.tsx`, pelo `ErrorScreen`) → `NoDataFound`. O
+    `global-error` usa os gutters da moldura, sem `max-w-*`.
 
-  Fora a ilustração, as telas mudam só o conteúdo, sem variante visual. A tela de erro nunca
+  A saída de toda tela de estado (link de volta, "Sair" ou "Tentar de novo") usa a variante
+  padrão do `Button`, nunca `solid`. Fora a ilustração, as telas mudam só o conteúdo, sem
+  variante visual. A tela de erro nunca
   mostra a mensagem da exceção, só o `digest`. Não confunda com o `EmptyState`, o vazio de
   lista com borda tracejada.
 
