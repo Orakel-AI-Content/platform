@@ -34,7 +34,7 @@ export function InfoField({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="font-semibold text-gray-600 dark:text-gray-400">{label}</dt>
+      <dt className="font-semibold">{label}</dt>
       <dd
         className={classNames(
           'font-bold text-gray-900 wrap-anywhere dark:text-gray-100',

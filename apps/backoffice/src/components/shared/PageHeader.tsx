@@ -15,15 +15,9 @@ export function PageTrail({ items }: { items: readonly TrailItem[] }) {
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         {items.map((item, index) => (
           <li key={`${index}-${item.label}`} className="flex items-center gap-2">
-            {index > 0 && (
-              <span aria-hidden="true" className="text-gray-600 dark:text-gray-400">
-                ›
-              </span>
-            )}
+            {index > 0 && <span aria-hidden="true">›</span>}
             {item.href === undefined ? (
-              <span aria-current="page" className="text-gray-600 dark:text-gray-400">
-                {item.label}
-              </span>
+              <span aria-current="page">{item.label}</span>
             ) : (
               <Link
                 href={item.href}

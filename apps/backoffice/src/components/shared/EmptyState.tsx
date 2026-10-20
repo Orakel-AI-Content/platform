@@ -24,7 +24,7 @@ export function EmptyState({
 }) {
   return (
     <div className="space-y-3 rounded-2xl border border-dashed border-gray-200 px-6 py-10 text-center dark:border-gray-800">
-      <p className="text-gray-600 dark:text-gray-400">{children}</p>
+      <p>{children}</p>
       {action && <div className="flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
   );

@@ -4,5 +4,5 @@
 /** Título de seção. */
 export const SECTION_TITLE_CLASS = 'text-lg font-semibold text-gray-900 dark:text-gray-100';
 
-/** Texto de apoio de seção. */
-export const SECTION_HINT_CLASS = 'text-sm text-gray-600 dark:text-gray-400';
+/** Texto de apoio de seção: a cor é a do body (camada base do Ecme, #395). */
+export const SECTION_HINT_CLASS = 'text-sm';

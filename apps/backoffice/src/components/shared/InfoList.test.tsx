@@ -40,8 +40,8 @@ describe('lista de dados', () => {
     const list = screen.getByRole('term').closest('dl')!;
     expect(list.className).toContain('text-sm');
     expect(list.className).toContain('sm:grid-cols-2');
-    expect(screen.getByRole('term').className).toContain('text-gray-600');
-    expect(screen.getByRole('term').className).toContain('dark:text-gray-400');
+    // O rótulo herda o cinza do body (#398): sem cor própria.
+    expect(screen.getByRole('term').className).not.toMatch(/text-gray-/);
     const value = screen.getByRole('definition');
     expect(value.className).toContain('text-gray-900');
     expect(value.className).toContain('dark:text-gray-100');
