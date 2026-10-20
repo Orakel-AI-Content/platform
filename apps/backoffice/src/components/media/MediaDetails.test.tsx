@@ -13,7 +13,7 @@ import type { MediaItem } from './MediaLibrary.tsx';
 // Detalhes de uma imagem (#187, no Dialog do Ecme desde #279): o botão da imagem abre o
 // diálogo com dimensões, formatos e identificador; "Copiar identificador" confirma no toast
 // (fora da app, anunciado com o diálogo aberto) ou explica a falha no Alert do diálogo; Esc e
-// "Fechar" fecham e o foco volta à imagem.
+// "Fechar" fecham e o foco volta à imagem. Os dados ficam na lista de dados compartilhada (#368).
 
 let app: HTMLElement;
 
@@ -93,6 +93,10 @@ describe('detalhes da imagem', () => {
       ['Identificador', '42'],
       ['Enviada em', '01/10/2026, 12:30 BRT'],
     ]);
+    // A lista de dados compartilhada (#368): rótulo em cima, valor embaixo, que quebra.
+    const list = details.getAllByRole('term')[0]!.closest('dl')!;
+    expect(list.className).not.toContain('grid-cols-[auto_1fr]');
+    expect(details.getAllByRole('definition')[2]?.className).toContain('wrap-anywhere');
     expect(details.getAllByRole('button', { name: 'Fechar' })).toHaveLength(1);
   });
 

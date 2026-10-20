@@ -12,11 +12,14 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import Container from '@/components/shared/Container';
 import EllipsisButton from '@/components/shared/EllipsisButton';
 import { IconButton } from '@/components/shared/IconButton';
+import { InfoField, InfoList } from '@/components/shared/InfoList';
 import Loading from '@/components/shared/Loading';
 import MediaSkeleton from '@/components/shared/loaders/MediaSkeleton';
+import { PageMeta } from '@/components/shared/PageMeta';
 import TextBlockSkeleton from '@/components/shared/loaders/TextBlockSkeleton';
 import StickyFooter from '@/components/shared/StickyFooter';
 import BottomStickyBar from '@/components/template/BottomStickyBar';
+import { StateTag } from '@/components/sites/SiteStatus';
 import { PAGE_CONTAINER_GUTTER_X } from '@/components/template/constants';
 import { Alert } from '@/components/ui/Alert';
 import { Avatar } from '@/components/ui/Avatar';
@@ -129,6 +132,12 @@ function isoNoFuso(date: Date | null, timeZone: string) {
 /** Arquivo já escolhido no Upload da vitrine: mostra a lista desde o servidor. */
 const PAUTA = new File(['%PDF-1.7'], 'pauta-da-semana.pdf', { type: 'application/pdf' });
 const ANEXOS_INICIAIS = [PAUTA];
+
+/**
+ * Valor de 120 caracteres sem espaço nem hífen (o pior caso de slug ou URL, sem ponto de quebra
+ * natural): quebra dentro da lista de dados (#368).
+ */
+const LONG_VALUE = 'guiacompleto'.repeat(10);
 
 const NEXT_SORT: Record<ThSort, ThSort> = { none: 'asc', asc: 'desc', desc: 'asc' };
 
@@ -920,6 +929,35 @@ export function Showcase({ linkPage }: { linkPage: number }) {
           <Tag>Rascunho</Tag>
           <Tag prefix>Publicado</Tag>
         </div>
+      </section>
+
+      <section aria-labelledby="vitrine-lista-de-dados" className="space-y-3">
+        <h2 id="vitrine-lista-de-dados" className="text-lg font-semibold">
+          Lista de dados e linha de metadados
+        </h2>
+        <PageMeta
+          items={[
+            <StateTag key="estado" color="bg-success">
+              Publicado
+            </StateTag>,
+            'Versão 3',
+            'Atualizada em 01/10/2026, 12:30 BRT',
+          ]}
+        />
+        <Card>
+          <InfoList className="sm:grid-cols-2">
+            <InfoField label="Domínio">exemplo-a.test</InfoField>
+            <InfoField label="Identificador" className="tabular-nums">
+              42
+            </InfoField>
+            <InfoField label="Slug">
+              <span data-vitrine-valor-longo="">{LONG_VALUE}</span>
+            </InfoField>
+            <InfoField label="Estado">
+              <StateTag color="bg-warning">Em revisão</StateTag>
+            </InfoField>
+          </InfoList>
+        </Card>
       </section>
 
       <section aria-labelledby="vitrine-avatar" className="space-y-3">

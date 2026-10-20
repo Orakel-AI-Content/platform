@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media/MediaLibrary';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
+import { InfoField, InfoList } from '@/components/shared/InfoList.tsx';
 import { formatDateTime } from '@/components/shared/siteLabels.ts';
 import Button from '@/components/ui/Button';
 import Dialog from '@/components/ui/Dialog';
@@ -15,6 +16,7 @@ import Dialog from '@/components/ui/Dialog';
 // Alert dentro do diálogo. Esc, o fundo ou "Fechar" fecham, e o react-modal
 // devolve o foco à imagem. O "Fechar" é o botão explícito ao lado do `h2` (`closable={false}`,
 // para não haver dois), e o título fica no corpo em `h2`, em vez do `h5` do `title` do Dialog.
+// Os dados ficam na lista de dados compartilhada (#368), numa coluna.
 
 /** Nome original, ou o texto de reserva das mídias sem envio registrado (#186). */
 export function mediaName(item: MediaItem): string {
@@ -90,18 +92,18 @@ export function MediaDetails({ item, timeZone }: { item: MediaItem; timeZone: st
           <div className="w-40">
             <MediaThumbnail item={item} />
           </div>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-gray-600 dark:text-gray-400">Dimensões</dt>
-            <dd>
+          <InfoList>
+            <InfoField label="Dimensões">
               {item.width}×{item.height} px
-            </dd>
-            <dt className="text-gray-600 dark:text-gray-400">Formatos disponíveis</dt>
-            <dd>{formats.length > 0 ? formats.join(', ') : '—'}</dd>
-            <dt className="text-gray-600 dark:text-gray-400">Identificador</dt>
-            <dd className="tabular-nums">{item.id}</dd>
-            <dt className="text-gray-600 dark:text-gray-400">Enviada em</dt>
-            <dd>{mediaUploadedAt(item, timeZone)}</dd>
-          </dl>
+            </InfoField>
+            <InfoField label="Formatos disponíveis">
+              {formats.length > 0 ? formats.join(', ') : '—'}
+            </InfoField>
+            <InfoField label="Identificador" className="tabular-nums">
+              {item.id}
+            </InfoField>
+            <InfoField label="Enviada em">{mediaUploadedAt(item, timeZone)}</InfoField>
+          </InfoList>
           <div className="space-y-3">
             <Button size="sm" onClick={copyId}>
               Copiar identificador
