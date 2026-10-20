@@ -53,7 +53,6 @@ const renderPanel = (props: Partial<Props> = {}) =>
       issues={[]}
       checklist={checklist}
       canApprove
-      previewUrl="https://preview.orakel.localhost/exemplo-a/guia/"
       approve={vi.fn()}
       {...props}
     />,
@@ -91,12 +90,20 @@ describe('painel de revisão', () => {
     expect(screen.queryByRole('link', { name: 'Voltar' })).toBeNull();
   });
 
-  it('liga para a visualização em nova aba', () => {
+  it('títulos na escala do guia: as seções em h2, nenhum h3 no tamanho de h2, sem o link da prévia', () => {
     renderPanel();
 
-    const link = screen.getByRole('link', { name: 'Abrir a visualização em nova aba' });
-    expect(link.getAttribute('href')).toBe('https://preview.orakel.localhost/exemplo-a/guia/');
-    expect(link.getAttribute('target')).toBe('_blank');
+    const panel = screen.getByRole('complementary', { name: 'Revisão da versão 2' });
+    const headings = [...panel.querySelectorAll('h1, h2, h3, h4, h5, h6')];
+    expect(headings.map((heading) => [heading.tagName, heading.textContent])).toEqual([
+      ['H2', 'Validação da release'],
+      ['H2', 'Checklist'],
+    ]);
+    for (const heading of panel.querySelectorAll('h3')) {
+      expect(heading.className).not.toContain('text-lg');
+    }
+    // "Abrir prévia" é ação do cabeçalho da página (#373).
+    expect(panel.querySelector('a')).toBeNull();
   });
 
   it('com bloco fora da release, mostra o erro e bloqueia aprovar, com o motivo', () => {
@@ -159,7 +166,6 @@ describe('painel de revisão', () => {
         issues={[]}
         checklist={checklist}
         canApprove
-        previewUrl="https://preview.orakel.localhost/exemplo-a/guia/"
         approve={approve}
       />,
     );

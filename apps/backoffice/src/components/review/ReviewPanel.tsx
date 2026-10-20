@@ -11,12 +11,14 @@ import { SECTION_HINT_CLASS, SECTION_TITLE_CLASS } from '@/components/shared/sec
 import Card from '@/components/ui/Card';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
-// Painel da tela de revisão (#75), ao lado da visualização: erros de validação da release,
-// checklist e aprovação. A página decide permissão e estado no servidor e passa os itens do
+// Painel da tela de revisão (#75), ao lado da visualização a partir de `xl` e abaixo dela antes
+// (#373): erros de validação da release, checklist e aprovação. A página decide permissão e estado no servidor e passa os itens do
 // checklist (REVIEW_CHECKLIST, do domínio, que não pode ir para o bundle do cliente); o
 // domínio confere tudo de novo ao aprovar. Visual do Ecme (#277): o conteúdo em `Card`s, com as
 // cores do `@theme`; o `<aside>` fica por fora para manter o landmark. O checklist tem cartão
-// próprio, com "Aprovar" no rodapé dele (#333).
+// próprio, com "Aprovar" no rodapé dele (#333). As duas seções são seções da tela (`h2`, como
+// "Dados" e "Blocos" na versão, #372); o `<aside>` tem o nome por `aria-label`, sem `h2` oculto,
+// e a prévia em nova aba é ação do cabeçalho da página.
 
 export type ChecklistItem = { key: string; label: string };
 
@@ -37,7 +39,6 @@ export function ReviewPanel({
   issues,
   checklist,
   canApprove,
-  previewUrl,
   approve,
 }: {
   version: number;
@@ -47,7 +48,6 @@ export function ReviewPanel({
   checklist: readonly ChecklistItem[];
   /** `content.publish`, decidido no servidor. */
   canApprove: boolean;
-  previewUrl: string;
   approve: (checklist: string[]) => Promise<FormActionResult<SchemaFormIssue>>;
 }) {
   const id = useId();
@@ -56,32 +56,18 @@ export function ReviewPanel({
   const inReview = status === 'em_revisao';
   const blocked = issues.length > 0;
   const checklistTitle = (
-    <h3 id={`${id}-checklist`} className={SECTION_TITLE_CLASS}>
+    <h2 id={`${id}-checklist`} className={SECTION_TITLE_CLASS}>
       Checklist
-    </h3>
+    </h2>
   );
 
   return (
-    <aside aria-labelledby={`${id}-title`} className="flex flex-col gap-4">
-      <Card bodyClass="space-y-6">
-        <h2 id={`${id}-title`} className="sr-only">
-          Revisão da versão {version}
-        </h2>
-        <p className="text-sm">
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary underline underline-offset-4 dark:text-primary-mild"
-          >
-            Abrir a visualização em nova aba
-          </a>
-        </p>
-
+    <aside aria-label={`Revisão da versão ${version}`} className="flex flex-col gap-4">
+      <Card>
         <section aria-labelledby={`${id}-issues`} className="space-y-2">
-          <h3 id={`${id}-issues`} className={SECTION_TITLE_CLASS}>
+          <h2 id={`${id}-issues`} className={SECTION_TITLE_CLASS}>
             Validação da release
-          </h3>
+          </h2>
           {blocked ? (
             <ul className="list-disc space-y-1 pl-5 text-sm text-error">
               {issues.map((issue) => (

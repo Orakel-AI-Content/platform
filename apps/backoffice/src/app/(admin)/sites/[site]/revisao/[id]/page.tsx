@@ -4,11 +4,16 @@ import { notFound } from 'next/navigation';
 
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
+import { CONTENT_STATUS_LABEL, CONTENT_STATUS_TAG } from '@/components/shared/siteLabels.ts';
+import { StateTag } from '@/components/sites/SiteStatus';
 import { can } from '@/domain/access/rbac.ts';
 import { REVIEW_CHECKLIST, reviewIssues } from '@/domain/reviews/reviews.ts';
 import { getEnv } from '@/env.ts';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
+import { Button } from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
 
 import { itemTitle } from '../../item-title.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
@@ -32,7 +37,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 /**
  * Tela de revisão (#75): a versão mais recente na visualização do site (iframe) e, ao lado, os
  * erros de validação da release, o checklist e a aprovação. Ler exige site.read; aprovar só
- * aparece com content.publish, e o domínio confere tudo de novo.
+ * aparece com content.publish, e o domínio confere tudo de novo. Tela de detalhe do guia (#373),
+ * na ordem invertida do `CustomerDetails`: a prévia é o conteúdo principal, com a largura do
+ * `main`, e o painel fica abaixo dela até `xl` e ao lado a partir dele.
  */
 export default async function ReviewPage({ params }: Params) {
   const { site: siteId, id } = await params;
@@ -63,25 +70,47 @@ export default async function ReviewPage({ params }: Params) {
           { label: latest.data.title },
         ])}
         title={<>Revisão de “{latest.data.title}”</>}
+        action={
+          // O mesmo `Button` e variante do "Ver prévia" do editor, em `sm` como as ações de
+          // cabeçalho do guia.
+          <Button
+            asElement="a"
+            href={previewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            size="sm"
+          >
+            Abrir prévia<span className="sr-only"> (abre em nova aba)</span>
+          </Button>
+        }
       />
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Versão {latest.version} · /{latest.data.slug}
-      </p>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <iframe
-          src={previewUrl}
-          title={`Visualização de “${latest.data.title}” no site`}
-          className="h-[75vh] w-full rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
-        />
-        <ReviewPanel
-          version={latest.version}
-          status={latest.status}
-          issues={validation.value.issues.map(({ message }) => ({ message }))}
-          checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
-          canApprove={can(actor, 'content.publish')}
-          previewUrl={previewUrl}
-          approve={approveAction.bind(null, site.id, contentId, latest.version)}
-        />
+      <PageMeta
+        items={[
+          <StateTag key="status" color={CONTENT_STATUS_TAG[latest.status]}>
+            {CONTENT_STATUS_LABEL[latest.status]}
+          </StateTag>,
+          `Versão ${latest.version}`,
+          `/${latest.data.slug}`,
+        ]}
+      />
+      <div className="flex flex-col gap-4 xl:flex-row">
+        <Card className="w-full min-w-0">
+          <iframe
+            src={previewUrl}
+            title={`Visualização de “${latest.data.title}” no site`}
+            className="h-[75vh] w-full rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
+          />
+        </Card>
+        <div className="xl:min-w-[330px] 2xl:min-w-[400px]">
+          <ReviewPanel
+            version={latest.version}
+            status={latest.status}
+            issues={validation.value.issues.map(({ message }) => ({ message }))}
+            checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
+            canApprove={can(actor, 'content.publish')}
+            approve={approveAction.bind(null, site.id, contentId, latest.version)}
+          />
+        </div>
       </div>
     </section>
   );
