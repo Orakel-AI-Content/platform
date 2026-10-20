@@ -123,9 +123,11 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
 - **Larguras:** duas utilities de `globals.css`, na `section` (ou `article`) de topo da página,
   nunca um `max-w-*` solto. `form-width` (`max-w-3xl`) para criar e editar, configuração,
   textos institucionais e telas que leem um item (página do site, versão de um conteúdo):
-  uma coluna legível. `list-width` (largura cheia do `main`) para as listas e tabelas: sites,
-  conteúdos, versões, autores, taxonomias, menus e mídia. O componente de formulário não
-  define largura; quem define é a página.
+  uma coluna legível. Nos formulários de tela (#328), o `form-width` sai da `section` e vai
+  para o cabeçalho e para a coluna de cartões e o conteúdo da barra (`contentClassName` do
+  `SchemaForm`), para o `BottomStickyBar` encostar nas bordas do `main`. `list-width` (largura
+  cheia do `main`) para as listas e tabelas: sites, conteúdos, versões, autores, taxonomias,
+  menus e mídia. O componente de formulário não define largura; quem define é a página.
 - **Carregamento:** `NavigationIndicator` no layout `(admin)`. Acende "Carregando…" numa região
   `role="status"` persistente no clique de um link interno e apaga quando o endereço muda. Não
   use `loading.tsx` nem `Suspense` acima das páginas: o fallback só aparece quando muda o
@@ -337,8 +339,21 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   Formulário longo (a configuração do site) passa `sections` (`{ id, title, paths }`, chaves
   de topo): cada seção vira `<section>` com `h2` (`#secao-<id>`), todas na mesma página, sem
   abas, com um índice de âncoras no topo (`nav` "Seções do formulário"). Chave de topo fora
-  de todas as seções aparece depois delas; sem `sections`, uma coluna só. Durante o envio o
-  botão fica desabilitado e mostra `pendingLabel` ("Salvando…" por padrão; "Cadastrando…",
+  de todas as seções aparece depois delas; sem `sections`, uma coluna só.
+  **Formulário de tela** (#328), como o `CustomerForm` do Ecme: cadastro e configuração de
+  site, autores, taxonomias, menus e textos institucionais passam `actionBar`
+  (`{ kind, href }`). O `SchemaForm` monta o `Form` (com `FormContainer`), uma coluna de
+  `Card`s com `gap-4` (um por seção, com o título no visual do `h4 mb-6` do Ecme e `h2` na
+  estrutura; sem seções, um `Card` só) e o `BottomStickyBar` com a ação principal à direita.
+  Na criação (`kind: 'create'`), "Descartar" (cor de erro) abre um
+  `ConfirmDialog type="danger"` e, confirmado, vai para `href` sem enviar, como o
+  `CustomerCreate`; na edição, "Voltar" (`plain`, seta) é um link para `href`, como o
+  `CustomerEdit`. `href` é o nível anterior da trilha (a lista, a página do site), nunca
+  `history.back()`. Campos curtos relacionados ficam lado a lado a partir de `md` por
+  `sideBySide` (grupos de caminhos com `*`, em `grid md:grid-cols-2 gap-4`): ID e nome, idioma
+  e fuso, nome e slug, rótulo e link do item de menu. Formulário dentro de outra tela
+  (checklist da revisão) não passa `actionBar`: sem barra e sem cartão próprio, porque quem o
+  contém já é o cartão. Durante o envio o botão fica desabilitado e mostra `pendingLabel` ("Salvando…" por padrão; "Cadastrando…",
   "Criando…", "Aprovando…" por quem chama), sem segundo envio. Quem fica na tela confirma
   devolvendo `{ success: mensagem }`, que vai para o toast do retorno padrão (`pushSuccess`,
   ver "Retorno das ações"), como a aprovação na revisão. Quem sai da tela também confirma no
