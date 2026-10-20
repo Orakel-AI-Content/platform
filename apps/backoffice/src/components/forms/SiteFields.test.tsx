@@ -133,13 +133,15 @@ describe('campos da configuração do site', () => {
     const user = userEvent.setup();
     const onSubmit = renderForm({ domains: ['a.example.com'], featureFlags: {}, preset: 'padrao' });
 
-    const preset = screen.getByLabelText<HTMLSelectElement>(fieldLabel('Preset'));
-    expect(
-      within(preset)
-        .getAllByRole('option')
-        .map((option) => option.textContent),
-    ).toEqual(['padrao', 'revista']);
-    await user.selectOptions(preset, 'revista');
+    const preset = screen.getByRole('combobox', { name: fieldLabel('Preset') });
+    expect(screen.getByText('padrao')).toBeTruthy();
+    preset.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'padrao',
+      'revista',
+    ]);
+    await user.keyboard('{ArrowDown}{Enter}');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect((await submitted(onSubmit)).preset).toBe('revista');

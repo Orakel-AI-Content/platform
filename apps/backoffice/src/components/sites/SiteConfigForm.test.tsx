@@ -141,9 +141,15 @@ describe('formulário da configuração do site', () => {
 
     await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
 
-    const home = screen.getByLabelText(fieldLabel('Preset da página Home'));
+    const home = screen.getByRole('combobox', { name: fieldLabel('Preset da página Home') });
     await waitFor(() => expect(document.activeElement).toBe(home));
     expect(home.getAttribute('aria-invalid')).toBe('true');
+    // A mensagem do FormItem entra na descrição acessível do combobox (#330).
+    expect(
+      (home.getAttribute('aria-describedby') ?? '')
+        .split(' ')
+        .map((id) => document.getElementById(id)?.textContent),
+    ).toContain('Preset "x" de home não é suportado');
     expect(screen.getByText('Preset "x" de home não é suportado')).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toContain(
       'Não foi possível salvar a configuração.',
