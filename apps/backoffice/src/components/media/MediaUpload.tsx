@@ -13,8 +13,8 @@ import Upload from '@/components/ui/Upload';
 // à vista; o react-modal devolve o foco ao botão. O Upload acumula o que já foi escolhido no
 // estado interno, então só os arquivos novos do `onChange` seguem adiante. Recusa e limite ficam
 // na fila (sem `beforeUpload` nem `uploadLimit`). O título fica no corpo em `h4`, como no Ecme,
-// ligado por `aria-labelledby`; o texto da área nomeia o campo de arquivo. Cores: o
-// `text-blue-500` do Ecme, fora da paleta, vira `text-primary dark:text-primary-mild`, e a
+// ligado por `aria-labelledby`; o texto da área nomeia o campo de arquivo. Cores: o azul fixo
+// do Ecme, fora da paleta, vira `text-primary dark:text-primary-mild`, e a
 // segunda linha usa `text-gray-600 dark:text-gray-300` no lugar do `opacity-60`, que não chega
 // ao contraste AA (pares em globals-contrast.test.ts).
 

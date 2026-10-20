@@ -1818,7 +1818,7 @@ const ECME_PAIRS: readonly EcmePair[] = [
   },
   // Envio de imagens (#376): o texto da área do Upload arrastável no diálogo, sobre o
   // `bg-gray-100` da área no claro e o `dark:bg-gray-800` do diálogo no escuro (a área é
-  // `dark:bg-transparent`). O `text-blue-500` do Ecme, fora da paleta, vira `primary`; a segunda
+  // `dark:bg-transparent`). O azul fixo do Ecme, fora da paleta, vira `primary`; a segunda
   // linha troca o `opacity-60` do Ecme pela cor própria. O foco da área fica sobre o diálogo, já
   // nos pares "foco no cartão".
   {
