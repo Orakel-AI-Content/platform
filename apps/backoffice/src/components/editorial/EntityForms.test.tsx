@@ -185,7 +185,7 @@ describe('formulários de entidades', () => {
     );
     render(<ToastProvider />);
 
-    await user.click(screen.getByRole('button', { name: 'Salvar textos' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Textos salvos.'));
     expect(screen.getByRole('status').querySelector('.notification')).not.toBeNull();

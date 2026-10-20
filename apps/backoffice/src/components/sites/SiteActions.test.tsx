@@ -74,7 +74,7 @@ describe('BuildWindowForm', () => {
     render(<BuildWindowForm intro={null} own={null} action={action} />);
 
     if (typed !== '') await user.type(windowInput(), typed);
-    await user.click(screen.getByRole('button', { name: 'Salvar janela' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(windowInput().getAttribute('aria-invalid')).toBe('true'));
     expect(screen.getAllByText(WINDOW_MESSAGE).length).toBeGreaterThan(0);
@@ -88,7 +88,7 @@ describe('BuildWindowForm', () => {
     render(<ToastProvider />);
 
     await user.type(windowInput(), '30');
-    await user.click(screen.getByRole('button', { name: 'Salvar janela' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(action).toHaveBeenCalledWith({ buildWindowSeconds: 30 });
     await waitFor(() =>
@@ -126,17 +126,17 @@ describe('BuildWindowForm', () => {
     render(<BuildWindowForm intro={null} own={null} action={action} />);
 
     await user.type(windowInput(), '30');
-    await user.click(screen.getByRole('button', { name: 'Salvar janela' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(windowInput().getAttribute('aria-invalid')).toBe('true'));
     expect(screen.getAllByText('Janela recusada pelo domínio.').length).toBeGreaterThan(0);
   });
 
-  it('"Salvar janela" e "Usar padrão" no rodapé do cartão, do mesmo tamanho', () => {
+  it('"Salvar" e "Usar padrão" no rodapé do cartão, do mesmo tamanho', () => {
     render(<BuildWindowForm intro={null} own={null} action={vi.fn()} />);
 
     const footer = document.querySelector('.card .card-footer');
-    const save = screen.getByRole('button', { name: 'Salvar janela' });
+    const save = screen.getByRole('button', { name: 'Salvar' });
     const reset = screen.getByRole('button', { name: 'Usar padrão' });
     expect(footer?.contains(save)).toBe(true);
     expect(footer?.contains(reset)).toBe(true);

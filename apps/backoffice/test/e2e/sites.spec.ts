@@ -138,7 +138,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await expect(page.getByRole('option', { name: current ?? '' })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(home).toHaveAttribute('aria-expanded', 'false');
-  await tabTo(page, page.getByRole('button', { name: 'Cadastrar site' }));
+  await tabTo(page, page.getByRole('button', { name: 'Criar', exact: true }));
   await page.keyboard.press('Enter');
 
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
@@ -184,7 +184,7 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
     page.getByRole('textbox', { name: 'Domínios' }),
     `novo.${siteId}.example.com`,
   );
-  await tabTo(page, page.getByRole('button', { name: 'Salvar configuração' }));
+  await tabTo(page, page.getByRole('button', { name: 'Salvar', exact: true }));
   await page.keyboard.press('Enter');
   await expect(page.getByRole('status').filter({ hasText: 'versão 2' })).toBeVisible();
 
@@ -268,7 +268,7 @@ test('configuração: pares lado a lado, barra na largura do main e Voltar', asy
   }
   const bar = page
     .locator('.sticky')
-    .filter({ has: page.getByRole('button', { name: 'Salvar configuração' }) });
+    .filter({ has: page.getByRole('button', { name: 'Salvar', exact: true }) });
   const main = await page.locator('main').boundingBox();
   const barBox = await bar.boundingBox();
   expect(barBox?.x).toBe(main?.x);
@@ -303,7 +303,7 @@ async function newSite(page: Page, siteId: string): Promise<void> {
   await page.getByLabel(fieldLabel('Nome')).fill(`Site ${siteId}`);
   await page.getByRole('textbox', { name: 'Domínios' }).fill(`${siteId}.example.com`);
   await page.getByRole('radio', { name: /Editorial claro/ }).check();
-  await page.getByRole('button', { name: 'Cadastrar site' }).click();
+  await page.getByRole('button', { name: 'Criar', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
 }
 
@@ -344,7 +344,7 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
     await indexavel.focus();
     await page.keyboard.press('Space');
     await expect(indexavel).toBeChecked();
-    await page.getByRole('button', { name: 'Salvar configuração' }).click();
+    await page.getByRole('button', { name: 'Salvar', exact: true }).click();
   };
   await indexar();
   await expect(page.getByRole('switch', { name: 'Indexável' })).toHaveAccessibleDescription(
@@ -366,14 +366,14 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   const windowInput = windowSection.getByLabel('Janela própria (segundos)');
   for (const value of ['', '-1', '1.5']) {
     await windowInput.fill(value);
-    await windowSection.getByRole('button', { name: 'Salvar janela' }).click();
+    await windowSection.getByRole('button', { name: 'Salvar', exact: true }).click();
     await expect(windowInput).toHaveAttribute('aria-invalid', 'true');
     await expect(windowInput).toHaveAccessibleDescription(
       'Informe um número inteiro de segundos, 0 ou mais.',
     );
   }
   await page.getByLabel('Janela própria (segundos)').fill('30');
-  await page.getByRole('button', { name: 'Salvar janela' }).click();
+  await windowSection.getByRole('button', { name: 'Salvar', exact: true }).click();
   await expect(status(page, 'Janela de 30 s salva.')).toBeVisible();
   await expect(page.getByText('Janela efetiva: 30 s, própria')).toBeVisible();
   await expect(windowInput).not.toHaveAttribute('aria-invalid', 'true');
@@ -478,13 +478,7 @@ test('editor vê a página do site sem as ações', async ({ page }) => {
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
   await expect(page.getByRole('heading', { name: 'Ciclo de vida' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Publicação' })).toBeVisible();
-  for (const name of [
-    /^Marcar/,
-    /^Publicar agora/,
-    'Registrar G1',
-    'Salvar janela',
-    'Usar padrão',
-  ]) {
+  for (const name of [/^Marcar/, /^Publicar agora/, 'Registrar G1', /^Salvar$/, 'Usar padrão']) {
     await expect(page.getByRole('button', { name })).toHaveCount(0);
   }
   await expect(page.getByRole('link', { name: 'Editar configuração' })).toHaveCount(0);
@@ -505,14 +499,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
     // G1 e janela gerados do schema, em cartão com os botões no rodapé, sem barra fixa (#333).
     const windowSection = page.getByRole('region', { name: 'Janela de agrupamento' });
     const footer = windowSection.locator('.card-footer');
-    await expect(footer.getByRole('button', { name: 'Salvar janela' })).toBeVisible();
+    await expect(footer.getByRole('button', { name: 'Salvar', exact: true })).toBeVisible();
     await expect(footer.getByRole('button', { name: 'Usar padrão' })).toBeVisible();
     await expect(page.locator('.sticky')).toHaveCount(0);
     await page.waitForLoadState('networkidle');
     // O erro de campo do schema, validado no navegador (sem gravar nada).
     const windowInput = windowSection.getByLabel('Janela própria (segundos)');
     await windowInput.fill('');
-    await footer.getByRole('button', { name: 'Salvar janela' }).click();
+    await footer.getByRole('button', { name: 'Salvar', exact: true }).click();
     await expect(windowInput).toHaveAttribute('aria-invalid', 'true');
 
     await expectNoViolations(page);

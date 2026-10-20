@@ -120,7 +120,7 @@ async function chooseNewType(user: ReturnType<typeof userEvent.setup>, label: st
 }
 
 const save = (user: ReturnType<typeof userEvent.setup>) =>
-  user.click(screen.getByRole('button', { name: /Salvar nova versão|Criar conteúdo/ }));
+  user.click(screen.getByRole('button', { name: /^(Salvar|Criar)$/ }));
 
 describe('editor de conteúdo', () => {
   it('o tipo de bloco novo só oferece os tipos da release', async () => {
@@ -261,7 +261,7 @@ describe('barra de ações e continuar no editor (#109)', () => {
     // A fixação no rodapé é visual: o E2E contents.spec.ts confere.
     renderEditor();
 
-    const submit = screen.getByRole('button', { name: 'Salvar nova versão' });
+    const submit = screen.getByRole('button', { name: 'Salvar' });
     const bar = submit.closest('.sticky');
     expect(bar).not.toBeNull();
     const back = screen.getByRole('link', { name: 'Voltar' });
@@ -320,7 +320,7 @@ describe('barra de ações e continuar no editor (#109)', () => {
     expect(action).toHaveBeenCalledTimes(1);
 
     act(() => finish({ ok: true, message: 'Versão 2 salva.', id: 7 }));
-    expect(await screen.findByRole('button', { name: 'Salvar nova versão' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Salvar' })).toBeTruthy();
   });
 
   it('criação (#332): "Criando…" durante o envio, e Descartar no lugar de Voltar', async () => {
@@ -362,7 +362,7 @@ describe('barra de ações e continuar no editor (#109)', () => {
     expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
     expect(action.mock.calls[0]?.[0].blocks.at(-1)).toMatchObject({ new: true, title: 'Novo' });
     // A confirmação chega antes do fim da transição: espera o botão sair de "Salvando…".
-    const button = await screen.findByRole('button', { name: 'Salvar nova versão' });
+    const button = await screen.findByRole('button', { name: 'Salvar' });
     expect(button).toHaveProperty('disabled', false);
 
     await save(user);

@@ -102,7 +102,8 @@ export function InstitutionalTextsForm({
       fields={INSTITUTIONAL_FIELDS}
       actionBar={{ kind: 'edit', href: backHref }}
       contentClassName={contentClassName}
-      submitLabel="Salvar textos"
+      submitLabel="Salvar"
+      pendingLabel="Salvando…"
       onSubmit={async (value) => {
         const result = await action(value);
         if (!result.ok) {

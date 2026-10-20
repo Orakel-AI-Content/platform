@@ -29,7 +29,7 @@ export function SubmitForReview({
           disabled={pending}
           onClick={() => run(action)}
         >
-          {pending ? 'Enviando…' : 'Enviar para revisão'}
+          {pending ? 'Enviando para revisão…' : 'Enviar para revisão'}
         </Button>
       )}
       <ActionAlert error={error} />

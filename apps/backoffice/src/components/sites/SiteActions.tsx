@@ -22,8 +22,16 @@ import {
 // site.configure.
 
 const NEXT_STEP = {
-  cadastrado: { step: 'infra_aplicada', label: 'Marcar infra aplicada' },
-  infra_aplicada: { step: 'zona_ativa', label: 'Marcar zona ativa' },
+  cadastrado: {
+    step: 'infra_aplicada',
+    label: 'Marcar infra aplicada',
+    pendingLabel: 'Marcando infra aplicada…',
+  },
+  infra_aplicada: {
+    step: 'zona_ativa',
+    label: 'Marcar zona ativa',
+    pendingLabel: 'Marcando zona ativa…',
+  },
 } as const;
 
 type Step = (typeof NEXT_STEP)[keyof typeof NEXT_STEP]['step'];
@@ -67,7 +75,7 @@ export function LifecycleAction({
       disabled={scope.pending}
       onClick={() => scope.run(() => action(next.step))}
     >
-      {scope.pending ? 'Salvando…' : next.label}
+      {scope.pending ? next.pendingLabel : next.label}
     </Button>
   );
 }
@@ -96,7 +104,7 @@ export function RegisterG1Form({
       labels={{ note: 'Observação do G1' }}
       card={{ intro }}
       submitLabel="Registrar G1"
-      pendingLabel="Registrando…"
+      pendingLabel="Registrando G1…"
       onSubmit={async (value) => outcome(await action(value))}
     />
   );
@@ -124,11 +132,13 @@ export function BuildWindowForm({
         intro,
         extra: {
           label: 'Usar padrão',
+          pendingLabel: 'Usando padrão…',
           resetTo: { buildWindowSeconds: '' },
           run: async () => outcome(await action(null)),
         },
       }}
-      submitLabel="Salvar janela"
+      submitLabel="Salvar"
+      pendingLabel="Salvando…"
       onSubmit={async (value) => outcome(await action(value))}
     />
   );

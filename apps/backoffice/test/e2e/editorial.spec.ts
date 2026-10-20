@@ -267,7 +267,7 @@ test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.type(text);
   await expectNoViolations(page);
-  await page.getByRole('button', { name: 'Salvar textos' }).click();
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click();
 
   await expect(page.getByRole('status').filter({ hasText: 'Textos salvos.' })).toBeVisible();
   await expectNoViolations(page);

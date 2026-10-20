@@ -90,7 +90,7 @@ describe('formulário da configuração do site', () => {
     render(<ToastProvider />);
 
     expect(screen.getByLabelText(fieldLabel('ID')).hasAttribute('readonly')).toBe(true);
-    await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(action).toHaveBeenCalled());
     expect(action.mock.calls[0]?.[0]).toEqual(config);
@@ -106,24 +106,24 @@ describe('formulário da configuração do site', () => {
     const reply = deferred();
     renderForm('edit', reply.promise);
 
-    await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(await screen.findByRole('button', { name: 'Salvando…' })).toHaveProperty(
       'disabled',
       true,
     );
     reply.finish({ ok: true, message: 'Configuração salva (versão 2).' });
-    await screen.findByRole('button', { name: 'Salvar configuração' });
+    await screen.findByRole('button', { name: 'Salvar' });
   });
 
-  it('cadastro: "Cadastrando…" durante o envio e depois vai para /sites com a marca do site', async () => {
+  it('cadastro: "Criando…" durante o envio e depois vai para /sites com a marca do site', async () => {
     const user = userEvent.setup();
     const reply = deferred();
     const action = renderForm('create', reply.promise);
 
-    await user.click(screen.getByRole('button', { name: 'Cadastrar site' }));
+    await user.click(screen.getByRole('button', { name: 'Criar' }));
 
-    const pending = await screen.findByRole('button', { name: 'Cadastrando…' });
+    const pending = await screen.findByRole('button', { name: 'Criando…' });
     expect(pending).toHaveProperty('disabled', true);
     await user.click(pending);
     expect(action).toHaveBeenCalledTimes(1);
@@ -139,7 +139,7 @@ describe('formulário da configuração do site', () => {
       issues: [{ path: ['presets', 'home'], message: 'Preset "x" de home não é suportado' }],
     });
 
-    await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     const home = screen.getByRole('combobox', { name: fieldLabel('Preset da página Home') });
     await waitFor(() => expect(document.activeElement).toBe(home));
@@ -184,7 +184,7 @@ describe('seções da configuração do site', () => {
 
       const regions = titles.map((title) => screen.getByRole('region', { name: title }));
       const form = screen
-        .getByRole('button', { name: /Cadastrar site|Salvar configuração/ })
+        .getByRole('button', { name: /^(Criar|Salvar)$/ })
         .closest('form') as HTMLFormElement;
       const controls = [...form.querySelectorAll('input, select, textarea')];
       expect(controls.length).toBeGreaterThan(0);
@@ -199,8 +199,8 @@ describe('seções da configuração do site', () => {
     },
   );
   it.each([
-    ['create', 'Cadastrar site', '/sites'],
-    ['edit', 'Salvar configuração', '/sites/exemplo-a'],
+    ['create', 'Criar', '/sites'],
+    ['edit', 'Salvar', '/sites/exemplo-a'],
   ] as const)(
     '%s: ID e nome, idioma e fuso lado a lado; a barra fixa leva a ação principal',
     (mode, submit, back) => {
