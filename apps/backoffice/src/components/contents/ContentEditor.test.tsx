@@ -755,14 +755,20 @@ describe('recolher e expandir blocos (#135)', () => {
     const user = userEvent.setup();
     const action = renderEditor();
 
-    const date = screen.getByLabelText(fieldLabel('Data de publicação'));
-    expect(date.getAttribute('type')).toBe('datetime-local');
-    expect((date as HTMLInputElement).value).toBe('2026-10-06T12:00');
+    // DateTimepicker do Ecme (#331): combobox com a hora de parede do site.
+    const date = screen.getByRole('combobox', { name: fieldLabel('Data de publicação') });
+    expect(date).toHaveProperty('value', '06/10/2026 12:00');
     expect(document.getElementById(date.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
       'Horário de America/Sao_Paulo',
     );
 
-    fireEvent.change(date, { target: { value: '2026-10-07T09:15' } });
+    await user.click(date);
+    await user.click(screen.getByRole('button', { name: '7 de outubro de 2026' }));
+    await user.click(screen.getByRole('textbox', { name: 'Hora' }));
+    await user.keyboard('09');
+    await user.click(screen.getByRole('textbox', { name: 'Minuto' }));
+    await user.keyboard('15');
+    await user.click(screen.getByRole('button', { name: 'OK' }));
     await save(user);
 
     await waitFor(() => expect(action).toHaveBeenCalled());
