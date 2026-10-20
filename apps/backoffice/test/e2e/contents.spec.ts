@@ -11,6 +11,7 @@ import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
 import { analyzeTables } from './statistics.ts';
 import { fieldLabel } from './fieldLabel.ts';
+import { chooseOption } from './select.ts';
 
 // Editor de conteúdo (#45) contra o ambiente local semeado: o editor cria um artigo com
 // texto, imagem e FAQ e o acha na lista; o revisor não grava nada. Lista com 2.000
@@ -27,7 +28,7 @@ async function loginAs(page: Page, email: string): Promise<void> {
 }
 
 async function addBlock(page: Page, type: string): Promise<void> {
-  await page.getByLabel('Tipo do novo bloco').selectOption({ label: type });
+  await chooseOption(page.getByRole('combobox', { name: 'Tipo do novo bloco' }), type);
   await page.getByRole('button', { name: 'Adicionar bloco' }).click();
 }
 

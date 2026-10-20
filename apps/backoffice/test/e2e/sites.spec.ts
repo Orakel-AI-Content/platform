@@ -125,6 +125,19 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   await tabTo(page, page.getByRole('radio', { name: /Editorial claro/ }));
   await page.keyboard.press('Space');
   await expect(page.getByRole('radio', { name: /Editorial claro/ })).toBeChecked();
+  // Preset (#330): o Select do Ecme, ligado ao rótulo do FormItem, abre na seta e escolhe no
+  // Enter a opção em foco (a atual, que segue no valor).
+  const home = page.getByRole('combobox', { name: fieldLabel('Preset da página Home') });
+  const current = await page
+    .locator('.select', { has: home })
+    .locator('.select-single-value')
+    .textContent();
+  await tabTo(page, home);
+  await page.keyboard.press('ArrowDown');
+  await expect(home).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('option', { name: current ?? '' })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(home).toHaveAttribute('aria-expanded', 'false');
   await tabTo(page, page.getByRole('button', { name: 'Cadastrar site' }));
   await page.keyboard.press('Enter');
 
@@ -184,37 +197,10 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   ).toBeVisible();
 });
 
-test('preset fora dos recursos é recusado com a mensagem do domínio', async ({ page }) => {
-  const siteId = `e2e-preset-${Date.now()}`;
-  created.push(siteId);
-  await loginAs(page, 'operacao@orakel.local');
-  await page.goto('/sites/novo');
-  await page.getByLabel(fieldLabel('ID')).fill(siteId);
-  await page.getByLabel(fieldLabel('Nome')).fill('Preset forçado');
-  await page.getByRole('textbox', { name: 'Domínios' }).fill(`${siteId}.example.com`);
-  await page.getByRole('radio', { name: /Editorial claro/ }).check();
-  // Valor forçado: uma opção que RESOURCES não lista.
-  const home = page.getByLabel('Preset da página Home');
-  await home.evaluate((select: HTMLSelectElement) => {
-    select.add(new Option('inexistente', 'inexistente'));
-  });
-  await home.selectOption('inexistente');
-  await page.getByRole('button', { name: 'Cadastrar site' }).click();
-
-  // O erro fica no campo (descrição acessível), além do resumo de erros do formulário.
-  await expect(page.getByLabel('Preset da página Home')).toHaveAccessibleDescription(
-    /Preset "inexistente" de home não é suportado/,
-  );
-  await expect(home).toHaveAttribute('aria-invalid', 'true');
-  await expect(home).toBeFocused();
-  await expect(
-    page.getByRole('alert').filter({ hasText: 'Não foi possível salvar' }),
-  ).toBeVisible();
-  // A mensagem do FormItem (#245) entra com transição de opacidade, que mistura a cor do texto
-  // com o fundo; o axe roda depois dela.
-  await expect(page.locator('.form-explain')).toHaveCSS('opacity', '1');
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
-});
+// Preset fora dos recursos (#330): o Select do Ecme não aceita injetar uma opção pela página,
+// como o `<select>` nativo aceitava. A recusa do domínio fica em `src/app/(admin)/sites/actions.test.ts`,
+// o caminho até o campo (foco, `aria-invalid`, descrição) em `SiteConfigForm.test.tsx` e o
+// Select inválido no FormItem, com o axe, na vitrine (`components.spec.ts`).
 
 // Formulário no visual do Ecme (#245): cadastro e configuração sem violação do axe nos dois
 // temas, com as seções em Card e os campos do FormItem.

@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { fieldLabel } from './fieldLabel.ts';
+import { chooseOption } from './select.ts';
 
 // Fila de revisão (#74) contra o ambiente local semeado: o editor cria um artigo, envia pela
 // página do conteúdo e o encontra na fila; o revisor vê a fila mas não o botão de enviar.
@@ -18,11 +19,8 @@ async function createDraft(page: Page, title: string, slug: string): Promise<str
   await page.goto('/sites/exemplo-a/conteudos/novo');
   await page.getByLabel(fieldLabel('Título')).fill(title);
   await page.getByLabel('Slug').fill(slug);
-  await page
-    .getByRole('group', { name: 'Autores' })
-    .getByRole('checkbox', { name: 'Ana Souza' })
-    .check();
-  await page.getByLabel('Tipo do novo bloco').selectOption({ label: 'Texto' });
+  await chooseOption(page.getByRole('combobox', { name: fieldLabel('Autores') }), 'Ana Souza');
+  await chooseOption(page.getByRole('combobox', { name: 'Tipo do novo bloco' }), 'Texto');
   await page.getByRole('button', { name: 'Adicionar bloco' }).click();
   await page.getByRole('textbox', { name: 'Texto', exact: true }).click();
   await page.keyboard.type('Parágrafo para revisão.');
