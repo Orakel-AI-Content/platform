@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { currentActor } from '@/auth/request-actor.ts';
 import CollapsibleSide from '@/components/layouts/CollapsibleSide';
 import { NavigationIndicator } from '@/components/shared/NavigationIndicator';
+import { NoAccessScreen } from '@/components/shared/NoAccessScreen';
 import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
 import ThemeSwitcher from '@/components/template/ThemeSwitcher';
 import UserProfileDropdown from '@/components/template/UserProfileDropdown';
@@ -21,12 +22,16 @@ import { readVisibleSites } from './visible-sites.ts';
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const actor = await currentActor();
   if (!actor.ok) {
+    // Sem a moldura: o <main> dá a altura, os gutters e centraliza a tela de estado.
     return (
-      <main className="mx-auto max-w-xl p-8">
-        <h1 className="text-xl font-semibold">Sem acesso</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Sua identidade não tem acesso ao Backoffice. Peça a uma pessoa administradora.
-        </p>
+      <main
+        className={classNames(
+          'flex min-h-screen flex-col justify-center bg-gray-100 dark:bg-gray-950',
+          PAGE_CONTAINER_GUTTER_X,
+          PAGE_CONTAINER_GUTTER_Y,
+        )}
+      >
+        <NoAccessScreen />
       </main>
     );
   }
@@ -53,15 +58,16 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           </>
         }
       >
-        {/* tabIndex -1: a âncora do skip link leva o foco até aqui, não só a rolagem. */}
+        {/* tabIndex -1: a âncora do skip link leva o foco até aqui, não só a rolagem. Sem
+            anel de foco: o <main> só recebe foco programático do skip link, e o anel contornaria
+            a página inteira; o foco visível segue no próximo Tab. */}
         <main
           id="conteudo"
           tabIndex={-1}
           className={classNames(
-            'flex-auto bg-gray-100 dark:bg-gray-950',
+            'flex-auto bg-gray-100 focus-visible:outline-none dark:bg-gray-950',
             PAGE_CONTAINER_GUTTER_X,
             PAGE_CONTAINER_GUTTER_Y,
-            'focus-visible:outline-none',
           )}
         >
           {children}
