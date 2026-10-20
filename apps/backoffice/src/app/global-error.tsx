@@ -3,6 +3,8 @@
 import { useLayoutEffect } from 'react';
 
 import { ErrorScreen } from '@/components/shared/ErrorScreen';
+import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
+import classNames from '@/components/ui/utils/classNames';
 import { applyStoredTheme, THEME_COOKIE_SCRIPT } from '@/configs/theme.config';
 
 import './globals.css';
@@ -29,13 +31,14 @@ export default function GlobalError({
       </head>
       <body className="min-h-screen bg-gray-100 antialiased dark:bg-gray-950">
         <header className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-          <div className="mx-auto flex max-w-6xl items-center px-6 py-3">
+          <div className={classNames('flex items-center py-3', PAGE_CONTAINER_GUTTER_X)}>
             <span className="font-semibold text-gray-900 dark:text-gray-100">
               Orakel Backoffice
             </span>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-6 py-8">
+        {/* Gutters da moldura, como o <main> do layout de (admin), sem largura máxima. */}
+        <main className={classNames(PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y)}>
           <ErrorScreen digest={error.digest} retry={retry} />
         </main>
       </body>
