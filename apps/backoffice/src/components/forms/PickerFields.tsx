@@ -157,7 +157,7 @@ export function entityField(options: readonly PickerOption[], empty: string): Fi
     const selected = new Set(Array.isArray(value) ? (value as number[]) : []);
     if (options.length === 0) {
       return (
-        <p id={id} className="text-sm text-gray-600 dark:text-gray-400">
+        <p id={id} className="text-sm">
           {empty}
         </p>
       );

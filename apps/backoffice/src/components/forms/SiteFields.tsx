@@ -111,9 +111,7 @@ function FlagsField({ id, label, value, onChange, invalid, describedBy, ref }: F
       aria-describedby={describedBy}
       className="space-y-3"
     >
-      {rows.length === 0 && (
-        <p className="text-sm text-gray-600 dark:text-gray-400">Nenhum recurso configurado.</p>
-      )}
+      {rows.length === 0 && <p className="text-sm">Nenhum recurso configurado.</p>}
       {rows.map((row, index) => (
         <div key={row.key} className="flex flex-wrap items-center gap-3">
           <Input
@@ -247,7 +245,7 @@ export function themeField(themes: readonly ThemeSummary[]): FieldRenderer {
               </span>
               <span className="flex flex-col">
                 <span className="font-medium">{theme.name}</span>
-                <span className="text-gray-600 dark:text-gray-400">{theme.id}</span>
+                <span>{theme.id}</span>
               </span>
             </span>
           </Radio>

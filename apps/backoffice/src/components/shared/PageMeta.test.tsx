@@ -22,8 +22,8 @@ describe('linha de metadados', () => {
     expect(separators).toHaveLength(2);
     expect([...separators].every((separator) => separator.textContent === '·')).toBe(true);
     expect(line.className).toContain('text-sm');
-    expect(line.className).toContain('text-gray-600');
-    expect(line.className).toContain('dark:text-gray-400');
+    // O cinza vem do body (#398): sem cor própria.
+    expect(line.className).not.toMatch(/text-gray-/);
   });
 
   it('aceita a StateTag como item e ignora os vazios sem sobrar separador', () => {

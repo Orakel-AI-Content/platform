@@ -45,7 +45,7 @@ const UserProfileDropdown = ({ email, roles }: UserProfileDropdownProps) => {
           <Avatar {...avatarProps} />
           <div>
             <div className="font-bold text-gray-900 dark:text-gray-100">{email}</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">{roleList}</div>
+            <div className="text-xs">{roleList}</div>
           </div>
         </div>
       </Dropdown.Item>

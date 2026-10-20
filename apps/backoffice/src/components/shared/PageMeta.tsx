@@ -24,7 +24,7 @@ export function PageMeta({
   return (
     <div
       className={classNames(
-        'flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600 wrap-anywhere dark:text-gray-400',
+        'flex flex-wrap items-center gap-x-2 gap-y-1 text-sm wrap-anywhere',
         className,
       )}
     >

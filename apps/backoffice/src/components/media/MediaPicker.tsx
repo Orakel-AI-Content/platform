@@ -95,7 +95,7 @@ export function MediaPicker({
       <Dialog isOpen={open} onClose={close} aria={{ labelledby: `${id}-title` }}>
         <div className="space-y-4">
           <h4 id={`${id}-title`}>Escolher imagem</h4>
-          <p role="status" className="text-sm text-gray-600 dark:text-gray-400">
+          <p role="status" className="text-sm">
             {status}
           </p>
           {shown && shown.items.length > 0 && (

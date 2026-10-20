@@ -270,9 +270,7 @@ export function UploadList({
           {entries.map((entry) => (
             <li key={entry.id} className="flex flex-wrap items-center gap-x-2">
               <span className="font-medium break-all">{entry.name}</span>
-              <span className={STATE_COLOR[entry.state.kind] ?? 'text-gray-600 dark:text-gray-400'}>
-                {entryLabel(entry.state)}
-              </span>
+              <span className={STATE_COLOR[entry.state.kind]}>{entryLabel(entry.state)}</span>
               {entry.state.kind === 'enviando' && (
                 <Progress
                   className="basis-full"
