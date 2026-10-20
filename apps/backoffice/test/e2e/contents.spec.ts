@@ -150,7 +150,7 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveValue('Funciona offline?');
 
   // Sem texto alternativo nem decorativa: recusado com a mensagem junto do campo.
-  await page.getByRole('button', { name: 'Criar conteúdo' }).click();
+  await page.getByRole('button', { name: 'Criar', exact: true }).click();
   const alt = page.getByRole('textbox', { name: 'Texto alternativo' });
   await expect(alt).toHaveAttribute('aria-invalid', 'true');
   await expect(alt).toHaveAccessibleDescription(
@@ -186,7 +186,7 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
   expect(accessibility.violations).toEqual([]);
 
   await alt.fill('Mesa organizada');
-  await page.getByRole('button', { name: 'Criar conteúdo' }).click();
+  await page.getByRole('button', { name: 'Criar', exact: true }).click();
 
   // Fica no editor do conteúdo criado (#109), com a confirmação no toast, fora do main (#326).
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos\/\d+\/editar$/);
@@ -549,7 +549,7 @@ test.describe('barra de ações do editor (#109)', () => {
     await loginAs(page, 'editor@orakel.local');
     const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
     await page.goto(editPath);
-    const save = page.getByRole('button', { name: 'Salvar nova versão' });
+    const save = page.getByRole('button', { name: 'Salvar', exact: true });
 
     for (const position of [0, 0.5, 1]) {
       await page.evaluate((fraction) => {
@@ -623,7 +623,7 @@ test.describe('barra de ações do editor (#109)', () => {
     await expect(titleField).toHaveValue(`${title} (rascunho)`);
 
     // Depois de salvar, nenhuma pergunta: o link navega direto.
-    await page.getByRole('button', { name: 'Salvar nova versão' }).click();
+    await page.getByRole('button', { name: 'Salvar', exact: true }).click();
     await expect(toastRegion(page)).toContainText(/Versão \d+ salva\./);
     page.on('dialog', (dialog) => {
       dialogs.push(`inesperado: ${dialog.type()}`);
@@ -675,7 +675,7 @@ test.describe('barra de ações do editor (#109)', () => {
       expect(await control.evaluate((el) => el.closest('.card') !== null)).toBe(true);
     }
     // A barra encosta nas bordas do main, com os três botões na mesma altura.
-    const save = page.getByRole('button', { name: 'Salvar nova versão' });
+    const save = page.getByRole('button', { name: 'Salvar', exact: true });
     const bar = page.locator('.sticky').filter({ has: save });
     const main = await page.locator('main').boundingBox();
     const barBox = await bar.boundingBox();
@@ -768,7 +768,7 @@ test.describe('barra de ações do editor (#109)', () => {
       await loginAs(page, 'editor@orakel.local');
       await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
       await page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true }).click();
-      await expect(page.getByRole('button', { name: 'Salvar nova versão' })).toBeInViewport();
+      await expect(page.getByRole('button', { name: 'Salvar', exact: true })).toBeInViewport();
       await page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true }).click();
       await expect(page.getByRole('menu')).toBeVisible();
       // O menu entra com transição de opacidade (mesmo com movimento reduzido); o axe audita

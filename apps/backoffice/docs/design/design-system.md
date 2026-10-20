@@ -380,8 +380,9 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   janela) fica à esquerda do envio, não passa pelo schema e tem o mesmo retorno do envio (toast,
   erro de campo ou resumo). O cartão é o da seção inteira: sem permissão para o formulário, a
   página mostra a mesma introdução num `Card` só de leitura; na revisão, o checklist tem o seu
-  próprio cartão, separado do da validação. Durante o envio o botão fica desabilitado e mostra `pendingLabel` ("Salvando…" por padrão; "Cadastrando…",
-  "Criando…", "Aprovando…" por quem chama), sem segundo envio. Quem fica na tela confirma
+  próprio cartão, separado do da validação. Durante o envio o botão fica desabilitado e mostra `pendingLabel` (ver "Formulário:
+  rótulos, estrutura e espaçamento"), sem segundo envio; a ação secundária do cartão mostra o
+  seu (`card.extra.pendingLabel`) enquanto roda. Quem fica na tela confirma
   devolvendo `{ success: mensagem }`, que vai para o toast do retorno padrão (`pushSuccess`,
   ver "Retorno das ações"), como a aprovação na revisão. Quem sai da tela também confirma no
   toast, que vive no layout raiz: criar autor, taxonomia ou menu chama `pushSuccess` antes de
@@ -409,6 +410,22 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   texto, feature flags e opções de `RESOURCES`: `linesField`, `flagsField` e `choiceField`
   (`src/components/forms/SiteFields.tsx`). Nenhum formulário é escrito à mão: o da
   configuração do site também usa o gerador (#47).
+- **Formulário: rótulos, estrutura e espaçamento:** regra única de todo formulário (#334).
+  **Envio:** o formulário de tela envia com "Criar" na criação e "Salvar" na edição, sem
+  complemento, como o "Create"/"Save" do `CustomerCreate`/`CustomerEdit` do Ecme; o objeto já
+  está no título da tela ("Cadastrar site", "Criar conteúdo"), que não muda. O formulário em
+  cartão dentro de outra tela e a ação de domínio usam o verbo do que acontece: "Registrar
+  G1", "Aprovar", "Usar padrão", "Enviar para revisão", "Marcar zona ativa"; a janela de
+  agrupamento, que só grava um valor, envia com "Salvar". **Pendência:** é sempre o rótulo
+  inteiro no gerúndio, com reticências: "Criando…", "Salvando…", "Registrando G1…",
+  "Aprovando…", "Usando padrão…", "Enviando para revisão…", "Marcando zona ativa…"; todo
+  botão que roda uma ação tem pendência, inclusive a ação secundária do cartão.
+  **Estrutura:** a tela que é um formulário inteiro tem os campos em `Card`s e a barra fixa
+  (`BottomStickyBar`, com "Descartar" ou "Voltar" e o envio); o formulário dentro de outra
+  tela (G1, janela, checklist da revisão) é a exceção: um `Card` só, com os botões no rodapé
+  dele e sem barra fixa (ver o `SchemaForm` acima). **Espaçamento:** a `section` da tela de
+  formulário e a coluna `form-width` usam `space-y-4`, o mesmo passo do `gap-4` da coluna de
+  cartões; nenhuma tela de formulário usa outro.
 - **Rich text:** TipTap só com o que o `RichTextSchema` aceita (`src/components/forms/`).
   Registre `richTextField('richText')` para texto e textos institucionais, e
   `richTextField('inlines')` (um parágrafo, sem intertítulo nem lista) para citação, resposta

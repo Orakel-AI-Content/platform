@@ -128,6 +128,22 @@ describe('DateTimepicker', () => {
     expect(lastIso(onChange)).toBe('2026-07-15T17:00:00.000Z');
   });
 
+  it('dentro de um formulário, o OK fecha o painel sem enviar o formulário', async () => {
+    const onSubmit = vi.fn((event: SubmitEvent) => event.preventDefault());
+    render(
+      <form onSubmit={(event) => onSubmit(event.nativeEvent)}>
+        <FormItem label="Publicação">
+          <DateTimepicker defaultValue={new Date('2026-07-15T12:00:00Z')} timeZone={LISBOA} />
+        </FormItem>
+      </form>,
+    );
+
+    await typeHours('18');
+    await userEvent.click(screen.getByRole('button', { name: 'OK' }));
+    expect(panel()).toBeNull();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('valor controlado: o onChange recebe o instante e o campo segue a prop', async () => {
     const onChange = vi.fn();
     const { rerender } = renderPicker({

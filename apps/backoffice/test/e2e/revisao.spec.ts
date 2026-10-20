@@ -24,7 +24,7 @@ async function createDraft(page: Page, title: string, slug: string): Promise<str
   await page.getByRole('button', { name: 'Adicionar bloco' }).click();
   await page.getByRole('textbox', { name: 'Texto', exact: true }).click();
   await page.keyboard.type('Parágrafo para revisão.');
-  await page.getByRole('button', { name: 'Criar conteúdo' }).click();
+  await page.getByRole('button', { name: 'Criar', exact: true }).click();
   // Depois de criar, o editor continua aberto no conteúdo criado (#109).
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos\/\d+\/editar$/);
   // As versões, pela trilha (#174): o título do conteúdo leva a elas.

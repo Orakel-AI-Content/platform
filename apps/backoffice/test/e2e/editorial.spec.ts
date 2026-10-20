@@ -255,6 +255,8 @@ test('editor edita um item do menu e o vê na lista', async ({ page }) => {
 
 test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   const text = `Quem somos, revisto em ${Date.now()}.`;
+  // Sem a animação do toast, o axe audita a confirmação já em repouso.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await loginAs(page, 'editor@orakel.local');
   await page.goto('/sites/exemplo-a');
   await page
@@ -267,7 +269,7 @@ test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   await page.keyboard.press('ControlOrMeta+A');
   await page.keyboard.type(text);
   await expectNoViolations(page);
-  await page.getByRole('button', { name: 'Salvar textos' }).click();
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click();
 
   await expect(page.getByRole('status').filter({ hasText: 'Textos salvos.' })).toBeVisible();
   await expectNoViolations(page);

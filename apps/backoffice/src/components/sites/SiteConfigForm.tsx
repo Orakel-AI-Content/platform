@@ -154,8 +154,8 @@ export function SiteConfigForm({
       sideBySide={SITE_CONFIG_SIDE_BY_SIDE}
       actionBar={{ kind: mode, href: backHref }}
       contentClassName={contentClassName}
-      submitLabel={mode === 'create' ? 'Cadastrar site' : 'Salvar configuração'}
-      pendingLabel={mode === 'create' ? 'Cadastrando…' : 'Salvando…'}
+      submitLabel={mode === 'create' ? 'Criar' : 'Salvar'}
+      pendingLabel={mode === 'create' ? 'Criando…' : 'Salvando…'}
       onSubmit={async (config) => {
         const result = await action(config);
         if (!result.ok) return [...result.issues, { path: [], message: result.message }];

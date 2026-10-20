@@ -112,10 +112,10 @@ export type ContentEditorOptions = {
   taxonomies: readonly PickerOption[];
 };
 
-/** Rótulo do envio, parado e durante o envio (#332: criar diz "Criando…"). */
+/** Rótulo do envio, parado e durante o envio: "Criar"/"Salvar" e o gerúndio (#334). */
 const SUBMIT_LABEL = {
-  create: { idle: 'Criar conteúdo', pending: 'Criando…' },
-  edit: { idle: 'Salvar nova versão', pending: 'Salvando…' },
+  create: { idle: 'Criar', pending: 'Criando…' },
+  edit: { idle: 'Salvar', pending: 'Salvando…' },
 } as const;
 
 /** Por quanto tempo o "Desfazer" da remoção de bloco fica disponível no toast (#112). */
