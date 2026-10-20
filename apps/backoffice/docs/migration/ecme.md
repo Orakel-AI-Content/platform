@@ -60,7 +60,7 @@ ThemeConfigurator completo.
 | `src/views/<área>/<Tela>/components/*`                                                                     | `src/components/<área>/` (`contents/`, `editorial/`, `forms/`, `media/`, `review/`, `sites/`), componentes de uma tela só, chamados pelas rotas de `src/app/` |
 | `src/configs/navigation.config/*`, `navigation-icon.config.tsx`                                            | `src/configs/navigation.config.ts` (áreas globais e do site) e `src/configs/navigation-icon.config.tsx`                                                       |
 | `src/configs/theme.config.ts`, `store/themeStore.ts`                                                       | `src/configs/theme.config.ts` + cookie de tema (sem zustand para o tema, se o cookie bastar)                                                                  |
-| `src/assets/styles/{tailwind,components,template}/*`                                                       | `src/app/globals.css` (`@theme`) e `src/app/styles/` com as classes de componente em `@layer components`                                                      |
+| `src/assets/styles/{tailwind,components,template}/*`                                                       | `src/app/globals.css` (`@theme` e a `@layer base`) e `src/app/styles/` com as classes de componente em `@layer components`                                    |
 | `src/utils/hooks/{useResponsive,useLayout,useMenuActive}`                                                  | não portados                                                                                                                                                  |
 
 ## Regras de porte
@@ -96,6 +96,13 @@ ThemeConfigurator completo.
 
   Par novo de texto ou foco sobre fundo, com ou sem `dark:`, entra em `ECME_PAIRS` do
   `globals-contrast.test.ts` (#217), no tema em que aparece.
+
+- **Camada base:** a `@layer base` do `tailwind/index.css` vem para o `globals.css` (#395) e dá ao
+  texto sem classe própria, aos títulos `h1`–`h6` e ao `hr` o estilo do template; as peças
+  portadas contam com ela (os títulos de Dialog, Drawer e Card são `h4`/`h5` sem classe). Ficam
+  de fora a cor do body, trocada pela substituta da tabela acima, o fundo do body (`bg-neutral`;
+  o `main` pinta `gray-100`) e a regra de `border-color` em `*`, que a preflight do Tailwind 4
+  já cobre. A `.heading-text` vem da `@layer components` do mesmo arquivo.
 
 - **Acessibilidade (não negociável):**
   - landmarks: `banner` com o e-mail e os papéis, `main#conteudo`, `nav "Principal"`,

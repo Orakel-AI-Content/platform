@@ -38,7 +38,8 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   `primary`, `info`, `error`, `success` e `warning` são escurecidos no mesmo tom até 4,5:1 com
   branco; o `.dark` devolve os valores originais do Ecme. A escala `gray`, o `neutral` e os
   `-subtle` são iguais nos dois temas: o escuro sai das variantes `dark:`, como no template
-  (fundo da página `bg-neutral dark:bg-gray-950`, texto `text-gray-900 dark:text-gray-100`).
+  (fundo da página `bg-neutral dark:bg-gray-950`, texto do body `text-gray-600 dark:text-gray-400`,
+  títulos `text-gray-900 dark:text-gray-100`).
 - **Pares de contraste:** todo par de texto chega a 4,5:1 e o foco a 3:1, nos dois temas. O
   `src/app/globals-contrast.test.ts` lê os tokens do `globals.css` e reprova o par que não
   chegar: `PAIRS` com os tokens e `ECME_PAIRS` com as classes como os componentes os combinam.
@@ -79,12 +80,35 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   cabeçalho (`src/components/template/ThemeSwitcher.tsx`), que grava ou apaga o cookie e troca a
   classe na hora. Sem zustand nem localStorage para o tema. O E2E `theme.spec.ts` confere que
   nenhum quadro sai no tema oposto.
+- **Camada base:** a `@layer base` do `globals.css`, portada do `tailwind/index.css` do
+  template, estiliza o que não tem classe própria: o body em `text-sm font-medium
+leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` (a substituta
+  AA do `gray-500` do Ecme); `h1`–`h6` e `.h1`–`.h6` na escala abaixo; `button` e
+  `[role=button]` com `cursor: pointer`; `hr` em `border-gray-200 dark:border-gray-600`. A
+  `.heading-text` (`@layer components`) dá a cor de título a texto que não é título. Por estar
+  em layer, uma utility da tela sempre vence a base. O `globals-tokens.test.ts` compila o
+  `globals.css` e confere a camada.
 - **Tipografia:** Inter do Ecme, auto-hospedada por `next/font/local` (`src/app/fonts/`), no
-  `--font-sans`. Escala de quatro tamanhos: título da página (`h1`) em `text-2xl font-bold`,
-  como os títulos do template; seção (`h2`) em `text-lg font-semibold`; corpo em `text-sm`,
-  inclusive rótulos, dicas e erros de campo e mensagens de status de uma ação; auxiliar em
-  `text-xs`, só para tags e legendas (data sob uma tag, legenda de imagem). Texto de campo nunca
-  fica menor que o corpo. Contagens e páginas usam números tabulares (`tabular-nums`).
+  `--font-sans`. Escala dos títulos do template, pela base, todos em
+  `text-gray-900 dark:text-gray-100`:
+
+  | Título      | Classes                   | Onde                             |
+  | ----------- | ------------------------- | -------------------------------- |
+  | `h1`, `.h1` | `text-4xl font-bold`      | —                                |
+  | `h2`, `.h2` | `text-3xl font-bold`      | —                                |
+  | `h3`, `.h3` | `text-2xl font-bold`      | título da página                 |
+  | `h4`, `.h4` | `text-xl font-bold`       | Drawer, Card e diálogos de mídia |
+  | `h5`, `.h5` | `text-lg font-bold`       | Dialog e ConfirmDialog           |
+  | `h6`, `.h6` | `text-base font-semibold` | —                                |
+
+  Nas telas: o título da página é um `h1` (um por página) com o tamanho do `h3` do template,
+  `text-2xl font-bold`, como no `PageHeader`; seção (`h2`) em `text-lg font-semibold`; corpo
+  em `text-sm`, o da base, inclusive rótulos, dicas e erros de campo e mensagens de status de
+  uma ação; auxiliar em `text-xs`, só para tags e legendas (data sob uma tag, legenda de
+  imagem). Os títulos de Dialog, ConfirmDialog, Drawer e Card não levam classe de tamanho: vêm
+  da base. Texto de campo nunca fica menor que o corpo. Contagens e páginas usam números
+  tabulares (`tabular-nums`).
+
 - **Foco:** uma regra global `:focus-visible` (`@layer base` do `globals.css`) desenha o
   contorno `ring` de 2px, afastado 2px, em todo elemento focável: links, botões, campos e o
   editor de rich text. Componentes não repetem classes de foco (`focus-visible:outline-*`);
