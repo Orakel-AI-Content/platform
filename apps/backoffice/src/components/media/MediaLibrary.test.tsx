@@ -1,17 +1,21 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ComponentProps } from 'react';
 
+import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp.ts';
 import { MediaLibrary, type MediaItem } from './MediaLibrary.tsx';
 import type { MediaPickerPage } from './MediaPicker.tsx';
 import type { SendFile } from './UploadQueue.tsx';
 
 // Biblioteca de mídia (#52, #186): envio pela rota, "processando" até o total da página
 // crescer, recusa com o motivo, grade sem envio para quem não edita, nome e data de cada
-// imagem no fuso do site, e busca e página pela URL (`useListState`).
+// imagem no fuso do site, e busca e página pela URL (`useListState`). O envio é pelo diálogo
+// "Enviar imagens" (#376); soltar sobre a grade não envia.
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
 const search = vi.hoisted(() => ({ value: '' }));
@@ -21,8 +25,26 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search.value),
 }));
 
+let app: HTMLElement;
+
+beforeAll(() => {
+  // O happy-dom rejeita a animação nativa que o motion cancela ao desmontar.
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
+
+beforeEach(() => {
+  app = document.createElement('div');
+  app.id = APP_ELEMENT_ID;
+  document.body.append(app);
+  Modal.setAppElement(app);
+});
+
 afterEach(() => {
   cleanup();
+  app.remove();
   vi.clearAllMocks();
   search.value = '';
 });
@@ -60,7 +82,19 @@ function renderLibrary(props: Partial<Props> & Pick<Props, 'items' | 'canWrite' 
       pollMs={5}
       {...props}
     />,
+    { container: app },
   );
+}
+
+/** Abre o diálogo de envio e devolve o campo de arquivo da área de soltar. */
+async function openUpload(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Enviar imagens' }));
+  const dialog = screen.getByRole('dialog', { name: 'Enviar imagens' });
+  return within(dialog).getByLabelText<HTMLInputElement>(/^Solte as imagens aqui/);
+}
+
+async function expectUploadClosed() {
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 }
 
 describe('biblioteca de mídia', () => {
@@ -86,10 +120,9 @@ describe('biblioteca de mídia', () => {
     const refresh = vi.fn(() => Promise.resolve(pageOf([item(1), item(2)])));
     renderLibrary({ items: [item(1)], canWrite: true, refresh, uploadStatus, send });
 
-    const input = screen.getByLabelText(/^Imagens \(JPEG/);
-    expect(input.hasAttribute('multiple')).toBe(true);
+    const input = await openUpload(user);
     await user.upload(input, [image(), new File(['x'], 'texto.jpg', { type: 'image/jpeg' })]);
-    await user.click(screen.getByRole('button', { name: 'Enviar imagens' }));
+    await expectUploadClosed();
 
     const uploads = screen.getByRole('list', { name: 'Envios' });
     await waitFor(() =>
@@ -105,20 +138,18 @@ describe('biblioteca de mídia', () => {
     expect(refresh).toHaveBeenCalledWith('exemplo-a', 1, '');
   });
 
-  it('o campo de envio é obrigatório, aceita várias imagens e só os formatos da rota', () => {
+  it('"Enviar imagens" abre o diálogo com o campo que aceita várias imagens dos formatos da rota', async () => {
+    const user = userEvent.setup();
     renderLibrary({ items: [], canWrite: true, refresh: vi.fn(() => Promise.resolve(null)) });
 
-    const input = screen.getByLabelText<HTMLInputElement>(/^Imagens \(JPEG/);
+    const input = await openUpload(user);
     expect(input.type).toBe('file');
-    expect(input.required).toBe(true);
     expect(input.multiple).toBe(true);
     expect(input.accept).toBe('image/jpeg,image/png,image/webp,image/avif');
-    expect(screen.getByRole('button', { name: 'Enviar imagens' }).getAttribute('type')).toBe(
-      'submit',
-    );
   });
 
-  it('arrastar arquivos destaca a área de soltar; soltar envia', async () => {
+  it('soltar sobre a biblioteca não envia; soltar na área do diálogo põe na fila, que fica à vista', async () => {
+    const user = userEvent.setup();
     const send = vi.fn<SendFile>(() => new Promise(() => undefined));
     const { container } = renderLibrary({
       items: [],
@@ -126,15 +157,20 @@ describe('biblioteca de mídia', () => {
       refresh: vi.fn(() => Promise.resolve(null)),
       send,
     });
-    const area = container.firstElementChild as HTMLElement;
+    const library = container.firstElementChild as HTMLElement;
     const dataTransfer = { types: ['Files'], files: [image()] };
 
-    fireEvent.dragOver(area, { dataTransfer });
-    expect(area.dataset.dragging).toBe('true');
-    expect(area.className).toContain('border-primary');
-    fireEvent.drop(area, { dataTransfer });
+    fireEvent.dragOver(library, { dataTransfer });
+    fireEvent.drop(library, { dataTransfer });
+    expect(library.className).not.toContain('border-primary');
+    expect(send).not.toHaveBeenCalled();
 
-    expect(area.dataset.dragging).toBeUndefined();
+    // Soltar sobre o campo que cobre a área: o navegador põe os arquivos nele e dispara change.
+    const input = await openUpload(user);
+    fireEvent.drop(input.parentElement as HTMLElement, { dataTransfer });
+    fireEvent.change(input, { target: { files: [image()] } });
+
+    await expectUploadClosed();
     await waitFor(() => expect(send).toHaveBeenCalledOnce());
     expect(screen.getByRole('list', { name: 'Envios' }).textContent).toContain('foto.jpg');
   });
@@ -146,8 +182,8 @@ describe('biblioteca de mídia', () => {
       refresh: vi.fn(() => Promise.resolve(null)),
     });
 
-    expect(screen.queryByLabelText(/Imagem \(JPEG/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Enviar imagem' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Enviar imagens' })).toBeNull();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
     const list = screen.getByRole('list', { name: 'Imagens do site' });
     const img = list.querySelector('img');
     expect(img?.getAttribute('src')).toBe('https://media.exemplo-a.test/exemplo-a/h1-320.webp');
