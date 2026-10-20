@@ -18,6 +18,9 @@ import {
 } from '@/components/sites/SiteStatus';
 import { ActionAlert, pushSuccess, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { ROW_LINK_CLASS } from '@/components/shared/rowLink.ts';
+import { Truncated } from '@/components/shared/Truncated';
+import { TwoLines } from '@/components/shared/TwoLines';
 import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
 import Dropdown from '@/components/ui/Dropdown';
 import Table from '@/components/ui/Table';
@@ -35,25 +38,6 @@ const { THead, TBody, Tr, Th, Td } = Table;
  */
 const ACTIONS_TOGGLE_CLASS =
   'button h-8 rounded-lg px-3 py-1 text-xs bg-white border border-gray-300 text-gray-600 dark:bg-gray-700 dark:border-gray-700 dark:text-gray-100 ring-primary dark:ring-white hover:border-primary dark:hover:border-white hover:ring-1 hover:text-primary dark:hover:text-white dark:hover:bg-transparent';
-
-/** Duas linhas numa célula: a principal e a secundária, menor; nenhuma quebra além delas. */
-function TwoLines({ children, secondary }: { children: ReactNode; secondary?: ReactNode }) {
-  return (
-    <span className="flex flex-col items-start gap-0.5">
-      <span>{children}</span>
-      {secondary !== undefined && <span className="text-xs">{secondary}</span>}
-    </span>
-  );
-}
-
-/** Texto cortado numa largura máxima, com o texto inteiro em `title`. */
-function Truncated({ text, className }: { text: string; className: string }) {
-  return (
-    <span title={text} className={classNames('block truncate', className)}>
-      {text}
-    </span>
-  );
-}
 
 /** Último build: a lista mistura fusos, cada linha com a sigla; data e versão cortadas. */
 function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; timeZone: string }) {
@@ -78,7 +62,7 @@ const columns = column.columns([
           <Link
             href={`/sites/${site.id}`}
             title={site.name}
-            className="block max-w-40 truncate font-semibold text-gray-900 underline underline-offset-4 hover:text-primary dark:text-gray-100"
+            className={classNames('block max-w-40 truncate', ROW_LINK_CLASS)}
           >
             {site.name}
           </Link>
