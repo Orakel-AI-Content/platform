@@ -59,7 +59,7 @@ test('site inexistente leva a Sites; item inexistente leva ao site; os dois com 
   expect(missingContent?.status()).toBe(404);
   await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
   await expect(page.getByRole('banner')).toContainText(OPERATOR);
-  await page.getByRole('link', { name: `Ir para o site ${SITE}` }).click();
+  await page.getByRole('link', { name: `Ir para o site ${SITE_NAME}` }).click();
   await expect(page).toHaveURL(new RegExp(`/sites/${SITE}$`));
   await expect(page.getByRole('heading', { level: 1 })).toContainText(SITE_NAME);
 });
