@@ -10,8 +10,9 @@ import {
 } from '@/components/editorial/entityConfig.ts';
 import { EntityForm, type EntityFormResult } from '@/components/editorial/EntityForms';
 import { EntityTable } from '@/components/editorial/EntityTable';
+import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { ListHeader, PageHeader, PageTrail } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 import { withoutId } from '@/components/shared/withoutId.ts';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
@@ -75,7 +76,10 @@ const ROUTES: {
   menu: { read: readMenus, create: createMenuAction, update: updateMenuAction, media: false },
 };
 
-/** Lista do tipo, com busca e paginação quando há (#108); criar e editar só com content.write. */
+/**
+ * Lista do tipo, com busca e paginação (#108); criar e editar só com content.write. No padrão
+ * do template (#363): a trilha acima do cartão; título, ação, toolbar e tabela dentro dele.
+ */
 export function editorialListPage<K extends EntityKind>(kind: K): EditorialPage<SiteParams> {
   const config = ENTITY_CONFIG[kind];
   const routes = ROUTES[kind];
@@ -97,21 +101,23 @@ export function editorialListPage<K extends EntityKind>(kind: K): EditorialPage<
 
     return (
       <section aria-labelledby={titleId} className="list-width space-y-4">
-        <PageHeader
-          id={titleId}
-          trail={siteTrail(site, config.area)}
-          title={config.area}
-          action={create}
-        />
-        <EntityTable
-          basePath={`/sites/${site.id}/${config.segment}`}
-          headers={config.list.headers}
-          rows={items.value.map((item) => config.list.row(item))}
-          noun={config.list.noun}
-          search={config.list.search}
-          canWrite={canWrite}
-          emptyAction={create}
-        />
+        <PageTrail items={siteTrail(site, config.area)} />
+        <AdaptiveCard>
+          <div className="flex flex-col gap-4">
+            <ListHeader id={titleId} title={config.area} action={create} />
+            <EntityTable
+              basePath={`/sites/${site.id}/${config.segment}`}
+              headers={config.list.headers}
+              rows={items.value.map((item) => config.list.row(item))}
+              empty={config.list.empty}
+              search={config.list.search}
+              truncated={config.list.truncated}
+              canWrite={canWrite}
+              emptyAction={create}
+              labelledBy={titleId}
+            />
+          </div>
+        </AdaptiveCard>
       </section>
     );
   }
