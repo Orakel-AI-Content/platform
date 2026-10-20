@@ -5,7 +5,6 @@ import { useMemo, type ReactNode } from 'react';
 
 import {
   LIFECYCLE_LABEL,
-  LIFECYCLE_ORDER,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
 } from '@/components/shared/siteLabels.ts';
@@ -35,10 +34,12 @@ import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 const STATES = Object.keys(SITE_STATE_LABEL) as SiteSummary['state'][];
 
-/** Busca por nome, id e domínio, filtro por estado, por nome (#364). */
+/** Busca por nome, id e domínio, filtro por estado, ordem por nome (#364). */
 const LIST: ListConfig = {
   filters: [{ column: 'state', param: 'estado', values: STATES }],
-  sortable: ['name', 'lifecycle', 'state', 'pendingChanges'],
+  // Só Site e Estado: o ícone de ordem alarga o cabeçalho, e a 1280 px a tabela não cabe com
+  // ele em todas as colunas (#248).
+  sortable: ['name', 'state'],
   defaultSort: { id: 'name', desc: false },
   pageSizes: [10, 25, 50, 100],
 };
@@ -49,13 +50,16 @@ function byText(text: (site: SiteSummary) => string) {
     text(a.original).localeCompare(text(b.original), 'pt-BR');
 }
 
-/** Último build: a lista mistura fusos, cada linha com a sigla; data e versão cortadas. */
+/**
+ * Último build: a lista mistura fusos, cada linha com a sigla; data e versão cortadas. Os cortes
+ * desta tabela (nome, motivo, build) cabem a 1280 px dentro do cartão do template (#248, #364).
+ */
 function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; timeZone: string }) {
   return (
     <LastBuildSummary
       build={build}
       timeZone={timeZone}
-      details={(text) => <Truncated text={text} className="max-w-32" />}
+      details={(text) => <Truncated text={text} className="max-w-28" />}
     />
   );
 }
@@ -105,12 +109,12 @@ function columnsFor(
         const site = row.original;
         return (
           <TwoLines
-            secondary={<Truncated text={`${site.id} · ${site.domain}`} className="max-w-40" />}
+            secondary={<Truncated text={`${site.id} · ${site.domain}`} className="max-w-32" />}
           >
             <Link
               href={`/sites/${site.id}`}
               title={site.name}
-              className={classNames('block max-w-40 truncate', ROW_LINK_CLASS)}
+              className={classNames('block max-w-32 truncate', ROW_LINK_CLASS)}
             >
               {site.name}
             </Link>
@@ -122,9 +126,7 @@ function columnsFor(
       header: 'Ciclo de vida',
       accessorKey: 'lifecycle',
       enableGlobalFilter: false,
-      sortFn: (a, b) =>
-        LIFECYCLE_ORDER.indexOf(a.original.lifecycle) -
-        LIFECYCLE_ORDER.indexOf(b.original.lifecycle),
+      enableSorting: false,
       cell: ({ row }) => {
         const { lifecycle, release } = row.original;
         return (
@@ -145,7 +147,7 @@ function columnsFor(
         const reason = site.state === 'pausado' ? site.pausedReason : null;
         return (
           <TwoLines
-            secondary={reason ? <Truncated text={reason} className="max-w-28" /> : undefined}
+            secondary={reason ? <Truncated text={reason} className="max-w-24" /> : undefined}
           >
             <StateTag color={SITE_STATE_VARIANT[site.state]}>
               {SITE_STATE_LABEL[site.state]}
@@ -165,7 +167,7 @@ function columnsFor(
       header: 'Pendências',
       accessorKey: 'pendingChanges',
       enableGlobalFilter: false,
-      sortFn: 'basic',
+      enableSorting: false,
       cell: ({ row }) => (
         <PendingCount siteId={row.original.id} count={row.original.pendingChanges} />
       ),
@@ -185,7 +187,8 @@ function columnsFor(
       cell: ({ row }) => {
         const site = row.original;
         return (
-          <span className="flex items-center justify-end gap-1">
+          // Um botão sob o outro: lado a lado, a coluna não cabe a 1280 px (#248).
+          <span className="flex flex-col items-end gap-1">
             {publishNow && site.state !== 'pausado' && (
               <PublishNowButton siteId={site.id} action={publishNow} onResult={onResult} />
             )}
