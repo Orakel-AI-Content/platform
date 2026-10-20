@@ -9,7 +9,12 @@
 //   tamanho e nas caixas de seleção; o `IndeterminateCheckbox` usa o `indeterminate` do
 //   Checkbox portado (#208), que já liga a propriedade nativa;
 // - a tabela fica com `aria-busy` enquanto carrega (o esqueleto é `aria-hidden`, #206);
-// - `ref` só com o `DataTableResetHandle` (o Ecme aceitava também o da <table>, que não usava).
+// - `ref` só com o `DataTableResetHandle` (o Ecme aceitava também o da <table>, que não usava);
+// - as features incluem as de `listFeatures` (busca global, `sortFns` e o filtro
+//   `equalsString`), exportadas como `dataTableFeatures`: a mesma `ColumnDef` serve ao
+//   `useListTable`, que filtra, ordena e corta, e ao DataTable, que só desenha (#361);
+// - contagem "N resultados" em `role="status"` no rodapé, junto da paginação e do seletor, e o
+//   rodapé quebra linha em tela estreita (#361).
 'use client';
 
 import { useImperativeHandle, useMemo, useState } from 'react';
@@ -33,8 +38,11 @@ import {
   createFilteredRowModel,
   createPaginatedRowModel,
   createSortedRowModel,
+  filterFn_equalsString,
   flexRender,
   functionalUpdate,
+  globalFilteringFeature,
+  sortFns,
 } from '@tanstack/react-table';
 import type {
   ColumnDef as BaseColumnDef,
@@ -49,9 +57,10 @@ import type { CheckboxProps } from '@/components/ui/Checkbox';
 import type { ChangeEvent, ReactNode, Ref } from 'react';
 
 // Ordenação e paginação são controladas por quem usa (manualSorting / manualPagination); as
-// features registradas cobrem as APIs usadas no render.
-const dataTableFeatures = tableFeatures({
+// features registradas cobrem as APIs usadas no render e as do cálculo do `useListTable`.
+export const dataTableFeatures = tableFeatures({
   columnFilteringFeature,
+  globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
   rowSelectionFeature,
@@ -60,9 +69,11 @@ const dataTableFeatures = tableFeatures({
   filteredRowModel: createFilteredRowModel(),
   sortedRowModel: createSortedRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
+  sortFns,
+  filterFns: { equalsString: filterFn_equalsString },
 });
 
-type DataTableFeatures = typeof dataTableFeatures;
+export type DataTableFeatures = typeof dataTableFeatures;
 
 export type ColumnDef<T extends RowData, TValue = unknown> = BaseColumnDef<
   DataTableFeatures,
