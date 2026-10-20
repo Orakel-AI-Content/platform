@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 
 import { MediaThumbnail, type MediaItem } from '@/components/media/MediaLibrary';
+import { MediaTile } from '@/components/media/MediaTile';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import { InfoField, InfoList } from '@/components/shared/InfoList.tsx';
 import { formatDateTime } from '@/components/shared/siteLabels.ts';
@@ -13,10 +14,11 @@ import Dialog from '@/components/ui/Dialog';
 // do Ecme (#279), com nome, dimensões, formatos, identificador e data de envio, e "Copiar
 // identificador" pela área de transferência, no retorno padrão: o sucesso vai para o toast (o
 // ToastProvider fica fora da app e continua anunciado com o diálogo aberto) e a falha para o
-// Alert dentro do diálogo. Esc, o fundo ou "Fechar" fecham, e o react-modal
-// devolve o foco à imagem. O "Fechar" é o botão explícito ao lado do `h2` (`closable={false}`,
-// para não haver dois), e o título fica no corpo em `h2`, em vez do `h5` do `title` do Dialog.
-// Os dados ficam na lista de dados compartilhada (#368), numa coluna.
+// Alert dentro do diálogo. Esc, o fundo ou o X "Fechar" do Dialog fecham, e o react-modal
+// devolve o foco à imagem. O título fica no corpo em `h4`, como o `UploadFile` do FileManager
+// do Ecme (#374), em vez do `h5` do `title` do Dialog, que não aceita o `break-all`. A imagem
+// da grade é a `MediaTile`, a mesma do seletor. Os dados ficam na lista de dados compartilhada
+// (#368), numa coluna.
 
 /** Nome original, ou o texto de reserva das mídias sem envio registrado (#186). */
 export function mediaName(item: MediaItem): string {
@@ -68,27 +70,15 @@ export function MediaDetails({ item, timeZone }: { item: MediaItem; timeZone: st
 
   return (
     <>
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-        className="w-full space-y-1 rounded-md text-left hover:bg-gray-200 dark:hover:bg-gray-800"
-      >
-        <MediaThumbnail item={item} />
-        <span className="block text-xs text-gray-600 dark:text-gray-400">
-          {mediaCaption(item, timeZone)}
-        </span>
-      </button>
-      <Dialog isOpen={open} onClose={close} closable={false} aria={{ labelledby: `${id}-title` }}>
+      <MediaTile item={item} aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        {mediaCaption(item, timeZone)}
+      </MediaTile>
+      <Dialog isOpen={open} onClose={close} aria={{ labelledby: `${id}-title` }}>
         <div className="space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <h2 id={`${id}-title`} className="text-lg font-semibold break-all">
-              {mediaName(item)}
-            </h2>
-            <Button variant="plain" size="sm" onClick={close}>
-              Fechar
-            </Button>
-          </div>
+          {/* Recuo à direita: o nome longo quebra antes de passar sob o X do Dialog. */}
+          <h4 id={`${id}-title`} className="pe-8 break-all">
+            {mediaName(item)}
+          </h4>
           <div className="w-40">
             <MediaThumbnail item={item} />
           </div>
