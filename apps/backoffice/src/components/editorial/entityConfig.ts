@@ -88,6 +88,7 @@ export const ENTITY_CONFIG: { [K in EntityKind]: EntityConfig<EntityItems[K]> } 
       }),
       empty: 'Nenhum autor cadastrado.',
       search: { label: 'Buscar por nome', notFound: 'Nenhum autor encontrado.' },
+      truncated: [1],
     },
   },
   taxonomy: {

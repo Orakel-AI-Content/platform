@@ -29,7 +29,9 @@ function columnsFor(
 ): ColumnDef<EntityRow>[] {
   const [nameHeader, ...rest] = headers;
   const columns: ColumnDef<EntityRow>[] = [
-    { header: nameHeader, accessorKey: 'name', enableSorting: false },
+    // O nome, nunca cortado, fica com a maior parte da largura (o DataTable dá a cada célula a
+    // largura da coluna, 150 px por padrão, e a tabela distribui a sobra na mesma proporção).
+    { header: nameHeader, accessorKey: 'name', enableSorting: false, size: 300 },
     ...rest.map((header, index): ColumnDef<EntityRow> => ({
       id: `cell-${index}`,
       header,
@@ -38,7 +40,7 @@ function columnsFor(
       enableSorting: false,
       cell: ({ row }) => {
         const text = row.original.cells[index] ?? '';
-        return truncated.includes(index) ? <Truncated text={text} className="max-w-md" /> : text;
+        return truncated.includes(index) ? <Truncated text={text} className="max-w-xs" /> : text;
       },
     })),
   ];
@@ -49,6 +51,8 @@ function columnsFor(
       id: 'actions',
       header: () => <span className="sr-only">Ações</span>,
       enableSorting: false,
+      // Na largura do botão: o resto da tabela vai para o nome e as demais células.
+      size: 1,
       cell: ({ row }) => (
         <ButtonLink href={`${basePath}/${row.original.id}`} size="xs">
           Editar
