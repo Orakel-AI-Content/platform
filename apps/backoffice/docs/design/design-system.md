@@ -122,12 +122,12 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   no `Button` padrão. A tabela nunca desenha o link de criar.
 - **Larguras:** duas utilities de `globals.css`, na `section` (ou `article`) de topo da página,
   nunca um `max-w-*` solto. `form-width` (`max-w-3xl`) para criar e editar, configuração,
-  textos institucionais e telas que leem um item (página do site, versão de um conteúdo):
-  uma coluna legível. Nos formulários de tela (#328), o `form-width` sai da `section` e vai
+  textos institucionais e telas que leem um item (versão de um conteúdo): uma coluna legível. Nos formulários de tela (#328), o `form-width` sai da `section` e vai
   para o cabeçalho e para a coluna de cartões e o conteúdo da barra (`contentClassName` do
   `SchemaForm`), para o `BottomStickyBar` encostar nas bordas do `main`. `list-width` (largura
   cheia do `main`) para as listas e tabelas: sites, conteúdos, versões, autores, taxonomias,
-  menus e mídia. O componente de formulário não define largura; quem define é a página.
+  menus e mídia; e para as telas de detalhe com resumo ao lado (página do site, #370), que
+  precisam da largura para pôr o resumo e o conteúdo lado a lado a partir de `xl`. O componente de formulário não define largura; quem define é a página.
 - **Espaçamento:** a `section` (ou `article`) de topo de toda página usa `space-y-4` entre os
   blocos (cabeçalho, cartões, tabelas), o mesmo passo do `gap-4` das colunas e grades; nenhuma
   tela usa outro. Vale também para a coluna `form-width` dos formulários de tela. Fica de fora
@@ -337,7 +337,9 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
     linha cinza escrita à mão.
   - Corpo: `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, de largura
     mínima `min-w-[330px]` (`2xl:min-w-[400px]`), e o conteúdo à direita num
-    `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção. Abaixo de `xl`, empilha. Espaçamento em
+    `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção (na página
+    do site, o `SiteTabs`: Ciclo de vida, G1 e Janela; o nome da aba é o título da seção, e um
+    formulário dentro dela é o `SchemaForm` com `card`, de botões `size: 'sm'`). Abaixo de `xl`, empilha. Espaçamento em
     `space-y-4`/`gap-4`, o mesmo passo dos formulários.
   - Dados de rótulo e valor: `InfoList` e `InfoField` (`src/components/shared/InfoList.tsx`), o
     `CustomerInfoField` do `ProfileSection`: um `<dl>` em `text-sm`, cada campo com o rótulo
