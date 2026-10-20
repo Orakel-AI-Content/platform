@@ -292,9 +292,11 @@ test('revisor não tem editor nem link para criar ou editar', async ({ page }) =
 });
 
 // Histórico de versões e leitura de uma versão no Ecme (#271): Table e Tag sem violação do axe.
-// Versões no DataTable do template (#366), nos dois temas: trilha fora do cartão; título, toolbar
-// e tabela nele; a 1280 px nada rola na horizontal e nenhuma célula passa de duas linhas; o
-// filtro vai para o endereço e recarregar mantém a mesma visão.
+// Versões no DataTable do template (#366), nos dois temas, no cartão "Versões" da tela de detalhe
+// (#371): trilha e título do conteúdo fora do cartão; o h2, a toolbar e a tabela nele; a 1280 px
+// a página não rola na horizontal (ao lado do resumo, a tabela rola só dentro do próprio
+// contêiner, como no `CustomerDetails` do Ecme) e nenhuma célula passa de duas linhas; o filtro
+// vai para o endereço e recarregar mantém a mesma visão.
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`versões a 1280 px, até duas linhas por célula, e uma versão sem violação do axe (${colorScheme})`, async ({
     page,
@@ -307,18 +309,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
       .getByRole('link', { name: / \(versões\)$/ })
       .first()
       .click();
-    await expect(page.getByRole('heading', { level: 1, name: /^Versões de/ })).toBeVisible();
+    const card = page.locator('.card').filter({ has: page.getByRole('table') });
+    await expect(card.getByRole('heading', { level: 2, name: 'Versões' })).toBeVisible();
     const versions = page.url();
     expect(page.viewportSize()?.width).toBe(1280);
 
-    const card = page.locator('.card').filter({ has: page.getByRole('table') });
     await expect(card).toHaveCount(1);
-    await expect(card.getByRole('heading', { level: 1, name: /^Versões de/ })).toBeVisible();
+    await expect(card.getByRole('heading', { level: 1 })).toHaveCount(0);
     await expect(card.getByRole('search')).toBeVisible();
     await expect(card.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
-    const table = page.getByRole('table', { name: /^Versões de/ });
+    const table = page.getByRole('table', { name: 'Versões', exact: true });
     await expect(table.getByRole('columnheader')).toHaveText([
       'Versão',
       'Status',
@@ -334,11 +337,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
       /^\d+ resultados?$/,
     );
 
-    const overflow = await table.evaluate((element) => [
-      document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      element.parentElement!.scrollWidth - element.parentElement!.clientWidth,
-    ]);
-    expect(overflow).toEqual([0, 0]);
+    const overflow = await table.evaluate((element) => ({
+      page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      container: getComputedStyle(element.parentElement!).overflowX,
+    }));
+    expect(overflow.page).toBe(0);
+    expect(overflow.container).toBe('auto');
 
     // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
     // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
@@ -390,12 +394,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
-// Uma versão em cartões (#372): "Voltar às versões" e, com content.write, "Editar" no cabeçalho,
-// do mesmo tamanho; a 375 px, a URL canônica de 120 caracteres sem espaço quebra dentro do cartão
-// e a página não rola na horizontal; o axe passa nos dois temas.
-test.describe('versão em cartões (#372)', () => {
-  let contentId = 0;
-  const canonical = `https://exemplo-a.example.com/${'guiacompleto'.repeat(10)}`.slice(0, 120);
+// Tela do conteúdo no detalhe do guia (#371): num rascunho com slug longo e sem hífen, criado
+// direto pelo domínio. "Editar" e "Enviar para revisão" no cabeçalho, ambos `solid sm`, só com
+// content.write; o resumo à esquerda do cartão de versões a 1280 px e acima dele a 1024 e a
+// 375 px, sem rolagem horizontal; axe nos dois temas.
+test.describe('tela do conteúdo no detalhe (#371)', () => {
+  const stamp = Date.now();
+  const title = `Detalhe ${stamp}`;
+  const slug = `detalhe${'x'.repeat(90)}${stamp}`;
+  let contentPath = '';
 
   test.beforeAll(async () => {
     const fixture = await readFixture('exemplo-a');
@@ -405,68 +412,87 @@ test.describe('versão em cartões (#372)', () => {
     try {
       const created = await createDb(pool).transaction((tx) =>
         createContent(tx, SYSTEM_ACTOR, 'exemplo-a', {
-          // O ID da fixture é ignorado: o domínio aloca o próximo.
           ...content.data,
           kind: 'article',
-          title: `Versão em cartões ${Date.now()}`,
-          slug: `versao-em-cartoes-${Date.now()}`,
-          seo: { ...content.data.seo, canonical },
-          blocks: [{ new: true as const, type: 'toc' as const, title: 'Neste guia' }],
+          title,
+          slug,
+          blocks: [{ new: true as const, type: 'toc' as const, title: 'Seção' }],
         }),
       );
       if (!created.ok) throw new Error(JSON.stringify(created.issues));
-      contentId = created.value.id;
+      contentPath = `/sites/exemplo-a/conteudos/${created.value.id}`;
     } finally {
       await pool.end();
     }
   });
 
+  test('o cabeçalho traz Editar e Enviar para revisão, solid sm, só com content.write', async ({
+    page,
+    browser,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(contentPath);
+    await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
+    const edit = page.getByRole('link', { name: 'Editar', exact: true });
+    const submit = page.getByRole('button', { name: 'Enviar para revisão' });
+    await expect(edit).toHaveAttribute('href', `${contentPath}/editar`);
+    for (const action of [edit, submit]) {
+      await expect(action).toHaveClass(/(^| )bg-primary( |$)/);
+      await expect(action).toHaveClass(/(^| )h-10( |$)/);
+    }
+    const [editBox, submitBox] = [await edit.boundingBox(), await submit.boundingBox()];
+    expect(editBox?.height).toBe(submitBox?.height);
+    expect(editBox?.y).toBe(submitBox?.y);
+
+    const reviewer = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
+    await loginAs(reviewer, 'revisor@orakel.local');
+    await reviewer.goto(contentPath);
+    await expect(
+      reviewer.getByRole('heading', { level: 1, name: title, exact: true }),
+    ).toBeVisible();
+    await expect(reviewer.getByRole('link', { name: 'Editar', exact: true })).toHaveCount(0);
+    await expect(reviewer.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);
+    await reviewer.context().close();
+  });
+
   for (const colorScheme of ['light', 'dark'] as const) {
-    test(`a 375 px, o canônico longo quebra sem rolar, sem violação do axe (${colorScheme})`, async ({
+    test(`resumo ao lado das versões a 1280 px, empilhado a 1024 e a 375 px, sem violação do axe (${colorScheme})`, async ({
       page,
     }) => {
-      await page.setViewportSize({ width: 375, height: 800 });
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
       await loginAs(page, 'editor@orakel.local');
-      const contentPath = `/sites/exemplo-a/conteudos/${contentId}`;
-      await page.goto(`${contentPath}/versoes/1`);
+      await page.goto(contentPath);
+      const summary = page.locator('.card').filter({ has: page.locator('dl') });
+      const versions = page.locator('.card').filter({ has: page.getByRole('table') });
+      await expect(summary.getByText(`/${slug}`)).toBeVisible();
+      await expect(summary.locator('dt')).toHaveText(['Tipo', 'ID', 'Slug', 'Estado']);
+      await expect(summary.locator('dd').last()).toHaveText('Rascunho');
+
+      for (const width of [1280, 1024, 375]) {
+        await page.setViewportSize({ width, height: 800 });
+        const [left, right] = [await summary.boundingBox(), await versions.boundingBox()];
+        if (left === null || right === null) throw new Error('cartões sem caixa');
+        if (width === 1280) {
+          expect(left.x + left.width).toBeLessThanOrEqual(right.x);
+          expect(Math.abs(left.y - right.y)).toBeLessThan(1);
+        } else {
+          expect(left.y + left.height).toBeLessThanOrEqual(right.y);
+        }
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow, `rolagem horizontal a ${width} px`).toBe(0);
+        // O slug quebra dentro do cartão em vez de passar da borda.
+        const slugBox = await summary.getByText(`/${slug}`).boundingBox();
+        expect(slugBox!.x + slugBox!.width).toBeLessThanOrEqual(left.x + left.width);
+      }
+
+      await page.setViewportSize({ width: 1280, height: 800 });
       await page.waitForLoadState('networkidle');
-
-      const back = page.getByRole('link', { name: 'Voltar às versões' });
-      const edit = page.getByRole('link', { name: 'Editar', exact: true });
-      await expect(back).toHaveAttribute('href', contentPath);
-      await expect(edit).toHaveAttribute('href', `${contentPath}/editar`);
-      const [backBox, editBox] = [(await back.boundingBox())!, (await edit.boundingBox())!];
-      expect(backBox.height).toBe(editBox.height);
-
-      const data = page
-        .locator('.card')
-        .filter({ has: page.getByRole('heading', { name: 'Dados' }) });
-      const value = data.getByText(canonical, { exact: true });
-      await expect(value).toBeVisible();
-      const valueBox = (await value.boundingBox())!;
-      const cardBox = (await data.boundingBox())!;
-      expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 1);
-      const lineHeight = await value.evaluate((element) =>
-        Number.parseFloat(getComputedStyle(element).lineHeight),
-      );
-      expect(valueBox.height).toBeGreaterThan(lineHeight * 1.5);
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow).toBe(0);
-
       const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
       expect(accessibility.violations).toEqual([]);
     });
   }
-
-  test('sem content.write, o cabeçalho só traz o voltar', async ({ page }) => {
-    await loginAs(page, 'revisor@orakel.local');
-    await page.goto(`/sites/exemplo-a/conteudos/${contentId}/versoes/1`);
-    await expect(page.getByRole('link', { name: 'Voltar às versões' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Editar', exact: true })).toHaveCount(0);
-  });
 });
 
 const BIG_SITE = `e2e-conteudos-${Date.now()}`;

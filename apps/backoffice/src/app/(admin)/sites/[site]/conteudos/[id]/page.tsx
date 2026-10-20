@@ -2,13 +2,21 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { ContentVersionsTable } from '@/components/contents/ContentVersionsTable';
-import { CONTENT_KIND_LABEL } from '@/components/shared/siteLabels.ts';
+import {
+  CONTENT_KIND_LABEL,
+  CONTENT_STATUS_LABEL,
+  CONTENT_STATUS_TAG,
+} from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { SubmitForReview } from '@/components/contents/SubmitForReview';
+import { SubmitForReview, SubmitForReviewScope } from '@/components/contents/SubmitForReview';
 import { can } from '@/domain/access/rbac.ts';
-import AdaptiveCard from '@/components/shared/AdaptiveCard';
-import { ListHeader, PageTrail } from '@/components/shared/PageHeader';
+import { InfoField, InfoList } from '@/components/shared/InfoList';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import { siteTrail } from '@/components/shared/trail.ts';
+import { StateTag } from '@/components/sites/SiteStatus';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
+import Card from '@/components/ui/Card';
 
 import { itemTitle } from '../../item-title.ts';
 import { submitForReviewAction } from '../actions.ts';
@@ -29,10 +37,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 /**
- * Versões de um conteúdo, da primeira à mais recente; cada uma abre só para leitura. Enviar
- * para revisão só aparece com content.write e a versão mais recente em rascunho (o domínio
- * confere de novo). Lista no padrão do template (#366): a trilha acima do cartão; título com o
- * envio como ação, a linha do conteúdo, toolbar e tabela dentro dele.
+ * Um conteúdo na tela de detalhe do guia (#371): o título no PageHeader com as ações de quem tem
+ * content.write ("Editar" e, com a versão mais recente em rascunho, "Enviar para revisão"; o
+ * domínio confere de novo); abaixo, o resumo à esquerda e as versões, da primeira à mais
+ * recente, à direita (empilham abaixo de `xl`). A recusa do envio vai ao Alert do escopo, logo
+ * abaixo da linha do título.
  */
 export default async function ContentVersionsPage({ params }: Params) {
   const { site: siteId, id } = await params;
@@ -48,30 +57,55 @@ export default async function ContentVersionsPage({ params }: Params) {
   const latest = versions.value.at(-1)!;
   const canWrite = can(actor, 'content.write');
 
+  const header = (
+    <PageHeader
+      id="content-title"
+      trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
+        { label: latest.data.title },
+      ])}
+      title={latest.data.title}
+      action={
+        canWrite ? (
+          <>
+            <ButtonLink
+              href={`/sites/${siteId}/conteudos/${contentId}/editar`}
+              variant="solid"
+              size="sm"
+            >
+              Editar
+            </ButtonLink>
+            <SubmitForReview
+              available={latest.status === 'rascunho'}
+              action={submitForReviewAction.bind(null, siteId, contentId)}
+            />
+          </>
+        ) : undefined
+      }
+    />
+  );
+
   return (
-    <section aria-labelledby="versions-title" className="list-width space-y-4">
-      <PageTrail
-        items={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
-          { label: latest.data.title },
-        ])}
-      />
-      <AdaptiveCard>
-        <div className="flex flex-col gap-4">
-          <ListHeader
-            id="versions-title"
-            title={<>Versões de “{latest.data.title}”</>}
-            action={
-              canWrite && (
-                <SubmitForReview
-                  available={latest.status === 'rascunho'}
-                  action={submitForReviewAction.bind(null, siteId, contentId)}
-                />
-              )
-            }
-          />
-          <p className="text-sm">
-            {CONTENT_KIND_LABEL[latest.data.kind]} · ID {contentId} · /{latest.data.slug}
-          </p>
+    <section aria-labelledby="content-title" className="list-width space-y-4">
+      {canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header}
+      <div className="flex flex-col gap-4 xl:flex-row">
+        <Card className="min-w-[330px] xl:max-w-[330px] 2xl:max-w-[400px] 2xl:min-w-[400px]">
+          <InfoList className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-1">
+            <InfoField label="Tipo">{CONTENT_KIND_LABEL[latest.data.kind]}</InfoField>
+            <InfoField label="ID" className="tabular-nums">
+              {contentId}
+            </InfoField>
+            <InfoField label="Slug">/{latest.data.slug}</InfoField>
+            <InfoField label="Estado">
+              <StateTag color={CONTENT_STATUS_TAG[latest.status]}>
+                {CONTENT_STATUS_LABEL[latest.status]}
+              </StateTag>
+            </InfoField>
+          </InfoList>
+        </Card>
+        <Card className="w-full min-w-0" bodyClass="flex flex-col gap-4">
+          <h2 id="versions-title" className={SECTION_TITLE_CLASS}>
+            Versões
+          </h2>
           <ContentVersionsTable
             siteId={siteId}
             contentId={contentId}
@@ -85,8 +119,8 @@ export default async function ContentVersionsPage({ params }: Params) {
               approval: version.approval,
             }))}
           />
-        </div>
-      </AdaptiveCard>
+        </Card>
+      </div>
     </section>
   );
 }
