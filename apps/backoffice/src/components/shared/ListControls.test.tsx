@@ -6,13 +6,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import Table from '@/components/ui/Table';
 
-import { ListPagination, ListToolbar, SortableHead } from './ListControls.tsx';
+import { resultCount } from './DataTable.tsx';
+import { ListToolbar } from './ListControls.tsx';
 import { listFeatures, useListState, type ListConfig } from './useListState.ts';
 
-const { THead, TBody, Tr, Td } = Table;
+const { THead, TBody, Tr, Th, Td } = Table;
 
-// Controles de lista (#106): busca sem acentos, filtros, cabeçalho ordenável com aria-sort e
-// paginação, ligados a uma lista de teste com o estado na URL (router.replace simulado).
+// Toolbar da lista (#106): busca sem acentos e filtros, ligados a uma lista de teste com o
+// estado na URL (router.replace simulado). Ordem e paginação do DataTable têm testes próprios
+// (`useListTable.test.ts`, `DataTable.test.tsx`).
 
 const navigation = vi.hoisted(() => {
   let search = '';
@@ -109,13 +111,9 @@ function TestList() {
         <THead>
           <Tr>
             {table.getHeaderGroups()[0]?.headers.map((header) => (
-              <SortableHead
-                key={header.id}
-                scope="col"
-                label={String(header.column.columnDef.header)}
-                direction={header.column.getIsSorted()}
-                onToggle={() => header.column.toggleSorting()}
-              />
+              <Th key={header.id} scope="col">
+                {String(header.column.columnDef.header)}
+              </Th>
             ))}
           </Tr>
         </THead>
@@ -129,12 +127,7 @@ function TestList() {
           ))}
         </TBody>
       </Table>
-      <ListPagination
-        total={table.getPrePaginatedRowModel().rows.length}
-        page={list.state.page}
-        pageCount={table.getPageCount()}
-        onPageChange={list.setPage}
-      />
+      <p role="status">{resultCount(table.getPrePaginatedRowModel().rows.length)}</p>
     </>
   );
 }
@@ -194,10 +187,7 @@ describe('ListToolbar', () => {
 
     expect(screen.getByLabelText<HTMLInputElement>('Buscar por título').value).toBe('guia');
     expect(filterValue('Tipo')).toBe('Artigo');
-    expect(screen.getByRole('columnheader', { name: /Título/ }).getAttribute('aria-sort')).toBe(
-      'descending',
-    );
-    expect(screen.getByText('Página 2 de 2')).toBeDefined();
+    // Segunda página da ordem decrescente por título.
     expect(titles()).toEqual(['Guia 05', 'Guia 04', 'Guia 03']);
   });
 });
@@ -233,81 +223,5 @@ describe('ListToolbar: layout do template (#361)', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Limpar filtros' })).toBeNull();
-  });
-});
-
-describe('SortableHead', () => {
-  it('alterna o sentido com clique e teclado e expõe aria-sort', async () => {
-    const user = userEvent.setup();
-    render(<TestList />);
-    const header = () => screen.getByRole('columnheader', { name: /Título/ });
-    expect(header().getAttribute('aria-sort')).toBe('none');
-    expect(screen.getByRole('columnheader', { name: /ID/ }).getAttribute('aria-sort')).toBe(
-      'ascending',
-    );
-
-    await user.click(within(header()).getByRole('button'));
-    expect(header().getAttribute('aria-sort')).toBe('ascending');
-    expect(within(header()).getByRole('button', { name: /ordem crescente/ })).toBeDefined();
-    expect(navigation.get()).toBe('ordem=title');
-
-    within(header()).getByRole('button').focus();
-    await user.keyboard('{Enter}');
-    expect(header().getAttribute('aria-sort')).toBe('descending');
-    await user.keyboard(' ');
-    expect(header().getAttribute('aria-sort')).toBe('ascending');
-    expect(screen.getByRole('columnheader', { name: /ID/ }).getAttribute('aria-sort')).toBe('none');
-  });
-});
-
-describe('ListPagination', () => {
-  it('mostra a contagem e desabilita Página anterior na primeira página e Próxima página na última', async () => {
-    const user = userEvent.setup();
-    render(<TestList />);
-    const previous = () => screen.getByRole('button', { name: 'Página anterior' });
-    const next = () => screen.getByRole('button', { name: 'Próxima página' });
-    const pagination = () => screen.getByRole('navigation', { name: 'Paginação' });
-
-    expect(screen.getByRole('status').textContent).toBe('30 resultados');
-    expect(screen.getAllByRole('row')).toHaveLength(26);
-    expect(previous()).toHaveProperty('disabled', true);
-    expect(next()).toHaveProperty('disabled', false);
-    expect(
-      within(pagination()).getByRole('button', { name: 'Página 1' }).getAttribute('aria-current'),
-    ).toBe('page');
-
-    await user.click(next());
-
-    expect(screen.getByText('Página 2 de 2')).toBeDefined();
-    expect(screen.getAllByRole('row')).toHaveLength(6);
-    expect(previous()).toHaveProperty('disabled', false);
-    expect(next()).toHaveProperty('disabled', true);
-    expect(
-      within(pagination()).getByRole('button', { name: 'Página 2' }).getAttribute('aria-current'),
-    ).toBe('page');
-    expect(navigation.get()).toBe('pagina=2');
-
-    await user.click(within(pagination()).getByRole('button', { name: 'Página 1' }));
-    expect(navigation.get()).toBe('');
-  });
-
-  it('volta à página 1 quando a busca ou o filtro mudam', async () => {
-    const user = userEvent.setup();
-    act(() => navigation.set('pagina=2'));
-    render(<TestList />);
-
-    await user.type(screen.getByLabelText('Buscar por título'), 'g');
-    expect(navigation.get()).toBe('q=g');
-    expect(screen.getByText('Página 1 de 2')).toBeDefined();
-
-    act(() => navigation.set('pagina=2'));
-    await choose(user, 'Tipo', 'Artigo');
-    expect(navigation.get()).toBe('tipo=article');
-  });
-
-  it('formata a contagem em pt-BR', () => {
-    render(<ListPagination total={2000} page={1} pageCount={80} onPageChange={() => {}} />);
-    expect(screen.getByRole('status').textContent).toBe('2.000 resultados');
-    expect(screen.getByText('Página 1 de 80')).toBeDefined();
   });
 });
