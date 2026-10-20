@@ -50,6 +50,45 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const canConfigure = can(actor, 'site.configure');
   const canPublish = can(actor, 'operations.run') && site.state !== 'pausado';
 
+  // Título, dica e estado das seções de G1 e janela: com permissão, o corpo do cartão do
+  // formulário (gerado do schema, botões no rodapé, #333); sem, um cartão só de leitura.
+  const g1Intro = (
+    <>
+      <h2 id="g1-title" className={SECTION_TITLE_CLASS}>
+        G1 (indexação)
+      </h2>
+      <p className={SECTION_HINT_CLASS}>
+        Registro que libera a indexação do site: sem ele, o site não pode ficar indexável.
+      </p>
+      {g1 ? (
+        <p>
+          Registrado por {g1.registeredBy} em {formatDateTime(g1.registeredAt, site.timeZone)}
+          {g1.note ? ` — ${g1.note}` : ''}.
+        </p>
+      ) : (
+        <p>G1 não registrado: o site não pode ficar indexável.</p>
+      )}
+    </>
+  );
+  const windowIntro = (
+    <>
+      <h2 id="window-title" className={SECTION_TITLE_CLASS}>
+        Janela de agrupamento
+      </h2>
+      <p className={SECTION_HINT_CLASS}>
+        Tempo que as mudanças aguardam antes de virar um build: as que chegam nesse intervalo entram
+        no mesmo build.
+      </p>
+      <p>
+        Janela efetiva:{' '}
+        <strong>
+          {formatDuration(site.effectiveBuildWindowSeconds)},{' '}
+          {site.buildWindowSeconds === null ? 'padrão' : 'própria'}
+        </strong>
+      </p>
+    </>
+  );
+
   return (
     <section aria-labelledby="site-title" className="form-width space-y-6">
       <PageHeader
@@ -122,50 +161,23 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
       </section>
 
       <section aria-labelledby="g1-title">
-        <Card bodyClass="space-y-3">
-          <h2 id="g1-title" className={SECTION_TITLE_CLASS}>
-            G1 (indexação)
-          </h2>
-          <p className={SECTION_HINT_CLASS}>
-            Registro que libera a indexação do site: sem ele, o site não pode ficar indexável.
-          </p>
-          {g1 ? (
-            <p>
-              Registrado por {g1.registeredBy} em {formatDateTime(g1.registeredAt, site.timeZone)}
-              {g1.note ? ` — ${g1.note}` : ''}.
-            </p>
-          ) : (
-            <>
-              <p>G1 não registrado: o site não pode ficar indexável.</p>
-              {canConfigure && <RegisterG1Form action={registerG1Action.bind(null, site.id)} />}
-            </>
-          )}
-        </Card>
+        {!g1 && canConfigure ? (
+          <RegisterG1Form intro={g1Intro} action={registerG1Action.bind(null, site.id)} />
+        ) : (
+          <Card bodyClass="space-y-3">{g1Intro}</Card>
+        )}
       </section>
 
       <section aria-labelledby="window-title">
-        <Card bodyClass="space-y-3">
-          <h2 id="window-title" className={SECTION_TITLE_CLASS}>
-            Janela de agrupamento
-          </h2>
-          <p className={SECTION_HINT_CLASS}>
-            Tempo que as mudanças aguardam antes de virar um build: as que chegam nesse intervalo
-            entram no mesmo build.
-          </p>
-          <p>
-            Janela efetiva:{' '}
-            <strong>
-              {formatDuration(site.effectiveBuildWindowSeconds)},{' '}
-              {site.buildWindowSeconds === null ? 'padrão' : 'própria'}
-            </strong>
-          </p>
-          {canConfigure && (
-            <BuildWindowForm
-              own={site.buildWindowSeconds}
-              action={setBuildWindowAction.bind(null, site.id)}
-            />
-          )}
-        </Card>
+        {canConfigure ? (
+          <BuildWindowForm
+            intro={windowIntro}
+            own={site.buildWindowSeconds}
+            action={setBuildWindowAction.bind(null, site.id)}
+          />
+        ) : (
+          <Card bodyClass="space-y-3">{windowIntro}</Card>
+        )}
       </section>
     </section>
   );
