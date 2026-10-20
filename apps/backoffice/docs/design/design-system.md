@@ -204,11 +204,11 @@ Não negociável, em toda tela e todo componente portado:
   biblioteca.
 - **Detalhes da imagem:** `MediaDetails` (`src/components/media/MediaDetails.tsx`): na biblioteca,
   cada imagem é um botão (`aria-haspopup="dialog"`) com a miniatura e a legenda "<nome> ·
-  <data>", que abre o `Dialog` do Ecme, como o `MediaPicker`: nome no `h2`, miniatura e um
-  `<dl>` com dimensões, formatos disponíveis, identificador e data de envio. "Copiar
-  identificador" usa `navigator.clipboard.writeText` no retorno padrão (ver "Retorno das
-  ações"): o sucesso vai para o toast ("Identificador copiado."), anunciado com o diálogo
-  aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
+  <data>", que abre o `Dialog` do Ecme, como o `MediaPicker`: nome no `h2`, miniatura e a lista
+  de dados (`InfoList`, numa coluna; ver "Tela de detalhe") com dimensões, formatos
+  disponíveis, identificador e data de envio. "Copiar identificador" usa
+  `navigator.clipboard.writeText` no retorno padrão (ver "Retorno das ações"): o sucesso vai
+  para o toast ("Identificador copiado."), anunciado com o diálogo aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
   `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o fundo ou "Fechar" fecham, e o foco
   volta à imagem.
 - **Retorno das ações:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
@@ -305,6 +305,27 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   fica no item da etapa que ela conclui; o sucesso vai para o toast e o erro para o
   `ActionAlert` abaixo da lista (`LifecycleActionScope`), que sobrevive à revalidação que move o
   botão de item.
+- **Tela de detalhe:** o layout do `CustomerDetails` do Ecme
+  (`views/concepts/customers/CustomerDetails`) para a página de uma coisa só (site, conteúdo,
+  versão, revisão), definido na #368:
+  - Cabeçalho: `PageHeader` com a trilha, o título e as ações principais em `size="sm"`, a
+    principal `variant="solid"` e o "Voltar" `plain` com seta, como no `CustomerEdit`; só as
+    ações que quem pede pode usar.
+  - Abaixo do título, a linha de metadados: `PageMeta` (`src/components/shared/PageMeta.tsx`),
+    texto de apoio em `text-sm` no cinza do body, itens separados por " · " (o separador é
+    `aria-hidden`) e espaço para a `StateTag` do estado. Itens vazios ficam de fora. Nunca uma
+    linha cinza escrita à mão.
+  - Corpo: `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, de largura
+    mínima `min-w-[330px]` (`2xl:min-w-[400px]`), e o conteúdo à direita num
+    `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção. Abaixo de `xl`, empilha. Espaçamento em
+    `space-y-4`/`gap-4`, o mesmo passo dos formulários.
+  - Dados de rótulo e valor: `InfoList` e `InfoField` (`src/components/shared/InfoList.tsx`), o
+    `CustomerInfoField` do `ProfileSection`: um `<dl>` em `text-sm`, cada campo com o rótulo
+    (`dt`, `font-semibold`, cinza do body) em cima e o valor (`dd`, `font-bold`, cor dos
+    títulos) embaixo. O valor quebra em qualquer ponto (`wrap-anywhere`, com `min-w-0` no
+    item), então slug e URL longos não rolam a página no celular. As colunas ficam com quem
+    usa: a grade do `ProfileSection` (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1`) no resumo,
+    uma coluna no diálogo. Nunca a grade `grid-cols-[auto_1fr]`, que estoura a 375 px.
 - **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela sem
   linhas, nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
   permissão, a mesma ação principal do cabeçalho (`emptyAction` das tabelas). Com a lista
