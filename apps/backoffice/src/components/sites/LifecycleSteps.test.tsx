@@ -9,7 +9,8 @@ import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Ciclo de vida como sequência de etapas (#148) no Steps do Ecme (#369): ordem fixa, estado em
-// texto, a atual com aria-current e a ação manual junto da etapa que ela conclui.
+// texto, a atual com aria-current e a ação manual junto da etapa que ela conclui. A atual se
+// distingue pelo ícone `step-item-icon-current` do template, sem o contorno do foco (#397).
 
 afterEach(cleanup);
 
@@ -60,6 +61,19 @@ describe('etapas do ciclo de vida', () => {
       null,
       null,
     ]);
+  });
+
+  it('distingue a atual pelo ícone do template, sem contorno igual ao do foco', () => {
+    render(<LifecycleSteps current="infra_aplicada" />);
+
+    const icon = (item: HTMLElement | undefined) => item?.querySelector('.step-item-icon');
+    expect(items().map((item) => icon(item)?.classList.contains('step-item-icon-current'))).toEqual(
+      [false, true, false, false],
+    );
+    for (const element of items()[1]!.querySelectorAll('*')) {
+      expect([...element.classList].filter((name) => /(^|:)outline-/.test(name))).toEqual([]);
+    }
+    expect(items()[1]?.getAttribute('aria-current')).toBe('step');
   });
 
   it('mostra o estado da atual e das pendentes na tela, fora do leitor de tela', () => {

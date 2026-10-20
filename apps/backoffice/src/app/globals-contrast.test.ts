@@ -1971,7 +1971,9 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:focus:bg-gray-950',
     minimum: 3,
   },
-  // Legenda da MediaTile no hover (#396), na grade da biblioteca e no seletor do editor.
+  // Legenda da MediaTile no hover (#396), na grade da biblioteca e no seletor do editor, sobre
+  // bg-white e dark:bg-gray-800. No escuro o hover segue o item do menu (#397): sobe a gray-700
+  // e clareia a legenda, que no gray-800 da superfície não aparecia.
   {
     name: 'legenda da miniatura no hover',
     theme: 'claro',
@@ -1982,8 +1984,8 @@ const ECME_PAIRS: readonly EcmePair[] = [
   {
     name: 'legenda da miniatura no hover',
     theme: 'escuro',
-    text: 'dark:text-gray-400',
-    background: 'dark:hover:bg-gray-800',
+    text: 'dark:group-hover:text-gray-100',
+    background: 'dark:hover:bg-gray-700',
     minimum: 4.5,
   },
 ];

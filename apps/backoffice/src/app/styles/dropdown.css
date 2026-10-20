@@ -1,11 +1,14 @@
-/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_dropdown.css */
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_dropdown.css
+   Adaptado (#397): sem o `focus:outline-none` e o `outline-none` do Ecme no `.dropdown-menu`, que
+   em @layer components venceriam a regra global de foco do @layer base (globals.css) e apagariam
+   o contorno de 2px do teclado quando o menu recebe o foco. */
 @layer components {
   .dropdown {
     @apply relative inline-block;
   }
 
   .dropdown-menu {
-    @apply rounded-2xl bg-white dark:bg-gray-900 ring-0 shadow-[0px_48px_64px_-16px_rgba(0,0,0,0.25)] border border-gray-100 dark:border-gray-800 focus:outline-none p-3 z-30 outline-none;
+    @apply rounded-2xl bg-white dark:bg-gray-900 ring-0 shadow-[0px_48px_64px_-16px_rgba(0,0,0,0.25)] border border-gray-100 dark:border-gray-800 p-3 z-30;
 
     &.top-start {
       @apply ltr:left-0 rtl:right-0 bottom-full origin-bottom;
