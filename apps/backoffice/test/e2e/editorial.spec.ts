@@ -9,6 +9,7 @@ import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
 import { fieldLabel } from './fieldLabel.ts';
+import { chooseOption } from './select.ts';
 
 // Autores, taxonomias, menus e textos institucionais (#46) contra o ambiente local semeado:
 // o editor cria e edita pelas telas e vê o resultado; o revisor não grava. Autores e
@@ -75,7 +76,7 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await page.goto('/sites/exemplo-a/taxonomias');
   await page.getByRole('link', { name: 'Criar taxonomia' }).first().click();
   await expect(page.getByRole('heading', { name: 'Criar taxonomia' })).toBeVisible();
-  await page.getByLabel('Tipo').selectOption({ label: 'Categoria' });
+  await chooseOption(page.getByRole('combobox', { name: fieldLabel('Tipo') }), 'Categoria');
   await page.getByLabel(fieldLabel('Nome')).fill(category);
   await page.getByLabel('Slug').fill(`categoria-${stamp}`);
   await page.getByRole('button', { name: 'Criar' }).click();
@@ -91,14 +92,15 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await expect(page.getByRole('table')).toBeVisible();
 
   await page.goto('/sites/exemplo-a/conteudos/novo');
-  await page
-    .getByRole('group', { name: 'Autores' })
-    .getByRole('checkbox', { name: author })
-    .check();
-  await page
-    .getByRole('group', { name: 'Taxonomias' })
-    .getByRole('checkbox', { name: `${category} (categoria)` })
-    .check();
+  await chooseOption(page.getByRole('combobox', { name: fieldLabel('Autores') }), author);
+  await chooseOption(
+    page.getByRole('combobox', { name: fieldLabel('Taxonomias') }),
+    `${category} (categoria)`,
+  );
+  // No múltiplo, cada valor escolhido tem o próprio "Remover <opção>" (#319).
+  await expect(page.getByRole('button', { name: `Remover ${author}` })).toBeVisible();
+  await page.getByRole('combobox', { name: fieldLabel('Autores') }).press('Backspace');
+  await expect(page.getByRole('button', { name: `Remover ${author}` })).toHaveCount(0);
 });
 
 // Cabeçalho da tela de site (trilha, título e ação) no visual do Ecme (#247), nos dois temas.

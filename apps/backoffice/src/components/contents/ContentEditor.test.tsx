@@ -106,32 +106,45 @@ function renderEditor({
   return action;
 }
 
+/** Escolhe o tipo do novo bloco só com teclado: digita para filtrar e confirma. */
+async function chooseNewType(user: ReturnType<typeof userEvent.setup>, label: string) {
+  screen.getByRole('combobox', { name: 'Tipo do novo bloco' }).focus();
+  await user.keyboard(label);
+  await user.keyboard('{Enter}');
+}
+
 const save = (user: ReturnType<typeof userEvent.setup>) =>
   user.click(screen.getByRole('button', { name: /Salvar nova versão|Criar conteúdo/ }));
 
 describe('editor de conteúdo', () => {
-  it('o tipo de bloco novo só oferece os tipos da release', () => {
+  it('o tipo de bloco novo só oferece os tipos da release', async () => {
     renderEditor({ blockTypes: ['text', 'toc', 'image'] });
 
-    const select = screen.getByLabelText(fieldLabel('Tipo do novo bloco'));
-    expect(
-      within(select)
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual(['Texto', 'Sumário', 'Imagem']);
+    screen.getByRole('combobox', { name: 'Tipo do novo bloco' }).focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Texto',
+      'Sumário',
+      'Imagem',
+    ]);
   });
 
-  it('autores e taxonomias do site aparecem para seleção', () => {
-    renderEditor();
+  it('autores e taxonomias são escolhidos no Select múltiplo e vão como os mesmos IDs', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor();
 
-    const authors = screen.getByRole('group', { name: 'Autores' });
-    expect(
-      within(authors)
-        .getAllByRole('checkbox')
-        .map((c) => c.closest('label')?.textContent),
-    ).toEqual(['Ana', 'Bia']);
-    const taxonomies = screen.getByRole('group', { name: 'Taxonomias' });
-    expect(within(taxonomies).getByRole('checkbox', { name: 'Receitas (categoria)' })).toBeTruthy();
+    screen.getByRole('combobox', { name: fieldLabel('Autores') }).focus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Ana', 'Bia']);
+    await user.keyboard('{ArrowDown}{Enter}{Escape}');
+    screen.getByRole('combobox', { name: fieldLabel('Taxonomias') }).focus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'Receitas (categoria)' })).toBeTruthy();
+    await user.keyboard('{Enter}{Escape}');
+    await save(user);
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(action.mock.calls[0]?.[0]).toMatchObject({ authorIds: [2], taxonomyIds: [1] });
   });
 
   it('move e remove blocos só pelo teclado; os n existentes seguem para o servidor', async () => {
@@ -166,7 +179,7 @@ describe('editor de conteúdo', () => {
     const user = userEvent.setup();
     const action = renderEditor({ mode: 'create', defaultValues: { ...meta, blocks: [] } });
 
-    await user.selectOptions(screen.getByLabelText(fieldLabel('Tipo do novo bloco')), 'Sumário');
+    await chooseNewType(user, 'Sumário');
     await user.click(screen.getByRole('button', { name: 'Adicionar bloco' }));
     await user.type(screen.getByLabelText(fieldLabel('Título do sumário')), 'Neste guia');
     await save(user);
@@ -292,7 +305,7 @@ describe('barra de ações e continuar no editor (#109)', () => {
       result: { ok: true, message: 'Versão 2 salva.', id: 7, saved: saved as never },
     });
 
-    await user.selectOptions(screen.getByLabelText(fieldLabel('Tipo do novo bloco')), 'Sumário');
+    await chooseNewType(user, 'Sumário');
     await user.click(screen.getByRole('button', { name: 'Adicionar bloco' }));
     const titles = screen.getAllByLabelText(fieldLabel('Título do sumário'));
     await user.type(titles[titles.length - 1] as HTMLElement, 'Novo');

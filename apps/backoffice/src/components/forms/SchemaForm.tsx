@@ -17,6 +17,7 @@ import {
   type FieldValues,
   type UseFormRegister,
 } from 'react-hook-form';
+import { components as selectComponents, type GroupBase, type InputProps } from 'react-select';
 import * as z from 'zod';
 
 import { pushSuccess } from '@/components/shared/ActionFeedback.tsx';
@@ -33,6 +34,7 @@ import Checkbox from '@/components/ui/Checkbox';
 import { Form, FormItem } from '@/components/ui/Form';
 import { useFormItem } from '@/components/ui/Form/context';
 import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
 import classNames from '@/components/ui/utils/classNames';
 import BottomStickyBar from '@/components/template/BottomStickyBar';
 import { PAGE_CONTAINER_GUTTER_X } from '@/components/template/constants';
@@ -45,8 +47,7 @@ import { clean, describe, emptyValue, pattern, type FieldNode } from './schemaWa
 // campos, por caminho com `*` no lugar dos índices. A validação é só a do schema.
 // Visual do Ecme (#245): cada campo num `FormItem` (rótulo e mensagem de erro ligados ao
 // controle), texto e número no `Input`, booleano no `Checkbox`, botões no `Button` e as seções em
-// `Card`, como os formulários do template (ProductForm). O enum continua `<select>` nativo, com
-// as classes do `Input`.
+// `Card`, como os formulários do template (ProductForm). O enum usa o `Select` do Ecme (#330).
 // Erro, dica e obrigatoriedade só no `FormItem` (#329): a dica é o `hint` dele, o erro é a
 // mensagem dele (`.form-explain`) em todo tipo de campo, inclusive caixa de seleção e lista (num
 // `FormItem` sem rótulo), e campo não opcional no schema leva o asterisco e `aria-required`.
@@ -146,15 +147,6 @@ type Ctx = {
   fields: Record<string, FieldRenderer>;
   sideBySide: readonly string[][];
 };
-
-/** `<select>` nativo com a aparência do `Input` do Ecme (tamanho `md`). */
-const selectClass = (invalid: boolean) =>
-  classNames(
-    'input input-md h-12',
-    invalid
-      ? 'input-invalid'
-      : 'focus:ring-primary focus-within:ring-primary focus-within:border-primary focus:border-primary',
-  );
 
 /** Borda dos grupos (objeto, lista e item de lista). */
 const groupClass = 'rounded-xl border border-gray-200 dark:border-gray-700';
@@ -264,19 +256,43 @@ type ControlProps = {
   invalid: boolean;
   /**
    * Dica e erro do `FormItem`: para controles que não leem o contexto dele (registrados,
-   * `<select>`, `Checkbox`); o `Input` do Ecme os soma sozinho.
+   * `Checkbox`); o `Input` do Ecme os soma sozinho, e o `Select`, por `selectInFormItem`.
    */
   describedBy: string | undefined;
   required: boolean;
 };
+
+/** Ids da dica e da mensagem de erro do `FormItem` (o do erro, só enquanto inválido). */
+const describedByOf = (formItem: ReturnType<typeof useFormItem>) =>
+  [formItem?.hintId, formItem?.errorId].filter(Boolean).join(' ') || undefined;
+
+/**
+ * Campo de texto do `Select` que soma ao `aria-describedby` do react-select (a região viva ou o
+ * placeholder) a dica e o erro do `FormItem` em volta: o react-select não aceita
+ * `aria-describedby`. Uso: `components={selectInFormItem}` (com `components` próprios, espalhe).
+ */
+function FormItemSelectInput<Option, IsMulti extends boolean, Group extends GroupBase<Option>>(
+  props: InputProps<Option, IsMulti, Group>,
+) {
+  const describedBy = describedByOf(useFormItem());
+  return (
+    <selectComponents.Input
+      {...props}
+      aria-describedby={
+        [props['aria-describedby'], describedBy].filter(Boolean).join(' ') || undefined
+      }
+    />
+  );
+}
+
+export const selectInFormItem = { Input: FormItemSelectInput };
 
 /** Lê os ids da dica e da mensagem de erro do `FormItem` (o do erro, só enquanto inválido). */
 function FieldControl({
   children,
   ...props
 }: Omit<ControlProps, 'describedBy'> & { children: (props: ControlProps) => ReactNode }) {
-  const formItem = useFormItem();
-  const describedBy = [formItem?.hintId, formItem?.errorId].filter(Boolean).join(' ') || undefined;
+  const describedBy = describedByOf(useFormItem());
   return <>{children({ ...props, describedBy })}</>;
 }
 
@@ -397,22 +413,29 @@ function Node({
     case 'enum':
       return (
         <Field ctx={ctx} path={path} label={label} required={required}>
-          {({ id, invalid, describedBy, required }) => (
-            <select
-              id={id}
-              className={selectClass(invalid)}
-              aria-invalid={invalid}
-              aria-required={required || undefined}
-              aria-describedby={describedBy}
-              {...ctx.register(path)}
-            >
-              {node.options.map((option) => (
-                <option key={option} value={option}>
-                  {ctx.labels[`${pattern(path)}=${option}`] ?? option}
-                </option>
-              ))}
-            </select>
-          )}
+          {({ required }) => {
+            const options = node.options.map((option) => ({
+              value: option,
+              label: ctx.labels[`${pattern(path)}=${option}`] ?? option,
+            }));
+            return (
+              <Controller
+                control={ctx.control}
+                name={path}
+                render={({ field }) => (
+                  <Select<{ value: string; label: string }>
+                    field={field}
+                    options={options}
+                    value={options.find((option) => option.value === field.value) ?? null}
+                    onChange={(option) => field.onChange(option?.value)}
+                    required={required}
+                    placeholder="Escolha"
+                    components={selectInFormItem}
+                  />
+                )}
+              />
+            );
+          }}
         </Field>
       );
     case 'boolean':

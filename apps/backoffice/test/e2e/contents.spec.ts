@@ -11,6 +11,7 @@ import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
 import { analyzeTables } from './statistics.ts';
 import { fieldLabel } from './fieldLabel.ts';
+import { chooseOption } from './select.ts';
 
 // Editor de conteúdo (#45) contra o ambiente local semeado: o editor cria um artigo com
 // texto, imagem e FAQ e o acha na lista; o revisor não grava nada. Lista com 2.000
@@ -27,7 +28,7 @@ async function loginAs(page: Page, email: string): Promise<void> {
 }
 
 async function addBlock(page: Page, type: string): Promise<void> {
-  await page.getByLabel('Tipo do novo bloco').selectOption({ label: type });
+  await chooseOption(page.getByRole('combobox', { name: 'Tipo do novo bloco' }), type);
   await page.getByRole('button', { name: 'Adicionar bloco' }).click();
 }
 
@@ -42,12 +43,11 @@ test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', asyn
 
   await page.getByLabel(fieldLabel('Título')).fill(title);
   await page.getByLabel('Slug').fill(slug);
-  const authors = page.getByRole('group', { name: 'Autores' });
-  await authors.getByRole('checkbox', { name: 'Ana Souza' }).check();
-  await page
-    .getByRole('group', { name: 'Taxonomias' })
-    .getByRole('checkbox', { name: 'Guias (categoria)' })
-    .check();
+  await chooseOption(page.getByRole('combobox', { name: fieldLabel('Autores') }), 'Ana Souza');
+  await chooseOption(
+    page.getByRole('combobox', { name: fieldLabel('Taxonomias') }),
+    'Guias (categoria)',
+  );
 
   await addBlock(page, 'Texto');
   // A barra de formatação do bloco de texto cabe numa linha a 1280 px (#133): a altura da
@@ -225,17 +225,22 @@ for (const colorScheme of ['light', 'dark'] as const) {
       .click();
     await expect(grid).toBeHidden();
     await expect(cover.getByRole('button', { name: 'Remover' })).toBeVisible();
-    await expect(
-      page.getByRole('group', { name: 'Autores' }).getByRole('checkbox').first(),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('group', { name: 'Taxonomias' }).getByRole('checkbox').first(),
-    ).toBeVisible();
+    const authors = page.getByRole('combobox', { name: fieldLabel('Autores') });
+    await expect(authors).toBeVisible();
+    await expect(page.getByRole('combobox', { name: fieldLabel('Taxonomias') })).toBeVisible();
     await expect(page.getByLabel('Data de publicação')).toBeVisible();
 
     await page.mouse.move(0, 0);
     const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(accessibility.violations).toEqual([]);
+    // Select múltiplo dos autores (#330) aberto pelo teclado, sem violação com a lista aberta.
+    await authors.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('listbox')).toBeVisible();
+    const withMenu = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(withMenu.violations).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('listbox')).toHaveCount(0);
 
     // "Remover" da capa confirma num diálogo (#327), sem violação com ele aberto: Cancelar
     // mantém a imagem; "Remover" esvazia o campo e leva o foco a "Escolher imagem".

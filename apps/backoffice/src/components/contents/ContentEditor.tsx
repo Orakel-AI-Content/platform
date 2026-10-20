@@ -43,7 +43,9 @@ import { IconButton } from '@/components/shared/IconButton';
 import StickyFooter from '@/components/shared/StickyFooter';
 import { Button } from '@/components/ui/Button';
 import Dropdown from '@/components/ui/Dropdown';
+import { FormItem } from '@/components/ui/Form';
 import Notification from '@/components/ui/Notification';
+import Select from '@/components/ui/Select';
 import toast from '@/components/ui/toast';
 import Tooltip from '@/components/ui/Tooltip';
 import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
@@ -193,6 +195,7 @@ export function ContentEditor({
   };
   const offered = options.blockTypes.filter(isBlockType);
   const [nextType, setNextType] = useState<Block['type'] | undefined>(offered[0]);
+  const typeOptions = offered.map((type) => ({ value: type, label: BLOCK_TYPE_LABEL[type] }));
 
   const blockFields: Record<Block['type'], Record<string, FieldRenderer>> = {
     text: { 'blocks.*.content': richTextField('richText') },
@@ -443,25 +446,19 @@ export function ContentEditor({
             );
           })}
           <div className="flex flex-wrap items-end gap-2">
-            <div className="space-y-1.5">
-              <label htmlFor={`${id}-new-type`} className="text-sm font-medium">
-                Tipo do novo bloco
-              </label>
-              <select
-                id={`${id}-new-type`}
-                className="flex h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-100"
-                value={nextType ?? ''}
-                onChange={(event) =>
-                  setNextType(isBlockType(event.target.value) ? event.target.value : undefined)
-                }
-              >
-                {offered.map((type) => (
-                  <option key={type} value={type}>
-                    {BLOCK_TYPE_LABEL[type]}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Um `FormItem` próprio: o tipo do novo bloco não herda o erro da lista em volta. */}
+            <FormItem
+              htmlFor={`${id}-new-type`}
+              label="Tipo do novo bloco"
+              className="mb-0 min-w-52"
+            >
+              <Select<{ value: Block['type']; label: string }>
+                size="sm"
+                options={typeOptions}
+                value={typeOptions.find((option) => option.value === nextType) ?? null}
+                onChange={(option) => setNextType(option?.value)}
+              />
+            </FormItem>
             <Button
               type="button"
               size="sm"

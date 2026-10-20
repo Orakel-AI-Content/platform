@@ -107,7 +107,9 @@ describe('formulários de entidades', () => {
       />,
     );
 
-    expect(screen.getByLabelText<HTMLSelectElement>(fieldLabel('Tipo')).value).toBe('category');
+    // O tipo é o Select do Ecme (#330): mostra o rótulo da opção atual.
+    expect(screen.getByRole('combobox', { name: fieldLabel('Tipo') })).toBeTruthy();
+    expect(screen.getByText('Categoria', { selector: '.select-single-value' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
     const slug = screen.getByLabelText(fieldLabel('Slug'));

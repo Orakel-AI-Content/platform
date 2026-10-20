@@ -2,6 +2,7 @@
 
 import type { ThemeSummary } from '@orakel/tokens';
 import { useState } from 'react';
+import type { SelectInstance } from 'react-select';
 
 import ConfirmDialog, {
   dangerButtonClass,
@@ -10,24 +11,15 @@ import ConfirmDialog, {
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
 import Input from '@/components/ui/Input';
-import classNames from '@/components/ui/utils/classNames';
+import Select from '@/components/ui/Select';
 
-import type { FieldProps, FieldRenderer } from './SchemaForm.tsx';
+import { selectInFormItem, type FieldProps, type FieldRenderer } from './SchemaForm.tsx';
 
 // Campos do gerador para o que o schema da configuração do site não desenha sozinho: listas
 // de texto (um item por linha), feature flags (registro nome → ligado), escolha entre opções
 // que vêm dos recursos da release, não do schema, e o tema com amostra. O valor é sempre o
 // da SiteConfig. Visual do Ecme (#245): `Input` (com `textArea` nas listas), `Checkbox` e
-// `Button`; a escolha continua `<select>` nativo e o tema, rádios nativos, com os tokens do Ecme.
-
-/** `<select>` nativo com a aparência do `Input` do Ecme (tamanho `md`). */
-const selectClass = (invalid: boolean) =>
-  classNames(
-    'input input-md h-12',
-    invalid
-      ? 'input-invalid'
-      : 'focus:ring-primary focus-within:ring-primary focus-within:border-primary focus:border-primary',
-  );
+// `Button`; a escolha usa o `Select` do Ecme (#330) e o tema, rádios nativos, com os tokens do Ecme.
 
 const toLines = (text: string): string[] =>
   text
@@ -180,24 +172,20 @@ function FlagsField({ id, label, value, onChange, invalid, describedBy, ref }: F
 
 /** Escolha entre opções recebidas em tempo de execução (presets e variantes de RESOURCES). */
 export function choiceField(options: readonly string[]): FieldRenderer {
-  function ChoiceField({ id, value, onChange, invalid, describedBy, required, ref }: FieldProps) {
+  const choices = options.map((option) => ({ value: option, label: option }));
+  function ChoiceField({ name, value, onChange, required, ref }: FieldProps) {
     return (
-      <select
-        id={id}
-        ref={ref}
-        className={selectClass(invalid)}
-        aria-invalid={invalid}
-        aria-required={required || undefined}
-        aria-describedby={describedBy}
-        value={typeof value === 'string' ? value : ''}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+      <Select<{ value: string; label: string }>
+        // O foco do erro (inclusive do servidor) cai no campo de texto do combobox.
+        field={{ ref: (select: SelectInstance | null) => ref(select?.inputRef ?? null) }}
+        name={name}
+        options={choices}
+        value={choices.find((choice) => choice.value === value) ?? null}
+        onChange={(choice) => onChange(choice?.value)}
+        required={required}
+        placeholder="Escolha"
+        components={selectInFormItem}
+      />
     );
   }
   return ChoiceField;
