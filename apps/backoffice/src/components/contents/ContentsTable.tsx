@@ -62,7 +62,7 @@ function columnsFor(
       cell: ({ row }) => (
         <Link href={`/sites/${siteId}/conteudos/${row.original.id}`} className={ROW_LINK_CLASS}>
           <Truncated text={row.original.title} className="max-w-xs" />
-          <span className="sr-only"> (versões)</span>
+          <span className="sr-only"> (ver versões)</span>
         </Link>
       ),
     },

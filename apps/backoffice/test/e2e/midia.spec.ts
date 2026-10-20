@@ -36,6 +36,9 @@ test.afterAll(async () => {
   await getDb().pool.end();
 });
 
+// Com a biblioteca vazia, "Enviar imagens" aparece no cabeçalho e no `EmptyState` (#377): o E2E
+// usa o primeiro, o do cabeçalho.
+
 async function loginAs(page: Page, email: string): Promise<void> {
   await page.goto('/sites');
   await page.getByRole('link', { name: email }).click();
@@ -43,6 +46,12 @@ async function loginAs(page: Page, email: string): Promise<void> {
 }
 
 /** O EXIF (após "Exif\0\0") aponta para o bloco de GPS: tag 0x8825 na ordem de bytes do TIFF. */
+/** Diálogo "Enviar imagens" (#376) e o campo de arquivo da área de soltar, nomeado pelo texto. */
+function uploadDialog(page: Page) {
+  const dialog = page.getByRole('dialog', { name: 'Enviar imagens' });
+  return { dialog, input: dialog.getByLabel(/^Solte as imagens aqui/) };
+}
+
 function hasGpsIfd(exif: Buffer): boolean {
   const tiff = exif.subarray(exif.indexOf('Exif\0\0') + 6);
   const tag = tiff.subarray(0, 2).toString() === 'II' ? [0x25, 0x88] : [0x88, 0x25];
@@ -69,8 +78,20 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
   const before = await maxMediaId();
   await loginAs(page, 'editor@orakel.local');
   await page.goto(`/sites/${SITE}/midia`);
-  await page.getByLabel(/^Imagens \(JPEG/).setInputFiles(FIXTURE.pathname);
-  await page.getByRole('button', { name: 'Enviar imagens' }).click();
+  // Soltar na área do diálogo (#376): o arrasto destaca a área, e o arquivo solto cai no campo
+  // que a cobre (o Playwright não solta arquivos do sistema; `setInputFiles` faz a parte dele).
+  await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
+  const upload = uploadDialog(page);
+  const dragged = await page.evaluateHandle(() => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(['x'], 'foto-gps.jpg', { type: 'image/jpeg' }));
+    return transfer;
+  });
+  await upload.input.dispatchEvent('dragover', { dataTransfer: dragged });
+  await expect(upload.dialog.locator('.upload-draggable')).toHaveClass(/border-primary/);
+  await upload.input.dispatchEvent('drop', { dataTransfer: dragged });
+  await upload.input.setInputFiles(FIXTURE.pathname);
+  await expect(upload.dialog).toBeHidden();
   // Cada arquivo tem a sua linha na fila de envio (#188).
   await expect(
     page
@@ -266,7 +287,8 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
   });
 
   // "Copiar identificador" no retorno padrão (#326): o toast fica fora da app que o diálogo
-  // deixa inerte e é anunciado com ele aberto; nos dois temas.
+  // deixa inerte e é anunciado com ele aberto; nos dois temas. O cabeçalho é o nativo do Dialog
+  // (#374): o nome num `h4` e um X "Fechar" só, que fecha e devolve o foco à imagem.
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`copiar o identificador com o diálogo aberto confirma no toast (${colorScheme})`, async ({
       page,
@@ -276,9 +298,12 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
       await loginAs(page, 'editor@orakel.local');
       await page.goto(`/sites/${LIBRARY_SITE}/midia`);
-      await page.getByRole('button', { name: /^foto-1\.jpg ·/ }).click();
+      const image = page.getByRole('button', { name: /^foto-1\.jpg ·/ });
+      await image.click();
       const details = page.getByRole('dialog', { name: 'foto-1.jpg' });
       await expect(details).toBeVisible();
+      await expect(details.getByRole('heading', { level: 4 })).toHaveText('foto-1.jpg');
+      await expect(details.getByRole('button', { name: 'Fechar' })).toHaveCount(1);
 
       await details.getByRole('button', { name: 'Copiar identificador' }).click();
       const toast = page.locator('[data-toast-placement="top-end"]');
@@ -292,6 +317,10 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
       await page.mouse.move(0, 0);
       const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
       expect(accessibility.violations).toEqual([]);
+
+      await details.getByRole('button', { name: 'Fechar' }).click();
+      await expect(details).toBeHidden();
+      await expect(image).toBeFocused();
     });
   }
 
@@ -328,17 +357,29 @@ test('envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com
   await loginAs(page, 'editor@orakel.local');
   await page.goto(`/sites/${SITE}/midia`);
 
-  // Só com teclado: o campo de arquivos e o botão, sem arrastar.
-  const input = page.getByLabel(/^Imagens \(JPEG/);
-  await input.setInputFiles([
+  // Só com teclado (#376): Enter no botão abre o diálogo; Tab passa pelo X "Fechar" e chega ao
+  // campo que cobre a área; Enter nele abre o seletor de arquivos do navegador. Escolher fecha o
+  // diálogo e o foco volta ao botão.
+  const trigger = page.getByRole('button', { name: 'Enviar imagens' }).first();
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  const upload = uploadDialog(page);
+  await expect(upload.dialog).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(upload.dialog.getByRole('button', { name: 'Fechar' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(upload.input).toBeFocused();
+  const chooser = page.waitForEvent('filechooser');
+  await page.keyboard.press('Enter');
+  await (
+    await chooser
+  ).setFiles([
     { name: 'foto-gps.jpg', mimeType: 'image/jpeg', buffer: await readFile(FIXTURE) },
     { name: 'paisagem.jpg', mimeType: 'image/jpeg', buffer: small },
     { name: 'notas.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('não é imagem') },
   ]);
-  await input.focus();
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Enviar imagens' })).toBeFocused();
-  await page.keyboard.press('Enter');
+  await expect(upload.dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
 
   const row = (name: string) =>
     page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
@@ -349,7 +390,8 @@ test('envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com
   await expect(row('paisagem.jpg')).toContainText('pronta', { timeout: 60_000 });
 });
 
-// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, nos dois temas.
+// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, nos dois temas, com
+// um único `role="status"` para a fila (#375), e o diálogo de envio aberto (#376).
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`fila de envio preenchida sem violação do axe (${colorScheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
@@ -361,18 +403,27 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await loginAs(page, 'editor@orakel.local');
     await page.goto(`/sites/${SITE}/midia`);
 
-    await page.getByLabel(/^Imagens \(JPEG/).setInputFiles([
+    await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
+    const upload = uploadDialog(page);
+    await expect(upload.dialog).toBeVisible();
+    const dialogAccessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(dialogAccessibility.violations).toEqual([]);
+
+    await upload.input.setInputFiles([
       { name: `axe-${colorScheme}.jpg`, mimeType: 'image/jpeg', buffer: small },
       { name: 'notas.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('não é imagem') },
     ]);
-    await page.getByRole('button', { name: 'Enviar imagens' }).click();
+    await expect(upload.dialog).toBeHidden();
 
     const row = (name: string) =>
       page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
-    await expect(row('notas.jpg').getByRole('status')).toHaveText(/^recusada: /);
-    await expect(row(`axe-${colorScheme}.jpg`).getByRole('status')).toHaveText('pronta', {
-      timeout: 60_000,
-    });
+    await expect(row('notas.jpg')).toContainText('recusada: ');
+    await expect(row(`axe-${colorScheme}.jpg`)).toContainText('pronta', { timeout: 60_000 });
+    // Um anúncio só para a fila, com o resumo; as linhas não têm região própria (#375).
+    await expect(page.getByRole('status').filter({ hasText: /^2 envios: / })).toHaveText(
+      '2 envios: 1 pronta, 1 recusada',
+    );
+    await expect(page.getByRole('list', { name: 'Envios' }).getByRole('status')).toHaveCount(0);
 
     const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(accessibility.violations).toEqual([]);

@@ -248,7 +248,7 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
   await context.close();
 });
 
-// Tela de revisão no Ecme (#277): o painel ao lado da visualização, com checklist e "Aprovar", e
+// Tela de revisão no Ecme (#277): o painel junto da visualização, com checklist e "Aprovar", e
 // o axe sem violação nos dois temas (fora o iframe, que é o site).
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`tela de revisão sem violação do axe (${colorScheme})`, async ({ page, browser }) => {
@@ -270,9 +270,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     const panel = reviewer.getByRole('complementary', { name: 'Revisão da versão 1' });
     await expect(panel.getByText('Nenhum problema de validação.')).toBeVisible();
-    await expect(
-      panel.getByRole('link', { name: 'Abrir a visualização em nova aba' }),
-    ).toBeVisible();
+    // "Abrir prévia" é ação do cabeçalho (#373), em nova aba; o painel não tem mais o link.
+    const preview = reviewer.getByRole('link', { name: 'Abrir prévia (abre em nova aba)' });
+    await expect(preview).toHaveAttribute('href', `${PREVIEW}/exemplo-a/${slug}/`);
+    await expect(preview).toHaveAttribute('target', '_blank');
+    await expect(panel.getByRole('link')).toHaveCount(0);
+    await expect(reviewer.getByText(`Versão 1·/${slug}`)).toBeVisible();
     await expect(panel.getByRole('checkbox')).toHaveCount(5);
     await expect(panel.getByRole('button', { name: 'Aprovar' })).toBeEnabled();
     // O checklist em cartão próprio, com "Aprovar" no rodapé dele (#333).
@@ -288,3 +291,57 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await context.close();
   });
 }
+
+// Tela de detalhe (#373): a prévia num Card com a largura do main e o painel abaixo dela até
+// xl; a partir de xl, o painel ao lado com pelo menos 330 px. A 375 px, empilhados, sem rolar
+// na horizontal.
+test('revisão: prévia em cartão, painel abaixo a 1024 px, ao lado a 1280 px e empilhado a 375 px', async ({
+  page,
+}) => {
+  const slug = `e2e-layout-${Date.now()}`;
+  const title = `Artigo ${slug}`;
+  await loginAs(page, 'editor@orakel.local');
+  await createDraft(page, title, slug);
+  await page.getByRole('button', { name: 'Enviar para revisão' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
+  await page.goto(queueFor(slug));
+  await page.getByRole('link', { name: `${title} (revisar)` }).click();
+
+  const frame = page.locator('iframe');
+  const panel = page.getByRole('complementary', { name: 'Revisão da versão 1' });
+  await expect(frame).toBeVisible();
+  // O iframe dentro de um Card do template.
+  expect(await frame.evaluate((element) => element.closest('.card') !== null)).toBe(true);
+  const card = page.locator('.card', { has: frame });
+  // A largura útil do main: a seção da tela ocupa toda ela (`list-width`).
+  const screenSection = page.locator('section[aria-labelledby="review-title"]');
+
+  const box = async () => {
+    const [cardBox, panelBox, sectionBox] = await Promise.all([
+      card.boundingBox(),
+      panel.boundingBox(),
+      screenSection.boundingBox(),
+    ]);
+    return { card: cardBox!, panel: panelBox!, mainWidth: sectionBox!.width };
+  };
+
+  await page.setViewportSize({ width: 1024, height: 900 });
+  let layout = await box();
+  expect(layout.card.width).toBeGreaterThanOrEqual(600);
+  expect(Math.abs(layout.card.width - layout.mainWidth)).toBeLessThanOrEqual(1);
+  expect(layout.panel.y).toBeGreaterThanOrEqual(layout.card.y + layout.card.height);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  layout = await box();
+  expect(layout.panel.x).toBeGreaterThanOrEqual(layout.card.x + layout.card.width);
+  expect(layout.panel.width).toBeGreaterThanOrEqual(330);
+
+  await page.setViewportSize({ width: 375, height: 800 });
+  layout = await box();
+  expect(layout.panel.y).toBeGreaterThanOrEqual(layout.card.y + layout.card.height);
+  const viewport = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+});

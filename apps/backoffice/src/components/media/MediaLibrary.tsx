@@ -1,17 +1,16 @@
 'use client';
 
-import {
-  useCallback,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-  type FormEvent,
-} from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
-import { ListPagination, ListToolbar } from '@/components/shared/ListControls.tsx';
+import AdaptiveCard from '@/components/shared/AdaptiveCard';
+import { resultCount } from '@/components/shared/DataTable';
+import { EmptyState, NoResults } from '@/components/shared/EmptyState';
+import { ListToolbar } from '@/components/shared/ListControls.tsx';
+import { ListHeader } from '@/components/shared/PageHeader';
+import Pagination from '@/components/ui/Pagination';
 import { MediaDetails } from '@/components/media/MediaDetails';
+import { MediaGrid } from '@/components/media/MediaGrid';
+import { MediaUpload } from '@/components/media/MediaUpload';
 import {
   UploadList,
   useUploadQueue,
@@ -21,17 +20,16 @@ import {
 } from '@/components/media/UploadQueue';
 import { useListState, type ListConfig } from '@/components/shared/useListState.ts';
 import type { MediaPickerPage } from '@/components/media/MediaPicker';
-import { Button } from '@/components/ui/Button';
-import { FormItem } from '@/components/ui/Form';
-import Input from '@/components/ui/Input';
-import classNames from '@/components/ui/utils/classNames';
 
-// Biblioteca de mídia do site (#52, #186, #188): envio de várias imagens pela fila (escolher
-// no campo ou soltar sobre a biblioteca), com o resultado de cada arquivo, e a grade paginada
-// no servidor, com busca por nome, nome e data de envio de cada imagem e as miniaturas de
-// media.<domínio>. Busca e página ficam na URL (`q`, `pagina`). Envio no FormItem, Input e
-// Button do Ecme (#281); a área de soltar destaca a borda em `primary`, como o `ui/Upload`
-// arrastável do Ecme, sem usá-lo (ele envia ao escolher e tem lista própria).
+// Biblioteca de mídia do site (#52, #186, #188): envio de várias imagens pela fila, com o
+// resultado de cada arquivo, e a grade paginada no servidor, com busca por nome, nome e data de
+// envio de cada imagem e as miniaturas de media.<domínio>. Busca e página ficam na URL (`q`,
+// `pagina`). O envio é o diálogo com o Upload arrastável do Ecme (#376, `MediaUpload`): escolher
+// ou soltar na área do diálogo põe os arquivos na fila, que fica à vista na biblioteca. No
+// padrão de lista do template (#377): título, envio, fila, toolbar, grade, contagem e paginação
+// num cartão; a regra única de estado vazio do `EmptyState` (#361); e o rodapé do `DataTable`
+// (`Pagination` e "N resultados" em `role="status"`), sem o `DataTable`, porque é uma grade
+// paginada no servidor, com tamanho fixo.
 
 /** Mídia na grade: a miniatura já resolvida para o endereço de mídia do site. */
 export type MediaItem = {
@@ -78,6 +76,8 @@ const ACCEPT = 'image/jpeg,image/png,image/webp,image/avif';
 const MEDIA_LIST: ListConfig = { filters: [], sortable: [] };
 
 export function MediaLibrary({
+  titleId,
+  title,
   siteId,
   timeZone,
   items: initialItems,
@@ -92,6 +92,9 @@ export function MediaLibrary({
   pollMs = 2000,
   timeoutMs = 120_000,
 }: {
+  /** `id` do título, para o `aria-labelledby` da página. */
+  titleId: string;
+  title: string;
   siteId: string;
   /** Fuso IANA do site: a data de envio aparece nele. */
   timeZone: string;
@@ -114,9 +117,6 @@ export function MediaLibrary({
   const list = useListState(MEDIA_LIST);
   const [items, setItems] = useState(initialItems);
   const [total, setTotal] = useState(initialTotal);
-  const [dragging, setDragging] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const fileId = useId();
 
   // Imagem pronta: relê a página atual para ela aparecer na grade.
   const reload = useCallback(() => {
@@ -135,82 +135,53 @@ export function MediaLibrary({
   );
   const queue = useUploadQueue({ send: sendFile, status, onReady: reload, pollMs, timeoutMs });
 
-  function upload(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    queue.add([...(fileInput.current?.files ?? [])]);
-    event.currentTarget.reset();
-  }
-
-  // Soltar arquivos sobre a biblioteca envia como o campo; o destaque marca a área de soltar.
-  const dropProps = canWrite
-    ? {
-        onDragOver: (event: DragEvent<HTMLDivElement>) => {
-          if (!event.dataTransfer.types.includes('Files')) return;
-          event.preventDefault();
-          setDragging(true);
-        },
-        onDragLeave: (event: DragEvent<HTMLDivElement>) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
-        },
-        onDrop: (event: DragEvent<HTMLDivElement>) => {
-          event.preventDefault();
-          setDragging(false);
-          queue.add([...event.dataTransfer.files]);
-        },
-      }
-    : {};
+  const upload = canWrite ? <MediaUpload accept={ACCEPT} onAdd={queue.add} /> : undefined;
+  // Vazia é a biblioteca sem imagem nenhuma; com busca, é só a busca sem resultado. Pelo total
+  // local, para a grade aparecer quando o primeiro envio fica pronto.
+  const empty = total === 0 && search === '';
 
   return (
-    <div
-      {...dropProps}
-      data-dragging={dragging || undefined}
-      className={classNames(
-        'space-y-6 rounded-lg border-2 border-dashed border-transparent',
-        dragging && 'border-primary',
-      )}
-    >
-      {canWrite && (
-        <form onSubmit={upload} className="flex flex-wrap items-end gap-3">
-          <FormItem
-            htmlFor={fileId}
-            label="Imagens (JPEG, PNG, WebP ou AVIF, até 25 MB cada; ou solte aqui)"
-            className="mb-0"
-          >
-            <Input id={fileId} ref={fileInput} type="file" accept={ACCEPT} multiple required />
-          </FormItem>
-          <Button type="submit" variant="solid">
-            Enviar imagens
-          </Button>
-        </form>
-      )}
-      <UploadList entries={queue.entries} notice={queue.notice} />
-      <ListToolbar
-        search={search}
-        searchLabel="Buscar por nome do arquivo"
-        onSearchChange={list.setSearch}
-        onClear={list.clearFilters}
-      />
-      <ul
-        aria-label="Imagens do site"
-        className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4"
-      >
-        {items.map((item) => (
-          <li key={item.id}>
-            <MediaDetails item={item} timeZone={timeZone} />
-          </li>
-        ))}
-      </ul>
-      {items.length === 0 && (
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {search === '' ? 'Nenhuma imagem na biblioteca.' : 'Nenhuma imagem com esse nome.'}
-        </p>
-      )}
-      <ListPagination
-        total={total}
-        page={page}
-        pageCount={Math.ceil(total / pageSize)}
-        onPageChange={list.setPage}
-      />
-    </div>
+    <AdaptiveCard>
+      <div className="flex flex-col gap-4">
+        <ListHeader id={titleId} title={title} action={upload} />
+        <UploadList entries={queue.entries} notice={queue.notice} />
+        {empty ? (
+          <EmptyState action={upload}>Nenhuma imagem na biblioteca.</EmptyState>
+        ) : (
+          <>
+            <ListToolbar
+              search={search}
+              searchLabel="Buscar por nome do arquivo"
+              onSearchChange={list.setSearch}
+              onClear={list.clearFilters}
+            />
+            {items.length > 0 ? (
+              <MediaGrid label="Imagens do site">
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <MediaDetails item={item} timeZone={timeZone} />
+                  </li>
+                ))}
+              </MediaGrid>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-4">
+                <NoResults>Nenhuma imagem encontrada.</NoResults>
+              </div>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Pagination
+                pageSize={pageSize}
+                currentPage={page}
+                total={total}
+                onChange={list.setPage}
+              />
+              <p role="status" className="text-sm tabular-nums">
+                {resultCount(total)}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+    </AdaptiveCard>
   );
 }

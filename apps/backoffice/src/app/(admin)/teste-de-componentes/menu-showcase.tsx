@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { HiOutlineDocumentText, HiOutlineHome, HiOutlinePhotograph } from 'react-icons/hi';
+import { PiFileText, PiHouse, PiImage } from 'react-icons/pi';
 
 import NavToggle from '@/components/shared/NavToggle';
 import { Card } from '@/components/ui/Card';
@@ -18,19 +18,19 @@ const ITENS = [
     key: 'visao-geral',
     title: 'Visão geral',
     href: '/teste-de-componentes?menu=visao-geral',
-    icon: HiOutlineHome,
+    icon: PiHouse,
   },
   {
     key: 'conteudos',
     title: 'Conteúdos',
     href: '/teste-de-componentes',
-    icon: HiOutlineDocumentText,
+    icon: PiFileText,
   },
   {
     key: 'midia',
     title: 'Mídia',
     href: '/teste-de-componentes?menu=midia',
-    icon: HiOutlinePhotograph,
+    icon: PiImage,
   },
 ];
 

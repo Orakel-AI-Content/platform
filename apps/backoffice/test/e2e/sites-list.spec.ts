@@ -201,7 +201,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test(`a lista de sites sem violação do axe (${colorScheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await loginAsAdmin(page);
-    await expect(page.getByRole('link', { name: 'Cadastrar site' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Criar site' })).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
@@ -237,7 +237,7 @@ test('busca e filtro por estado ficam na URL e recarregar mantém a mesma visão
   await expect(page).toHaveURL(new RegExp(`q=e2e-lista-${stamp}`));
   await expect(count).toHaveText('18 resultados');
 
-  await page.getByRole('combobox', { name: 'Estado' }).focus();
+  await page.getByRole('combobox', { name: 'Status' }).focus();
   await page.keyboard.press('ArrowDown');
   await page.getByRole('option', { name: 'Pausado' }).click();
   await expect(page).toHaveURL(/estado=pausado/);

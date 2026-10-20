@@ -13,7 +13,8 @@ import type { MediaItem } from './MediaLibrary.tsx';
 // Detalhes de uma imagem (#187, no Dialog do Ecme desde #279): o botão da imagem abre o
 // diálogo com dimensões, formatos e identificador; "Copiar identificador" confirma no toast
 // (fora da app, anunciado com o diálogo aberto) ou explica a falha no Alert do diálogo; Esc e
-// "Fechar" fecham e o foco volta à imagem. Os dados ficam na lista de dados compartilhada (#368).
+// o X "Fechar" do Dialog (#374) fecham e o foco volta à imagem. Os dados ficam na lista de dados
+// compartilhada (#368).
 
 let app: HTMLElement;
 
@@ -83,7 +84,8 @@ describe('detalhes da imagem', () => {
     await user.click(trigger);
 
     const details = within(dialog('Praia ação 01.jpg'));
-    expect(details.getByRole('heading', { level: 2 }).textContent).toBe('Praia ação 01.jpg');
+    // Título no corpo em `h4`, como o `UploadFile` do Ecme (#374), e o nome do diálogo.
+    expect(details.getByRole('heading', { level: 4 }).textContent).toBe('Praia ação 01.jpg');
     const terms = details
       .getAllByRole('term')
       .map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
@@ -97,7 +99,9 @@ describe('detalhes da imagem', () => {
     const list = details.getAllByRole('term')[0]!.closest('dl')!;
     expect(list.className).not.toContain('grid-cols-[auto_1fr]');
     expect(details.getAllByRole('definition')[2]?.className).toContain('wrap-anywhere');
+    // Um "Fechar" só, o X do Dialog, antes dos outros controles.
     expect(details.getAllByRole('button', { name: 'Fechar' })).toHaveLength(1);
+    expect(details.getAllByRole('button')[0]?.getAttribute('aria-label')).toBe('Fechar');
   });
 
   it.each([['{Enter}'], [' ']])('%s no botão da imagem também abre', async (key) => {
@@ -177,7 +181,7 @@ describe('detalhes da imagem', () => {
     expect(within(dialog()).getByRole('alert').textContent).toBe('');
   });
 
-  it('sem envio registrado, usa os textos de reserva; "Fechar" também devolve o foco', async () => {
+  it('sem envio registrado, usa os textos de reserva; o X "Fechar" também devolve o foco', async () => {
     const user = userEvent.setup();
     const { trigger } = renderDetails({
       ...item,
@@ -189,7 +193,7 @@ describe('detalhes da imagem', () => {
     expect(trigger.textContent).toBe('Sem nome (Mídia 42) · Data de envio não registrada');
     await user.click(trigger);
     const details = within(dialog('Sem nome (Mídia 42)'));
-    expect(details.getByRole('heading', { level: 2 }).textContent).toBe('Sem nome (Mídia 42)');
+    expect(details.getByRole('heading', { level: 4 }).textContent).toBe('Sem nome (Mídia 42)');
     expect(details.getAllByRole('definition')[1]?.textContent).toBe('—');
     await user.click(details.getByRole('button', { name: 'Fechar' }));
 

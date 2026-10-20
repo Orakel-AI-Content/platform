@@ -5,6 +5,7 @@ import { MotionGlobalConfig } from 'motion/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { toast, ToastProvider } from '@/components/ui/toast';
+import { CONTROL_SIZES } from '@/components/ui/utils/constants';
 
 import type { SiteFormResult } from './siteConfigFormValues.ts';
 import { BuildWindowForm, RegisterG1Form } from './SiteActions.tsx';
@@ -59,6 +60,7 @@ describe('RegisterG1Form', () => {
     const submit = screen.getByRole('button', { name: 'Registrar G1' });
     expect(card?.querySelector('.card-footer')?.contains(submit)).toBe(true);
     expect(submit.className).toContain('bg-primary');
+    expect(submit.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
     expect(document.querySelector('.sticky')).toBeNull();
   });
 });
@@ -132,7 +134,7 @@ describe('BuildWindowForm', () => {
     expect(screen.getAllByText('Janela recusada pelo domínio.').length).toBeGreaterThan(0);
   });
 
-  it('"Salvar" e "Usar padrão" no rodapé do cartão, do mesmo tamanho', () => {
+  it('"Salvar" e "Usar padrão" no rodapé do cartão, os dois em sm', () => {
     render(<BuildWindowForm intro={null} own={null} action={vi.fn()} />);
 
     const footer = document.querySelector('.card .card-footer');
@@ -143,6 +145,7 @@ describe('BuildWindowForm', () => {
     const size = (button: HTMLElement) =>
       button.className.split(' ').filter((name) => /^(h-|px-|py-)/.test(name));
     expect(size(reset)).toEqual(size(save));
+    expect(save.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
     expect(save.className).toContain('bg-primary');
   });
 });

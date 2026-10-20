@@ -191,9 +191,9 @@ describe('tabela de sites', () => {
     expect(headers).toEqual([
       'Site',
       'Ciclo de vida',
-      'Estado',
+      'Status',
       'Indexável',
-      'Pendências',
+      'Mudanças pendentes',
       'Último build',
       'Ações',
     ]);
@@ -328,10 +328,10 @@ describe('tabela de sites', () => {
   });
 
   it('sem sites, o estado vazio repete a ação de cadastrar (#364)', () => {
-    render(<SitesTable rows={[]} emptyAction={<Link href="/sites/novo">Cadastrar site</Link>} />);
+    render(<SitesTable rows={[]} emptyAction={<Link href="/sites/novo">Criar site</Link>} />);
 
     expect(screen.queryByRole('search')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Cadastrar site' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Criar site' }).getAttribute('href')).toBe(
       '/sites/novo',
     );
   });
@@ -362,7 +362,7 @@ describe('busca, filtro e paginação da lista de sites (#364)', () => {
     const user = userEvent.setup();
     render(<SitesTable rows={rows} />);
 
-    await choose(user, 'Estado', 'Pausado');
+    await choose(user, 'Status', 'Pausado');
     expect(siteNames()).toEqual(['Viagens']);
     expect(navigation.get()).toBe('estado=pausado');
   });
@@ -380,7 +380,7 @@ describe('busca, filtro e paginação da lista de sites (#364)', () => {
 
   it('busca sem resultado mostra o "nenhum encontrado", não o estado vazio', async () => {
     const user = userEvent.setup();
-    render(<SitesTable rows={rows} emptyAction={<Link href="/sites/novo">Cadastrar site</Link>} />);
+    render(<SitesTable rows={rows} emptyAction={<Link href="/sites/novo">Criar site</Link>} />);
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Buscar por nome, ID ou domínio' }),

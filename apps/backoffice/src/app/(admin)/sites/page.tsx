@@ -33,7 +33,7 @@ export default async function SitesPage({ searchParams }: SearchParams) {
   const canConfigure = can(actor.value, 'site.configure');
   const register = canConfigure ? (
     <ButtonLink href="/sites/novo" variant="solid" size="sm">
-      Cadastrar site
+      Criar site
     </ButtonLink>
   ) : undefined;
   return (

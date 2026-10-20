@@ -25,7 +25,7 @@ test('a aba mostra a área e, dentro de um site, o nome dele', async ({ page }) 
   await expect(page).toHaveTitle('Sites · Orakel Backoffice');
 
   await page.goto('/sites/novo');
-  await expect(page).toHaveTitle('Cadastrar site · Orakel Backoffice');
+  await expect(page).toHaveTitle('Criar site · Orakel Backoffice');
 
   await page.goto(`/sites/${SITE}`);
   await expect(page).toHaveTitle(`${SITE_NAME} · Orakel Backoffice`);

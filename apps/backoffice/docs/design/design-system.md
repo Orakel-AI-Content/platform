@@ -103,6 +103,16 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   o `UserProfileDropdown`, com o e-mail e os papéis no nome do gatilho e "Sair" no menu. O
   `main` (`#conteudo`) tem o fundo do body do Ecme (`bg-gray-100 dark:bg-gray-950`) e os
   gutters do `PageContainer`.
+- **Ícones e marca:** os gatilhos do cabeçalho (toggle da barra, menu móvel, tema e perfil)
+  levam o tamanho e o cinza das classes `header-action-item` de `src/app/styles/header.css`:
+  `text-2xl` e o texto secundário (`text-gray-600 dark:text-gray-400`), escurecido no hover pelo
+  `header-action-item-hoverable`. Os ícones herdam pelo `1em` do `react-icons`, sem `text-*` por
+  componente. Exceção: o perfil mostra o `Avatar` de 32 px do template, com o tamanho e a cor
+  do próprio `Avatar` (`avatar.css`). Os ícones dos itens dos menus do cabeçalho (tema e "Sair")
+  ficam em `text-xl`, como no Ecme. Os ícones da moldura são do conjunto `react-icons/pi`, em
+  Duotone (o seletor de site usa o `PiCaretUpDownDuotone`), exceto o `NavToggle`, peça do Ecme
+  com os ícones originais. A marca "Orakel Backoffice" fica em `text-lg font-bold`, o tamanho de
+  seção da escala tipográfica.
 - **Navegação:** os itens vêm de `src/configs/navigation.config.ts` (`NavigationTree` do Ecme,
   com `authority` como lista de permissões de `rbac.ts`), filtrados no servidor pelo RBAC
   (`filterNavigation`, com `can()`; Textos institucionais só com `content.write`). A barra marca
@@ -122,12 +132,12 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   no `Button` padrão. A tabela nunca desenha o link de criar.
 - **Larguras:** duas utilities de `globals.css`, na `section` (ou `article`) de topo da página,
   nunca um `max-w-*` solto. `form-width` (`max-w-3xl`) para criar e editar, configuração,
-  textos institucionais e telas que leem um item (página do site, versão de um conteúdo):
-  uma coluna legível. Nos formulários de tela (#328), o `form-width` sai da `section` e vai
+  textos institucionais e telas que leem um item (versão de um conteúdo): uma coluna legível. Nos formulários de tela (#328), o `form-width` sai da `section` e vai
   para o cabeçalho e para a coluna de cartões e o conteúdo da barra (`contentClassName` do
   `SchemaForm`), para o `BottomStickyBar` encostar nas bordas do `main`. `list-width` (largura
   cheia do `main`) para as listas e tabelas: sites, conteúdos, versões, autores, taxonomias,
-  menus e mídia. O componente de formulário não define largura; quem define é a página.
+  menus e mídia; e para as telas de detalhe com resumo ao lado (página do site, #370), que
+  precisam da largura para pôr o resumo e o conteúdo lado a lado a partir de `xl`. O componente de formulário não define largura; quem define é a página.
 - **Espaçamento:** a `section` (ou `article`) de topo de toda página usa `space-y-4` entre os
   blocos (cabeçalho, cartões, tabelas), o mesmo passo do `gap-4` das colunas e grades; nenhuma
   tela usa outro. Vale também para a coluna `form-width` dos formulários de tela. Fica de fora
@@ -194,27 +204,50 @@ Não negociável, em toda tela e todo componente portado:
   `aria-hidden`. Ação indisponível que deve continuar focável (o foco fica no botão depois de
   mover) usa `aria-disabled`, desenhado como indisponível (opacidade e cursor), e o `onClick`
   confere a condição; `disabled` só quando o foco não precisa ficar no botão.
+- **Grade e miniatura da mídia:** `MediaGrid` (`src/components/media/MediaGrid.tsx`) é a `<ul>`
+  das miniaturas, com o nome de quem usa (`label`) e um tamanho só,
+  `grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4`: três colunas na largura padrão do
+  `Dialog` (520 px), a mesma grade na biblioteca e no seletor; os `<li>` vêm de quem usa.
+  `MediaTile` (`src/components/media/MediaTile.tsx`) é a miniatura clicável: um `<button>`
+  (`type="button"` fixo, porque o seletor fica dentro do formulário do editor; aceita as props
+  de botão, como `aria-haspopup` e `onClick`) com a `MediaThumbnail`
+  (`src/components/media/MediaLibrary.tsx`, `alt=""`) e a legenda em `text-xs` cinza, que é o
+  nome do botão. Só o texto da legenda vem de quem usa.
 - **Diálogo de grade de miniaturas:** `MediaPicker` (`src/components/media/MediaPicker.tsx`), no
   `Dialog` do Ecme. Um `Button` (`type="button"`, porque fica dentro de formulários, com
-  `aria-haspopup="dialog"`) abre o diálogo controlado. Dentro ficam o título "Escolher imagem"
-  (`h2` em `aria-labelledby`, com `closable={false}` e o "Fechar" ao lado) e a página de
-  miniaturas vinda de `load(page)` (a Server Action da leitura paginada), cada uma um botão
-  comum "Mídia N · L×A". Abaixo vêm a `Pagination` (`nav "Paginação"`, pontas desabilitadas,
-  `aria-current="page"`) e "Página X de Y · N imagens" em `role="status"` (também carregando,
-  erro e vazio). A paginação só aparece depois da primeira página lida. Enquanto a próxima
-  carrega, a grade anterior continua na tela, para o foco não se perder, e só a resposta mais
-  recente vale. Escolher chama `onSelect(id)` e fecha; Esc, o fundo e "Fechar" fecham sem
-  escolher. A miniatura é a `MediaThumbnail` (`src/components/media/MediaLibrary.tsx`), a mesma da
-  biblioteca.
-- **Detalhes da imagem:** `MediaDetails` (`src/components/media/MediaDetails.tsx`): na biblioteca,
-  cada imagem é um botão (`aria-haspopup="dialog"`) com a miniatura e a legenda "<nome> ·
-  <data>", que abre o `Dialog` do Ecme, como o `MediaPicker`: nome no `h2`, miniatura e a lista
-  de dados (`InfoList`, numa coluna; ver "Tela de detalhe") com dimensões, formatos
-  disponíveis, identificador e data de envio. "Copiar identificador" usa
-  `navigator.clipboard.writeText` no retorno padrão (ver "Retorno das ações"): o sucesso vai
-  para o toast ("Identificador copiado."), anunciado com o diálogo aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
-  `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o fundo ou "Fechar" fecham, e o foco
-  volta à imagem.
+  `aria-haspopup="dialog"`) abre o diálogo controlado, na largura padrão do `Dialog`. O
+  cabeçalho é o nativo do `Dialog`, como o `UploadFile` do FileManager do Ecme: o X do
+  `CloseButton` ("Fechar", o primeiro controle do diálogo) e o título "Escolher imagem" num
+  `h4` no corpo, ligado por `aria-labelledby` (não o `title` do `Dialog`, que gera `h5`).
+  Abaixo vêm "Página X de Y · N imagens" em `role="status"` (também carregando, erro e vazio) e
+  a página de miniaturas vinda de `load(page)` (a Server Action da leitura paginada), na
+  `MediaGrid` ("Imagens da biblioteca"), cada uma uma `MediaTile` "Mídia N · L×A". Depois, a
+  `Pagination` (`nav "Paginação"`, pontas desabilitadas, `aria-current="page"`), que só aparece
+  depois da primeira página lida. Enquanto a próxima carrega, a grade anterior continua na
+  tela, para o foco não se perder, e só a resposta mais recente vale. Escolher chama
+  `onSelect(id)` e fecha; Esc, o fundo e o X fecham sem escolher.
+- **Detalhes da imagem:** `MediaDetails` (`src/components/media/MediaDetails.tsx`): na biblioteca
+  (`MediaGrid` "Imagens do site"), cada imagem é uma `MediaTile` (`aria-haspopup="dialog"`) com
+  a legenda "<nome> · <data>", que abre o `Dialog` do Ecme com o mesmo cabeçalho nativo do
+  `MediaPicker`: o X "Fechar" e o nome num `h4` no corpo (`break-all`, com recuo à direita para
+  não passar sob o X), depois a miniatura e a lista de dados (`InfoList`, numa coluna; ver
+  "Tela de detalhe") com dimensões, formatos disponíveis, identificador e data de envio.
+  "Copiar identificador" usa `navigator.clipboard.writeText` no retorno padrão (ver "Retorno
+  das ações"): o sucesso vai para o toast ("Identificador copiado."), anunciado com o diálogo
+  aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
+  `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o fundo ou o X fecham, e o foco volta
+  à imagem.
+- **Biblioteca de mídia:** `MediaLibrary` (`src/components/media/MediaLibrary.tsx`) no padrão de
+  lista do template (#377, `CustomerList` do Ecme): a trilha (`PageTrail`) acima do cartão; no
+  `AdaptiveCard` (`flex flex-col gap-4`), o `ListHeader` com "Mídia" e "Enviar imagens" (o
+  `MediaUpload`, só com content.write), a fila de envio, a `ListToolbar`, a grade e o rodapé do
+  `DataTable` copiado: a `Pagination` do Ecme (`ui/Pagination`) e "N resultados" em
+  `role="status"` com `tabular-nums` (`resultCount`). O cabeçalho fica no componente cliente
+  porque o botão alimenta a fila dele. Sem `DataTable` nem `useListTable`: é grade paginada no
+  servidor (`q` e `pagina` na URL), com tamanho fixo (`MEDIA_PAGE_SIZE`), sem seletor. Biblioteca
+  vazia (total zero sem busca): só o `EmptyState` "Nenhuma imagem na biblioteca.", com "Enviar
+  imagens" quando há permissão, sem toolbar, grade nem contagem. Busca sem resultado: o
+  `NoResults` "Nenhuma imagem encontrada." no lugar da grade, com "0 resultados".
 - **Retorno das ações:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
   `src/components/shared/actionResult.ts`, importável pela Server Action), e
   `useActionResult` (`src/components/shared/ActionFeedback.tsx`) o mostra num lugar só: o
@@ -325,7 +358,9 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
     linha cinza escrita à mão.
   - Corpo: `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, de largura
     mínima `min-w-[330px]` (`2xl:min-w-[400px]`), e o conteúdo à direita num
-    `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção. Abaixo de `xl`, empilha. Espaçamento em
+    `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção (na página
+    do site, o `SiteTabs`: Ciclo de vida, G1 e Janela; o nome da aba é o título da seção, e um
+    formulário dentro dela é o `SchemaForm` com `card`, de botões `size: 'sm'`). Abaixo de `xl`, empilha. Espaçamento em
     `space-y-4`/`gap-4`, o mesmo passo dos formulários.
     Uma tabela no cartão da direita, mais estreito que a largura de lista, pode rolar na
     horizontal dentro do próprio contêiner (o `overflow-x-auto` do `Table`), como no
@@ -337,17 +372,34 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
     item), então slug e URL longos não rolam a página no celular. As colunas ficam com quem
     usa: a grade do `ProfileSection` (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1`) no resumo,
     uma coluna no diálogo. Nunca a grade `grid-cols-[auto_1fr]`, que estoura a 375 px.
-- **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela sem
-  linhas, nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
+- **Estado vazio:** `EmptyState` (`src/components/shared/EmptyState.tsx`) no lugar da tabela
+  sem linhas (ou da grade da mídia sem imagens), nunca uma tabela só com cabeçalho: a mensagem ("Nenhum autor cadastrado.") e, com
   permissão, a mesma ação principal do cabeçalho (`emptyAction` das tabelas). Com a lista
   vazia, a ação aparece duas vezes; no E2E, clique na primeira (a do cabeçalho).
-- **Telas de estado:** `StatusScreen` (`src/components/shared/StatusScreen.tsx`), com título (`h1`),
-  uma frase do que aconteceu e o que fazer, e a ação de saída (link de volta ou "Tentar de
-  novo"). "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo
-  catch-all `(admin)/[...rest]` e para o site inexistente), erro (`(admin)/error.tsx` e
-  `global-error.tsx`, pelo `ErrorScreen`) e falta de permissão (`ForbiddenScreen`) a usam,
-  mudando só o conteúdo, sem variante visual. A tela de erro nunca mostra a mensagem da
-  exceção, só o `digest`.
+- **Telas de estado:** `StatusScreen` (`src/components/shared/StatusScreen.tsx`), a tela vazia
+  do template (o `AccessDenied` e o "No user found" do `CustomerEdit`): coluna centrada, com a
+  ilustração decorativa em 280 × 280 por cima, o título (`h1`) na cor de heading, uma frase do
+  que aconteceu e o que fazer em `text-sm` no cinza do body e a ação de saída (link de volta
+  ou "Tentar de novo") centrada. Sem `max-w-*` nem `space-y-*`: o espaçamento é por margens,
+  como no template. A ilustração vem por prop (`illustration`), de `src/assets/svg/`, sempre
+  `aria-hidden`, e cada tela escolhe a sua:
+  - "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo catch-all
+    `(admin)/[...rest]` e para o site inexistente, e `sites/[site]/not-found.tsx`) →
+    `FileNotFound`;
+  - falta de permissão (`ForbiddenScreen`) → `SpaceSignBoard`;
+  - "Sem acesso" (`NoAccessScreen`, do layout de `(admin)` quando a identidade não tem
+    cadastro nem papel) → `SpaceSignBoard`. Sem a moldura, o `<main>` do layout dá a altura
+    (`min-h-screen`) e os gutters (`PAGE_CONTAINER_GUTTER_X`/`_Y`); a saída é "Sair", um `<a>`
+    para o `LOGOUT_PATH` do Access (`Button asElement="a"`, nunca `ButtonLink`);
+  - erro (`(admin)/error.tsx` e `global-error.tsx`, pelo `ErrorScreen`) → `NoDataFound`. O
+    `global-error` usa os gutters da moldura, sem `max-w-*`.
+
+  A saída de toda tela de estado (link de volta, "Sair" ou "Tentar de novo") usa a variante
+  padrão do `Button`, nunca `solid`. Fora a ilustração, as telas mudam só o conteúdo, sem
+  variante visual. A tela de erro nunca
+  mostra a mensagem da exceção, só o `digest`. Não confunda com o `EmptyState`, o vazio de
+  lista com borda tracejada.
+
 - **Formulários:** gerados do schema Zod com `SchemaForm` (`src/components/forms/`), sobre
   react-hook-form + zodResolver; a validação é só a do schema. Visual do Ecme: cada campo num
   `FormItem` (rótulo e erro ligados ao controle), texto e número no `Input`, booleano no
@@ -445,7 +497,7 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
 - **Formulário: rótulos, estrutura e espaçamento:** regra única de todo formulário (#334).
   **Envio:** o formulário de tela envia com "Criar" na criação e "Salvar" na edição, sem
   complemento, como o "Create"/"Save" do `CustomerCreate`/`CustomerEdit` do Ecme; o objeto já
-  está no título da tela ("Cadastrar site", "Criar conteúdo"), que não muda. O formulário em
+  está no título da tela ("Criar site", "Criar conteúdo"), que não muda. O formulário em
   cartão dentro de outra tela e a ação de domínio usam o verbo do que acontece: "Registrar
   G1", "Aprovar", "Usar padrão", "Enviar para revisão", "Marcar zona ativa"; a janela de
   agrupamento, que só grava um valor, envia com "Salvar". **Pendência:** é sempre o rótulo
@@ -462,6 +514,22 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   `richTextField('inlines')` (um parágrafo, sem intertítulo nem lista) para citação, resposta
   de FAQ e legenda. O valor é sempre a árvore do content-model; colar HTML descarta o que o
   schema não aceita, e link com endereço inválido vira texto.
+- **Vocabulário:** glossário dos rótulos da interface (#385, Story #62): a mesma coisa tem o
+  mesmo nome em colunas, títulos, trilhas, abas, botões, mensagens e textos ocultos (`sr-only`).
+  Os pares decididos:
+
+  | Em vez de                                              | Use                                                                                         |
+  | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+  | "Estado" (lista de sites)                              | **"Status"**, como em conteúdos, versões e filtros                                          |
+  | "Pendências" (coluna da lista de sites)                | **"Mudanças pendentes"**, como no título, na trilha e na página do site                     |
+  | "Cadastrar site"                                       | **"Criar"** em todo título e ação: "Criar site", como "Criar conteúdo"                      |
+  | "Configuração" (`h1` e trilha da configuração do site) | **"Configuração do site"** no `h1`, na aba e na trilha; o botão segue "Editar configuração" |
+  | "(versões)" no texto oculto do link da linha           | **o verbo da ação**, como em "(revisar)": "(ver versões)"                                   |
+
+  **Termo novo:** vale o que já predomina nas telas. Por esse critério ficam as mensagens e os
+  estados vazios com "cadastrado" ("Site X cadastrado.", "Nenhum conteúdo cadastrado."); a rota
+  `/sites/novo`, o parâmetro `?cadastrado=` e o estado `cadastrado` do ciclo de vida são do
+  domínio e não mudam com os rótulos.
 
 ## Testes
 

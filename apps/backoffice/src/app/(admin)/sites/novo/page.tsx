@@ -13,7 +13,7 @@ import { createSiteAction } from '../actions.ts';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = { title: 'Cadastrar site' };
+export const metadata = { title: 'Criar site' };
 
 /** Cadastro de site: a tela só mostra; permissão e regras são do domínio (createSite). */
 export default async function NewSitePage() {
@@ -28,8 +28,8 @@ export default async function NewSitePage() {
       <div className="form-width space-y-4">
         <PageHeader
           id="new-site-title"
-          trail={sitesTrail([{ label: 'Cadastrar site' }])}
-          title="Cadastrar site"
+          trail={sitesTrail([{ label: 'Criar site' }])}
+          title="Criar site"
         />
       </div>
       <SiteConfigForm

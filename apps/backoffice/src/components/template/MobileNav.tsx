@@ -46,13 +46,10 @@ const MobileNav = ({ navigationTree, sites, className }: MobileNavProps) => {
         type="button"
         aria-label="Menu de navegação"
         aria-expanded={isOpen}
-        className={classNames(
-          'header-action-item header-action-item-hoverable text-gray-600 dark:text-gray-400',
-          className,
-        )}
+        className={classNames('header-action-item header-action-item-hoverable', className)}
         onClick={() => setIsOpen(true)}
       >
-        <NavToggle className="text-2xl" toggled={isOpen} />
+        <NavToggle toggled={isOpen} />
       </button>
       <Drawer
         title="Navegação"

@@ -2,7 +2,9 @@
 
 import { useId, useRef, useState } from 'react';
 
-import { MediaThumbnail, type MediaItem } from '@/components/media/MediaLibrary';
+import { MediaGrid } from '@/components/media/MediaGrid';
+import type { MediaItem } from '@/components/media/MediaLibrary';
+import { MediaTile } from '@/components/media/MediaTile';
 import Button from '@/components/ui/Button';
 import Dialog from '@/components/ui/Dialog';
 import Pagination from '@/components/ui/Pagination';
@@ -10,11 +12,13 @@ import Pagination from '@/components/ui/Pagination';
 // Grade de miniaturas num diálogo (#181), para os campos de mídia escolherem uma imagem da
 // biblioteca sem carregá-la inteira. As páginas vêm de `load` (a Server Action da leitura
 // paginada, #180). No Dialog do Ecme (#280), como os detalhes da imagem (#279): o react-modal
-// prende o foco, torna a app inerte e, ao fechar por Esc, fundo, "Fechar" ou escolha, devolve
-// o foco ao botão que abriu. A `Pagination` (`nav "Paginação"`) só aparece depois que a
-// primeira página é lida. Enquanto a próxima página carrega, a grade e a paginação anteriores
-// continuam na tela, para o foco não se perder, e só a resposta mais recente vale. Erro e
-// biblioteca vazia ficam só no `role="status"`.
+// prende o foco, torna a app inerte e, ao fechar por Esc, fundo, o X "Fechar" do Dialog ou
+// escolha, devolve o foco ao botão que abriu. Título no corpo em `h4`, como o `UploadFile` do
+// FileManager do Ecme, e a grade e as miniaturas da biblioteca (`MediaGrid`, `MediaTile`,
+// #374). A `Pagination` (`nav "Paginação"`) só aparece depois que a primeira página é lida.
+// Enquanto a próxima página carrega, a grade e a paginação anteriores continuam na tela, para
+// o foco não se perder, e só a resposta mais recente vale. Erro e biblioteca vazia ficam só no
+// `role="status"`.
 
 /** Uma página da biblioteca: o mesmo formato do `MediaPage` da action. */
 export type MediaPickerPage = { items: MediaItem[]; total: number; page: number; pageSize: number };
@@ -88,46 +92,23 @@ export function MediaPicker({
       <Button ref={buttonRef} type="button" size="sm" aria-haspopup="dialog" onClick={openDialog}>
         {label}
       </Button>
-      <Dialog
-        isOpen={open}
-        onClose={close}
-        closable={false}
-        width={768}
-        aria={{ labelledby: `${id}-title` }}
-      >
+      <Dialog isOpen={open} onClose={close} aria={{ labelledby: `${id}-title` }}>
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 id={`${id}-title`} className="text-lg font-semibold">
-              Escolher imagem
-            </h2>
-            <Button type="button" variant="plain" size="sm" onClick={close}>
-              Fechar
-            </Button>
-          </div>
+          <h4 id={`${id}-title`}>Escolher imagem</h4>
           <p role="status" className="text-sm text-gray-600 dark:text-gray-400">
             {status}
           </p>
           {shown && shown.items.length > 0 && (
             <>
-              <ul
-                aria-label="Imagens da biblioteca"
-                className="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3"
-              >
+              <MediaGrid label="Imagens da biblioteca">
                 {shown.items.map((item) => (
                   <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => choose(item)}
-                      className="w-full space-y-1 rounded-md text-left hover:bg-gray-200 dark:hover:bg-gray-800"
-                    >
-                      <MediaThumbnail item={item} />
-                      <span className="block text-sm">
-                        Mídia {item.id} · {item.width}×{item.height}
-                      </span>
-                    </button>
+                    <MediaTile item={item} onClick={() => choose(item)}>
+                      Mídia {item.id} · {item.width}×{item.height}
+                    </MediaTile>
                   </li>
                 ))}
-              </ul>
+              </MediaGrid>
               <Pagination
                 total={pages}
                 pageSize={1}

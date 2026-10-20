@@ -10,9 +10,9 @@ import type { MediaItem } from './MediaLibrary.tsx';
 import { MediaPicker, type MediaPickerPage } from './MediaPicker.tsx';
 
 // Diálogo de grade de miniaturas (#181, no Dialog do Ecme desde #280): a página do carregador,
-// a `Pagination` com as pontas desabilitadas, escolha por clique e teclado, Esc e "Fechar", o
-// foco preso no diálogo e de volta ao botão que abriu. O comportamento real do navegador fica
-// no E2E da #182, que liga a grade ao formulário.
+// a `Pagination` com as pontas desabilitadas, escolha por clique e teclado, Esc e o X "Fechar"
+// do Dialog (#374), o foco preso no diálogo e de volta ao botão que abriu. O comportamento real
+// do navegador fica no E2E da #182, que liga a grade ao formulário.
 
 let app: HTMLElement;
 
@@ -83,7 +83,9 @@ describe('grade de miniaturas', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     await user.click(trigger);
 
-    expect(inDialog().getByRole('heading', { level: 2 }).textContent).toBe('Escolher imagem');
+    // Título no corpo em `h4`, como o `UploadFile` do Ecme (#374), e o nome do diálogo.
+    expect(inDialog().getByRole('heading', { level: 4 }).textContent).toBe('Escolher imagem');
+    expect(inDialog().getByRole('list', { name: 'Imagens da biblioteca' })).toBeTruthy();
     expect(load).toHaveBeenCalledWith(1);
     await waitFor(() =>
       expect(inDialog().getByRole('status').textContent).toBe('Página 1 de 3 · 5 imagens'),
@@ -163,7 +165,7 @@ describe('grade de miniaturas', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it('"Fechar" fecha sem escolher e o foco volta ao botão', async () => {
+  it('o X "Fechar" do Dialog, único, fecha sem escolher e o foco volta ao botão', async () => {
     const user = userEvent.setup();
     const { onSelect, trigger } = renderPicker(library(3));
 

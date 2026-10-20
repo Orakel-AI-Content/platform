@@ -41,7 +41,7 @@ const ThemeSwitcher = ({ initialMode }: ThemeSwitcherProps) => {
       toggleClassName="flex items-center header-action-item header-action-item-hoverable"
       activeKey={choice}
       renderTitle={
-        <div className="cursor-pointer flex items-center text-2xl">
+        <div className="cursor-pointer flex items-center">
           <current.Icon aria-hidden />
           <span className="sr-only">Tema: {current.label}</span>
         </div>

@@ -12,11 +12,11 @@ describe('ButtonLink', () => {
   it('renderiza um link com o href e as variantes do Button', () => {
     render(
       <ButtonLink href="/sites/novo" variant="solid" size="sm">
-        Cadastrar site
+        Criar site
       </ButtonLink>,
     );
 
-    const link = screen.getByRole('link', { name: 'Cadastrar site' });
+    const link = screen.getByRole('link', { name: 'Criar site' });
     expect(link.getAttribute('href')).toBe('/sites/novo');
     expect(link.className).toContain('bg-primary');
   });
