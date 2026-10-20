@@ -12,13 +12,18 @@ afterEach(cleanup);
 
 describe('tela de permissão', () => {
   it('um revisor em "criar conteúdo" vê o título, o motivo e o link para o site', () => {
-    render(<ForbiddenScreen action="content.write" back={backToSite('exemplo-a')} />);
+    render(
+      <ForbiddenScreen
+        action="content.write"
+        back={backToSite({ id: 'exemplo-a', name: 'Exemplo A — Guias' })}
+      />,
+    );
     expect(screen.getByRole('heading', { level: 1, name: 'Sem permissão' })).toBeTruthy();
     expect(screen.getByRole('alert').textContent).toBe(
       'Editar conteúdo exige o papel admin ou editor.',
     );
     expect(
-      screen.getByRole('link', { name: 'Ir para o site exemplo-a' }).getAttribute('href'),
+      screen.getByRole('link', { name: 'Ir para o site Exemplo A — Guias' }).getAttribute('href'),
     ).toBe('/sites/exemplo-a');
   });
 

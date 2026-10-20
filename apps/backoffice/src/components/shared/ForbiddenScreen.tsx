@@ -3,6 +3,7 @@ import { StatusScreen } from '@/components/shared/StatusScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import type { Role } from '@/db/schema/index.ts';
 import { PERMISSIONS, type Action } from '@/domain/access/rbac.ts';
+import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Tela de permissão (#80): a ação negada e os papéis que a permitem, lidos da matriz do RBAC,
 // com uma saída. Componente próprio, não o `forbidden()` do Next (experimental, sem a ação).
@@ -52,10 +53,10 @@ export function ForbiddenScreen({
   );
 }
 
-/** Saídas da tela de permissão: o site e a lista de sites. */
-export const backToSite = (siteId: string) => ({
-  href: `/sites/${siteId}`,
-  label: `Ir para o site ${siteId}`,
+/** Saídas da tela de permissão: o site, citado pelo nome, e a lista de sites. */
+export const backToSite = (site: Pick<SiteSummary, 'id' | 'name'>) => ({
+  href: `/sites/${site.id}`,
+  label: `Ir para o site ${site.name}`,
 });
 
 export const backToSites = { href: '/sites', label: 'Ir para a lista de sites' };
