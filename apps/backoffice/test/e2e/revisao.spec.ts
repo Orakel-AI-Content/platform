@@ -38,7 +38,7 @@ async function createDraft(page: Page, title: string, slug: string): Promise<str
     .getByRole('navigation', { name: 'Trilha de navegação' })
     .getByRole('link', { name: title })
     .click();
-  await expect(page.getByRole('heading', { name: `Versões de “${title}”` })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
   return new URL(page.url()).pathname;
 }
 
@@ -55,8 +55,12 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
   const reviewer = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
   await loginAs(reviewer, 'revisor@orakel.local');
   await reviewer.goto(contentPath);
-  await expect(reviewer.getByRole('heading', { name: `Versões de “${title}”` })).toBeVisible();
+  await expect(reviewer.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
   await expect(reviewer.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);
+
+  // Uma segunda aba do editor fica com a página antiga, ainda com o botão (#371).
+  const stale = await page.context().newPage();
+  await stale.goto(contentPath);
 
   // Editor envia: o retorno aparece em role=status e o botão some (versão em revisão).
   await page.getByRole('button', { name: 'Enviar para revisão' }).click();
@@ -66,6 +70,18 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
   await page.reload();
   await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Em revisão');
   await expect(page.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);
+
+  // Na aba antiga o domínio recusa o envio: o erro fica no Alert abaixo do título, fora do
+  // grupo de ações.
+  await stale.getByRole('button', { name: 'Enviar para revisão' }).click();
+  const refusal = stale.getByRole('alert').filter({ hasText: /rascunho/ });
+  await expect(refusal).toBeVisible();
+  const [titleBox, alertBox] = [
+    await stale.getByRole('heading', { level: 1, name: title, exact: true }).boundingBox(),
+    await refusal.boundingBox(),
+  ];
+  expect(alertBox!.y).toBeGreaterThanOrEqual(titleBox!.y + titleBox!.height);
+  await stale.close();
 
   // A fila é acessível pela barra lateral do site e mostra título, tipo, versão e data.
   await page.goto('/sites/exemplo-a');

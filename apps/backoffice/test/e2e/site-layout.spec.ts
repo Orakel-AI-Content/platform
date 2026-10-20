@@ -301,11 +301,11 @@ test('trilha nas telas de item: Sites › Site › Área › Item, sem link de v
     .getByRole('link', { name: /\(versões\)/ })
     .first()
     .click();
-  // Espera a tela de versões: lido antes, o h1 ainda seria o da lista de conteúdos.
-  const versionsHeading = page.getByRole('heading', { level: 1, name: /^Versões de “.+”$/ });
-  await expect(versionsHeading).toBeVisible();
-  const heading = (await versionsHeading.textContent()) ?? '';
-  const title = /“(.+)”/.exec(heading)?.[1] ?? '';
+  // Espera a tela do conteúdo (o h2 "Versões"): lido antes, o h1 ainda seria o da lista de
+  // conteúdos. O h1 é o título do conteúdo (#371).
+  await expect(page.getByRole('heading', { level: 2, name: 'Versões' })).toBeVisible();
+  const title = (await page.getByRole('heading', { level: 1 }).textContent()) ?? '';
+  expect(title).not.toBe('');
   await expectTrail(['Sites', SITE_NAME, 'Conteúdos', title]);
   const versionsPath = new URL(page.url()).pathname;
 
