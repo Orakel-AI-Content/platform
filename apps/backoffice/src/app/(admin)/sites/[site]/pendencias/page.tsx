@@ -1,8 +1,9 @@
+import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { noRead } from '@/components/shared/ForbiddenScreen';
+import { ListHeader, PageTrail } from '@/components/shared/PageHeader';
+import { siteTrail } from '@/components/shared/trail.ts';
 import { PendingChangesTable } from '@/components/sites/PendingChangesTable';
 import { listPendingChanges } from '@/domain/pending-changes/list.ts';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { siteTrail } from '@/components/shared/trail.ts';
 
 import { sitePageContext } from '../editorial-page.tsx';
 
@@ -12,7 +13,8 @@ export const metadata = { title: 'Mudanças pendentes' };
 
 /**
  * Mudanças do site ainda não publicadas (#99), só leitura: o destino do número de pendências
- * da lista de sites. Ler exige site.read (o domínio confere).
+ * da lista de sites. Ler exige site.read (o domínio confere). Lista no padrão do template
+ * (#365): a trilha acima do cartão; título, toolbar e tabela dentro dele.
  */
 export default async function PendingChangesPage({
   params,
@@ -28,12 +30,18 @@ export default async function PendingChangesPage({
 
   return (
     <section aria-labelledby="pending-title" className="list-width space-y-4">
-      <PageHeader
-        id="pending-title"
-        trail={siteTrail(site, 'Mudanças pendentes')}
-        title="Mudanças pendentes"
-      />
-      <PendingChangesTable siteId={site.id} timeZone={site.timeZone} rows={changes.value} />
+      <PageTrail items={siteTrail(site, 'Mudanças pendentes')} />
+      <AdaptiveCard>
+        <div className="flex flex-col gap-4">
+          <ListHeader id="pending-title" title="Mudanças pendentes" />
+          <PendingChangesTable
+            siteId={site.id}
+            timeZone={site.timeZone}
+            rows={changes.value}
+            labelledBy="pending-title"
+          />
+        </div>
+      </AdaptiveCard>
     </section>
   );
 }
