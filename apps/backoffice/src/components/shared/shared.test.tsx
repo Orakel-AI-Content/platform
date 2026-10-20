@@ -1,15 +1,17 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PAGE_CONTAINER_GUTTER_X } from '../template/constants.ts';
 import BottomStickyBar from '../template/BottomStickyBar.tsx';
+import Table from '../ui/Table/index.tsx';
 
 import AdaptiveCard from './AdaptiveCard.tsx';
 import Container from './Container.tsx';
 import EllipsisButton from './EllipsisButton.tsx';
 import MediaSkeleton from './loaders/MediaSkeleton.tsx';
+import TableRowSkeleton from './loaders/TableRowSkeleton.tsx';
 import TextBlockSkeleton from './loaders/TextBlockSkeleton.tsx';
 import Loading from './Loading.tsx';
 import StickyFooter from './StickyFooter.tsx';
@@ -17,7 +19,7 @@ import StickyFooter from './StickyFooter.tsx';
 // Componentes compartilhados do Ecme (#206): o Loading anuncia o carregamento, o
 // AdaptiveCard fica no layout único e o StickyFooter não rola a página nem escreve no console.
 // EllipsisButton, Container e BottomStickyBar (#322): nome acessível, ícone oculto, elemento e
-// barra sempre sticky nas bordas do `main`.
+// barra sempre sticky nas bordas do `main`. TableRowSkeleton (#392): linhas × colunas ocultas.
 
 afterEach(cleanup);
 
@@ -71,6 +73,39 @@ describe('loaders', () => {
     // Mídia: avatar, título e texto; bloco: título e 2 linhas.
     expect(skeletons).toHaveLength(6);
     for (const skeleton of skeletons) expect(skeleton.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('TableRowSkeleton: rows × columns células, avatar só nas colunas pedidas, tudo oculto', () => {
+    const { container } = render(
+      <Table>
+        <TableRowSkeleton rows={3} columns={4} avatarInColumns={[0, 2]} />
+      </Table>,
+    );
+    const rows = screen.getAllByRole('row');
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      const cells = within(row).getAllByRole('cell');
+      expect(cells).toHaveLength(4);
+      cells.forEach((cell, col) => {
+        const circles = cell.querySelectorAll('.skeleton-circle');
+        expect(circles).toHaveLength(col === 0 || col === 2 ? 1 : 0);
+      });
+    }
+    const skeletons = container.querySelectorAll('.skeleton');
+    // 12 células com o bloco, mais o avatar em 2 colunas de 3 linhas.
+    expect(skeletons).toHaveLength(18);
+    for (const skeleton of skeletons) expect(skeleton.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('TableRowSkeleton: padrão de 10 linhas e 1 coluna, sem avatar', () => {
+    const { container } = render(
+      <Table>
+        <TableRowSkeleton />
+      </Table>,
+    );
+    expect(screen.getAllByRole('row')).toHaveLength(10);
+    expect(screen.getAllByRole('cell')).toHaveLength(10);
+    expect(container.querySelectorAll('.skeleton-circle')).toHaveLength(0);
   });
 });
 
