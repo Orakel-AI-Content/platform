@@ -25,7 +25,7 @@ export function MediaTile({ item, className, children, ...rest }: MediaTileProps
       )}
     >
       <MediaThumbnail item={item} />
-      <span className="block text-xs text-gray-600 dark:text-gray-400">{children}</span>
+      <span className="block text-xs">{children}</span>
     </button>
   );
 }
