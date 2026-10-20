@@ -90,7 +90,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   );
 
   return (
-    <section aria-labelledby="site-title" className="form-width space-y-6">
+    <section aria-labelledby="site-title" className="form-width space-y-4">
       <PageHeader
         id="site-title"
         trail={siteTrail(site)}
