@@ -968,3 +968,54 @@ describe('SchemaForm: erro, dica e obrigatório no FormItem (#329)', () => {
     expect(checkbox.hasAttribute('aria-required')).toBe(false);
   });
 });
+
+describe('SchemaForm: enum no Select do Ecme (#330)', () => {
+  const schema = z.object({ tipo: z.enum(['a', 'b']) });
+
+  it('escolhe só com teclado e entrega a mesma string da opção', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ tipo: 'a' }}
+        labels={{ tipo: 'Tipo', 'tipo=a': 'Opção A', 'tipo=b': 'Opção B' }}
+        hints={{ tipo: 'Define o formato.' }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    const tipo = screen.getByRole('combobox', { name: fieldLabel('Tipo') });
+    expect(screen.getByText('Opção A')).toBeTruthy();
+    const ids = (tipo.getAttribute('aria-describedby') ?? '').split(' ');
+    expect(ids.map((id) => document.getElementById(id)?.textContent)).toContain(
+      'Define o formato.',
+    );
+
+    tipo.focus();
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+    expect(screen.getByText('Opção B')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ tipo: 'b' }));
+  });
+
+  it('a recusa do servidor deixa o combobox inválido e com o foco', async () => {
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ tipo: 'a' }}
+        labels={{ tipo: 'Tipo' }}
+        submitLabel="Salvar"
+        onSubmit={() => [{ path: ['tipo'], message: 'Tipo indisponível' }]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    const tipo = screen.getByRole('combobox', { name: fieldLabel('Tipo') });
+    await waitFor(() => expect(document.activeElement).toBe(tipo));
+    expect(tipo.getAttribute('aria-invalid')).toBe('true');
+  });
+});
