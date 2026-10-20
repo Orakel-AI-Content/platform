@@ -416,7 +416,11 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
       .getByRole('button')
       .click();
     await page.getByRole('button', { name: 'Próxima página' }).click();
-    await expect(page.getByText('Página 2 de 20')).toBeVisible();
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Paginação' })
+        .getByRole('button', { name: 'Página 2', exact: true }),
+    ).toHaveAttribute('aria-current', 'page');
     await expect(page).toHaveURL(/tipo=page/);
     await expect(page).toHaveURL(/ordem=title/);
     await expect(page).toHaveURL(/pagina=2/);
@@ -427,7 +431,6 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
     await expect(other.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
       '500 resultados',
     );
-    await expect(other.getByText('Página 2 de 20')).toBeVisible();
     await expect(other.getByRole('search').getByText('Página', { exact: true })).toBeVisible();
     await expect(
       other
@@ -496,18 +499,57 @@ test.describe('lista com 2.000 conteúdos (#107)', () => {
     });
   }
 
-  test('busca sem resultado mostra a mensagem, e "Limpar busca" volta a lista', async ({
+  // Regra única do estado vazio (#361, #362): a tabela fica, com "0 resultados", e a ação de
+  // limpar é a "Limpar filtros" da toolbar.
+  test('busca sem resultado mantém a tabela com a mensagem, e "Limpar filtros" volta a lista', async ({
     page,
   }) => {
     await loginAs(page, 'editor@orakel.local');
     await page.goto(`/sites/${BIG_SITE}/conteudos?q=nada-com-isso`);
 
-    await expect(page.getByText('Nenhum conteúdo encontrado.')).toBeVisible();
-    await expect(page.getByRole('table')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Limpar busca' }).click();
+    const table = page.getByRole('table', { name: 'Conteúdos', exact: true });
+    await expect(table.getByText('Nenhum conteúdo encontrado.')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '0 resultados',
+    );
+    await expect(page.getByRole('button', { name: 'Limpar busca' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
 
     await expect(page.getByLabel('Buscar por título')).toHaveValue('');
     await expect(page.getByRole('row')).toHaveCount(26);
+    await expect(page.getByRole('button', { name: 'Limpar filtros' })).toHaveCount(0);
+  });
+
+  test('o seletor de tamanho fica na URL e recarregar mantém a mesma visão (#362)', async ({
+    page,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${BIG_SITE}/conteudos`);
+
+    await page.getByRole('combobox', { name: 'Itens por página' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await page.getByRole('option', { name: '50 / página' }).click();
+    await expect(page).toHaveURL(/por-pagina=50/);
+    await expect(page.locator('tbody tr')).toHaveCount(50);
+
+    await page.reload();
+    await expect(page.locator('tbody tr')).toHaveCount(50);
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '2.000 resultados',
+    );
+  });
+
+  // Padrão do template (#362): trilha acima do cartão; título, ação, toolbar e tabela nele.
+  test('trilha fora do cartão; título, toolbar e tabela dentro dele', async ({ page }) => {
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${BIG_SITE}/conteudos`);
+
+    const card = page.locator('.card').filter({ has: page.getByRole('table') });
+    await expect(card).toHaveCount(1);
+    await expect(card.getByRole('heading', { level: 1, name: 'Conteúdos' })).toBeVisible();
+    await expect(card.getByRole('search')).toBeVisible();
+    await expect(card.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toBeVisible();
   });
 });
 

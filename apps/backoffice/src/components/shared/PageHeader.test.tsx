@@ -3,7 +3,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import Link from 'next/link';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PageHeader } from './PageHeader.tsx';
+import { ListHeader, PageHeader, PageTrail } from './PageHeader.tsx';
 import { sitesTrail, siteTrail } from './trail.ts';
 
 // Trilha das telas de site e de área (#173): Sites › Site › Área, links até a tela atual; e a
@@ -77,6 +77,34 @@ describe('trilha do PageHeader', () => {
 
     render(<PageHeader id="t" title="Sites" />);
     expect(screen.queryByRole('navigation')).toBeNull();
+  });
+});
+
+describe('lista no padrão do template (#362)', () => {
+  it('PageTrail é a mesma trilha do PageHeader, sem o título', () => {
+    render(<PageTrail items={siteTrail(site, 'Conteúdos')} />);
+
+    const nav = screen.getByRole('navigation', { name: 'Trilha de navegação' });
+    expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe('Conteúdos');
+    expect(screen.queryByRole('heading')).toBeNull();
+  });
+
+  it('ListHeader: o h1 leva o id, a ação fica ao lado; sem ação, só o título', () => {
+    render(
+      <ListHeader
+        id="contents-title"
+        title="Conteúdos"
+        action={<Link href="/sites/exemplo-a/conteudos/novo">Criar conteúdo</Link>}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Conteúdos' }).id).toBe('contents-title');
+    expect(screen.getByRole('link', { name: 'Criar conteúdo' })).toBeTruthy();
+    expect(screen.queryByRole('navigation')).toBeNull();
+    cleanup();
+
+    render(<ListHeader id="t" title="Conteúdos" />);
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });
 
