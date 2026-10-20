@@ -11,6 +11,8 @@
 //   dele (no Ecme, `setHours` no `Date` local);
 // - `inputtable` chega ao BasePicker (no Ecme, era desestruturado e não repassado); o texto
 //   digitado é lido no fuso do navegador, como no Ecme.
+// - o OK é `type="button"`: dentro de um formulário, fecha o painel sem enviá-lo (no Ecme, sem
+//   `type`, era `submit`).
 'use client';
 
 import 'dayjs/locale/pt-br';
@@ -331,7 +333,7 @@ const DateTimepicker = (props: DateTimepickerProps) => {
           size="sm"
           onChange={handleTimeChange}
         />
-        <Button size="sm" disabled={!_value} onClick={handleOk}>
+        <Button type="button" size="sm" disabled={!_value} onClick={handleOk}>
           {okButtonContent}
         </Button>
       </div>
