@@ -23,12 +23,15 @@ export default async function NewSitePage() {
     return <ForbiddenScreen action="site.configure" back={backToSites} />;
   }
   return (
-    <section aria-labelledby="new-site-title" className="form-width space-y-6">
-      <PageHeader
-        id="new-site-title"
-        trail={sitesTrail([{ label: 'Cadastrar site' }])}
-        title="Cadastrar site"
-      />
+    <section aria-labelledby="new-site-title" className="space-y-6">
+      {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
+      <div className="form-width space-y-6">
+        <PageHeader
+          id="new-site-title"
+          trail={sitesTrail([{ label: 'Cadastrar site' }])}
+          title="Cadastrar site"
+        />
+      </div>
       <SiteConfigForm
         mode="create"
         defaultValues={emptySiteConfig(RESOURCES)}
@@ -37,6 +40,8 @@ export default async function NewSitePage() {
           variants: RESOURCES.variants,
           themes: THEME_SUMMARIES,
         }}
+        backHref={backToSites.href}
+        contentClassName="form-width"
         action={createSiteAction}
       />
     </section>

@@ -64,6 +64,8 @@ function renderForm(mode: 'create' | 'edit', result: SiteFormResult | Promise<Si
       defaultValues={editValues({ ...config, institutionalTexts: { about: [] } })}
       options={options}
       action={action}
+      backHref={mode === 'create' ? '/sites' : '/sites/exemplo-a'}
+      contentClassName="form-width"
     />,
   );
   return action;
@@ -184,6 +186,34 @@ describe('seções da configuração do site', () => {
       }
       expect(within(regions[2] as HTMLElement).getByLabelText('Tema')).toBeTruthy();
       expect(within(regions[4] as HTMLElement).getByLabelText('Indexável')).toBeTruthy();
+    },
+  );
+  it.each([
+    ['create', 'Cadastrar site', '/sites'],
+    ['edit', 'Salvar configuração', '/sites/exemplo-a'],
+  ] as const)(
+    '%s: ID e nome, idioma e fuso lado a lado; a barra fixa leva a ação principal',
+    (mode, submit, back) => {
+      renderForm(mode, { ok: true, message: '' });
+
+      for (const [first, second] of [
+        ['ID', 'Nome'],
+        ['Idioma', 'Fuso horário'],
+      ]) {
+        const pair = screen.getByLabelText(first).closest('.grid');
+        expect(pair?.className).toContain('md:grid-cols-2');
+        expect(pair?.contains(screen.getByLabelText(second))).toBe(true);
+      }
+      const bar = screen.getByRole('button', { name: submit }).closest('.sticky');
+      expect(bar).not.toBeNull();
+      if (mode === 'edit') {
+        expect(within(bar as HTMLElement).getByRole('link', { name: 'Voltar' })).toHaveProperty(
+          'pathname',
+          back,
+        );
+      } else {
+        expect(within(bar as HTMLElement).getByRole('button', { name: 'Descartar' })).toBeTruthy();
+      }
     },
   );
 });
