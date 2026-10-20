@@ -88,7 +88,7 @@ export default async function ContentVersionsPage({ params }: Params) {
     <section aria-labelledby="content-title" className="list-width space-y-4">
       {canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header}
       <div className="flex flex-col gap-4 xl:flex-row">
-        <Card className="min-w-[330px] 2xl:min-w-[400px]">
+        <Card className="min-w-[330px] xl:max-w-[330px] 2xl:max-w-[400px] 2xl:min-w-[400px]">
           <InfoList className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-1">
             <InfoField label="Tipo">{CONTENT_KIND_LABEL[latest.data.kind]}</InfoField>
             <InfoField label="ID" className="tabular-nums">
