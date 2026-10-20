@@ -1,13 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
+import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
 import { THEME_COOKIE_SCRIPT } from '@/configs/theme.config';
 
 import GlobalError from './global-error.tsx';
 
 // global-error (#77): documento próprio em pt-BR, cabeçalho estático do Backoffice e a tela de
 // erro, sem a mensagem da exceção; o tema escolhido vem do script do <head> (#283). O clique em
-// "Tentar de novo" é coberto no error.test.tsx.
+// "Tentar de novo" é coberto no error.test.tsx. Cabeçalho e <main> nos gutters da moldura (#380).
 
 describe('global-error', () => {
   const failure = Object.assign(new Error('conexão recusada: segredo'), { digest: '42' });
@@ -31,6 +32,13 @@ describe('global-error', () => {
     expect(html).toContain('Algo deu errado');
     expect(html).toContain('Tentar de novo');
     expect(html).toContain('Código do erro: 42');
+  });
+
+  it('usa os gutters da moldura, sem largura máxima', () => {
+    expect(html).not.toMatch(/max-w-/);
+    expect(html).toMatch(
+      new RegExp(`<main class="${PAGE_CONTAINER_GUTTER_X} ${PAGE_CONTAINER_GUTTER_Y}"`),
+    );
   });
 
   it('não expõe a mensagem da exceção', () => {
