@@ -199,7 +199,7 @@ describe('seções da configuração do site', () => {
       for (const [first, second] of [
         ['ID', 'Nome'],
         ['Idioma', 'Fuso horário'],
-      ]) {
+      ] as const) {
         const pair = screen.getByLabelText(first).closest('.grid');
         expect(pair?.className).toContain('md:grid-cols-2');
         expect(pair?.contains(screen.getByLabelText(second))).toBe(true);
