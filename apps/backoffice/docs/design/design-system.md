@@ -327,6 +327,9 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
     mínima `min-w-[330px]` (`2xl:min-w-[400px]`), e o conteúdo à direita num
     `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção. Abaixo de `xl`, empilha. Espaçamento em
     `space-y-4`/`gap-4`, o mesmo passo dos formulários.
+    Uma tabela no cartão da direita, mais estreito que a largura de lista, pode rolar na
+    horizontal dentro do próprio contêiner (o `overflow-x-auto` do `Table`), como no
+    `CustomerDetails`; a página nunca rola (#371).
   - Dados de rótulo e valor: `InfoList` e `InfoField` (`src/components/shared/InfoList.tsx`), o
     `CustomerInfoField` do `ProfileSection`: um `<dl>` em `text-sm`, cada campo com o rótulo
     (`dt`, `font-semibold`, cinza do body) em cima e o valor (`dd`, `font-bold`, cor dos

@@ -294,8 +294,9 @@ test('revisor não tem editor nem link para criar ou editar', async ({ page }) =
 // Histórico de versões e leitura de uma versão no Ecme (#271): Table e Tag sem violação do axe.
 // Versões no DataTable do template (#366), nos dois temas, no cartão "Versões" da tela de detalhe
 // (#371): trilha e título do conteúdo fora do cartão; o h2, a toolbar e a tabela nele; a 1280 px
-// nada rola na horizontal e nenhuma célula passa de duas linhas; o filtro vai para o endereço e
-// recarregar mantém a mesma visão.
+// a página não rola na horizontal (ao lado do resumo, a tabela rola só dentro do próprio
+// contêiner, como no `CustomerDetails` do Ecme) e nenhuma célula passa de duas linhas; o filtro
+// vai para o endereço e recarregar mantém a mesma visão.
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`versões a 1280 px, até duas linhas por célula, e uma versão sem violação do axe (${colorScheme})`, async ({
     page,
@@ -336,11 +337,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
       /^\d+ resultados?$/,
     );
 
-    const overflow = await table.evaluate((element) => [
-      document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      element.parentElement!.scrollWidth - element.parentElement!.clientWidth,
-    ]);
-    expect(overflow).toEqual([0, 0]);
+    const overflow = await table.evaluate((element) => ({
+      page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      container: getComputedStyle(element.parentElement!).overflowX,
+    }));
+    expect(overflow.page).toBe(0);
+    expect(overflow.container).toBe('auto');
 
     // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
     // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
