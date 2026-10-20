@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { fieldLabel } from './fieldLabel.ts';
 
 // Fila de revisão (#74) contra o ambiente local semeado: o editor cria um artigo, envia pela
 // página do conteúdo e o encontra na fila; o revisor vê a fila mas não o botão de enviar.
@@ -15,7 +16,7 @@ async function loginAs(page: Page, email: string): Promise<void> {
 /** Artigo mínimo em rascunho; devolve o caminho da página do conteúdo. */
 async function createDraft(page: Page, title: string, slug: string): Promise<string> {
   await page.goto('/sites/exemplo-a/conteudos/novo');
-  await page.getByLabel('Título', { exact: true }).fill(title);
+  await page.getByLabel(fieldLabel('Título')).fill(title);
   await page.getByLabel('Slug').fill(slug);
   await page
     .getByRole('group', { name: 'Autores' })

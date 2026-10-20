@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { fieldLabel } from './fieldLabel.ts';
 
 // Vitrine dos componentes do Ecme (#205; workspace#45): cada componente portado auditado com
 // axe e teclado nos dois temas, renderizado no servidor sem aviso de hidratação. Com movimento
@@ -801,7 +802,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.waitForLoadState('networkidle');
     const selects = section(page, 'Select');
 
-    const categoria = selects.getByLabel('Categoria', { exact: true });
+    const categoria = selects.getByLabel(fieldLabel('Categoria'));
     await expect(categoria).toHaveAttribute('role', 'combobox');
     await categoria.focus();
     await page.keyboard.press('ArrowDown');

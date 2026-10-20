@@ -8,6 +8,7 @@ import { createAuthor } from '../../src/domain/content/authors.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
+import { fieldLabel } from './fieldLabel.ts';
 
 // Autores, taxonomias, menus e textos institucionais (#46) contra o ambiente local semeado:
 // o editor cria e edita pelas telas e vê o resultado; o revisor não grava. Autores e
@@ -40,7 +41,7 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await page.getByRole('link', { name: 'Criar autor' }).first().click();
   // "Nome" exato: a lista também tem "Buscar por nome" (#108).
   await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
-  await page.getByLabel('Nome', { exact: true }).fill(author);
+  await page.getByLabel(fieldLabel('Nome')).fill(author);
   await page.getByLabel('Slug').fill(`autora-${stamp}`);
   await expectNoViolations(page);
   await page.getByRole('button', { name: 'Criar' }).click();
@@ -65,7 +66,7 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   // Slug repetido: a recusa do domínio aparece junto do campo.
   await page.getByRole('link', { name: 'Criar autor' }).first().click();
   await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
-  await page.getByLabel('Nome', { exact: true }).fill('Outra');
+  await page.getByLabel(fieldLabel('Nome')).fill('Outra');
   await page.getByLabel('Slug').fill(`autora-${stamp}`);
   await page.getByRole('button', { name: 'Criar' }).click();
   await expect(page.getByLabel('Slug')).toHaveAttribute('aria-invalid', 'true');
@@ -75,7 +76,7 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await page.getByRole('link', { name: 'Criar taxonomia' }).first().click();
   await expect(page.getByRole('heading', { name: 'Criar taxonomia' })).toBeVisible();
   await page.getByLabel('Tipo').selectOption({ label: 'Categoria' });
-  await page.getByLabel('Nome', { exact: true }).fill(category);
+  await page.getByLabel(fieldLabel('Nome')).fill(category);
   await page.getByLabel('Slug').fill(`categoria-${stamp}`);
   await page.getByRole('button', { name: 'Criar' }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/taxonomias$/);
@@ -126,7 +127,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const summary = page.getByRole('alert').filter({ hasText: 'Corrija os campos destacados:' });
     await expect(summary.locator('.alert')).toBeVisible();
     await summary.getByRole('button', { name: /^Nome:/ }).click();
-    await expect(page.getByLabel('Nome', { exact: true })).toBeFocused();
+    await expect(page.getByLabel(fieldLabel('Nome'))).toBeFocused();
     await expectNoViolations(page);
   });
 }
@@ -181,7 +182,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       expect(await control.evaluate((el) => el.closest('.card') !== null)).toBe(true);
     }
     // Nome e Slug na mesma linha a 1280 px; um embaixo do outro a 767 px.
-    const name = page.getByLabel('Nome', { exact: true });
+    const name = page.getByLabel(fieldLabel('Nome'));
     const slug = page.getByLabel('Slug');
     expect((await name.boundingBox())?.y).toBe((await slug.boundingBox())?.y);
     // A barra encosta nas bordas do main.

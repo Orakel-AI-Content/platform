@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { fieldLabel } from './fieldLabel.ts';
 
 // Foco visível (#85): navegando só com Tab, link, campo e botão mostram o contorno --ring
 // de 2px, vindo da regra global de globals.css, nos dois temas. O "Pular para o conteúdo"
@@ -52,7 +53,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       page.getByRole('link', { name: 'Pular para o conteúdo' }),
       // Link da trilha (#243), com as classes do Ecme.
       main.getByRole('navigation', { name: 'Trilha de navegação' }).getByRole('link').first(),
-      main.getByLabel('Nome', { exact: true }),
+      main.getByLabel(fieldLabel('Nome')),
       main.getByRole('button', { name: 'Criar', exact: true }),
     ];
     for (const target of targets) {
