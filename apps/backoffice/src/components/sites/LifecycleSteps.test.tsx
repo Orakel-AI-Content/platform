@@ -8,14 +8,21 @@ import { LifecycleAction, LifecycleActionScope } from './SiteActions.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
-// Ciclo de vida como sequência de etapas (#148): ordem fixa, estado em texto, a atual com
-// aria-current e a ação manual junto da etapa que ela conclui.
+// Ciclo de vida como sequência de etapas (#148) no Steps do Ecme (#369): ordem fixa, estado em
+// texto, a atual com aria-current e a ação manual junto da etapa que ela conclui.
 
 afterEach(cleanup);
 
 type Lifecycle = SiteSummary['lifecycle'];
 
 const items = () => within(screen.getByRole('list')).getAllByRole('listitem');
+
+/** O texto do item sem o que é `aria-hidden` (marcador, conector e o estado visível). */
+const spokenText = (item: HTMLElement) => {
+  const clone = item.cloneNode(true) as HTMLElement;
+  for (const hidden of clone.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
+  return clone.textContent;
+};
 
 const withAction = (
   lifecycle: Lifecycle,
@@ -30,15 +37,22 @@ const withAction = (
 );
 
 describe('etapas do ciclo de vida', () => {
-  it('mostra as quatro etapas em ordem com o estado em texto e a atual marcada', () => {
+  it('mostra as quatro etapas do Steps em ordem com o estado em texto e a atual marcada', () => {
     render(<LifecycleSteps current="infra_aplicada" />);
 
     expect(screen.getByRole('list').tagName).toBe('OL');
-    expect(items().map((item) => item.textContent)).toEqual([
-      '1Cadastrado (concluída)',
-      '2Infra aplicada (atual)',
-      '3Zona ativa (pendente)',
-      '4Publicado (pendente)',
+    expect(screen.getByRole('list').classList).toContain('steps-vertical');
+    expect(items().map((item) => item.classList.contains('step-item'))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(items().map(spokenText)).toEqual([
+      'Cadastrado (concluída)',
+      'Infra aplicada (atual)',
+      'Zona ativa (pendente)',
+      'Publicado (pendente)',
     ]);
     expect(items().map((item) => item.getAttribute('aria-current'))).toEqual([
       null,
@@ -48,14 +62,16 @@ describe('etapas do ciclo de vida', () => {
     ]);
   });
 
-  it('pinta o marcador de cada etapa com a cor do estado, nos tokens do Ecme', () => {
+  it('mostra o estado da atual e das pendentes na tela, fora do leitor de tela', () => {
     render(<LifecycleSteps current="infra_aplicada" />);
 
-    const marker = (index: number) => within(items()[index]!).getByText(String(index + 1));
-    expect(marker(0).className).toContain('bg-primary');
-    expect(marker(1).className).toContain('outline-primary');
-    expect(marker(1).className).not.toContain('bg-primary');
-    expect(marker(2).className).toContain('border-dashed');
+    // O sufixo visível fica no título, aria-hidden; o leitor de tela ouve só o sr-only do StepItem.
+    const visibleState = (item: HTMLElement) =>
+      item.querySelector('.step-item-title [aria-hidden="true"]')?.textContent ?? null;
+    expect(items().map(visibleState)).toEqual([null, ' (atual)', ' (pendente)', ' (pendente)']);
+    for (const item of items()) {
+      expect(item.querySelectorAll('.sr-only')).toHaveLength(1);
+    }
   });
 
   it.each([
