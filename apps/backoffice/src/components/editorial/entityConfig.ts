@@ -48,8 +48,11 @@ export type EntityConfig<T> = {
   list: {
     headers: [string, ...string[]];
     row: (item: T) => EntityRow;
-    noun: { one: string; many: string; none: string };
-    search?: EntitySearch;
+    /** Lista vazia: nada cadastrado. */
+    empty: string;
+    search: EntitySearch;
+    /** Índices de `cells` cortados numa linha, com o texto inteiro em `title` (#363). */
+    truncated?: readonly number[];
   };
 };
 
@@ -83,7 +86,7 @@ export const ENTITY_CONFIG: { [K in EntityKind]: EntityConfig<EntityItems[K]> } 
         name: author.name,
         cells: [author.slug, author.expertise ?? '—'],
       }),
-      noun: { one: 'autor', many: 'autores', none: 'Nenhum autor cadastrado.' },
+      empty: 'Nenhum autor cadastrado.',
       search: { label: 'Buscar por nome', notFound: 'Nenhum autor encontrado.' },
     },
   },
@@ -114,7 +117,7 @@ export const ENTITY_CONFIG: { [K in EntityKind]: EntityConfig<EntityItems[K]> } 
         name: taxonomy.name,
         cells: [TAXONOMY_KIND_LABEL[taxonomy.kind], taxonomy.slug],
       }),
-      noun: { one: 'taxonomia', many: 'taxonomias', none: 'Nenhuma taxonomia cadastrada.' },
+      empty: 'Nenhuma taxonomia cadastrada.',
       search: { label: 'Buscar por nome', notFound: 'Nenhuma taxonomia encontrada.' },
     },
   },
@@ -146,7 +149,9 @@ export const ENTITY_CONFIG: { [K in EntityKind]: EntityConfig<EntityItems[K]> } 
         name: menu.key,
         cells: [menu.items.map((item) => `${item.label} (${item.href})`).join(' · ')],
       }),
-      noun: { one: 'menu', many: 'menus', none: 'Nenhum menu cadastrado.' },
+      empty: 'Nenhum menu cadastrado.',
+      search: { label: 'Buscar por chave', notFound: 'Nenhum menu encontrado.' },
+      truncated: [0],
     },
   },
 };
