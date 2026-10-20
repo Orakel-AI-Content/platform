@@ -94,3 +94,100 @@ describe('paleta compilada do globals.css', async () => {
     expect(generated(candidate)).toBe(true);
   });
 });
+
+// Camada base do Ecme (#395): compilada, cada regra cai na @layer base (ou components, a
+// .heading-text), que o Tailwind declara antes de utilities. Assim o texto sem classe própria
+// sai como no template, e uma utility da tela ainda vence a base.
+type Rule = { layer: string | null; selector: string; body: string };
+
+/** Regras do CSS compilado com a @layer que as contém (`null` fora de layer). */
+function rules(output: string, layer: string | null = null): Rule[] {
+  const found: Rule[] = [];
+  const text = output.replace(/\/\*[\s\S]*?\*\//g, '');
+  let start = 0;
+  while (start < text.length) {
+    const open = text.indexOf('{', start);
+    if (open === -1) break;
+    const selector = text.slice(start, open).split(/[;}]/).pop()!.trim();
+    let depth = 1;
+    let close = open + 1;
+    for (; depth > 0; close++) depth += text[close] === '{' ? 1 : text[close] === '}' ? -1 : 0;
+    const body = text.slice(open + 1, close - 1);
+    const nested = /^@layer\s+([\w-]+)$/.exec(selector);
+    if (nested) found.push(...rules(body, nested[1]));
+    else found.push({ layer, selector: selector.replace(/\s+/g, ' '), body });
+    start = close;
+  }
+  return found;
+}
+
+describe('camada base compilada do globals.css', async () => {
+  const compiler = await compile(css, {
+    base: fileURLToPath(new URL('.', import.meta.url)),
+    loadStylesheet,
+  });
+  const output = compiler.build(['text-gray-900']);
+  const all = rules(output);
+  /** Corpo da regra com esse seletor; erro se não houver exatamente uma. */
+  const rule = (selector: string) => {
+    const matches = all.filter((r) => r.selector === selector);
+    expect(matches, selector).toHaveLength(1);
+    return matches[0]!;
+  };
+
+  it('declara a @layer base antes de utilities', () => {
+    expect(output).toContain('@layer theme, base, components, utilities;');
+  });
+
+  it('põe o body só na @layer base, com o texto do template e o cinza AA', () => {
+    const body = rule('body');
+    expect(body.layer).toBe('base');
+    expect(body.body).toContain('font-size: var(--text-sm)');
+    expect(body.body).toContain('font-weight: var(--font-weight-medium)');
+    expect(body.body).toContain('line-height: var(--leading-normal)');
+    expect(body.body).toContain('-webkit-font-smoothing: antialiased');
+    expect(body.body).toMatch(/^\s*color: var\(--gray-600\);/m);
+    expect(body.body).toMatch(/&:is\(\.dark \*\) \{\s*color: var\(--gray-400\);/);
+  });
+
+  it('deixa uma utility da tela vencer o body', () => {
+    expect(rule('.text-gray-900').layer).toBe('utilities');
+  });
+
+  it.each([
+    ['h1, .h1', 'text-4xl', 'bold'],
+    ['h2, .h2', 'text-3xl', 'bold'],
+    ['h3, .h3', 'text-2xl', 'bold'],
+    ['h4, .h4', 'text-xl', 'bold'],
+    ['h5, .h5', 'text-lg', 'bold'],
+    ['h6, .h6', 'text-base', 'semibold'],
+  ])('%s em %s, font-%s e a cor de título', (selector, size, weight) => {
+    const heading = rule(selector);
+    expect(heading.layer).toBe('base');
+    expect(heading.body).toContain(`font-size: var(--${size})`);
+    expect(heading.body).toContain(`font-weight: var(--font-weight-${weight})`);
+    expect(heading.body).toMatch(/^\s*color: var\(--gray-900\);/m);
+    expect(heading.body).toMatch(/&:is\(\.dark \*\) \{\s*color: var\(--gray-100\);/);
+  });
+
+  it('dá cursor de mão a button e [role=button]', () => {
+    const button = rule("button, [role='button']");
+    expect(button.layer).toBe('base');
+    expect(button.body).toContain('cursor: pointer');
+  });
+
+  it('pinta o hr de gray-200 no claro e gray-600 no escuro', () => {
+    // A preflight do Tailwind tem outro `hr` (altura e borda superior), também na base.
+    const hr = all.find((r) => r.selector === 'hr' && r.body.includes('--gray-200'));
+    expect(hr?.layer).toBe('base');
+    expect(hr!.body).toMatch(/^\s*border-color: var\(--gray-200\);/m);
+    expect(hr!.body).toMatch(/&:is\(\.dark \*\) \{\s*border-color: var\(--gray-600\);/);
+  });
+
+  it('define a .heading-text com a cor de título, em components', () => {
+    const heading = rule('.heading-text');
+    expect(heading.layer).toBe('components');
+    expect(heading.body).toMatch(/^\s*color: var\(--gray-900\);/m);
+    expect(heading.body).toMatch(/&:is\(\.dark \*\) \{\s*color: var\(--gray-100\);/);
+  });
+});
