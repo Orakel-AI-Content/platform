@@ -874,7 +874,11 @@ describe('SchemaForm: formulário em cartão (#333)', () => {
         labels={labels}
         card={{
           intro: <h2>Janela</h2>,
-          extra: { label: 'Usar padrão', run: vi.fn(() => Promise.resolve({ success: 'ok' })) },
+          extra: {
+            label: 'Usar padrão',
+            pendingLabel: 'Usando padrão…',
+            run: vi.fn(() => Promise.resolve({ success: 'ok' })),
+          },
         }}
         submitLabel="Salvar"
         onSubmit={vi.fn()}
@@ -909,7 +913,14 @@ describe('SchemaForm: formulário em cartão (#333)', () => {
         schema={schema}
         defaultValues={{ seconds: 30 }}
         labels={labels}
-        card={{ extra: { label: 'Usar padrão', resetTo: { seconds: '' }, run } }}
+        card={{
+          extra: {
+            label: 'Usar padrão',
+            pendingLabel: 'Usando padrão…',
+            resetTo: { seconds: '' },
+            run,
+          },
+        }}
         submitLabel="Salvar"
         onSubmit={onSubmit}
       />,
@@ -929,6 +940,38 @@ describe('SchemaForm: formulário em cartão (#333)', () => {
     expect(input.getAttribute('aria-invalid')).not.toBe('true');
   });
 
+  it('durante a ação secundária, ela mostra a pendência e os dois botões ficam desabilitados', async () => {
+    const user = userEvent.setup();
+    let finish: (value: { success: string }) => void = () => undefined;
+    const run = vi.fn(
+      () =>
+        new Promise<{ success: string }>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ seconds: 30 }}
+        labels={labels}
+        card={{ extra: { label: 'Usar padrão', pendingLabel: 'Usando padrão…', run } }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Usar padrão' }));
+    const pending = await screen.findByRole('button', { name: 'Usando padrão…' });
+    expect(pending).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Salvar' })).toHaveProperty('disabled', true);
+
+    finish({ success: 'ok' });
+    expect(await screen.findByRole('button', { name: 'Usar padrão' })).toHaveProperty(
+      'disabled',
+      false,
+    );
+  });
+
   it('recusa da ação secundária com path vira erro do campo', async () => {
     const user = userEvent.setup();
     render(
@@ -939,6 +982,7 @@ describe('SchemaForm: formulário em cartão (#333)', () => {
         card={{
           extra: {
             label: 'Usar padrão',
+            pendingLabel: 'Usando padrão…',
             run: () => Promise.resolve([{ path: ['seconds'], message: 'Recusado pelo domínio.' }]),
           },
         }}

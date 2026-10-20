@@ -95,6 +95,8 @@ export type SchemaFormActionBar = { kind: 'create' | 'edit'; href: string };
  */
 export type SchemaFormExtraAction = {
   label: string;
+  /** Rótulo enquanto a ação roda: o mesmo rótulo no gerúndio ("Usando padrão…"). */
+  pendingLabel: string;
   /** Valores do formulário ao acionar (ex.: o campo volta a vazio). */
   resetTo?: Record<string, unknown>;
   run: () => Promise<SubmitOutcome>;
@@ -821,7 +823,7 @@ export function SchemaForm<T>({
                           .finally(() => setExtraPending(false));
                       }}
                     >
-                      {card.extra.label}
+                      {extraPending ? card.extra.pendingLabel : card.extra.label}
                     </Button>
                   )}
                   {submit}
