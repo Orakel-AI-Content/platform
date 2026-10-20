@@ -349,7 +349,8 @@ test('envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com
   await expect(row('paisagem.jpg')).toContainText('pronta', { timeout: 60_000 });
 });
 
-// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, nos dois temas.
+// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, nos dois temas, com
+// um único `role="status"` para a fila (#375).
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`fila de envio preenchida sem violação do axe (${colorScheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
@@ -369,10 +370,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
     const row = (name: string) =>
       page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
-    await expect(row('notas.jpg').getByRole('status')).toHaveText(/^recusada: /);
-    await expect(row(`axe-${colorScheme}.jpg`).getByRole('status')).toHaveText('pronta', {
-      timeout: 60_000,
-    });
+    await expect(row('notas.jpg')).toContainText('recusada: ');
+    await expect(row(`axe-${colorScheme}.jpg`)).toContainText('pronta', { timeout: 60_000 });
+    // Um anúncio só para a fila, com o resumo; as linhas não têm região própria (#375).
+    await expect(page.getByRole('status').filter({ hasText: /^2 envios: / })).toHaveText(
+      '2 envios: 1 pronta, 1 recusada',
+    );
+    await expect(page.getByRole('list', { name: 'Envios' }).getByRole('status')).toHaveCount(0);
 
     const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
     expect(accessibility.violations).toEqual([]);
