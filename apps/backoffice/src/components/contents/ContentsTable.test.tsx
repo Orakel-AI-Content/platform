@@ -124,12 +124,12 @@ describe('tabela de conteúdos', () => {
     const user = userEvent.setup();
     render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
 
-    const first = screen.getByRole('link', { name: 'Guia de uso (versões)' });
+    const first = screen.getByRole('link', { name: 'Guia de uso (ver versões)' });
     // Busca, filtros e cabeçalhos ordenáveis vêm antes: o Tab chega ao primeiro link.
     while (document.activeElement !== first) await user.tab();
     expect(first.getAttribute('href')).toBe('/sites/exemplo-a/conteudos/1');
     await user.tab();
-    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Sobre (versões)' }));
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Sobre (ver versões)' }));
   });
 
   it('sem conteúdo mostra o estado vazio no lugar da tabela, com a ação recebida', () => {
@@ -166,7 +166,7 @@ const titles = () =>
   screen
     .getAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('link')[0]?.textContent?.replace(' (versões)', ''));
+    .map((row) => within(row).getAllByRole('link')[0]?.textContent?.replace(' (ver versões)', ''));
 
 const many: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
   id: index + 10,
@@ -321,7 +321,7 @@ describe('busca, filtros, ordem e paginação (#107)', () => {
       />,
     );
 
-    const link = screen.getByRole('link', { name: `${title} (versões)` });
+    const link = screen.getByRole('link', { name: `${title} (ver versões)` });
     const text = within(link).getByText(title);
     expect(text.getAttribute('title')).toBe(title);
     expect(text.className).toContain('truncate');
