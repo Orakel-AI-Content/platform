@@ -237,7 +237,7 @@ test('busca e filtro por estado ficam na URL e recarregar mantém a mesma visão
   await expect(page).toHaveURL(new RegExp(`q=e2e-lista-${stamp}`));
   await expect(count).toHaveText('18 resultados');
 
-  await page.getByRole('combobox', { name: 'Estado' }).focus();
+  await page.getByRole('combobox', { name: 'Status' }).focus();
   await page.keyboard.press('ArrowDown');
   await page.getByRole('option', { name: 'Pausado' }).click();
   await expect(page).toHaveURL(/estado=pausado/);

@@ -37,7 +37,7 @@ const STATES = Object.keys(SITE_STATE_LABEL) as SiteSummary['state'][];
 /** Busca por nome, id e domínio, filtro por estado, ordem por nome (#364). */
 const LIST: ListConfig = {
   filters: [{ column: 'state', param: 'estado', values: STATES }],
-  // Só Site e Estado: o ícone de ordem alarga o cabeçalho, e a 1280 px a tabela não cabe com
+  // Só Site e Status: o ícone de ordem alarga o cabeçalho, e a 1280 px a tabela não cabe com
   // ele em todas as colunas (#248).
   sortable: ['name', 'state'],
   defaultSort: { id: 'name', desc: false },
@@ -137,7 +137,7 @@ function columnsFor(
       },
     },
     {
-      header: 'Estado',
+      header: 'Status',
       accessorKey: 'state',
       enableGlobalFilter: false,
       filterFn: 'equalsString',
@@ -164,7 +164,7 @@ function columnsFor(
       cell: ({ row }) => (row.original.indexavel ? 'Sim' : 'Não'),
     },
     {
-      header: 'Pendências',
+      header: 'Mudanças pendentes',
       accessorKey: 'pendingChanges',
       enableGlobalFilter: false,
       enableSorting: false,
@@ -248,7 +248,7 @@ export function SitesTable({
         filters={[
           {
             column: 'state',
-            label: 'Estado',
+            label: 'Status',
             value: list.state.filters.state,
             options: STATES.map((state) => ({ value: state, label: SITE_STATE_LABEL[state] })),
           },
