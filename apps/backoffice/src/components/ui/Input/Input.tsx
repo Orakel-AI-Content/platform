@@ -3,6 +3,7 @@
 // - dentro de um FormItem, o campo usa o id que o rótulo aponta (`controlId`, se não vier `id`)
 //   e, inválido, anuncia o estado (`aria-invalid`) e soma o id da mensagem de erro ao
 //   `aria-describedby` recebido; o Ecme só trocava a classe;
+// - (#329) soma também o id da dica do FormItem (`hintId`), sem repetir ids;
 // - o `isNil` do `es-toolkit/compat` virou a checagem local de `undefined` (o `offsetWidth` é
 //   número ou ausente).
 'use client';
@@ -74,8 +75,13 @@ const Input = (props: InputProps) => {
   const isInputInvalid = invalid || formItem?.invalid;
 
   const describedBy =
-    [ariaDescribedBy, isInputInvalid ? formItem?.errorId : undefined].filter(Boolean).join(' ') ||
-    undefined;
+    [
+      ...new Set(
+        [ariaDescribedBy, formItem?.hintId, isInputInvalid ? formItem?.errorId : undefined].filter(
+          Boolean,
+        ),
+      ),
+    ].join(' ') || undefined;
 
   const fixControlledValue = (val: string | number | readonly string[] | undefined) => {
     if (typeof val === 'undefined' || val === null) {
