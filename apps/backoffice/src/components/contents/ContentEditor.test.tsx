@@ -197,6 +197,23 @@ describe('editor de conteúdo', () => {
     expect(action).not.toHaveBeenCalled();
   });
 
+  it('sem blocos: o erro da lista é a mensagem do FormItem, ligada à seção Blocos (#329)', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor({ mode: 'create', defaultValues: { ...meta, blocks: [] } });
+
+    await save(user);
+
+    const blocks = screen.getByRole('region', { name: 'Blocos' });
+    await waitFor(() => {
+      const [error] = (blocks.getAttribute('aria-describedby') ?? '')
+        .split(' ')
+        .map((id) => document.getElementById(id));
+      expect(error?.textContent).toBe('Adicione ao menos um bloco');
+      expect(error?.className).toContain('form-explain');
+    });
+    expect(action).not.toHaveBeenCalled();
+  });
+
   it('a recusa do domínio aparece no campo do caminho e no resumo', async () => {
     const user = userEvent.setup();
     renderEditor({

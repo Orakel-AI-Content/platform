@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { TbArrowNarrowLeft, TbTrash } from 'react-icons/tb';
 import {
   Controller,
@@ -490,33 +490,28 @@ function Children({
   );
 }
 
-/**
- * Grupo (`fieldset`) num `FormItem` sem rótulo: o nome é o `legend`, e a mensagem de erro do
- * `FormItem` entra no `aria-describedby` do grupo enquanto ele está inválido.
- */
-export function FieldGroup({
-  message,
-  className,
-  children,
-}: {
+type FieldGroupProps = {
+  /** Erro da lista inteira (ex.: "ao menos um item"); sem ele, o grupo está válido. */
   message: string | undefined;
-  className?: string;
-  children: ReactNode;
-}) {
+  /** `fieldset` (nome no `legend`) ou `section` (nome pelo `aria-labelledby` do título). */
+  as?: 'fieldset' | 'section';
+} & HTMLAttributes<HTMLElement>;
+
+/**
+ * Grupo (lista) num `FormItem` sem rótulo: a mensagem de erro é a do `FormItem` e entra no
+ * `aria-describedby` do grupo enquanto ele está inválido.
+ */
+export function FieldGroup({ message, ...props }: FieldGroupProps) {
   return (
     <FormItem invalid={message !== undefined} errorMessage={message}>
-      <GroupFieldset className={className}>{children}</GroupFieldset>
+      <GroupElement {...props} />
     </FormItem>
   );
 }
 
-function GroupFieldset({ className, children }: { className?: string; children: ReactNode }) {
+function GroupElement({ as: Element = 'fieldset', ...props }: Omit<FieldGroupProps, 'message'>) {
   const errorId = useFormItem()?.errorId;
-  return (
-    <fieldset aria-describedby={errorId} className={className}>
-      {children}
-    </fieldset>
-  );
+  return <Element aria-describedby={errorId} {...props} />;
 }
 
 /** Lista de objetos: um fieldset por item, com adicionar e remover. */
