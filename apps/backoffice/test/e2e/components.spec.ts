@@ -2111,7 +2111,7 @@ for (const width of [375, 700, 1280]) {
 
 // Lista de dados e linha de metadados (#368): o `CustomerInfoField` do Ecme, com o rótulo em
 // cima e o valor embaixo. A 375 px, o valor de 120 caracteres sem espaço nem hífen quebra dentro
-// do cartão, sem rolagem horizontal da página; o axe passa nos dois temas.
+// do cartão, e nada da seção passa da janela; o axe passa nos dois temas.
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`lista de dados quebra o valor longo a 375 px, sem violação do axe (${colorScheme})`, async ({
     page,
@@ -2132,20 +2132,23 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const value = showcase.locator('[data-vitrine-valor-longo]');
     await expect(value).toHaveText('guiacompleto'.repeat(10));
     const valueBox = (await value.boundingBox())!;
-    const cardBox = (await showcase
-      .getByRole('term', { name: 'Slug' })
-      .locator('xpath=ancestor::dl[1]')
-      .boundingBox())!;
-    expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 1);
+    const listBox = (await showcase.locator('dl').boundingBox())!;
+    expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(listBox.x + listBox.width + 1);
     const lineHeight = await value.evaluate((element) =>
       Number.parseFloat(getComputedStyle(element).lineHeight),
     );
     expect(valueBox.height).toBeGreaterThan(lineHeight * 1.5);
-    const viewport = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+    // Nada da seção passa da janela: a página não rola por causa dela. (A vitrine inteira rola a
+    // 375 px por outras seções, como a Pagination e o DataTable; por isso a medida é da seção.)
+    const overflow = await showcase.evaluate((element) => {
+      const right = Math.max(
+        element.getBoundingClientRect().right,
+        ...[...element.querySelectorAll('*')].map((child) => child.getBoundingClientRect().right),
+      );
+      return { right, scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
+    });
+    expect(overflow.right).toBeLessThanOrEqual(375);
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
 
     const accessibility = await new AxeBuilder({ page })
       .withTags(WCAG)
