@@ -298,7 +298,7 @@ test('trilha nas telas de item: Sites › Site › Área › Item, sem link de v
   await page.goto(`/sites/${SITE}/conteudos`);
   await main
     .getByRole('table')
-    .getByRole('link', { name: /\(versões\)/ })
+    .getByRole('link', { name: /\(ver versões\)/ })
     .first()
     .click();
   // Espera a tela do conteúdo (o h2 "Versões"): lido antes, o h1 ainda seria o da lista de
