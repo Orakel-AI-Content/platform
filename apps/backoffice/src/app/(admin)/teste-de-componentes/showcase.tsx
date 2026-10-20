@@ -53,6 +53,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { Upload } from '@/components/ui/Upload';
 
 import { DataTableShowcase } from './data-table-showcase.tsx';
+import { FormsShowcase } from './forms-showcase.tsx';
 import { MediaShowcase } from './media-showcase.tsx';
 import { MenuShowcase } from './menu-showcase.tsx';
 
@@ -885,6 +886,8 @@ export function Showcase({ linkPage }: { linkPage: number }) {
       <MenuShowcase />
 
       <MediaShowcase />
+
+      <FormsShowcase />
 
       <section aria-labelledby="vitrine-movimento" className="space-y-3">
         <h2 id="vitrine-movimento" className="text-lg font-semibold">
