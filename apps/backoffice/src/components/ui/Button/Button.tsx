@@ -9,6 +9,9 @@
 // - `href` e `download` tipados (#247), para o link com cara de botão (`asElement={Link}` ou
 //   `asElement="a"`), como o `href` do Dropdown.Item (#239); `target` e `rel` (#274), para o
 //   link que abre em nova aba.
+// - o hover do `plain` usa `hover:text-primary-deep` no claro: o `primary-mild` do Ecme dá 4,14:1
+//   sobre `gray-100` (#396; par em ECME_PAIRS); o escuro mantém o `primary-mild`. Saem o
+//   `dark:primary-mild` e o `dark:active:primary-mild` do Ecme, que não são utilities.
 'use client';
 
 import classNames from '../utils/classNames';
@@ -141,10 +144,10 @@ const Button = (props: ButtonProps) => {
 
   const plainColor = () => {
     const btn = {
-      bgColor: active ? `` : `dark:primary-mild`,
+      bgColor: ``,
       textColor: ``,
-      hoverColor: active ? '' : `hover:text-primary-mild`,
-      activeColor: `dark:active:primary-mild`,
+      hoverColor: active ? '' : `hover:text-primary-deep dark:hover:text-primary-mild`,
+      activeColor: ``,
     };
     return getBtnColor(btn);
   };
