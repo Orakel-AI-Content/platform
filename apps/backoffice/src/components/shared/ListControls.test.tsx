@@ -202,6 +202,40 @@ describe('ListToolbar', () => {
   });
 });
 
+describe('ListToolbar: layout do template (#361)', () => {
+  it('em coluna abaixo de md, em linha a partir de md, sem min-w fixo', () => {
+    render(
+      <ListToolbar
+        search=""
+        searchLabel="Buscar por título"
+        onSearchChange={() => {}}
+        filters={[{ column: 'kind', label: 'Tipo', value: 'page', options: [] }]}
+        onClear={() => {}}
+      />,
+    );
+
+    const form = screen.getByRole('search');
+    expect(form.className.split(' ')).toEqual(
+      expect.arrayContaining(['flex-col', 'md:flex-row', 'md:items-center', 'md:justify-between']),
+    );
+    expect(form.outerHTML).not.toMatch(/min-w-/);
+    expect(within(form).getByRole('button', { name: 'Limpar filtros' })).toBeTruthy();
+  });
+
+  it('sem filtro ativo nem busca, não mostra "Limpar filtros"', () => {
+    render(
+      <ListToolbar
+        search=""
+        searchLabel="Buscar por nome"
+        onSearchChange={() => {}}
+        onClear={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Limpar filtros' })).toBeNull();
+  });
+});
+
 describe('SortableHead', () => {
   it('alterna o sentido com clique e teclado e expõe aria-sort', async () => {
     const user = userEvent.setup();
