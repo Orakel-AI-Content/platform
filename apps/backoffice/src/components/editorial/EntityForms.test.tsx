@@ -177,7 +177,9 @@ describe('formulários de entidades', () => {
     const action = vi.fn(() =>
       Promise.resolve<EntityFormResult>({ ok: true, message: 'Textos salvos.' }),
     );
-    render(<InstitutionalTextsForm defaultValues={{}} action={action} />);
+    render(
+      <InstitutionalTextsForm defaultValues={{}} action={action} backHref="/sites/exemplo-a" />,
+    );
     render(<ToastProvider />);
 
     await user.click(screen.getByRole('button', { name: 'Salvar textos' }));
@@ -185,5 +187,66 @@ describe('formulários de entidades', () => {
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Textos salvos.'));
     expect(screen.getByRole('status').querySelector('.notification')).not.toBeNull();
     expect(router.refresh).toHaveBeenCalled();
+  });
+
+  // Formulário do template (#328): pares lado a lado e a barra fixa com Descartar ou Voltar.
+  it.each([
+    ['author', { slug: '', name: '' }, ['Nome', 'Slug']],
+    ['taxonomy', { kind: 'category', slug: '', name: '' }, ['Nome', 'Slug']],
+    ['menu', { key: '', items: [{ label: '', href: '' }] }, ['Rótulo', 'Link']],
+  ] as const)('%s: campos curtos lado a lado a partir de md', (kind, values, [first, second]) => {
+    render(
+      <EntityForm
+        kind={kind}
+        mode="create"
+        siteId="exemplo-a"
+        defaultValues={values}
+        action={vi.fn()}
+      />,
+    );
+
+    const pair = screen.getByLabelText(first).closest('.grid');
+    expect(pair?.className).toContain('md:grid-cols-2');
+    expect(pair?.contains(screen.getByLabelText(second))).toBe(true);
+  });
+
+  it('criar tem Descartar; editar tem Voltar para a lista; os dois na barra fixa', () => {
+    const { unmount } = render(
+      <EntityForm
+        kind="author"
+        mode="create"
+        siteId="exemplo-a"
+        defaultValues={{ slug: '', name: '' }}
+        action={vi.fn()}
+      />,
+    );
+    const create = screen.getByRole('button', { name: 'Criar' }).closest('.sticky') as HTMLElement;
+    expect(within(create).getByRole('button', { name: 'Descartar' })).toBeTruthy();
+    unmount();
+
+    render(
+      <EntityForm
+        kind="author"
+        mode="edit"
+        siteId="exemplo-a"
+        defaultValues={{ slug: 'ana', name: 'Ana' }}
+        action={vi.fn()}
+      />,
+    );
+    const edit = screen.getByRole('button', { name: 'Salvar' }).closest('.sticky') as HTMLElement;
+    expect(within(edit).getByRole('link', { name: 'Voltar' }).getAttribute('href')).toBe(
+      '/sites/exemplo-a/autores',
+    );
+  });
+
+  it('textos institucionais: todos os campos num Card e Voltar para a página do site', () => {
+    render(
+      <InstitutionalTextsForm defaultValues={{}} action={vi.fn()} backHref="/sites/exemplo-a" />,
+    );
+
+    expect(document.querySelectorAll('.card')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Voltar' }).getAttribute('href')).toBe(
+      '/sites/exemplo-a',
+    );
   });
 });

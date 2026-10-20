@@ -29,6 +29,8 @@ export type EntityConfig<T> = {
   segment: string;
   labels: Record<string, string>;
   hints?: Record<string, string>;
+  /** Campos curtos relacionados, lado a lado a partir de `md` (#328). */
+  sideBySide?: string[][];
   /** Campos especiais; os de mídia usam a biblioteca do site (só quando a página a passa). */
   fields?: (media: MediaSource | undefined) => Record<string, FieldRenderer>;
   /** Base dos ids dos títulos: `<plural>-title`, `new-<one>-title`, `edit-<one>-title`. */
@@ -65,6 +67,7 @@ export const ENTITY_CONFIG: { [K in EntityKind]: EntityConfig<EntityItems[K]> } 
       avatarMediaId: 'Foto',
     },
     hints: { slug: SLUG_HINT },
+    sideBySide: [['name', 'slug']],
     fields: (media): Record<string, FieldRenderer> =>
       media ? { avatarMediaId: mediaField(media, { optional: true }) } : {},
     htmlId: { one: 'author', many: 'authors' },
@@ -97,6 +100,7 @@ export const ENTITY_CONFIG: { [K in EntityKind]: EntityConfig<EntityItems[K]> } 
       description: 'Descrição',
     },
     hints: { slug: SLUG_HINT },
+    sideBySide: [['name', 'slug']],
     htmlId: { one: 'taxonomy', many: 'taxonomies' },
     area: 'Taxonomias',
     createLabel: 'Criar taxonomia',
@@ -128,6 +132,7 @@ export const ENTITY_CONFIG: { [K in EntityKind]: EntityConfig<EntityItems[K]> } 
       key: 'Onde o menu aparece, ex.: principal, rodape.',
       'items.*.href': 'Caminho iniciado por / ou URL http/https.',
     },
+    sideBySide: [['items.*.label', 'items.*.href']],
     htmlId: { one: 'menu', many: 'menus' },
     area: 'Menus',
     createLabel: 'Criar menu',

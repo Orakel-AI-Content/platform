@@ -29,14 +29,19 @@ export default async function InstitutionalTextsPage({
   if (!texts.ok) return noRead;
 
   return (
-    <section aria-labelledby="institutional-title" className="form-width space-y-4">
-      <PageHeader
-        id="institutional-title"
-        trail={siteTrail(site, 'Textos institucionais')}
-        title="Textos institucionais"
-      />
+    <section aria-labelledby="institutional-title" className="space-y-4">
+      {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
+      <div className="form-width space-y-4">
+        <PageHeader
+          id="institutional-title"
+          trail={siteTrail(site, 'Textos institucionais')}
+          title="Textos institucionais"
+        />
+      </div>
       <InstitutionalTextsForm
         defaultValues={texts.value}
+        backHref={`/sites/${site.id}`}
+        contentClassName="form-width"
         action={updateInstitutionalTextsAction.bind(null, site.id)}
       />
     </section>
