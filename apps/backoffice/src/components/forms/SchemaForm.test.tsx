@@ -862,6 +862,101 @@ describe('SchemaForm: formulário de tela (#328)', () => {
   });
 });
 
+describe('SchemaForm: formulário em cartão (#333)', () => {
+  const schema = z.object({ seconds: z.number({ error: 'Informe os segundos.' }).int().min(0) });
+  const labels = { seconds: 'Segundos' };
+
+  it('introdução e campos no corpo do Card, botões no rodapé dele, sem barra fixa', () => {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ seconds: 30 }}
+        labels={labels}
+        card={{
+          intro: <h2>Janela</h2>,
+          extra: { label: 'Usar padrão', run: vi.fn(() => Promise.resolve({ success: 'ok' })) },
+        }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(document.querySelector('.sticky')).toBeNull();
+    const cards = document.querySelectorAll('.card');
+    expect(cards).toHaveLength(1);
+    const body = cards[0]?.querySelector('.card-body');
+    expect(body?.contains(screen.getByRole('heading', { name: 'Janela' }))).toBe(true);
+    expect(body?.contains(screen.getByLabelText(fieldLabel('Segundos')))).toBe(true);
+    const footer = cards[0]?.querySelector('.card-footer');
+    const save = screen.getByRole('button', { name: 'Salvar' });
+    const extra = screen.getByRole('button', { name: 'Usar padrão' });
+    expect(footer?.contains(save)).toBe(true);
+    expect(footer?.contains(extra)).toBe(true);
+    // Mesmo tamanho; a ação principal é a solid.
+    const size = (button: HTMLElement) =>
+      button.className.split(' ').filter((name) => /^(h-|px-|text-(sm|base|lg))/.test(name));
+    expect(size(extra)).toEqual(size(save));
+    expect(save.className).toContain('bg-primary');
+    expect(extra.className).not.toContain('bg-primary');
+  });
+
+  it('a ação secundária não passa pelo schema, limpa o campo e mostra o retorno no toast', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const run = vi.fn(() => Promise.resolve({ success: 'Janela padrão restaurada.' }));
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ seconds: 30 }}
+        labels={labels}
+        card={{ extra: { label: 'Usar padrão', resetTo: { seconds: '' }, run } }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+    render(<ToastProvider />);
+    const input = screen.getByLabelText<HTMLInputElement>(fieldLabel('Segundos'));
+    await user.clear(input);
+    await user.type(input, '-1');
+
+    await user.click(screen.getByRole('button', { name: 'Usar padrão' }));
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Janela padrão restaurada.'),
+    );
+    expect(input.value).toBe('');
+    expect(input.getAttribute('aria-invalid')).not.toBe('true');
+  });
+
+  it('recusa da ação secundária com path vira erro do campo', async () => {
+    const user = userEvent.setup();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ seconds: 30 }}
+        labels={labels}
+        card={{
+          extra: {
+            label: 'Usar padrão',
+            run: () => Promise.resolve([{ path: ['seconds'], message: 'Recusado pelo domínio.' }]),
+          },
+        }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Usar padrão' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText(fieldLabel('Segundos')).getAttribute('aria-invalid')).toBe(
+        'true',
+      ),
+    );
+    expect(screen.getAllByText('Recusado pelo domínio.').length).toBeGreaterThan(0);
+  });
+});
+
 describe('SchemaForm: erro, dica e obrigatório no FormItem (#329)', () => {
   const schema = z.object({
     titulo: z.string().min(1, 'Informe o título'),

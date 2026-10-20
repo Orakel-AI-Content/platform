@@ -55,8 +55,8 @@ import { clean, describe, emptyValue, pattern, type FieldNode } from './schemaWa
 // seção, ou um só) → `BottomStickyBar` com "Descartar" (criação, confirmado num diálogo, como o
 // `CustomerCreate`) ou "Voltar" (edição, como o `CustomerEdit`) e a ação principal. Os campos
 // curtos relacionados ficam lado a lado a partir de `md` (`sideBySide`). Formulário dentro de
-// outra tela (checklist da revisão) não liga a barra nem cria cartão: quem o contém já é o
-// cartão.
+// outra tela (G1 e janela da página do site, checklist da revisão) passa `card` (#333): um
+// `Card` com a introdução e os campos no corpo e os botões no rodapé dele, sem barra fixa.
 
 /** Props de um campo registrado: valor e mudança vêm do react-hook-form (Controller). */
 export type FieldProps = {
@@ -89,6 +89,23 @@ export type SchemaFormSection = { id: string; title: string; paths: string[] };
  */
 export type SchemaFormActionBar = { kind: 'create' | 'edit'; href: string };
 
+/**
+ * Ação secundária do rodapé do cartão, à esquerda do envio (ex.: "Usar padrão" da janela): não
+ * passa pelo schema, e o retorno segue o do envio (toast, erro de campo ou resumo).
+ */
+export type SchemaFormExtraAction = {
+  label: string;
+  /** Valores do formulário ao acionar (ex.: o campo volta a vazio). */
+  resetTo?: Record<string, unknown>;
+  run: () => Promise<SubmitOutcome>;
+};
+
+/**
+ * Formulário dentro de outra tela (#333): um `Card` com `intro` (título, dica, estado) e os
+ * campos no corpo, e os botões no rodapé, todos do mesmo tamanho; sem barra fixa.
+ */
+export type SchemaFormCard = { intro?: ReactNode; extra?: SchemaFormExtraAction };
+
 export type SchemaFormProps<T> = {
   schema: z.ZodType<T>;
   defaultValues: Record<string, unknown>;
@@ -113,6 +130,8 @@ export type SchemaFormProps<T> = {
   sideBySide?: string[][];
   /** Formulário de tela: campos em `Card` e a barra fixa com Descartar/Voltar e o envio. */
   actionBar?: SchemaFormActionBar;
+  /** Formulário dentro de outra tela: campos e botões num `Card` só; exclui `actionBar`. */
+  card?: SchemaFormCard;
   /** Largura da coluna de cartões e da barra (`form-width`); quem decide é a página. */
   contentClassName?: string;
   submitLabel: string;
@@ -705,6 +724,7 @@ export function SchemaForm<T>({
   sections,
   sideBySide,
   actionBar,
+  card,
   contentClassName,
   submitLabel,
   pendingLabel = 'Salvando…',
@@ -723,16 +743,38 @@ export function SchemaForm<T>({
   const form = useForm<FieldValues>({ resolver, defaultValues });
   const { isSubmitting, errors } = form.formState;
   const items = errorItems(errors, schema, new Set(Object.keys(fields ?? {})));
+  // Ação secundária do cartão em curso: os dois botões ficam desabilitados, como no envio.
+  const [extraPending, setExtraPending] = useState(false);
+  const pending = isSubmitting || extraPending;
+
+  const settle = (outcome: SubmitOutcome) => {
+    if (outcome !== undefined && 'success' in outcome) {
+      pushSuccess(outcome.success);
+      return;
+    }
+    setGeneral(applyServerIssues(form.setError, outcome ?? []));
+  };
 
   const submit = (
     <Button
       type="submit"
       variant="solid"
-      disabled={submitDisabled || isSubmitting}
+      disabled={submitDisabled || pending}
       aria-describedby={submitDescribedBy}
     >
       {isSubmitting ? pendingLabel : submitLabel}
     </Button>
+  );
+
+  const summary = (
+    <ErrorSummary
+      lines={general}
+      items={items.map((item) => ({
+        key: item.path,
+        text: `${summaryLabel(labels ?? {}, item.path)}: ${item.message}`,
+        onFocus: item.focusable ? () => form.setFocus(item.path) : undefined,
+      }))}
+    />
   );
 
   return (
@@ -742,59 +784,93 @@ export function SchemaForm<T>({
         containerClassName="flex flex-col"
         onSubmit={(event) => {
           // Um envio por vez: Enter num campo durante o envio também não dispara outro.
-          if (isSubmitting) {
+          if (pending) {
             event.preventDefault();
             return;
           }
           void form.handleSubmit(
             async (value) => {
               setGeneral([]);
-              const outcome = await onSubmit(value as T);
-              if (outcome !== undefined && 'success' in outcome) {
-                pushSuccess(outcome.success);
-                return;
-              }
-              setGeneral(applyServerIssues(form.setError, outcome ?? []));
+              settle(await onSubmit(value as T));
             },
             () => setGeneral([]),
           )(event);
         }}
       >
-        <div className={classNames('flex flex-col gap-4', contentClassName)}>
-          {sections && (
-            <nav aria-label="Seções do formulário">
-              <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                {sections.map((section) => (
-                  <li key={section.id}>
-                    <a href={`#secao-${section.id}`} className="underline underline-offset-4">
-                      {section.title}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          )}
-          <ErrorSummary
-            lines={general}
-            items={items.map((item) => ({
-              key: item.path,
-              text: `${summaryLabel(labels ?? {}, item.path)}: ${item.message}`,
-              onFocus: item.focusable ? () => form.setFocus(item.path) : undefined,
-            }))}
-          />
-          <SchemaFields
-            schema={schema}
-            labels={labels}
-            hints={hints}
-            hidden={hidden}
-            readOnly={readOnly}
-            fields={fields}
-            sections={sections}
-            sideBySide={sideBySide}
-            carded={actionBar !== undefined}
-          />
-          {actionBar === undefined && <div>{submit}</div>}
-        </div>
+        {card ? (
+          <Card
+            bodyClass="space-y-3"
+            footer={{
+              bordered: true,
+              content: (
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  {card.extra && (
+                    <Button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        const extra = card.extra;
+                        if (!extra) return;
+                        form.clearErrors();
+                        setGeneral([]);
+                        if (extra.resetTo) form.reset(extra.resetTo);
+                        setExtraPending(true);
+                        void extra
+                          .run()
+                          .then(settle)
+                          .finally(() => setExtraPending(false));
+                      }}
+                    >
+                      {card.extra.label}
+                    </Button>
+                  )}
+                  {submit}
+                </div>
+              ),
+            }}
+          >
+            {card.intro}
+            {summary}
+            <SchemaFields
+              schema={schema}
+              labels={labels}
+              hints={hints}
+              hidden={hidden}
+              readOnly={readOnly}
+              fields={fields}
+              sideBySide={sideBySide}
+            />
+          </Card>
+        ) : (
+          <div className={classNames('flex flex-col gap-4', contentClassName)}>
+            {sections && (
+              <nav aria-label="Seções do formulário">
+                <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  {sections.map((section) => (
+                    <li key={section.id}>
+                      <a href={`#secao-${section.id}`} className="underline underline-offset-4">
+                        {section.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
+            {summary}
+            <SchemaFields
+              schema={schema}
+              labels={labels}
+              hints={hints}
+              hidden={hidden}
+              readOnly={readOnly}
+              fields={fields}
+              sections={sections}
+              sideBySide={sideBySide}
+              carded={actionBar !== undefined}
+            />
+            {actionBar === undefined && <div>{submit}</div>}
+          </div>
+        )}
         {actionBar && (
           <FormActionBar
             {...actionBar}
