@@ -191,9 +191,9 @@ describe('tabela de sites', () => {
     expect(headers).toEqual([
       'Site',
       'Ciclo de vida',
-      'Estado',
+      'Status',
       'Indexável',
-      'Pendências',
+      'Mudanças pendentes',
       'Último build',
       'Ações',
     ]);
@@ -362,7 +362,7 @@ describe('busca, filtro e paginação da lista de sites (#364)', () => {
     const user = userEvent.setup();
     render(<SitesTable rows={rows} />);
 
-    await choose(user, 'Estado', 'Pausado');
+    await choose(user, 'Status', 'Pausado');
     expect(siteNames()).toEqual(['Viagens']);
     expect(navigation.get()).toBe('estado=pausado');
   });
