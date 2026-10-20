@@ -1,5 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+import { compile } from 'tailwindcss';
 import { describe, expect, it } from 'vitest';
 
 // Toda classe de cor usada nas telas resolve para uma cor do @theme (#202). Com a troca para a
@@ -49,5 +54,43 @@ describe('cores das classes de src/', () => {
 
   it.each([...used])('%s (em %s) é uma cor do @theme', (name) => {
     expect(THEME_COLORS.has(name) || KEYWORDS.has(name), `--color-${name} no @theme`).toBe(true);
+  });
+});
+
+// O globals.css zera a paleta padrão do Tailwind (#399): compilado de verdade, uma cor fora da
+// paleta do template não gera utility, e white, black e as palavras-chave continuam gerando.
+const require = createRequire(import.meta.url);
+
+/** Resolve os @import do globals.css: o `tailwindcss` pelo pacote, o resto relativo ao arquivo. */
+async function loadStylesheet(id: string, base: string) {
+  const path = id === 'tailwindcss' ? require.resolve('tailwindcss/index.css') : resolve(base, id);
+  return { path, base: dirname(path), content: await readFile(path, 'utf8') };
+}
+
+describe('paleta compilada do globals.css', async () => {
+  const compiler = await compile(css, {
+    base: fileURLToPath(new URL('.', import.meta.url)),
+    loadStylesheet,
+  });
+  /** CSS gerado para uma classe sozinha (vazio quando o Tailwind não a conhece). */
+  const generated = (candidate: string) =>
+    compiler.build([candidate]).includes(`.${candidate.replace('/', '\\/')}`);
+
+  it.each(['bg-red-500', 'text-blue-600', 'border-slate-200', 'bg-zinc-900'])(
+    '%s, fora da paleta, não gera CSS',
+    (candidate) => {
+      expect(generated(candidate)).toBe(false);
+    },
+  );
+
+  it.each([
+    'bg-white',
+    'text-black',
+    'bg-transparent',
+    'text-current',
+    'bg-primary',
+    'text-gray-500',
+  ])('%s gera CSS', (candidate) => {
+    expect(generated(candidate)).toBe(true);
   });
 });
