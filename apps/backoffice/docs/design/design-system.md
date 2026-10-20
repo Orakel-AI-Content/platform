@@ -319,8 +319,13 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
 - **Formulários:** gerados do schema Zod com `SchemaForm` (`src/components/forms/`), sobre
   react-hook-form + zodResolver; a validação é só a do schema. Visual do Ecme: cada campo num
   `FormItem` (rótulo e erro ligados ao controle), texto e número no `Input`, booleano no
-  `Checkbox`, botões no `Button` e as seções em `Card`. O gerador desenha texto, número,
-  booleano, enum, objeto (`fieldset`) e lista de objetos (adicionar e remover).
+  `Checkbox`, enum no `Select`, botões no `Button` e as seções em `Card`. O gerador desenha
+  texto, número, booleano, enum, objeto (`fieldset`) e lista de objetos (adicionar e remover).
+  **Lista de opções é sempre o `Select` do Ecme** (#330), nunca `<select>` nativo nem grade de
+  caixas: uma opção no simples, várias no `isMulti`. Dentro de um `FormItem`, passe
+  `components={selectInFormItem}` (de `SchemaForm.tsx`) para a dica e o erro entrarem no
+  `aria-describedby` do combobox, que o react-select não aceita como prop; num campo
+  registrado, ligue o `ref` ao `inputRef` da instância, para o foco do erro chegar.
   Rótulos e dicas por caminho (`items.*.question`); `hidden` para o que é do servidor
   (`n`, `type`). O que o schema sozinho não descreve (rich text, seletor de mídia ou de
   entidade) entra por `fields`, um campo registrado por caminho, com `*` no lugar dos
@@ -380,7 +385,8 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   site: `mediaField(source)` (miniatura do valor atual lida por ID, "Escolher imagem"/"Trocar"
   pelo `MediaPicker` e, com `{ optional: true }` para capa e avatar, "Remover"; `source` são as
   actions da leitura paginada e por IDs ligadas ao site pela página) e
-  `entityField(opções, aviso)` (caixas de seleção para `authorIds` e `taxonomyIds`), em
+  `entityField(opções, aviso)` (`Select` múltiplo para `authorIds` e `taxonomyIds`, com os IDs
+  na ordem das opções), em
   `src/components/forms/PickerFields.tsx`. Campos registrados recebem `ref` (ligue ao controle
   focável, para o foco do erro chegar) e `readOnly` (caminhos em `readOnly`). Para listas de
   texto, feature flags e opções de `RESOURCES`: `linesField`, `flagsField` e `choiceField`
