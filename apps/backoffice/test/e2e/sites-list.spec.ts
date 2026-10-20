@@ -201,7 +201,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
   test(`a lista de sites sem violação do axe (${colorScheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await loginAsAdmin(page);
-    await expect(page.getByRole('link', { name: 'Cadastrar site' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Criar site' })).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])

@@ -37,8 +37,8 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
       <div className="form-width space-y-4">
         <PageHeader
           id="site-config-title"
-          trail={siteTrail({ id: site, name: config.name }, 'Configuração')}
-          title="Configuração"
+          trail={siteTrail({ id: site, name: config.name }, 'Configuração do site')}
+          title="Configuração do site"
         />
       </div>
       <SiteConfigForm

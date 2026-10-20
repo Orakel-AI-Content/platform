@@ -114,8 +114,8 @@ test('operação cadastra e edita um site só com o teclado', async ({ page }) =
   created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
   // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
-  await page.getByRole('link', { name: 'Cadastrar site' }).first().click();
-  await expect(page.getByRole('heading', { name: 'Cadastrar site' })).toBeVisible();
+  await page.getByRole('link', { name: 'Criar site' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Criar site' })).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
   await typeInto(page, page.getByLabel(fieldLabel('ID')), siteId);
@@ -210,7 +210,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await loginAs(page, 'operacao@orakel.local');
 
     for (const [path, heading] of [
-      ['/sites/novo', 'Cadastrar site'],
+      ['/sites/novo', 'Criar site'],
       ['/sites/exemplo-a/configuracao', 'Identidade'],
     ] as const) {
       await page.goto(path);
@@ -280,9 +280,22 @@ test('configuração: pares lado a lado, barra na largura do main e Voltar', asy
   await expect(page.getByText('Nome que não fica')).toHaveCount(0);
 });
 
+// Vocabulário do guia (#385): o h1, a aba e o item corrente da trilha dizem "Configuração do site".
+test('configuração: h1, aba e trilha dizem Configuração do site', async ({ page }) => {
+  await loginAs(page, 'operacao@orakel.local');
+  await page.goto('/sites/exemplo-a/configuracao');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Configuração do site', exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle('Configuração do site · Orakel Backoffice');
+  await expect(
+    page.getByRole('navigation', { name: 'Trilha de navegação' }).locator('[aria-current="page"]'),
+  ).toHaveText('Configuração do site');
+});
+
 test('editor não cadastra nem edita a configuração', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
-  await expect(page.getByRole('link', { name: 'Cadastrar site' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Criar site' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Editar configuração/ })).toHaveCount(0);
 
   for (const path of ['/sites/novo', '/sites/exemplo-a/configuracao']) {

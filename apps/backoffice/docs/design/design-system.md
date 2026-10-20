@@ -442,7 +442,7 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
 - **Formulário: rótulos, estrutura e espaçamento:** regra única de todo formulário (#334).
   **Envio:** o formulário de tela envia com "Criar" na criação e "Salvar" na edição, sem
   complemento, como o "Create"/"Save" do `CustomerCreate`/`CustomerEdit` do Ecme; o objeto já
-  está no título da tela ("Cadastrar site", "Criar conteúdo"), que não muda. O formulário em
+  está no título da tela ("Criar site", "Criar conteúdo"), que não muda. O formulário em
   cartão dentro de outra tela e a ação de domínio usam o verbo do que acontece: "Registrar
   G1", "Aprovar", "Usar padrão", "Enviar para revisão", "Marcar zona ativa"; a janela de
   agrupamento, que só grava um valor, envia com "Salvar". **Pendência:** é sempre o rótulo
@@ -459,6 +459,22 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   `richTextField('inlines')` (um parágrafo, sem intertítulo nem lista) para citação, resposta
   de FAQ e legenda. O valor é sempre a árvore do content-model; colar HTML descarta o que o
   schema não aceita, e link com endereço inválido vira texto.
+- **Vocabulário:** glossário dos rótulos da interface (#385, Story #62): a mesma coisa tem o
+  mesmo nome em colunas, títulos, trilhas, abas, botões, mensagens e textos ocultos (`sr-only`).
+  Os pares decididos:
+
+  | Em vez de                                              | Use                                                                                         |
+  | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+  | "Estado" (lista de sites)                              | **"Status"**, como em conteúdos, versões e filtros                                          |
+  | "Pendências" (coluna da lista de sites)                | **"Mudanças pendentes"**, como no título, na trilha e na página do site                     |
+  | "Cadastrar site"                                       | **"Criar"** em todo título e ação: "Criar site", como "Criar conteúdo"                      |
+  | "Configuração" (`h1` e trilha da configuração do site) | **"Configuração do site"** no `h1`, na aba e na trilha; o botão segue "Editar configuração" |
+  | "(versões)" no texto oculto do link da linha           | **o verbo da ação**, como em "(revisar)": "(ver versões)"                                   |
+
+  **Termo novo:** vale o que já predomina nas telas. Por esse critério ficam as mensagens e os
+  estados vazios com "cadastrado" ("Site X cadastrado.", "Nenhum conteúdo cadastrado."); a rota
+  `/sites/novo`, o parâmetro `?cadastrado=` e o estado `cadastrado` do ciclo de vida são do
+  domínio e não mudam com os rótulos.
 
 ## Testes
 
