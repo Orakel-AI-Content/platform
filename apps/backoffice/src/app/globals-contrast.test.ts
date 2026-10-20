@@ -1923,6 +1923,34 @@ describe.each(Object.entries(THEMES))('tokens do tema %s', (name, theme) => {
   );
 });
 
+// Texto do body (#395): a cor vem da @layer base do globals.css, lida dali, e é conferida
+// sobre os fundos que a app desenha de fato: o da página (neutral e gray-950, o body) e o
+// atenuado (gray-100 e gray-800, o main).
+const BODY_TEXT: Record<ThemeName, { text: string; backgrounds: readonly string[] }> = (() => {
+  const apply = /\bbody\s*\{\s*@apply ([^;]+);/.exec(css)?.[1] ?? '';
+  const light = /(?:^|\s)text-(gray-\d+)/.exec(apply)?.[1];
+  const dark = /(?:^|\s)dark:text-(gray-\d+)/.exec(apply)?.[1];
+  if (!light || !dark)
+    throw new Error(`Cor do texto do body não encontrada no globals.css: ${apply}`);
+  return {
+    claro: { text: light, backgrounds: ['neutral', 'gray-100'] },
+    escuro: { text: dark, backgrounds: ['gray-950', 'gray-800'] },
+  };
+})();
+
+describe.each(Object.entries(BODY_TEXT))(
+  'texto do body no tema %s',
+  (name, { text, backgrounds }) => {
+    it.each(backgrounds)(`${text} sobre %s chega a 4,5:1`, (background) => {
+      const theme = THEMES[name as ThemeName];
+      const ratio = contrast(resolve(theme, text)!, resolve(theme, background)!);
+      expect(ratio, `${text} sobre ${background}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    });
+  },
+);
+
 describe('pares do Ecme como o tema os combina', () => {
   it.each(ECME_PAIRS.map((pair) => [`${pair.name} (${pair.theme})`, pair] as const))(
     '%s',
