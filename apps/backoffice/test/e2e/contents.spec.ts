@@ -292,8 +292,13 @@ test('revisor não tem editor nem link para criar ou editar', async ({ page }) =
 });
 
 // Histórico de versões e leitura de uma versão no Ecme (#271): Table e Tag sem violação do axe.
+// Versões no DataTable do template (#366), nos dois temas: trilha fora do cartão; título, toolbar
+// e tabela nele; a 1280 px nada rola na horizontal e nenhuma célula passa de duas linhas; o
+// filtro vai para o endereço e recarregar mantém a mesma visão.
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`versões e uma versão sem violação do axe (${colorScheme})`, async ({ page }) => {
+  test(`versões a 1280 px, até duas linhas por célula, e uma versão sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await loginAs(page, 'editor@orakel.local');
     await page.goto('/sites/exemplo-a/conteudos');
@@ -304,12 +309,84 @@ for (const colorScheme of ['light', 'dark'] as const) {
       .click();
     await expect(page.getByRole('heading', { level: 1, name: /^Versões de/ })).toBeVisible();
     const versions = page.url();
+    expect(page.viewportSize()?.width).toBe(1280);
+
+    const card = page.locator('.card').filter({ has: page.getByRole('table') });
+    await expect(card).toHaveCount(1);
+    await expect(card.getByRole('heading', { level: 1, name: /^Versões de/ })).toBeVisible();
+    await expect(card.getByRole('search')).toBeVisible();
+    await expect(card.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toBeVisible();
+
+    const table = page.getByRole('table', { name: /^Versões de/ });
+    await expect(table.getByRole('columnheader')).toHaveText([
+      'Versão',
+      'Status',
+      'Título',
+      'Gravada em',
+      'Aprovação',
+    ]);
+    await expect(table.getByRole('link', { name: 'Versão 1', exact: true })).toHaveAttribute(
+      'href',
+      `${new URL(versions).pathname}/versoes/1`,
+    );
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      /^\d+ resultados?$/,
+    );
+
+    const overflow = await table.evaluate((element) => [
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      element.parentElement!.scrollWidth - element.parentElement!.clientWidth,
+    ]);
+    expect(overflow).toEqual([0, 0]);
+
+    // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
+    // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
+    const lines = await table.locator('tbody td').evaluateAll((cells) =>
+      cells.map((cell) => {
+        const found: { top: number; bottom: number }[] = [];
+        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          if (!node.textContent?.trim()) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) {
+            if (rect.width <= 1 || rect.height <= 1) continue;
+            const middle = (rect.top + rect.bottom) / 2;
+            const line = found.find((l) => l.top <= middle && middle <= l.bottom);
+            if (line === undefined) found.push({ top: rect.top, bottom: rect.bottom });
+            else
+              Object.assign(line, {
+                top: Math.min(line.top, rect.top),
+                bottom: Math.max(line.bottom, rect.bottom),
+              });
+          }
+        }
+        return found.length;
+      }),
+    );
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.filter((count) => count > 2)).toEqual([]);
+
     for (const path of [versions, `${versions}/versoes/1`]) {
       await page.goto(path);
       await page.waitForLoadState('networkidle');
       const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
       expect(accessibility.violations).toEqual([]);
     }
+
+    // Filtro por status no endereço; recarregar mantém a mesma visão.
+    await page.goto(versions);
+    await page.getByRole('combobox', { name: 'Status' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await page.getByRole('option', { name: 'Agendado', exact: true }).click();
+    await expect(page).toHaveURL(/status=agendado/);
+    await expect(table.getByText('Nenhuma versão encontrada.')).toBeVisible();
+    await page.reload();
+    await expect(table.getByText('Nenhuma versão encontrada.')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '0 resultados',
+    );
   });
 }
 
