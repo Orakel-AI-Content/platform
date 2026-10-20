@@ -805,45 +805,65 @@ export function SchemaForm<T>({
   );
 }
 
+export type FormActionBarProps = SchemaFormActionBar & {
+  /** Largura da coluna de cartões (`form-width`), para os botões se alinharem a ela. */
+  contentClassName?: string;
+  /** Envio em curso: "Descartar" fica desabilitado. */
+  pending: boolean;
+  /** Botão de envio (o `Button` `solid` do formulário). */
+  submit: ReactNode;
+  /** Ações a mais, entre "Descartar" e o envio (ex.: "Ver prévia" do editor de conteúdo). */
+  extra?: ReactNode;
+  /** Abaixo da linha de botões, na coluna (ex.: nota e resumo de erros do editor). */
+  children?: ReactNode;
+};
+
 /**
  * Barra fixa do formulário de tela, como a do `CustomerCreate`/`CustomerEdit`: a ação
  * secundária à esquerda ("Voltar") ou ao lado do envio ("Descartar"), o envio à direita. O
- * conteúdo acompanha os gutters do `main` e a largura da coluna de cartões.
+ * conteúdo acompanha os gutters do `main` e a largura da coluna de cartões. Também a do
+ * editor de conteúdo (#332), que tem formulário próprio.
  */
-function FormActionBar({
+export function FormActionBar({
   kind,
   href,
   contentClassName,
   pending,
   submit,
-}: SchemaFormActionBar & { contentClassName?: string; pending: boolean; submit: ReactNode }) {
+  extra,
+  children,
+}: FormActionBarProps) {
   const router = useRouter();
   const [discarding, setDiscarding] = useState(false);
   return (
     <BottomStickyBar>
       <div className={PAGE_CONTAINER_GUTTER_X}>
-        <div className={classNames('flex items-center justify-between gap-3', contentClassName)}>
-          {kind === 'edit' ? (
-            <Button asElement={Link} href={href} variant="plain" icon={<TbArrowNarrowLeft />}>
-              Voltar
-            </Button>
-          ) : (
-            <span />
-          )}
-          <div className="flex items-center gap-3">
-            {kind === 'create' && (
-              <Button
-                type="button"
-                customColorClass={dangerButtonClass}
-                icon={<TbTrash />}
-                disabled={pending}
-                onClick={() => setDiscarding(true)}
-              >
-                Descartar
+        <div className={contentClassName}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {kind === 'edit' ? (
+              <Button asElement={Link} href={href} variant="plain" icon={<TbArrowNarrowLeft />}>
+                Voltar
               </Button>
+            ) : (
+              <span />
             )}
-            {submit}
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {kind === 'create' && (
+                <Button
+                  type="button"
+                  customColorClass={dangerButtonClass}
+                  icon={<TbTrash />}
+                  disabled={pending}
+                  onClick={() => setDiscarding(true)}
+                >
+                  Descartar
+                </Button>
+              )}
+              {extra}
+              {submit}
+            </div>
           </div>
+          {children}
         </div>
       </div>
       <ConfirmDialog
