@@ -236,6 +236,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
     ).toBeVisible();
     await expect(panel.getByRole('checkbox')).toHaveCount(5);
     await expect(panel.getByRole('button', { name: 'Aprovar' })).toBeEnabled();
+    // O checklist em cartão próprio, com "Aprovar" no rodapé dele (#333).
+    await expect(
+      panel.locator('.card-footer').getByRole('button', { name: 'Aprovar' }),
+    ).toBeVisible();
 
     const accessibility = await new AxeBuilder({ page: reviewer })
       .withTags(WCAG)

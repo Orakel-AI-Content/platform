@@ -359,20 +359,26 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   await indexar();
   await expect(status(page, 'versão 2')).toBeVisible();
 
-  // Janela própria e volta à padrão; valor inválido dá erro no Alert junto da ação (#324).
+  // Janela própria e volta à padrão; valor vazio, negativo ou não inteiro dá erro no campo,
+  // pelo schema do formulário gerado (#333).
   await page.goto(`/sites/${siteId}`);
   const windowSection = page.getByRole('region', { name: 'Janela de agrupamento' });
-  await page.getByLabel('Janela própria (segundos)').fill('');
-  await page.getByRole('button', { name: 'Salvar janela' }).click();
-  await expect(windowSection.getByRole('alert')).toHaveText(
-    'Informe um número inteiro de segundos, 0 ou mais.',
-  );
+  const windowInput = windowSection.getByLabel('Janela própria (segundos)');
+  for (const value of ['', '-1', '1.5']) {
+    await windowInput.fill(value);
+    await windowSection.getByRole('button', { name: 'Salvar janela' }).click();
+    await expect(windowInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(windowInput).toHaveAccessibleDescription(
+      'Informe um número inteiro de segundos, 0 ou mais.',
+    );
+  }
   await page.getByLabel('Janela própria (segundos)').fill('30');
   await page.getByRole('button', { name: 'Salvar janela' }).click();
   await expect(status(page, 'Janela de 30 s salva.')).toBeVisible();
   await expect(page.getByText('Janela efetiva: 30 s, própria')).toBeVisible();
-  await expect(windowSection.getByRole('alert')).toBeEmpty();
+  await expect(windowInput).not.toHaveAttribute('aria-invalid', 'true');
   await page.getByRole('button', { name: 'Usar padrão' }).click();
+  await expect(status(page, 'Janela padrão restaurada.')).toBeVisible();
   await expect(page.getByText(/Janela efetiva: \d+ s( \(.+\))?, padrão/)).toBeVisible();
   expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
@@ -496,14 +502,18 @@ for (const colorScheme of ['light', 'dark'] as const) {
         page.getByRole('region', { name }).getByRole('heading', { level: 2, name }),
       ).toBeVisible();
     }
-    await expect(page.getByLabel('Janela própria (segundos)')).toBeVisible();
+    // G1 e janela gerados do schema, em cartão com os botões no rodapé, sem barra fixa (#333).
+    const windowSection = page.getByRole('region', { name: 'Janela de agrupamento' });
+    const footer = windowSection.locator('.card-footer');
+    await expect(footer.getByRole('button', { name: 'Salvar janela' })).toBeVisible();
+    await expect(footer.getByRole('button', { name: 'Usar padrão' })).toBeVisible();
+    await expect(page.locator('.sticky')).toHaveCount(0);
     await page.waitForLoadState('networkidle');
-    // O erro de uma ação no Alert do Ecme, validado no navegador (sem gravar nada).
-    await page.getByLabel('Janela própria (segundos)').fill('');
-    await page.getByRole('button', { name: 'Salvar janela' }).click();
-    await expect(
-      page.getByRole('region', { name: 'Janela de agrupamento' }).getByRole('alert'),
-    ).not.toBeEmpty();
+    // O erro de campo do schema, validado no navegador (sem gravar nada).
+    const windowInput = windowSection.getByLabel('Janela própria (segundos)');
+    await windowInput.fill('');
+    await footer.getByRole('button', { name: 'Salvar janela' }).click();
+    await expect(windowInput).toHaveAttribute('aria-invalid', 'true');
 
     await expectNoViolations(page);
 
