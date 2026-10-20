@@ -12,9 +12,9 @@ import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
 
 // Autores, taxonomias, menus e textos institucionais (#46) contra o ambiente local semeado:
-// o editor cria e edita pelas telas e vê o resultado; o revisor não grava. Autores e
-// taxonomias têm busca por nome e paginação (#108): o item novo, no fim da ordem por ID, é
-// achado pela busca (o banco local acumula itens entre rodadas).
+// o editor cria e edita pelas telas e vê o resultado; o revisor não grava. As três listas têm
+// busca e paginação (#108, #363): o item novo, no fim da ordem por ID, é achado pela busca (o
+// banco local acumula itens entre rodadas).
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
@@ -84,10 +84,10 @@ test('editor cria autor e categoria e os escolhe no editor de artigos', async ({
   await page.getByLabel('Buscar por nome').fill(category);
   await expect(page.getByRole('row', { name: new RegExp(category) })).toContainText('Categoria');
 
-  // Busca sem resultado: a mensagem e "Limpar busca" volta a lista.
+  // Busca sem resultado: a tabela fica com a mensagem, e "Limpar filtros" volta a lista (#361).
   await page.getByLabel('Buscar por nome').fill(`nada-${stamp}`);
   await expect(page.getByText('Nenhuma taxonomia encontrada.')).toBeVisible();
-  await page.getByRole('button', { name: 'Limpar busca' }).click();
+  await page.getByRole('button', { name: 'Limpar filtros' }).click();
   await expect(page.getByLabel('Buscar por nome')).toHaveValue('');
   await expect(page.getByRole('table')).toBeVisible();
 
@@ -237,9 +237,6 @@ test('editor edita um item do menu e o vê na lista', async ({ page }) => {
   const label = `Guias ${Date.now()}`;
   await loginAs(page, 'editor@orakel.local');
   await page.goto('/sites/exemplo-a/menus');
-  // Menus segue sem busca nem paginação (#108).
-  await expect(page.getByRole('search')).toHaveCount(0);
-  await expect(page.getByRole('navigation', { name: 'Paginação' })).toHaveCount(0);
   await page.getByRole('link', { name: 'Editar principal' }).click();
 
   const first = page.getByLabel('Rótulo').first();
@@ -252,6 +249,64 @@ test('editor edita um item do menu e o vê na lista', async ({ page }) => {
     `${label} (/categoria/guias/)`,
   );
 });
+
+// Menus no padrão do template (#363): busca pela chave e paginação, com o estado na URL, e a
+// coluna de itens numa linha cortada, com o texto inteiro em `title`.
+test('menus: busca pela chave na URL, sem resultado na tabela e itens cortados', async ({
+  page,
+}) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites/exemplo-a/menus');
+  const table = page.getByRole('table', { name: 'Menus', exact: true });
+  await expect(page.getByRole('navigation', { name: 'Paginação' })).toBeVisible();
+
+  await page.getByLabel('Buscar por chave').fill('principal');
+  await expect(page).toHaveURL(/q=principal/);
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  const items = table.getByRole('row', { name: /principal/ }).locator('td span.truncate');
+  await expect(items).toHaveAttribute('title', /\(\/.*\)/);
+  expect(await items.getAttribute('title')).toBe(await items.textContent());
+
+  await page.reload();
+  await expect(page.getByLabel('Buscar por chave')).toHaveValue('principal');
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+
+  await page.goto('/sites/exemplo-a/menus?q=nenhuma-chave-assim');
+  await expect(table.getByText('Nenhum menu encontrado.')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+    '0 resultados',
+  );
+  await page.getByRole('button', { name: 'Limpar filtros' }).click();
+  await expect(page.getByLabel('Buscar por chave')).toHaveValue('');
+  await expect(table.getByRole('row', { name: /principal/ })).toBeVisible();
+});
+
+// Padrão do template (#363): trilha acima do cartão; título, ação, toolbar e tabela nele, nas
+// três listas, nos dois temas.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`listas editoriais no cartão do template, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    for (const [segment, title] of [
+      ['autores', 'Autores'],
+      ['taxonomias', 'Taxonomias'],
+      ['menus', 'Menus'],
+    ] as const) {
+      await page.goto(`/sites/exemplo-a/${segment}`);
+      const card = page.locator('.card').filter({ has: page.getByRole('table') });
+      await expect(card).toHaveCount(1);
+      await expect(card.getByRole('heading', { level: 1, name: title })).toBeVisible();
+      await expect(card.getByRole('link', { name: /^Criar / })).toBeVisible();
+      await expect(card.getByRole('search')).toBeVisible();
+      await expect(card.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
+      await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toBeVisible();
+      await page.waitForLoadState('networkidle');
+      await expectNoViolations(page);
+    }
+  });
+}
 
 test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   const text = `Quem somos, revisto em ${Date.now()}.`;
@@ -300,8 +355,8 @@ test('revisor não vê formulário nem links de criar e editar', async ({ page }
 // Lista editorial legível de relance na Table do Ecme (#282): com mais autores do que cabem
 // numa página, a 1280 px, ao lado da barra lateral, nem a página nem a tabela rolam na
 // horizontal e nenhuma célula passa de duas linhas de texto. Autores, taxonomias e menus
-// usam o mesmo `EntityTable`: a de autores, com busca, paginação e a coluna de editar, é o
-// caso mais largo. Site próprio da rodada, com os autores gravados pelo domínio (cadastrar 30
+// usam o mesmo `EntityTable` (#363): a de autores, com a área de atuação longa e a coluna de
+// editar, é o caso mais largo. Site próprio da rodada, com os autores gravados pelo domínio (cadastrar 30
 // pela tela só tornaria o teste lento), removido no fim.
 test.describe('lista editorial a 1280 px', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
@@ -398,6 +453,25 @@ test.describe('lista editorial a 1280 px', () => {
     );
     expect(cells.length).toBeGreaterThan(0);
     expect(cells.filter((cell) => cell.lines > MAX_LINES_PER_CELL)).toEqual([]);
+  });
+
+  test('o seletor de tamanho fica na URL e recarregar mantém a mesma visão (#363)', async ({
+    page,
+  }) => {
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${siteId}/autores`);
+
+    await page.getByRole('combobox', { name: 'Itens por página' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await page.getByRole('option', { name: '10 / página' }).click();
+    await expect(page).toHaveURL(/por-pagina=10/);
+    await expect(page.locator('tbody tr')).toHaveCount(10);
+
+    await page.reload();
+    await expect(page.locator('tbody tr')).toHaveCount(10);
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '30 resultados',
+    );
   });
 
   // A lista na Table do Ecme, com busca, paginação e editar, nos dois temas.
