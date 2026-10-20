@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Link from 'next/link';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -7,8 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EntityTable, type EntityRow } from './EntityTable.tsx';
 
 // Listas de autores, taxonomias e menus (#46): células, links por permissão e teclado. Criar
-// é a ação do cabeçalho da página, repetida no estado vazio (#87). Busca por nome e paginação
-// opcionais, com o estado na URL (#108): router.replace simulado.
+// é a ação do cabeçalho da página, repetida no estado vazio (#87). Busca por nome, paginação e
+// tamanho com o estado na URL (#108), no DataTable do template (#363): router.replace simulado.
 
 const navigation = vi.hoisted(() => {
   let search = '';
@@ -51,7 +51,9 @@ const renderTable = (canWrite = false, data = rows) =>
       basePath="/sites/exemplo-a/menus"
       headers={['Chave', 'Itens']}
       rows={data}
-      noun={{ one: 'menu', many: 'menus', none: 'Nenhum menu cadastrado.' }}
+      empty="Nenhum menu cadastrado."
+      search={{ label: 'Buscar por chave', notFound: 'Nenhum menu encontrado.' }}
+      truncated={[0]}
       canWrite={canWrite}
       emptyAction={
         canWrite ? <Link href="/sites/exemplo-a/menus/novo">Criar menu</Link> : undefined
@@ -59,8 +61,15 @@ const renderTable = (canWrite = false, data = rows) =>
     />,
   );
 
+// O seletor de tamanho é o combobox do react-select: abre com a seta e escolhe a opção.
+async function choose(user: ReturnType<typeof userEvent.setup>, label: string, option: string) {
+  screen.getByRole('combobox', { name: label }).focus();
+  await user.keyboard('{ArrowDown}');
+  await user.click(screen.getByRole('option', { name: option }));
+}
+
 describe('tabela de entidades', () => {
-  it('mostra o nome e as células de cada linha', () => {
+  it('mostra o nome e as células de cada linha, com a contagem', () => {
     renderTable();
 
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
@@ -68,14 +77,24 @@ describe('tabela de entidades', () => {
       'Itens',
     ]);
     expect(screen.getAllByRole('row')[1]?.textContent).toBe('principalInício (/) · Guias (/guias)');
-    // A contagem é a <caption>: dá nome à tabela.
-    expect(screen.getByRole('table', { name: '2 menus' })).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('2 resultados');
+  });
+
+  it('a célula declarada em `truncated` fica numa linha cortada, com o texto inteiro em title', () => {
+    renderTable();
+
+    const text = screen.getByText('Início (/) · Guias (/guias)');
+    expect(text.getAttribute('title')).toBe('Início (/) · Guias (/guias)');
+    expect(text.className).toContain('truncate');
+    // O nome não é cortado.
+    expect(screen.getByText('principal').getAttribute('title')).toBeNull();
   });
 
   it('sem content.write não há links de criar nem de editar', () => {
     renderTable();
 
     expect(screen.queryAllByRole('link')).toEqual([]);
+    expect(screen.queryByRole('columnheader', { name: 'Ações' })).toBeNull();
   });
 
   it('com content.write, editar pelo teclado e sem link de criar na tabela', async () => {
@@ -84,15 +103,17 @@ describe('tabela de entidades', () => {
 
     expect(screen.queryByRole('link', { name: 'Criar menu' })).toBeNull();
     await user.tab();
+    await user.tab();
     const edit = screen.getByRole('link', { name: 'Editar principal' });
     expect(document.activeElement).toBe(edit);
     expect(edit.getAttribute('href')).toBe('/sites/exemplo-a/menus/1');
   });
 
-  it('sem linhas mostra o estado vazio com a ação no lugar da tabela', () => {
+  it('sem linhas mostra o estado vazio com a ação no lugar da toolbar e da tabela', () => {
     renderTable(true, []);
 
     expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('search')).toBeNull();
     expect(screen.getByText('Nenhum menu cadastrado.')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Criar menu' }).getAttribute('href')).toBe(
       '/sites/exemplo-a/menus/novo',
@@ -120,7 +141,7 @@ const renderAuthors = (data = authors) =>
       basePath="/sites/exemplo-a/autores"
       headers={['Nome', 'Slug']}
       rows={data}
-      noun={{ one: 'autor', many: 'autores', none: 'Nenhum autor cadastrado.' }}
+      empty="Nenhum autor cadastrado."
       search={{ label: 'Buscar por nome', notFound: 'Nenhum autor encontrado.' }}
     />,
   );
@@ -139,16 +160,12 @@ describe('busca por nome e paginação (#108)', () => {
     expect(names().slice(0, 2)).toEqual(['Ângela Souza', 'Autor 02']);
     expect(screen.getAllByRole('row')).toHaveLength(26);
     expect(screen.getByRole('status').textContent).toBe('30 resultados');
-    expect(screen.queryByText('30 autores')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Página anterior' })).toHaveProperty(
-      'disabled',
-      true,
-    );
+    // Sem cabeçalho ordenável: a ordem é a do servidor.
+    expect(screen.queryAllByRole('button', { name: /Nome|Slug/ })).toEqual([]);
 
     await user.click(screen.getByRole('button', { name: 'Próxima página' }));
 
     expect(names()).toEqual(['Autor 26', 'Autor 27', 'Autor 28', 'Autor 29', 'Autor 30']);
-    expect(screen.getByRole('button', { name: 'Próxima página' })).toHaveProperty('disabled', true);
     expect(navigation.get()).toBe('pagina=2');
   });
 
@@ -163,29 +180,54 @@ describe('busca por nome e paginação (#108)', () => {
 
     await user.clear(screen.getByLabelText('Buscar por nome'));
     await user.type(screen.getByLabelText('Buscar por nome'), 'autor-3');
-    expect(screen.getByText('Nenhum autor encontrado.')).toBeTruthy();
+    expect(within(screen.getByRole('table')).getByText('Nenhum autor encontrado.')).toBeTruthy();
   });
 
-  it('a URL com busca e página restaura o mesmo estado', () => {
-    act(() => navigation.set('q=autor&pagina=2'));
+  it('a URL com busca, página e tamanho restaura o mesmo estado', () => {
+    act(() => navigation.set('q=autor&pagina=2&por-pagina=10'));
     renderAuthors();
 
     expect(screen.getByLabelText<HTMLInputElement>('Buscar por nome').value).toBe('autor');
-    expect(screen.getByText('Página 2 de 2')).toBeTruthy();
-    expect(names()).toEqual(['Autor 27', 'Autor 28', 'Autor 29', 'Autor 30']);
+    expect(names()).toEqual([
+      'Autor 12',
+      'Autor 13',
+      'Autor 14',
+      'Autor 15',
+      'Autor 16',
+      'Autor 17',
+      'Autor 18',
+      'Autor 19',
+      'Autor 20',
+      'Autor 21',
+    ]);
+    expect(screen.getByRole('status').textContent).toBe('29 resultados');
   });
 
-  it('busca sem resultado mostra a mensagem, e "Limpar busca" volta a lista', async () => {
+  it('busca sem resultado mantém a tabela com 0 resultados; "Limpar filtros" volta tudo', async () => {
     const user = userEvent.setup();
     renderAuthors();
 
     await user.type(screen.getByLabelText('Buscar por nome'), 'ninguém');
-    expect(screen.queryByRole('table')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Limpar busca' }));
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText('Nenhum autor encontrado.')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('0 resultados');
+    // A única ação de limpar é a da toolbar (#361).
+    expect(screen.queryByRole('button', { name: 'Limpar busca' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Limpar filtros' }));
 
     expect(navigation.get()).toBe('');
     expect(screen.getByLabelText<HTMLInputElement>('Buscar por nome').value).toBe('');
     expect(screen.getAllByRole('row')).toHaveLength(26);
+  });
+
+  it('o seletor de tamanho troca os itens por página e vai para a URL (#363)', async () => {
+    const user = userEvent.setup();
+    renderAuthors();
+
+    await choose(user, 'Itens por página', '10 / página');
+
+    expect(screen.getAllByRole('row')).toHaveLength(11);
+    expect(navigation.get()).toBe('por-pagina=10');
   });
 
   it('sem linhas, o estado vazio de cadastro, sem busca nem paginação', () => {
@@ -194,13 +236,5 @@ describe('busca por nome e paginação (#108)', () => {
     expect(screen.getByText('Nenhum autor cadastrado.')).toBeTruthy();
     expect(screen.queryByRole('search')).toBeNull();
     expect(screen.queryByRole('navigation', { name: 'Paginação' })).toBeNull();
-  });
-
-  it('sem `search` (menus), nem busca nem paginação, com a contagem de antes', () => {
-    renderTable(false, authors.slice(0, 2));
-
-    expect(screen.queryByRole('search')).toBeNull();
-    expect(screen.queryByRole('navigation', { name: 'Paginação' })).toBeNull();
-    expect(screen.getByText('2 menus')).toBeTruthy();
   });
 });
