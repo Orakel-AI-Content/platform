@@ -299,10 +299,14 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
     e no `title`, sempre visível na lista de sites).
   - Build: publicado `bg-success`, falhou `bg-error`.
 - **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
-  processo de ordem fixa (ciclo de vida do site), não tag: `<ol>` com número, rótulo e o
-  estado em texto ("concluída", "atual", "pendente"), além do estilo; a atual leva
-  `aria-current="step"`. A ordem vem de `LIFECYCLE_ORDER` em `siteLabels.ts`. A ação manual
-  fica no item da etapa que ela conclui; o sucesso vai para o toast e o erro para o
+  processo de ordem fixa (ciclo de vida do site), não tag. Usa o `Steps` vertical
+  (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
+  `title`; o `Steps` desenha marcador e conector, põe `aria-current="step"` na atual e diz o
+  estado ("concluída", "atual", "pendente") em `sr-only`. A atual e as pendentes repetem o estado
+  em texto visível no `title`, `aria-hidden`, para não ficarem só na cor da borda. A ordem vem de
+  `LIFECYCLE_ORDER` em `siteLabels.ts`. A ação manual fica na `description` do item da etapa que
+  ela conclui (sem `onChange`, as etapas não viram botões); o sucesso vai para o toast e o erro
+  para o
   `ActionAlert` abaixo da lista (`LifecycleActionScope`), que sobrevive à revalidação que move o
   botão de item.
 - **Tela de detalhe:** o layout do `CustomerDetails` do Ecme
