@@ -14,7 +14,13 @@ import {
   type FieldRenderer,
   type SchemaFormSection,
 } from '@/components/forms/SchemaForm';
-import { choiceField, flagsField, linesField, themeField } from '@/components/forms/SiteFields';
+import {
+  choiceField,
+  flagsField,
+  linesField,
+  switchField,
+  themeField,
+} from '@/components/forms/SiteFields';
 import type { SiteFormResult } from '@/components/sites/siteConfigFormValues.ts';
 
 type Options = {
@@ -118,6 +124,7 @@ export function SiteConfigForm({
     domains: linesField(),
     theme: themeField(options.themes),
     featureFlags: flagsField(),
+    indexavel: switchField(),
     'crawlers.allow': linesField({ rows: 2 }),
     'crawlers.block': linesField({ rows: 2 }),
     ...Object.fromEntries(

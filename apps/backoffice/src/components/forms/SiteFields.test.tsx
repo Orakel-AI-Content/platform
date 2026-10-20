@@ -9,11 +9,11 @@ import * as z from 'zod';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { SchemaForm, type SchemaFormIssue } from './SchemaForm.tsx';
-import { choiceField, flagsField, linesField, themeField } from './SiteFields.tsx';
+import { choiceField, flagsField, linesField, switchField, themeField } from './SiteFields.tsx';
 import { fieldLabel } from '@/test/fieldLabel.ts';
 
-// Campos da configuração do site no gerador (#47): linhas ↔ lista, flags ↔ registro e
-// escolha entre as opções recebidas.
+// Campos da configuração do site no gerador (#47): linhas ↔ lista, flags ↔ registro,
+// escolha entre as opções recebidas e liga/desliga.
 
 // A mensagem de erro do FormItem (#245) anima com o motion, que o happy-dom cancela no `cleanup`.
 beforeAll(() => {
@@ -121,8 +121,11 @@ describe('campos da configuração do site', () => {
     within(group).getByRole('button', { name: 'Adicionar recurso' }).focus();
     await user.keyboard('{Enter}');
     await user.type(within(group).getByLabelText(fieldLabel('Nome do recurso 2')), 'busca');
-    const [comentarios] = within(group).getAllByRole('checkbox');
-    comentarios?.focus();
+    // Liga/desliga no Switcher do Ecme (#331), com nome por linha.
+    const comentarios = within(group).getByRole('switch', { name: 'Recurso 1 ligado' });
+    expect(comentarios).toHaveProperty('checked', false);
+    expect(within(group).queryByRole('checkbox')).toBeNull();
+    comentarios.focus();
     await user.keyboard(' ');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
@@ -244,5 +247,54 @@ describe('tema (#163)', () => {
       ),
     );
     expect(screen.getByRole('radiogroup').getAttribute('aria-invalid')).toBe('true');
+  });
+});
+
+describe('liga/desliga (#331)', () => {
+  function renderSwitch(
+    indexavel: boolean,
+    onSubmit: (value: unknown) => void | SchemaFormIssue[] = vi.fn(),
+  ) {
+    render(
+      <SchemaForm
+        schema={z.object({ indexavel: z.boolean() })}
+        defaultValues={{ indexavel }}
+        labels={{ indexavel: 'Indexável' }}
+        hints={{ indexavel: 'Ligar exige o G1 registrado.' }}
+        fields={{ indexavel: switchField() }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+  }
+
+  it('Switcher com o rótulo e a dica do FormItem, sem asterisco; envia o booleano', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderSwitch(false, onSubmit);
+
+    const indexavel = screen.getByRole('switch', { name: 'Indexável' });
+    expect(indexavel).toHaveProperty('checked', false);
+    expect(indexavel.getAttribute('aria-required')).toBeNull();
+    expect(screen.getByText('Indexável').closest('label')?.textContent).toBe('Indexável');
+    const hint = document.getElementById(indexavel.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe('Ligar exige o G1 registrado.');
+    indexavel.focus();
+    await user.keyboard(' ');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await submitted(onSubmit);
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({ indexavel: true });
+  });
+
+  it('a recusa do servidor leva o foco ao Switcher', async () => {
+    const user = userEvent.setup();
+    renderSwitch(true, () => [{ path: ['indexavel'], message: 'Exige o G1 registrado' }]);
+
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('switch', { name: 'Indexável' })),
+    );
   });
 });

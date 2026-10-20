@@ -1,7 +1,8 @@
 // Ecme v1.3.10 (e5f9a1d): src/components/ui/Radio/Group.tsx
 // Adaptado (#315), pela acessibilidade:
 // - `role="radiogroup"`, com `aria-label`/`aria-labelledby` repassados, para o leitor de tela
-//   anunciar o conjunto; o Ecme renderizava um <div> sem papel;
+//   anunciar o conjunto; o Ecme renderizava um <div> sem papel; aceita também `aria-invalid`,
+//   `aria-required` e `aria-describedby` (#331), para o grupo ser um campo de formulário;
 // - sem `name`, o grupo gera um (`useId`): é o `name` comum que faz das opções um grupo nativo,
 //   com uma parada só no Tab e as setas trocando a escolha;
 // - pelos tipos: o valor é `RadioValue` (`string | number`) no lugar de `any`, e o evento de
@@ -16,7 +17,12 @@ import type { RadioValue } from './context';
 import type { ChangeEvent, HTMLAttributes, Ref } from 'react';
 
 export interface RadioGroupProps
-  extends CommonProps, Pick<HTMLAttributes<HTMLDivElement>, 'aria-label' | 'aria-labelledby'> {
+  extends
+    CommonProps,
+    Pick<
+      HTMLAttributes<HTMLDivElement>,
+      'aria-label' | 'aria-labelledby' | 'aria-invalid' | 'aria-required' | 'aria-describedby'
+    > {
   radioClass?: string;
   disabled?: boolean;
   name?: string;

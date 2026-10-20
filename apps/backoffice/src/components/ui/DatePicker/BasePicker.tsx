@@ -16,7 +16,9 @@
 // - o botão de limpar chama-se `clearLabel` (o CloseButton diria "Fechar") e o ícone do
 //   calendário fica `aria-hidden`;
 // - o painel não herda o FormItem: o TimeInput dentro dele leria o `controlId` do campo e
-//   repetiria o id.
+//   repetiria o id;
+// - (#331) `aria-required` chega ao campo, para o campo obrigatório de um formulário anunciar
+//   a obrigatoriedade (o `combobox` admite o atributo).
 'use client';
 
 import {
@@ -48,6 +50,7 @@ import type {
 } from 'react';
 
 export interface BasePickerSharedProps {
+  'aria-required'?: boolean;
   clearable?: boolean;
   clearButton?: string | ReactNode;
   clearLabel?: string;
@@ -80,6 +83,7 @@ interface BasePickerProps extends CommonProps, BasePickerSharedProps {
 
 const BasePicker = (props: BasePickerProps) => {
   const {
+    'aria-required': ariaRequired,
     className,
     clearable = true,
     clearButton,
@@ -213,6 +217,7 @@ const BasePicker = (props: BasePickerProps) => {
         disabled={disabled}
         asElement={'input'}
         role="combobox"
+        aria-required={ariaRequired}
         onChange={onChange}
         {...getReferenceProps({
           onBlur: handleInputBlur,

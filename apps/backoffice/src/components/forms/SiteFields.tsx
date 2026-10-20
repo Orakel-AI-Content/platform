@@ -9,17 +9,18 @@ import ConfirmDialog, {
   dangerConfirmButtonProps,
 } from '@/components/shared/ConfirmDialog.tsx';
 import Button from '@/components/ui/Button';
-import Checkbox from '@/components/ui/Checkbox';
 import Input from '@/components/ui/Input';
+import { Radio } from '@/components/ui/Radio';
 import Select from '@/components/ui/Select';
+import { Switcher } from '@/components/ui/Switcher';
 
 import { selectInFormItem, type FieldProps, type FieldRenderer } from './SchemaForm.tsx';
 
 // Campos do gerador para o que o schema da configuração do site não desenha sozinho: listas
 // de texto (um item por linha), feature flags (registro nome → ligado), escolha entre opções
 // que vêm dos recursos da release, não do schema, e o tema com amostra. O valor é sempre o
-// da SiteConfig. Visual do Ecme (#245): `Input` (com `textArea` nas listas), `Checkbox` e
-// `Button`; a escolha usa o `Select` do Ecme (#330) e o tema, rádios nativos, com os tokens do Ecme.
+// da SiteConfig. Visual do Ecme (#245): `Input` (com `textArea` nas listas), `Switcher` no
+// liga/desliga e `Button`; a escolha usa o `Select` do Ecme (#330) e o tema, o `Radio.Group` (#331).
 
 const toLines = (text: string): string[] =>
   text
@@ -123,14 +124,13 @@ function FlagsField({ id, label, value, onChange, invalid, describedBy, ref }: F
               update(rows.map((r) => (r.key === row.key ? { ...r, name: event.target.value } : r)))
             }
           />
-          <Checkbox
+          <Switcher
+            aria-label={`Recurso ${index + 1} ligado`}
             checked={row.enabled}
             onChange={(checked) =>
               update(rows.map((r) => (r.key === row.key ? { ...r, enabled: checked } : r)))
             }
-          >
-            Ligado
-          </Checkbox>
+          />
           <Button
             type="button"
             size="sm"
@@ -192,7 +192,7 @@ export function choiceField(options: readonly string[]): FieldRenderer {
 }
 
 /**
- * Tema: um rádio por tema recebido (THEME_SUMMARIES, montado no servidor; o pacote não entra
+ * Tema: um `Radio` por tema recebido (THEME_SUMMARIES, montado no servidor; o pacote não entra
  * no bundle do navegador), com a amostra de fundo, texto e destaque e o nome legível. O `ref`
  * vai no rádio marcado (ou no primeiro), para o foco do erro chegar ao grupo.
  */
@@ -214,9 +214,11 @@ export function themeField(themes: readonly ThemeSummary[]): FieldRenderer {
       themes.findIndex((theme) => theme.id === selected),
     );
     return (
-      <div
+      <Radio.Group
         id={id}
-        role="radiogroup"
+        name={name}
+        value={selected}
+        onChange={(theme) => onChange(theme)}
         aria-label={label}
         aria-invalid={invalid}
         aria-required={required || undefined}
@@ -224,39 +226,54 @@ export function themeField(themes: readonly ThemeSummary[]): FieldRenderer {
         className="grid gap-2 sm:grid-cols-2"
       >
         {themes.map((theme, index) => (
-          <label
+          <Radio
             key={theme.id}
-            className="flex min-h-11 items-center gap-3 rounded-xl border border-gray-200 p-3 text-sm has-checked:border-primary dark:border-gray-700"
+            value={theme.id}
+            ref={index === focusable ? ref : undefined}
+            className="min-h-11 rounded-xl border border-gray-200 p-3 text-sm has-checked:border-primary dark:border-gray-700"
           >
-            <input
-              type="radio"
-              name={name}
-              value={theme.id}
-              ref={index === focusable ? ref : undefined}
-              checked={selected === theme.id}
-              onChange={() => onChange(theme.id)}
-              className="size-4 shrink-0 accent-primary"
-            />
-            <span aria-hidden="true" className="flex shrink-0 -space-x-1">
-              {[theme.colors.background, theme.colors.text, theme.colors.accent].map(
-                (color, swatch) => (
-                  <span
-                    key={swatch}
-                    data-swatch={color}
-                    className="size-5 rounded-full border border-gray-200 dark:border-gray-700"
-                    style={{ backgroundColor: color }}
-                  />
-                ),
-              )}
+            <span className="flex items-center gap-3">
+              <span aria-hidden="true" className="flex shrink-0 -space-x-1">
+                {[theme.colors.background, theme.colors.text, theme.colors.accent].map(
+                  (color, swatch) => (
+                    <span
+                      key={swatch}
+                      data-swatch={color}
+                      className="size-5 rounded-full border border-gray-200 dark:border-gray-700"
+                      style={{ backgroundColor: color }}
+                    />
+                  ),
+                )}
+              </span>
+              <span className="flex flex-col">
+                <span className="font-medium">{theme.name}</span>
+                <span className="text-gray-600 dark:text-gray-400">{theme.id}</span>
+              </span>
             </span>
-            <span className="flex flex-col">
-              <span className="font-medium">{theme.name}</span>
-              <span className="text-gray-600 dark:text-gray-400">{theme.id}</span>
-            </span>
-          </label>
+          </Radio>
         ))}
-      </div>
+      </Radio.Group>
     );
   }
   return ThemeField;
+}
+
+/**
+ * Liga/desliga de um booleano (indexável) no `Switcher`: o rótulo e a dica são os do `FormItem`,
+ * ligados por `id` e `aria-describedby`; envia `true`/`false`.
+ */
+export function switchField(): FieldRenderer {
+  function SwitchField({ id, value, onChange, describedBy, ref, readOnly }: FieldProps) {
+    return (
+      <Switcher
+        id={id}
+        ref={ref}
+        readOnly={readOnly}
+        aria-describedby={describedBy}
+        checked={value === true}
+        onChange={(checked) => onChange(checked)}
+      />
+    );
+  }
+  return SwitchField;
 }

@@ -228,6 +228,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const count = await names.count();
     await flags.getByRole('button', { name: 'Adicionar recurso' }).click();
     await expect(names).toHaveCount(count + 1);
+    // O liga/desliga é o Switcher do Ecme (#331): a linha nova entra ligada e o Espaço desliga.
+    const enabled = flags.getByRole('switch', { name: `Recurso ${count + 1} ligado` });
+    await expect(enabled).toBeChecked();
+    await enabled.focus();
+    await page.keyboard.press('Space');
+    await expect(enabled).not.toBeChecked();
     const remove = flags.getByRole('button', { name: `Remover recurso ${count + 1}` });
     const dialog = page.getByRole('alertdialog', { name: `Remover recurso ${count + 1}?` });
     await remove.click();
@@ -333,11 +339,15 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   // Indexação sem G1 é recusada; depois do G1 pela página, a mesma edição é aceita.
   const indexar = async () => {
     await page.goto(`/sites/${siteId}/configuracao`);
-    await page.getByLabel('Indexável').check();
+    // Indexável no Switcher do Ecme (#331), ligado pelo teclado.
+    const indexavel = page.getByRole('switch', { name: 'Indexável' });
+    await indexavel.focus();
+    await page.keyboard.press('Space');
+    await expect(indexavel).toBeChecked();
     await page.getByRole('button', { name: 'Salvar configuração' }).click();
   };
   await indexar();
-  await expect(page.getByRole('checkbox', { name: 'Indexável' })).toHaveAccessibleDescription(
+  await expect(page.getByRole('switch', { name: 'Indexável' })).toHaveAccessibleDescription(
     /só pode ficar indexável depois do G1 registrado/,
   );
   await page.goto(`/sites/${siteId}`);
