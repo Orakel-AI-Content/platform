@@ -1,8 +1,9 @@
 import { ReviewQueueTable } from '@/components/review/ReviewQueueTable';
+import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { listReviewQueue } from '@/domain/content/contents.ts';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { ListHeader, PageTrail } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
+import { listReviewQueue } from '@/domain/content/contents.ts';
 
 import { sitePageContext } from '../editorial-page.tsx';
 
@@ -12,7 +13,8 @@ export const metadata = { title: 'Revisão' };
 
 /**
  * Fila de revisão do site (#74): conteúdos cuja versão mais recente está em revisão. Ler
- * exige site.read (o domínio confere); aprovar é da tela de revisão de cada conteúdo.
+ * exige site.read (o domínio confere); aprovar é da tela de revisão de cada conteúdo. Lista no
+ * padrão do template (#365): a trilha acima do cartão; título, toolbar e tabela dentro dele.
  */
 export default async function ReviewQueuePage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
@@ -24,8 +26,18 @@ export default async function ReviewQueuePage({ params }: { params: Promise<{ si
 
   return (
     <section aria-labelledby="review-queue-title" className="list-width space-y-4">
-      <PageHeader id="review-queue-title" trail={siteTrail(site, 'Revisão')} title="Revisão" />
-      <ReviewQueueTable siteId={site.id} timeZone={site.timeZone} rows={queue.value} />
+      <PageTrail items={siteTrail(site, 'Revisão')} />
+      <AdaptiveCard>
+        <div className="flex flex-col gap-4">
+          <ListHeader id="review-queue-title" title="Revisão" />
+          <ReviewQueueTable
+            siteId={site.id}
+            timeZone={site.timeZone}
+            rows={queue.value}
+            labelledBy="review-queue-title"
+          />
+        </div>
+      </AdaptiveCard>
     </section>
   );
 }

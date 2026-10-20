@@ -14,6 +14,12 @@ async function loginAs(page: Page, email: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
 }
 
+/**
+ * Fila filtrada pela busca (#365): a fila é paginada e vem da mais antiga para a mais recente,
+ * e o banco local acumula envios de outras execuções; o slug está no título.
+ */
+const queueFor = (slug: string) => `/sites/exemplo-a/revisao?q=${slug}`;
+
 /** Artigo mínimo em rascunho; devolve o caminho da página do conteúdo. */
 async function createDraft(page: Page, title: string, slug: string): Promise<string> {
   await page.goto('/sites/exemplo-a/conteudos/novo');
@@ -69,7 +75,18 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
     .click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/revisao$/);
   await expect(page.getByRole('heading', { level: 1, name: /Revisão/ })).toBeVisible();
-  const row = page.getByRole('row', { name: new RegExp(title) });
+  // No cartão do template (#365): a tabela tem o nome do título; a busca vai para a URL e
+  // recarregar mantém a mesma visão.
+  const table = page.getByRole('table', { name: 'Revisão', exact: true });
+  const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
+  await page.getByLabel('Buscar por título').fill(slug);
+  await expect(page).toHaveURL(new RegExp(`q=${slug}`));
+  await expect(count).toHaveText('1 resultado');
+  await page.reload();
+  await expect(page.getByLabel('Buscar por título')).toHaveValue(slug);
+  await expect(count).toHaveText('1 resultado');
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  const row = table.getByRole('row', { name: new RegExp(title) });
   await expect(row).toContainText('Artigo');
   await expect(row.getByRole('cell').nth(2)).toHaveText('1');
   await expect(row.getByRole('cell').nth(3)).toHaveText(/\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}/);
@@ -87,10 +104,12 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
     .getByRole('navigation', { name: 'Áreas do site' })
     .getByRole('link', { name: 'Revisão' })
     .click();
+  await expect(reviewer).toHaveURL(/\/sites\/exemplo-a\/revisao$/);
+  await reviewer.getByLabel('Buscar por título').fill(slug);
   await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toBeVisible();
 });
 
-// Fila na Table do Ecme (#276): a 1280 px nada rola na horizontal, nenhuma célula passa de
+// Fila no DataTable do template (#276, #365): a 1280 px nada rola na horizontal, nenhuma célula passa de
 // duas linhas de texto e o axe não acha violação, nos dois temas.
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`fila a 1280 px, até duas linhas por célula, sem violação do axe (${colorScheme})`, async ({
@@ -106,9 +125,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
       page.getByRole('status').filter({ hasText: 'Enviado para revisão.' }),
     ).toBeVisible();
 
-    await page.goto('/sites/exemplo-a/revisao');
+    await page.goto(queueFor(slug));
     expect(page.viewportSize()?.width).toBe(1280);
-    const table = page.getByRole('table');
+    const table = page.getByRole('table', { name: 'Revisão', exact: true });
     await expect(table.getByRole('row', { name: new RegExp(title) })).toBeVisible();
 
     const overflow = await table.evaluate((element) => [
@@ -170,7 +189,7 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
   await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
 
   // Editor abre a revisão: vê a visualização e o checklist, sem a ação de aprovar.
-  await page.goto('/sites/exemplo-a/revisao');
+  await page.goto(queueFor(slug));
   await page.getByRole('link', { name: `${title} (revisar)` }).click();
   await expect(
     page.getByRole('heading', { level: 1, name: `Revisão de “${title}”` }),
@@ -181,7 +200,7 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
   const reviewer = await context.newPage();
   await loginAs(reviewer, 'revisor@orakel.local');
   await loginPreview(reviewer, 'revisor@orakel.local');
-  await reviewer.goto('/sites/exemplo-a/revisao');
+  await reviewer.goto(queueFor(slug));
   await reviewer.getByRole('link', { name: `${title} (revisar)` }).click();
 
   // A visualização do site, no iframe, com o artigo em revisão.
@@ -207,7 +226,7 @@ test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', as
   ).toBeVisible();
   await expect(reviewer.getByRole('button', { name: 'Aprovar' })).toHaveCount(0);
 
-  await reviewer.goto('/sites/exemplo-a/revisao');
+  await reviewer.goto(queueFor(slug));
   await expect(reviewer.getByRole('heading', { level: 1, name: /Revisão/ })).toBeVisible();
   await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toHaveCount(0);
   await context.close();
@@ -230,7 +249,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const reviewer = await context.newPage();
     await reviewer.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     await loginAs(reviewer, 'revisor@orakel.local');
-    await reviewer.goto('/sites/exemplo-a/revisao');
+    await reviewer.goto(queueFor(slug));
     await reviewer.getByRole('link', { name: `${title} (revisar)` }).click();
 
     const panel = reviewer.getByRole('complementary', { name: 'Revisão da versão 1' });

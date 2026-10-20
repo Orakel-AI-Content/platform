@@ -521,10 +521,13 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
-// Mudanças pendentes na Table do Ecme (#249), nos dois temas. O cadastro registra a
-// configuração v1: o site novo já tem uma pendência.
+// Mudanças pendentes no DataTable do template (#249, #365), nos dois temas: a 1280 px nada rola
+// na horizontal, nenhuma célula passa de duas linhas e o axe não acha violação. O cadastro
+// registra a configuração v1: o site novo já tem uma pendência.
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`mudanças pendentes sem violação do axe (${colorScheme})`, async ({ page }) => {
+  test(`mudanças pendentes a 1280 px, até duas linhas por célula, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
     const siteId = `e2e-pendencias-${colorScheme}-${Date.now()}`;
     created.push(siteId);
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
@@ -532,12 +535,50 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await newSite(page, siteId);
     await page.goto(`/sites/${siteId}/pendencias`);
     await expect(page.getByRole('heading', { name: 'Mudanças pendentes' })).toBeVisible();
-    const table = page.getByRole('table', { name: '1 mudança pendente' });
+    expect(page.viewportSize()?.width).toBe(1280);
+    const table = page.getByRole('table', { name: 'Mudanças pendentes', exact: true });
     await expect(table.getByRole('columnheader')).toHaveText(['Origem', 'Item', 'Registrada em']);
-    await expect(table.getByRole('link', { name: 'Configuração v1' })).toHaveAttribute(
+    await expect(table.getByRole('link', { name: 'Configuração v1 (abrir)' })).toHaveAttribute(
       'href',
       `/sites/${siteId}/configuracao`,
     );
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '1 resultado',
+    );
+
+    const overflow = await table.evaluate((element) => [
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      element.parentElement!.scrollWidth - element.parentElement!.clientWidth,
+    ]);
+    expect(overflow).toEqual([0, 0]);
+
+    // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
+    // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
+    const lines = await table.locator('tbody td').evaluateAll((cells) =>
+      cells.map((cell) => {
+        const found: { top: number; bottom: number }[] = [];
+        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          if (!node.textContent?.trim()) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) {
+            if (rect.width <= 1 || rect.height <= 1) continue;
+            const middle = (rect.top + rect.bottom) / 2;
+            const line = found.find((l) => l.top <= middle && middle <= l.bottom);
+            if (line === undefined) found.push({ top: rect.top, bottom: rect.bottom });
+            else
+              Object.assign(line, {
+                top: Math.min(line.top, rect.top),
+                bottom: Math.max(line.bottom, rect.bottom),
+              });
+          }
+        }
+        return found.length;
+      }),
+    );
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.filter((count) => count > 2)).toEqual([]);
 
     await expectNoViolations(page);
   });
