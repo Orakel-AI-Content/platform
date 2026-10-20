@@ -53,6 +53,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { Upload } from '@/components/ui/Upload';
 
 import { DataTableShowcase } from './data-table-showcase.tsx';
+import { MediaShowcase } from './media-showcase.tsx';
 import { MenuShowcase } from './menu-showcase.tsx';
 import { StatesShowcase } from './states-showcase.tsx';
 
