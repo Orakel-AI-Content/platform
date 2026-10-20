@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
 import Modal from 'react-modal';
@@ -28,8 +28,13 @@ beforeEach(() => {
   Modal.setAppElement(app);
 });
 
-afterEach(() => {
+// Desmontado aberto, o react-modal tira o portal só depois do `closeTimeoutMS`: espera a saída,
+// para o timer não rodar depois que o happy-dom some no fim do arquivo.
+afterEach(async () => {
   cleanup();
+  await waitFor(() => {
+    expect(document.querySelector('.dialog-portal')).toBeNull();
+  });
   app.remove();
 });
 
