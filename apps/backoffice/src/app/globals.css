@@ -103,6 +103,11 @@
 
   --breakpoint-xs: 576px;
 
+  /* Só a paleta do template (#399): zera as cores padrão do Tailwind (red-500… não gera CSS) e
+     redeclara white e black, que o código portado do Ecme usa. */
+  --color-*: initial;
+  --color-white: #fff;
+  --color-black: #000;
   --color-neutral: var(--neutral);
   --color-primary: var(--primary);
   --color-primary-deep: var(--primary-deep);
