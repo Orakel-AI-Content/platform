@@ -93,13 +93,10 @@ export function PublishNowButton({
   siteId,
   action,
   onResult,
-  size = 'sm',
 }: {
   siteId: string;
   action: PublishNow;
   onResult: (result: ActionResult) => void;
-  /** `xs` na lista, onde a linha tem pouca largura; `sm` na página do site. */
-  size?: 'xs' | 'sm';
 }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
@@ -107,7 +104,7 @@ export function PublishNowButton({
     <>
       <Button
         type="button"
-        size={size}
+        size="sm"
         disabled={pending}
         customColorClass={dangerButtonClass}
         onClick={() => setConfirming(true)}
