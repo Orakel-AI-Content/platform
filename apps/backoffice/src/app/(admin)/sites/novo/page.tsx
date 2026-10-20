@@ -23,9 +23,9 @@ export default async function NewSitePage() {
     return <ForbiddenScreen action="site.configure" back={backToSites} />;
   }
   return (
-    <section aria-labelledby="new-site-title" className="space-y-6">
+    <section aria-labelledby="new-site-title" className="space-y-4">
       {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
-      <div className="form-width space-y-6">
+      <div className="form-width space-y-4">
         <PageHeader
           id="new-site-title"
           trail={sitesTrail([{ label: 'Cadastrar site' }])}
