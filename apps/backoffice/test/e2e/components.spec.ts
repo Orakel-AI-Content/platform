@@ -2158,3 +2158,127 @@ for (const colorScheme of ['light', 'dark'] as const) {
     expect(hydration).toEqual([]);
   });
 }
+
+// Cabeçalho de página e peças de estado (#388): a trilha nomeada com o item atual em
+// aria-current, as seis cores do StateTag, a etapa atual do ciclo com aria-current="step" e a
+// ação na etapa seguinte. Por tema, o foco de 2px no --ring nos links e nas ações, e o axe em
+// cada seção. O foco parte do h2 da seção: a vitrine tem mais paradas de Tab que o `tabTo` dá.
+const STATES_SECTIONS = ['PageHeader', 'StatusScreen', 'StateTag', 'LifecycleSteps'] as const;
+
+/** Põe o foco no h2 da seção, para o próximo Tab entrar nela. */
+async function focusSection(page: Page, id: string): Promise<void> {
+  await page.locator(`#${id}`).evaluate((heading) => {
+    heading.setAttribute('tabindex', '-1');
+    (heading as HTMLElement).focus();
+  });
+}
+
+test('cabeçalho e estados: trilha, status em seis cores e ciclo com a etapa atual', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+
+  const header = section(page, 'PageHeader');
+  const trail = header.getByRole('navigation', { name: 'Trilha de navegação' });
+  await expect(trail.getByRole('listitem')).toHaveCount(3);
+  await expect(trail.getByRole('link')).toHaveText(['Sites', 'Portal Exemplo']);
+  await expect(trail.getByText('Mudanças pendentes')).toHaveAttribute('aria-current', 'page');
+  await expect(header.getByRole('heading', { level: 1, name: 'Mudanças pendentes' })).toBeVisible();
+  await expect(header.getByRole('link', { name: 'Criar conteúdo' })).toBeVisible();
+
+  const status = section(page, 'StatusScreen');
+  const screen = status.getByRole('region', { name: 'Página não encontrada' });
+  await expect(screen.getByRole('heading', { level: 1 })).toHaveText('Página não encontrada');
+  await expect(screen.locator('svg[aria-hidden="true"]')).toHaveCount(1);
+  await expect(screen.getByRole('link', { name: 'Voltar para os sites' })).toBeVisible();
+
+  const tags = section(page, 'StateTag').getByRole('listitem');
+  await expect(tags).toHaveText([
+    'Rascunho',
+    'Em revisão',
+    'Aprovado',
+    'Agendado',
+    'Publicado',
+    'Despublicado',
+  ]);
+  const dots = await tags.evaluateAll((items) =>
+    items.map((item) => getComputedStyle(item.querySelector('.tag-affix')!).backgroundColor),
+  );
+  expect(new Set(dots).size).toBe(6);
+
+  const steps = section(page, 'LifecycleSteps');
+  const [withAction, done] = await steps.getByRole('list').all();
+  await expect(withAction!.locator('[aria-current="step"]')).toContainText('Infra aplicada');
+  await expect(withAction!.getByRole('button', { name: 'Avançar etapa' })).toBeVisible();
+  await expect(done!.locator('[aria-current="step"]')).toContainText('Publicado');
+  await expect(done!.getByRole('button')).toHaveCount(0);
+
+  // A ação avança a etapa até a última, onde some.
+  const advance = steps.getByRole('button', { name: 'Avançar etapa' });
+  await advance.click();
+  await expect(withAction!.locator('[aria-current="step"]')).toContainText('Zona ativa');
+  await advance.click();
+  await expect(withAction!.locator('[aria-current="step"]')).toContainText('Publicado');
+  await expect(steps.getByRole('button')).toHaveCount(0);
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`cabeçalho e estados pelo teclado, com foco de 2px e sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const ring = await ringColor(page);
+
+    const header = section(page, 'PageHeader');
+    await focusSection(page, 'vitrine-page-header');
+    for (const target of [
+      header.getByRole('link', { name: 'Sites' }),
+      header.getByRole('link', { name: 'Portal Exemplo' }),
+      header.getByRole('link', { name: 'Criar conteúdo' }),
+    ]) {
+      await page.keyboard.press('Tab');
+      await expect(target).toBeFocused();
+      expect(await outline(target)).toEqual({ color: ring, style: 'solid', width: '2px' });
+    }
+
+    const back = section(page, 'StatusScreen').getByRole('link', { name: 'Voltar para os sites' });
+    await focusSection(page, 'vitrine-status-screen');
+    await page.keyboard.press('Tab');
+    await expect(back).toBeFocused();
+    expect(await outline(back)).toEqual({ color: ring, style: 'solid', width: '2px' });
+
+    const steps = section(page, 'LifecycleSteps');
+    const advance = steps.getByRole('button', { name: 'Avançar etapa' });
+    await focusSection(page, 'vitrine-lifecycle-steps');
+    await page.keyboard.press('Tab');
+    await expect(advance).toBeFocused();
+    expect(await outline(advance)).toEqual({ color: ring, style: 'solid', width: '2px' });
+    await page.keyboard.press('Enter');
+    await expect(steps.getByRole('list').first().locator('[aria-current="step"]')).toContainText(
+      'Zona ativa',
+    );
+
+    for (const id of [
+      'vitrine-page-header',
+      'vitrine-status-screen',
+      'vitrine-state-tag',
+      'vitrine-lifecycle-steps',
+    ]) {
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(WCAG)
+        .include(`[aria-labelledby="${id}"]`)
+        .analyze();
+      expect(accessibility.violations, id).toEqual([]);
+    }
+    for (const name of STATES_SECTIONS) {
+      await expect(section(page, name).getByRole('heading', { level: 2 })).toHaveText(name);
+    }
+    expect(hydration).toEqual([]);
+  });
+}
