@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Editor } from '@tiptap/core';
 import { fieldLabel } from './fieldLabel.ts';
 
 // Vitrine dos componentes do Ecme (#205; workspace#45): cada componente portado auditado com
@@ -2392,12 +2393,27 @@ for (const colorScheme of ['light', 'dark'] as const) {
     // Seleciona a palavra "link" pelo teclado e abre o popover pelo botão da barra. O link fica
     // dentro da frase (alvo em linha, exceção do 2.5.8).
     await expect(editor).toHaveText('Texto de exemplo para o link.');
-    await editor.focus();
-    // Fim do texto sem o End (no macOS ele só rola): seleciona tudo e recolhe para a direita.
-    await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowLeft');
-    for (let step = 0; step < 4; step += 1) await page.keyboard.press('Shift+ArrowLeft');
+    // O ProseMirror lê a seleção do DOM no `selectionchange`, e uma tecla que chega antes dele
+    // se perde (o link entrava com o endereço no início do texto): repete o gesto até o estado
+    // do editor (o Tiptap o expõe em `dom.editor`) ser a palavra.
+    await expect(async () => {
+      await editor.focus();
+      // Fim do texto sem o End (no macOS ele só rola): seleciona tudo e recolhe para a direita.
+      await page.keyboard.press('ControlOrMeta+a');
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('ArrowLeft');
+      for (let step = 0; step < 4; step += 1) await page.keyboard.press('Shift+ArrowLeft');
+      await expect
+        .poll(
+          () =>
+            editor.evaluate((dom) => {
+              const { state } = (dom as HTMLElement & { editor: Editor }).editor;
+              return state.doc.textBetween(state.selection.from, state.selection.to);
+            }),
+          { timeout: 1000 },
+        )
+        .toBe('link');
+    }).toPass({ timeout: 10_000 });
     await linkButton.focus();
     await page.keyboard.press('Enter');
     await expect(address).toBeVisible();
