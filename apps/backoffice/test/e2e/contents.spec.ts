@@ -390,6 +390,85 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Uma versão em cartões (#372): "Voltar às versões" e, com content.write, "Editar" no cabeçalho,
+// do mesmo tamanho; a 375 px, a URL canônica de 120 caracteres sem espaço quebra dentro do cartão
+// e a página não rola na horizontal; o axe passa nos dois temas.
+test.describe('versão em cartões (#372)', () => {
+  let contentId = 0;
+  const canonical = `https://exemplo-a.example.com/${'guiacompleto'.repeat(10)}`.slice(0, 120);
+
+  test.beforeAll(async () => {
+    const fixture = await readFixture('exemplo-a');
+    const content = fixture.find((line) => line.type === 'content');
+    if (content?.type !== 'content') throw new Error('fixture sem conteúdo');
+    const pool = createPool(getEnv().DATABASE_URL);
+    try {
+      const created = await createDb(pool).transaction((tx) =>
+        createContent(tx, SYSTEM_ACTOR, 'exemplo-a', {
+          // O ID da fixture é ignorado: o domínio aloca o próximo.
+          ...content.data,
+          kind: 'article',
+          title: `Versão em cartões ${Date.now()}`,
+          slug: `versao-em-cartoes-${Date.now()}`,
+          seo: { ...content.data.seo, canonical },
+          blocks: [{ new: true as const, type: 'toc' as const, title: 'Neste guia' }],
+        }),
+      );
+      if (!created.ok) throw new Error(JSON.stringify(created.issues));
+      contentId = created.value.id;
+    } finally {
+      await pool.end();
+    }
+  });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`a 375 px, o canônico longo quebra sem rolar, sem violação do axe (${colorScheme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 375, height: 800 });
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await loginAs(page, 'editor@orakel.local');
+      const contentPath = `/sites/exemplo-a/conteudos/${contentId}`;
+      await page.goto(`${contentPath}/versoes/1`);
+      await page.waitForLoadState('networkidle');
+
+      const back = page.getByRole('link', { name: 'Voltar às versões' });
+      const edit = page.getByRole('link', { name: 'Editar', exact: true });
+      await expect(back).toHaveAttribute('href', contentPath);
+      await expect(edit).toHaveAttribute('href', `${contentPath}/editar`);
+      const [backBox, editBox] = [(await back.boundingBox())!, (await edit.boundingBox())!];
+      expect(backBox.height).toBe(editBox.height);
+
+      const data = page
+        .locator('.card')
+        .filter({ has: page.getByRole('heading', { name: 'Dados' }) });
+      const value = data.getByText(canonical, { exact: true });
+      await expect(value).toBeVisible();
+      const valueBox = (await value.boundingBox())!;
+      const cardBox = (await data.boundingBox())!;
+      expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 1);
+      const lineHeight = await value.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).lineHeight),
+      );
+      expect(valueBox.height).toBeGreaterThan(lineHeight * 1.5);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(0);
+
+      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+      expect(accessibility.violations).toEqual([]);
+    });
+  }
+
+  test('sem content.write, o cabeçalho só traz o voltar', async ({ page }) => {
+    await loginAs(page, 'revisor@orakel.local');
+    await page.goto(`/sites/exemplo-a/conteudos/${contentId}/versoes/1`);
+    await expect(page.getByRole('link', { name: 'Voltar às versões' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Editar', exact: true })).toHaveCount(0);
+  });
+});
+
 const BIG_SITE = `e2e-conteudos-${Date.now()}`;
 const BIG_COUNT = 2000;
 /** Abrir a lista e atualizar a busca ou o filtro: teto da #35 (CA1). */
