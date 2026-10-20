@@ -35,9 +35,9 @@ function hydrationMessages(page: Page): string[] {
   return messages;
 }
 
-/** Leva o foco até o controle só com Tab (no máximo 150 passos: a vitrine cresce a cada Task). */
+/** Leva o foco até o controle só com Tab (no máximo 200 passos: a vitrine cresce a cada Task). */
 async function tabTo(page: Page, target: Locator): Promise<void> {
-  for (let step = 0; step < 150; step += 1) {
+  for (let step = 0; step < 200; step += 1) {
     if (await target.evaluate((element) => element === document.activeElement)) return;
     await page.keyboard.press('Tab');
   }
