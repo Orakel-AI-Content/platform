@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import classNames from '@/components/ui/utils/classNames';
 
 // Grade de miniaturas da mídia (#374): a mesma na biblioteca e no seletor do editor. Um tamanho
-// só, `minmax(9rem,1fr)`: três colunas na largura padrão do `Dialog` (520 px) e, na página,
-// entre os dois tamanhos que havia antes. Os itens (`<li>`) vêm de quem usa.
+// só de coluna, 9rem no mínimo: três colunas na largura padrão do `Dialog` (520 px) e, na
+// página, entre os dois tamanhos que havia antes. Os itens (`<li>`) vêm de quem usa.
 
 export function MediaGrid({
   label,

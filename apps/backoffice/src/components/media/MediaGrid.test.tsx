@@ -34,7 +34,7 @@ describe('grade de miniaturas', () => {
     );
 
     const { className } = screen.getByRole('list', { name: 'Imagens da biblioteca' });
-    expect(className).toContain('grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]');
+    expect(className).toMatch(/grid-cols-\[repeat\(auto-fill,minmax\(9rem,1fr\)\)\]/);
     expect(className.match(/minmax\(/g)).toHaveLength(1);
     expect(className).toContain('mt-2');
   });
