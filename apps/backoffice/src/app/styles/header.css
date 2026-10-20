@@ -13,7 +13,7 @@
   }
 
   .header-action-item {
-    @apply cursor-pointer p-2 rounded-full;
+    @apply cursor-pointer p-2 rounded-full text-2xl text-gray-600 dark:text-gray-400;
   }
 
   .header-action-item-hoverable {
