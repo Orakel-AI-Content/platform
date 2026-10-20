@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { TbArrowNarrowLeft } from 'react-icons/tb';
 
 import { ContentVersionView } from '@/components/contents/ContentVersionView';
 import {
@@ -10,7 +11,10 @@ import {
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { StateTag } from '@/components/sites/SiteStatus';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
+import { can } from '@/domain/access/rbac.ts';
 
 import { itemTitle } from '../../../../item-title.ts';
 import { readContentVersions } from '../../../content-versions.ts';
@@ -34,7 +38,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: itemTitle(version?.data.title, area) };
 }
 
-/** Uma versão de um conteúdo, só para leitura: nenhum controle de edição. */
+/**
+ * Uma versão de um conteúdo, só para leitura: nenhum controle de edição na versão. No
+ * cabeçalho, "Voltar às versões" e, com content.write, "Editar" (a edição atual), como a tela de
+ * detalhe do guia (#372).
+ */
 export default async function ContentVersionPage({ params }: Params) {
   const { site: siteId, id, versao } = await params;
   const contentId = positiveInt(id);
@@ -42,7 +50,7 @@ export default async function ContentVersionPage({ params }: Params) {
   if (contentId === undefined || number === undefined) notFound();
   const read = await readContentVersions(siteId, contentId);
   if (read === undefined) return null;
-  const { versions, timeZone, site } = read;
+  const { actor, versions, timeZone, site } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return noRead;
@@ -51,6 +59,7 @@ export default async function ContentVersionPage({ params }: Params) {
   if (version === undefined) notFound();
   const latestVersion = versions.value.at(-1)!;
   const latest = latestVersion.version;
+  const contentHref = `/sites/${siteId}/conteudos/${contentId}`;
 
   return (
     <article aria-labelledby="version-title" className="form-width space-y-4">
@@ -59,7 +68,7 @@ export default async function ContentVersionPage({ params }: Params) {
         trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
           {
             label: latestVersion.data.title,
-            href: `/sites/${siteId}/conteudos/${contentId}`,
+            href: contentHref,
           },
           { label: `Versão ${version.version}` },
         ])}
@@ -68,14 +77,28 @@ export default async function ContentVersionPage({ params }: Params) {
             Versão {version.version} de “{version.data.title}”
           </>
         }
+        action={
+          <>
+            <ButtonLink href={contentHref} variant="plain" size="sm" icon={<TbArrowNarrowLeft />}>
+              Voltar às versões
+            </ButtonLink>
+            {can(actor, 'content.write') && (
+              <ButtonLink href={`${contentHref}/editar`} variant="solid" size="sm">
+                Editar
+              </ButtonLink>
+            )}
+          </>
+        }
       />
-      <p className="flex flex-wrap items-center gap-2 text-sm">
-        <StateTag color={CONTENT_STATUS_TAG[version.status]}>
-          {CONTENT_STATUS_LABEL[version.status]}
-        </StateTag>
-        Gravada em {formatDateTime(version.createdAt, timeZone)}
-        {version.version === latest ? ' · versão mais recente' : ` · mais recente: ${latest}`}
-      </p>
+      <PageMeta
+        items={[
+          <StateTag key="status" color={CONTENT_STATUS_TAG[version.status]}>
+            {CONTENT_STATUS_LABEL[version.status]}
+          </StateTag>,
+          `Gravada em ${formatDateTime(version.createdAt, timeZone)}`,
+          version.version === latest ? 'Versão mais recente' : `Mais recente: ${latest}`,
+        ]}
+      />
       <ContentVersionView data={version.data} />
     </article>
   );
