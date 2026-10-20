@@ -6,6 +6,7 @@ import * as z from 'zod';
 
 import { SchemaForm } from './SchemaForm.tsx';
 import { isoToLocal, localToIso, zonedDateTimeField } from './ZonedDatetimeField.tsx';
+import { fieldLabel } from '@/test/fieldLabel.ts';
 
 // Data de publicação no fuso do site (#183): hora de parede ↔ ISO com o offset do fuso.
 
@@ -73,7 +74,7 @@ describe('campo no gerador', () => {
   it('é um seletor de data e hora com o valor no fuso do site e a dica do fuso', () => {
     renderField('2026-07-15T12:00:00-03:00');
 
-    const input = screen.getByLabelText('Data de publicação');
+    const input = screen.getByLabelText(fieldLabel('Data de publicação'));
     expect(input.getAttribute('type')).toBe('datetime-local');
     expect((input as HTMLInputElement).value).toBe('2026-07-15T16:00');
     expect(document.getElementById(input.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
@@ -90,7 +91,7 @@ describe('campo no gerador', () => {
     cleanup();
 
     const changed = renderField('2026-07-15T12:00:00Z');
-    fireEvent.change(screen.getByLabelText('Data de publicação'), {
+    fireEvent.change(screen.getByLabelText(fieldLabel('Data de publicação')), {
       target: { value: '2026-12-01T08:45' },
     });
     await user.click(screen.getByRole('button', { name: 'Salvar' }));

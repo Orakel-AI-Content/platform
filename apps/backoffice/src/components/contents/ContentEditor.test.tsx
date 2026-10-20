@@ -10,6 +10,7 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 
 import type { ContentFormResult } from './contentEditorValues.ts';
 import { ContentEditor, UNDO_MS, type ContentEditorOptions } from './ContentEditor.tsx';
+import { fieldLabel } from '@/test/fieldLabel.ts';
 
 // Editor de conteúdo (#45): tipos da release, seletores do site, teclado e erros por campo. O
 // retorno é o padrão das ações (#326): sucesso e "Desfazer" no toast, resumo de erros no Alert.
@@ -112,7 +113,7 @@ describe('editor de conteúdo', () => {
   it('o tipo de bloco novo só oferece os tipos da release', () => {
     renderEditor({ blockTypes: ['text', 'toc', 'image'] });
 
-    const select = screen.getByLabelText('Tipo do novo bloco');
+    const select = screen.getByLabelText(fieldLabel('Tipo do novo bloco'));
     expect(
       within(select)
         .getAllByRole('option')
@@ -165,9 +166,9 @@ describe('editor de conteúdo', () => {
     const user = userEvent.setup();
     const action = renderEditor({ mode: 'create', defaultValues: { ...meta, blocks: [] } });
 
-    await user.selectOptions(screen.getByLabelText('Tipo do novo bloco'), 'Sumário');
+    await user.selectOptions(screen.getByLabelText(fieldLabel('Tipo do novo bloco')), 'Sumário');
     await user.click(screen.getByRole('button', { name: 'Adicionar bloco' }));
-    await user.type(screen.getByLabelText('Título do sumário'), 'Neste guia');
+    await user.type(screen.getByLabelText(fieldLabel('Título do sumário')), 'Neste guia');
     await save(user);
 
     await waitFor(() => expect(action).toHaveBeenCalled());
@@ -187,7 +188,7 @@ describe('editor de conteúdo', () => {
 
     await save(user);
 
-    const alt = await screen.findByLabelText('Texto alternativo');
+    const alt = await screen.findByLabelText(fieldLabel('Texto alternativo'));
     await waitFor(() => expect(alt.getAttribute('aria-invalid')).toBe('true'));
     const describedBy = alt.getAttribute('aria-describedby') ?? '';
     expect(document.getElementById(describedBy.split(' ').at(-1) ?? '')?.textContent).toBe(
@@ -233,14 +234,16 @@ describe('barra de ações e continuar no editor (#109)', () => {
     const user = userEvent.setup();
     renderEditor();
 
-    await user.clear(screen.getByLabelText('Título', { exact: true }));
+    await user.clear(screen.getByLabelText(fieldLabel('Título'), { exact: true }));
     await save(user);
 
     const alert = screen.getByRole('alert');
     await waitFor(() => expect(alert.textContent).toBe('Corrija os campos destacados.'));
     expect(alert.querySelector('.alert')).toBeTruthy();
     await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByLabelText('Título', { exact: true })),
+      expect(document.activeElement).toBe(
+        screen.getByLabelText(fieldLabel('Título'), { exact: true }),
+      ),
     );
   });
 
@@ -272,9 +275,9 @@ describe('barra de ações e continuar no editor (#109)', () => {
       result: { ok: true, message: 'Versão 2 salva.', id: 7, saved: saved as never },
     });
 
-    await user.selectOptions(screen.getByLabelText('Tipo do novo bloco'), 'Sumário');
+    await user.selectOptions(screen.getByLabelText(fieldLabel('Tipo do novo bloco')), 'Sumário');
     await user.click(screen.getByRole('button', { name: 'Adicionar bloco' }));
-    const titles = screen.getAllByLabelText('Título do sumário');
+    const titles = screen.getAllByLabelText(fieldLabel('Título do sumário'));
     await user.type(titles[titles.length - 1] as HTMLElement, 'Novo');
     await save(user);
     expect(await screen.findByText('Versão 2 salva.')).toBeTruthy();
@@ -329,7 +332,7 @@ describe('ver prévia (#110)', () => {
     const region = note(link.getAttribute('aria-describedby'));
     expect(region?.getAttribute('aria-live')).toBe('polite');
 
-    await user.type(screen.getByLabelText('Título', { exact: true }), ' revisado');
+    await user.type(screen.getByLabelText(fieldLabel('Título'), { exact: true }), ' revisado');
     await waitFor(() =>
       expect(region?.textContent).toBe('As alterações não salvas não aparecem na prévia.'),
     );
@@ -371,7 +374,7 @@ describe('aviso ao sair (#111)', () => {
         saved: { ...meta, title: 'Guia!', blocks: [toc(1, 'A')] } as never,
       },
     });
-    const title = screen.getByLabelText('Título', { exact: true });
+    const title = screen.getByLabelText(fieldLabel('Título'), { exact: true });
     expect(leave()).toBe(false);
 
     await user.type(title, '!');
@@ -391,7 +394,9 @@ describe('desfazer a remoção de bloco (#112)', () => {
   const status = () => screen.getByRole('status').textContent;
   const undo = () => screen.queryByRole('button', { name: 'Desfazer' });
   const titles = () =>
-    screen.getAllByLabelText<HTMLInputElement>('Título do sumário').map((input) => input.value);
+    screen
+      .getAllByLabelText<HTMLInputElement>(fieldLabel('Título do sumário'))
+      .map((input) => input.value);
   const remove = (user: ReturnType<typeof userEvent.setup>, position: number) =>
     user.click(screen.getByRole('button', { name: `Remover bloco ${position}` }));
 
@@ -433,7 +438,7 @@ describe('desfazer a remoção de bloco (#112)', () => {
   it('desfazer devolve no mesmo índice, com os valores editados, o mesmo n e o foco', async () => {
     const user = userEvent.setup();
     const action = renderEditor({ defaultValues: three });
-    const second = screen.getAllByLabelText('Título do sumário')[1] as HTMLElement;
+    const second = screen.getAllByLabelText(fieldLabel('Título do sumário'))[1] as HTMLElement;
     await user.clear(second);
     await user.type(second, 'B editado');
 
@@ -444,7 +449,9 @@ describe('desfazer a remoção de bloco (#112)', () => {
     expect(screen.getByRole('group', { name: 'Bloco 2: Sumário' })).toBeTruthy();
     await waitFor(() => expect(status()).toBe('Bloco 2 devolvido.'));
     await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getAllByLabelText('Título do sumário')[1]),
+      expect(document.activeElement).toBe(
+        screen.getAllByLabelText(fieldLabel('Título do sumário'))[1],
+      ),
     );
     await save(user);
     await waitFor(() => expect(action).toHaveBeenCalled());
@@ -518,7 +525,7 @@ describe('controles de bloco com ícones (#131)', () => {
     expect(document.activeElement).toBe(first);
     expect(
       screen
-        .getAllByLabelText('Título do sumário')
+        .getAllByLabelText(fieldLabel('Título do sumário'))
         .map((input) => (input as HTMLInputElement).value),
     ).toEqual(['A', 'B', 'C']);
   });
@@ -564,7 +571,7 @@ describe('inserir bloco em qualquer posição (#134)', () => {
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
     expect(screen.getByRole('group', { name: 'Bloco 2: Sumário' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Remover bloco 4' })).toBeTruthy();
-    const titles = screen.getAllByLabelText<HTMLInputElement>('Título do sumário');
+    const titles = screen.getAllByLabelText<HTMLInputElement>(fieldLabel('Título do sumário'));
     expect(titles.map((input) => input.value)).toEqual(['A', '', 'B', 'C']);
     await waitFor(() => expect(document.activeElement).toBe(titles[1]));
 
@@ -685,7 +692,7 @@ describe('recolher e expandir blocos (#135)', () => {
     await save(user);
 
     await waitFor(() => expect(toggle(1).getAttribute('aria-expanded')).toBe('true'));
-    const alt = screen.getByLabelText('Texto alternativo');
+    const alt = screen.getByLabelText(fieldLabel('Texto alternativo'));
     await waitFor(() => expect(document.activeElement).toBe(alt));
     expect(action).not.toHaveBeenCalled();
   });
@@ -708,7 +715,9 @@ describe('recolher e expandir blocos (#135)', () => {
     expect(toggle(3).getAttribute('aria-expanded')).toBe('true');
     expect(toggle(1).getAttribute('aria-expanded')).toBe('false');
     await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getAllByLabelText('Título do sumário')[2]),
+      expect(document.activeElement).toBe(
+        screen.getAllByLabelText(fieldLabel('Título do sumário'))[2],
+      ),
     );
   });
 
@@ -716,7 +725,7 @@ describe('recolher e expandir blocos (#135)', () => {
     const user = userEvent.setup();
     const action = renderEditor();
 
-    const date = screen.getByLabelText('Data de publicação');
+    const date = screen.getByLabelText(fieldLabel('Data de publicação'));
     expect(date.getAttribute('type')).toBe('datetime-local');
     expect((date as HTMLInputElement).value).toBe('2026-10-06T12:00');
     expect(document.getElementById(date.getAttribute('aria-describedby') ?? '')?.textContent).toBe(

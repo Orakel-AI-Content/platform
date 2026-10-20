@@ -112,6 +112,7 @@ export function zonedDateTimeField(timeZone: string): FieldRenderer {
     onChange,
     invalid,
     describedBy,
+    required,
     ref,
     readOnly,
   }: FieldProps) {
@@ -124,6 +125,7 @@ export function zonedDateTimeField(timeZone: string): FieldRenderer {
         type="datetime-local"
         readOnly={readOnly}
         aria-invalid={invalid}
+        aria-required={required || undefined}
         aria-describedby={describedBy}
         value={typeof value === 'string' ? isoToLocal(value, timeZone) : ''}
         onChange={(event) => onChange(localToIso(event.target.value, timeZone))}

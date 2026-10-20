@@ -10,6 +10,7 @@ import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { SchemaForm, type SchemaFormIssue } from './SchemaForm.tsx';
 import { choiceField, flagsField, linesField, themeField } from './SiteFields.tsx';
+import { fieldLabel } from '@/test/fieldLabel.ts';
 
 // Campos da configuração do site no gerador (#47): linhas ↔ lista, flags ↔ registro e
 // escolha entre as opções recebidas.
@@ -70,7 +71,7 @@ describe('campos da configuração do site', () => {
     const user = userEvent.setup();
     const onSubmit = renderForm({ domains: ['a.example.com'], featureFlags: {}, preset: 'padrao' });
 
-    const domains = screen.getByLabelText<HTMLTextAreaElement>('Domínios');
+    const domains = screen.getByLabelText<HTMLTextAreaElement>(fieldLabel('Domínios'));
     expect(domains.value).toBe('a.example.com');
     await user.type(domains, '{Enter}');
     expect(domains.value).toBe('a.example.com\n');
@@ -84,11 +85,13 @@ describe('campos da configuração do site', () => {
     const user = userEvent.setup();
     const onSubmit = renderForm({ domains: ['a.example.com'], featureFlags: {}, preset: 'padrao' });
 
-    await user.clear(screen.getByLabelText('Domínios'));
+    await user.clear(screen.getByLabelText(fieldLabel('Domínios')));
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText('Domínios').getAttribute('aria-invalid')).toBe('true'),
+      expect(screen.getByLabelText(fieldLabel('Domínios')).getAttribute('aria-invalid')).toBe(
+        'true',
+      ),
     );
     expect(onSubmit).not.toHaveBeenCalled();
   });
@@ -110,14 +113,14 @@ describe('campos da configuração do site', () => {
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(document.activeElement).toBe(removeFirst);
-    expect(within(group).getByLabelText('Nome do recurso 2')).toBeTruthy();
+    expect(within(group).getByLabelText(fieldLabel('Nome do recurso 2'))).toBeTruthy();
     await user.keyboard('{Enter}');
     const dialog = screen.getByRole('alertdialog', { name: 'Remover recurso 1?' });
     await user.click(within(dialog).getByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     within(group).getByRole('button', { name: 'Adicionar recurso' }).focus();
     await user.keyboard('{Enter}');
-    await user.type(within(group).getByLabelText('Nome do recurso 2'), 'busca');
+    await user.type(within(group).getByLabelText(fieldLabel('Nome do recurso 2')), 'busca');
     const [comentarios] = within(group).getAllByRole('checkbox');
     comentarios?.focus();
     await user.keyboard(' ');
@@ -130,7 +133,7 @@ describe('campos da configuração do site', () => {
     const user = userEvent.setup();
     const onSubmit = renderForm({ domains: ['a.example.com'], featureFlags: {}, preset: 'padrao' });
 
-    const preset = screen.getByLabelText<HTMLSelectElement>('Preset');
+    const preset = screen.getByLabelText<HTMLSelectElement>(fieldLabel('Preset'));
     expect(
       within(preset)
         .getAllByRole('option')
@@ -140,6 +143,18 @@ describe('campos da configuração do site', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect((await submitted(onSubmit)).preset).toBe('revista');
+  });
+
+  it('obrigatório (#329): linhas e escolha com aria-required; recursos (grupo) só o asterisco', () => {
+    renderForm({ domains: ['a.example.com'], featureFlags: {}, preset: 'padrao' });
+
+    expect(screen.getByLabelText(fieldLabel('Domínios')).getAttribute('aria-required')).toBe(
+      'true',
+    );
+    expect(screen.getByLabelText(fieldLabel('Preset')).getAttribute('aria-required')).toBe('true');
+    expect(screen.getByText('Recursos ligados').closest('label')?.textContent).toBe(
+      '*Recursos ligados',
+    );
   });
 });
 

@@ -53,6 +53,7 @@ function LinesField({
   onChange,
   invalid,
   describedBy,
+  required,
   ref,
   readOnly,
   rows,
@@ -68,6 +69,7 @@ function LinesField({
       rows={rows}
       readOnly={readOnly}
       aria-invalid={invalid}
+      aria-required={required || undefined}
       aria-describedby={describedBy}
       value={text}
       onChange={(event) => {
@@ -178,13 +180,14 @@ function FlagsField({ id, label, value, onChange, invalid, describedBy, ref }: F
 
 /** Escolha entre opções recebidas em tempo de execução (presets e variantes de RESOURCES). */
 export function choiceField(options: readonly string[]): FieldRenderer {
-  function ChoiceField({ id, value, onChange, invalid, describedBy, ref }: FieldProps) {
+  function ChoiceField({ id, value, onChange, invalid, describedBy, required, ref }: FieldProps) {
     return (
       <select
         id={id}
         ref={ref}
         className={selectClass(invalid)}
         aria-invalid={invalid}
+        aria-required={required || undefined}
         aria-describedby={describedBy}
         value={typeof value === 'string' ? value : ''}
         onChange={(event) => onChange(event.target.value)}
@@ -206,7 +209,17 @@ export function choiceField(options: readonly string[]): FieldRenderer {
  * vai no rádio marcado (ou no primeiro), para o foco do erro chegar ao grupo.
  */
 export function themeField(themes: readonly ThemeSummary[]): FieldRenderer {
-  function ThemeField({ id, name, label, value, onChange, invalid, describedBy, ref }: FieldProps) {
+  function ThemeField({
+    id,
+    name,
+    label,
+    value,
+    onChange,
+    invalid,
+    describedBy,
+    required,
+    ref,
+  }: FieldProps) {
     const selected = typeof value === 'string' ? value : '';
     const focusable = Math.max(
       0,
@@ -218,6 +231,7 @@ export function themeField(themes: readonly ThemeSummary[]): FieldRenderer {
         role="radiogroup"
         aria-label={label}
         aria-invalid={invalid}
+        aria-required={required || undefined}
         aria-describedby={describedBy}
         className="grid gap-2 sm:grid-cols-2"
       >

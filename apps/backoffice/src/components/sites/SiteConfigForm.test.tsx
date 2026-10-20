@@ -11,6 +11,7 @@ import { toast, ToastProvider } from '@/components/ui/toast';
 import { editValues } from './siteConfigFormValues.ts';
 import type { SiteFormResult } from './siteConfigFormValues.ts';
 import { SITE_CONFIG_HIDDEN, SITE_CONFIG_SECTIONS, SiteConfigForm } from './SiteConfigForm.tsx';
+import { fieldLabel } from '@/test/fieldLabel.ts';
 
 // Formulário da configuração do site no gerador (#47): ida e volta da SiteConfig, SITE_ID só
 // leitura na edição e recusa do domínio no campo, com foco.
@@ -88,7 +89,7 @@ describe('formulário da configuração do site', () => {
     const action = renderEdit({ ok: true, message: 'Configuração salva (versão 2).' });
     render(<ToastProvider />);
 
-    expect(screen.getByLabelText('ID').hasAttribute('readonly')).toBe(true);
+    expect(screen.getByLabelText(fieldLabel('ID')).hasAttribute('readonly')).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
 
     await waitFor(() => expect(action).toHaveBeenCalled());
@@ -140,7 +141,7 @@ describe('formulário da configuração do site', () => {
 
     await user.click(screen.getByRole('button', { name: 'Salvar configuração' }));
 
-    const home = screen.getByLabelText('Preset da página Home');
+    const home = screen.getByLabelText(fieldLabel('Preset da página Home'));
     await waitFor(() => expect(document.activeElement).toBe(home));
     expect(home.getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByText('Preset "x" de home não é suportado')).toBeTruthy();
@@ -184,8 +185,10 @@ describe('seções da configuração do site', () => {
       for (const control of controls) {
         expect(regions.some((region) => region.contains(control))).toBe(true);
       }
-      expect(within(regions[2] as HTMLElement).getByLabelText('Tema')).toBeTruthy();
-      expect(within(regions[4] as HTMLElement).getByLabelText('Indexável')).toBeTruthy();
+      expect(within(regions[2] as HTMLElement).getByLabelText(fieldLabel('Tema'))).toBeTruthy();
+      expect(
+        within(regions[4] as HTMLElement).getByLabelText(fieldLabel('Indexável')),
+      ).toBeTruthy();
     },
   );
   it.each([
@@ -200,9 +203,9 @@ describe('seções da configuração do site', () => {
         ['ID', 'Nome'],
         ['Idioma', 'Fuso horário'],
       ] as const) {
-        const pair = screen.getByLabelText(first).closest('.grid');
+        const pair = screen.getByLabelText(fieldLabel(first)).closest('.grid');
         expect(pair?.className).toContain('md:grid-cols-2');
-        expect(pair?.contains(screen.getByLabelText(second))).toBe(true);
+        expect(pair?.contains(screen.getByLabelText(fieldLabel(second)))).toBe(true);
       }
       const bar = screen.getByRole('button', { name: submit }).closest('.sticky');
       expect(bar).not.toBeNull();

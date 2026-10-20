@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { toast, ToastProvider } from '@/components/ui/toast';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp.ts';
 import { EntityForm, InstitutionalTextsForm, type EntityFormResult } from './EntityForms.tsx';
+import { fieldLabel } from '@/test/fieldLabel.ts';
 
 // Formulários de entidades (#46): rótulos por tipo, recusa no campo e volta para a lista.
 
@@ -68,8 +69,8 @@ describe('formulários de entidades', () => {
       { container: app },
     );
 
-    await user.type(screen.getByLabelText('Nome'), 'Carla Dias');
-    await user.type(screen.getByLabelText('Slug'), 'carla-dias');
+    await user.type(screen.getByLabelText(fieldLabel('Nome')), 'Carla Dias');
+    await user.type(screen.getByLabelText(fieldLabel('Slug')), 'carla-dias');
     // A foto pela grade de miniaturas (#182).
     const photo = screen.getByRole('group', { name: 'Foto' });
     await user.click(within(photo).getByRole('button', { name: 'Escolher imagem' }));
@@ -106,10 +107,10 @@ describe('formulários de entidades', () => {
       />,
     );
 
-    expect(screen.getByLabelText<HTMLSelectElement>('Tipo').value).toBe('category');
+    expect(screen.getByLabelText<HTMLSelectElement>(fieldLabel('Tipo')).value).toBe('category');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
-    const slug = screen.getByLabelText('Slug');
+    const slug = screen.getByLabelText(fieldLabel('Slug'));
     await waitFor(() => expect(slug.getAttribute('aria-invalid')).toBe('true'));
     expect(screen.getByText('Já existe uma taxonomia com o slug guias')).toBeTruthy();
     expect(router.push).not.toHaveBeenCalled();
@@ -128,7 +129,7 @@ describe('formulários de entidades', () => {
       />,
     );
 
-    const label = screen.getByLabelText('Rótulo');
+    const label = screen.getByLabelText(fieldLabel('Rótulo'));
     await user.clear(label);
     await user.type(label, 'Começo');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
@@ -205,9 +206,9 @@ describe('formulários de entidades', () => {
       />,
     );
 
-    const pair = screen.getByLabelText(first).closest('.grid');
+    const pair = screen.getByLabelText(fieldLabel(first)).closest('.grid');
     expect(pair?.className).toContain('md:grid-cols-2');
-    expect(pair?.contains(screen.getByLabelText(second))).toBe(true);
+    expect(pair?.contains(screen.getByLabelText(fieldLabel(second)))).toBe(true);
   });
 
   it('criar tem Descartar; editar tem Voltar para a lista; os dois na barra fixa', () => {

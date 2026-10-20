@@ -47,6 +47,9 @@ import { clean, describe, emptyValue, pattern, type FieldNode } from './schemaWa
 // controle), texto e número no `Input`, booleano no `Checkbox`, botões no `Button` e as seções em
 // `Card`, como os formulários do template (ProductForm). O enum continua `<select>` nativo, com
 // as classes do `Input`.
+// Erro, dica e obrigatoriedade só no `FormItem` (#329): a dica é o `hint` dele, o erro é a
+// mensagem dele (`.form-explain`) em todo tipo de campo, inclusive caixa de seleção e lista (num
+// `FormItem` sem rótulo), e campo não opcional no schema leva o asterisco e `aria-required`.
 // Formulário de tela (#328), como o `CustomerForm` do Ecme: `Form` → coluna de `Card`s (um por
 // seção, ou um só) → `BottomStickyBar` com "Descartar" (criação, confirmado num diálogo, como o
 // `CustomerCreate`) ou "Voltar" (edição, como o `CustomerEdit`) e a ação principal. Os campos
@@ -63,6 +66,11 @@ export type FieldProps = {
   onChange: (value: unknown) => void;
   invalid: boolean;
   describedBy: string | undefined;
+  /**
+   * Não opcional no schema: o rótulo mostra o asterisco; ponha `aria-required` no controle se o
+   * papel dele admitir (campo de texto, `select`, `radiogroup`; um `group` não admite).
+   */
+  required: boolean;
   /** Ligue ao controle focável: o foco do erro (inclusive do servidor) chega até ele. */
   ref: (element: HTMLElement | null) => void;
   /** Caminho em `readOnly`: mostre o valor sem permitir mudança. */
@@ -147,9 +155,6 @@ const selectClass = (invalid: boolean) =>
       ? 'input-invalid'
       : 'focus:ring-primary focus-within:ring-primary focus-within:border-primary focus:border-primary',
   );
-
-/** Texto de apoio do campo (dica), com o par "texto no cartão" do contraste. */
-const hintClass = 'mt-1 text-sm text-gray-600 dark:text-gray-400';
 
 /** Borda dos grupos (objeto, lista e item de lista). */
 const groupClass = 'rounded-xl border border-gray-200 dark:border-gray-700';
@@ -257,55 +262,55 @@ const labelOf = (ctx: Ctx, path: string, key: string) => ctx.labels[pattern(path
 type ControlProps = {
   id: string;
   invalid: boolean;
-  /** Dica e erro: para controles que não leem o `FormItem` (registrados e `<select>`). */
+  /**
+   * Dica e erro do `FormItem`: para controles que não leem o contexto dele (registrados,
+   * `<select>`, `Checkbox`); o `Input` do Ecme os soma sozinho.
+   */
   describedBy: string | undefined;
-  /** Só a dica: o `Input` do Ecme soma o erro do `FormItem` sozinho. */
-  hintId: string | undefined;
+  required: boolean;
 };
 
-/** Lê o id da mensagem de erro do `FormItem` (só existe enquanto o campo está inválido). */
+/** Lê os ids da dica e da mensagem de erro do `FormItem` (o do erro, só enquanto inválido). */
 function FieldControl({
-  id,
-  invalid,
-  hintId,
   children,
+  ...props
 }: Omit<ControlProps, 'describedBy'> & { children: (props: ControlProps) => ReactNode }) {
-  const errorId = useFormItem()?.errorId;
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
-  return <>{children({ id, invalid, describedBy, hintId })}</>;
+  const formItem = useFormItem();
+  const describedBy = [formItem?.hintId, formItem?.errorId].filter(Boolean).join(' ') || undefined;
+  return <>{children({ ...props, describedBy })}</>;
 }
 
-/** Rótulo, controle, dica e erro ligados por id e aria-describedby, num `FormItem`. */
+/**
+ * Rótulo, controle, dica e erro ligados por id e aria-describedby, num `FormItem`. Sem `label`,
+ * o `FormItem` não desenha rótulo: o controle traz o seu (caixa de seleção).
+ */
 function Field({
   ctx,
   path,
   label,
+  required,
   children,
 }: {
   ctx: Ctx;
   path: string;
-  label: string;
+  label: string | undefined;
+  required: boolean;
   children: (props: ControlProps) => ReactNode;
 }) {
   const fieldId = `${ctx.id}-${path}`;
-  const hint = ctx.hints[pattern(path)];
   const message = messageAt(ctx.errors, path);
-  const hintId = hint ? `${fieldId}-hint` : undefined;
   return (
     <FormItem
       htmlFor={fieldId}
       label={label}
+      asterisk={required}
+      hint={ctx.hints[pattern(path)]}
       invalid={message !== undefined}
       errorMessage={message}
     >
-      <FieldControl id={fieldId} invalid={message !== undefined} hintId={hintId}>
+      <FieldControl id={fieldId} invalid={message !== undefined} required={required}>
         {children}
       </FieldControl>
-      {hint && (
-        <p id={hintId} className={hintClass}>
-          {hint}
-        </p>
-      )}
     </FormItem>
   );
 }
@@ -323,12 +328,14 @@ function Node({
 }) {
   if (ctx.hidden.has(pattern(path))) return null;
   const label = labelOf(ctx, path, name);
+  // Não opcional no schema: asterisco no rótulo e `aria-required` no controle.
+  const required = !describe(schema).optional;
 
   const registered = ctx.fields[pattern(path)];
   if (registered) {
     return (
-      <Field ctx={ctx} path={path} label={label}>
-        {({ id, invalid, describedBy }) => (
+      <Field ctx={ctx} path={path} label={label} required={required}>
+        {({ id, invalid, describedBy, required }) => (
           <Controller
             control={ctx.control}
             name={path}
@@ -342,6 +349,7 @@ function Node({
                   onChange: field.onChange,
                   invalid,
                   describedBy,
+                  required,
                   ref: field.ref,
                   readOnly: ctx.readOnly.has(pattern(path)),
                 })}
@@ -359,13 +367,13 @@ function Node({
       return null;
     case 'string':
       return (
-        <Field ctx={ctx} path={path} label={label}>
-          {({ id, invalid, hintId }) => (
+        <Field ctx={ctx} path={path} label={label} required={required}>
+          {({ id, invalid, required }) => (
             <Input
               id={id}
               readOnly={ctx.readOnly.has(pattern(path))}
               aria-invalid={invalid}
-              aria-describedby={hintId}
+              aria-required={required || undefined}
               {...ctx.register(path)}
             />
           )}
@@ -373,14 +381,14 @@ function Node({
       );
     case 'number':
       return (
-        <Field ctx={ctx} path={path} label={label}>
-          {({ id, invalid, hintId }) => (
+        <Field ctx={ctx} path={path} label={label} required={required}>
+          {({ id, invalid, required }) => (
             <Input
               id={id}
               type="number"
               inputMode="numeric"
               aria-invalid={invalid}
-              aria-describedby={hintId}
+              aria-required={required || undefined}
               {...ctx.register(path, { valueAsNumber: true })}
             />
           )}
@@ -388,12 +396,13 @@ function Node({
       );
     case 'enum':
       return (
-        <Field ctx={ctx} path={path} label={label}>
-          {({ id, invalid, describedBy }) => (
+        <Field ctx={ctx} path={path} label={label} required={required}>
+          {({ id, invalid, describedBy, required }) => (
             <select
               id={id}
               className={selectClass(invalid)}
               aria-invalid={invalid}
+              aria-required={required || undefined}
               aria-describedby={describedBy}
               {...ctx.register(path)}
             >
@@ -406,46 +415,31 @@ function Node({
           )}
         </Field>
       );
-    case 'boolean': {
-      // Sem `FormItem`: o rótulo é o do próprio `Checkbox` (o texto ao lado da caixa).
-      const fieldId = `${ctx.id}-${path}`;
-      const message = messageAt(ctx.errors, path);
-      const hint = ctx.hints[pattern(path)];
-      const describedBy =
-        [hint ? `${fieldId}-hint` : '', message ? `${fieldId}-error` : '']
-          .filter(Boolean)
-          .join(' ') || undefined;
+    case 'boolean':
+      // Sem rótulo no `FormItem`: o rótulo é o do próprio `Checkbox` (o texto ao lado da caixa).
+      // Sem asterisco: `false` é valor válido, "não opcional" não quer dizer "precisa marcar".
       return (
-        <div className="form-item vertical">
-          <Controller
-            control={ctx.control}
-            name={path}
-            render={({ field }) => (
-              <Checkbox
-                ref={field.ref}
-                name={field.name}
-                checked={field.value === true}
-                aria-invalid={message !== undefined}
-                aria-describedby={describedBy}
-                onChange={(checked) => field.onChange(checked)}
-              >
-                {label}
-              </Checkbox>
-            )}
-          />
-          {hint && (
-            <p id={`${fieldId}-hint`} className={hintClass}>
-              {hint}
-            </p>
+        <Field ctx={ctx} path={path} label={undefined} required={false}>
+          {({ invalid, describedBy }) => (
+            <Controller
+              control={ctx.control}
+              name={path}
+              render={({ field }) => (
+                <Checkbox
+                  ref={field.ref}
+                  name={field.name}
+                  checked={field.value === true}
+                  aria-invalid={invalid}
+                  aria-describedby={describedBy}
+                  onChange={(checked) => field.onChange(checked)}
+                >
+                  {label}
+                </Checkbox>
+              )}
+            />
           )}
-          {message && (
-            <p id={`${fieldId}-error`} className="mt-1 text-sm font-semibold text-error">
-              {message}
-            </p>
-          )}
-        </div>
+        </Field>
       );
-    }
     case 'object':
       return (
         <fieldset className={classNames(groupClass, 'mb-7 p-4')}>
@@ -496,6 +490,35 @@ function Children({
   );
 }
 
+/**
+ * Grupo (`fieldset`) num `FormItem` sem rótulo: o nome é o `legend`, e a mensagem de erro do
+ * `FormItem` entra no `aria-describedby` do grupo enquanto ele está inválido.
+ */
+export function FieldGroup({
+  message,
+  className,
+  children,
+}: {
+  message: string | undefined;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <FormItem invalid={message !== undefined} errorMessage={message}>
+      <GroupFieldset className={className}>{children}</GroupFieldset>
+    </FormItem>
+  );
+}
+
+function GroupFieldset({ className, children }: { className?: string; children: ReactNode }) {
+  const errorId = useFormItem()?.errorId;
+  return (
+    <fieldset aria-describedby={errorId} className={className}>
+      {children}
+    </fieldset>
+  );
+}
+
 /** Lista de objetos: um fieldset por item, com adicionar e remover. */
 function ArrayField({
   ctx,
@@ -521,7 +544,10 @@ function ArrayField({
     return <NoEditor label={label} path={path} />;
   }
   return (
-    <fieldset className={classNames(groupClass, 'mb-7 space-y-4 p-4')}>
+    <FieldGroup
+      message={typeof message === 'string' ? message : undefined}
+      className={classNames(groupClass, 'space-y-4 p-4')}
+    >
       <legend className="px-1 font-semibold text-gray-900 dark:text-gray-100">{label}</legend>
       {fields.map((item, index) => (
         <fieldset key={item.id} className={classNames(groupClass, 'p-4')}>
@@ -551,11 +577,10 @@ function ArrayField({
       >
         <p>O item e o que foi preenchido nele saem do formulário.</p>
       </ConfirmDialog>
-      {typeof message === 'string' && <p className="text-sm font-semibold text-error">{message}</p>}
       <Button type="button" size="sm" onClick={() => append(emptyValue(element))}>
         {`Adicionar ${itemLabel}`}
       </Button>
-    </fieldset>
+    </FieldGroup>
   );
 }
 
