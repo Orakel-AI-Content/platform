@@ -653,6 +653,78 @@ test.describe('barra de ações do editor (#109)', () => {
     await expect.poll(() => dialogs).toEqual(['confirm', 'confirm', 'beforeunload']);
   });
 
+  // Formulário do template (#332): metadados e blocos em Card, a barra fixa na largura do main,
+  // e "Voltar" (edição) passa pelo aviso de saída.
+  test('editor no formulário do template: cartões, barra na largura do main e Voltar (#332)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await loginAs(page, 'editor@orakel.local');
+    const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
+    await page.goto(editPath);
+    await page.waitForLoadState('networkidle');
+
+    // Todo campo dos metadados e dos blocos dentro de um Card (o tipo do novo bloco é da lista).
+    const newType = await page
+      .getByRole('combobox', { name: 'Tipo do novo bloco' })
+      .getAttribute('id');
+    const controls = page
+      .locator('main form')
+      .locator(`input:not([type=hidden]):not([id="${newType}"]), textarea`);
+    for (const control of await controls.all()) {
+      expect(await control.evaluate((el) => el.closest('.card') !== null)).toBe(true);
+    }
+    // A barra encosta nas bordas do main, com os três botões na mesma altura.
+    const save = page.getByRole('button', { name: 'Salvar nova versão' });
+    const bar = page.locator('.sticky').filter({ has: save });
+    const main = await page.locator('main').boundingBox();
+    const barBox = await bar.boundingBox();
+    expect(barBox?.x).toBe(main?.x);
+    expect(barBox?.width).toBe(main?.width);
+    const back = bar.getByRole('link', { name: 'Voltar' });
+    const heights = await Promise.all(
+      [back, bar.getByRole('link', { name: /Ver prévia/ }), save].map(
+        async (control) => (await control.boundingBox())?.height,
+      ),
+    );
+    expect(new Set(heights).size).toBe(1);
+
+    // Com alteração, Voltar pergunta: cancelar fica; confirmar vai para o conteúdo.
+    const titleField = page.getByLabel(fieldLabel('Título'));
+    await titleField.fill(`${title} (voltar)`);
+    page.once('dialog', (dialog) => void dialog.dismiss());
+    await back.click();
+    await expect(page).toHaveURL(new RegExp(`${editPath}$`));
+    await expect(titleField).toHaveValue(`${title} (voltar)`);
+    page.once('dialog', (dialog) => void dialog.accept());
+    await back.click();
+    await expect(page).toHaveURL(new RegExp(`/conteudos/${contentId}$`));
+  });
+
+  test('criar: Descartar confirma num diálogo e volta à lista sem criar (#332)', async ({
+    page,
+  }) => {
+    const draft = `Descartado ${Date.now()}`;
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a/conteudos/novo');
+    await page.getByLabel(fieldLabel('Título')).fill(draft);
+    page.on('dialog', (dialog) => {
+      throw new Error(`aviso inesperado: ${dialog.type()}`);
+    });
+
+    await page.getByRole('button', { name: 'Descartar' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Descartar o que foi preenchido?' });
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByLabel(fieldLabel('Título'))).toHaveValue(draft);
+
+    await page.getByRole('button', { name: 'Descartar' }).click();
+    await dialog.getByRole('button', { name: 'Descartar' }).click();
+    await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos$/);
+    await expect(page.getByRole('row', { name: new RegExp(draft) })).toHaveCount(0);
+    page.removeAllListeners('dialog');
+  });
+
   test('insere um bloco no meio só pelo teclado; Esc fecha a lista e devolve o foco (#134)', async ({
     page,
   }) => {
@@ -699,6 +771,9 @@ test.describe('barra de ações do editor (#109)', () => {
       await expect(page.getByRole('button', { name: 'Salvar nova versão' })).toBeInViewport();
       await page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true }).click();
       await expect(page.getByRole('menu')).toBeVisible();
+      // O menu entra com transição de opacidade (mesmo com movimento reduzido); o axe audita
+      // depois dela, senão mede o texto ainda translúcido.
+      await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
 
       await page.mouse.move(0, 0);
       // As guardas de foco do floating-ui (`aria-hidden` e `tabindex=0`, repassam o foco na

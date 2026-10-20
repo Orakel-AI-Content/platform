@@ -32,7 +32,12 @@ import {
   type PickerOption,
 } from '@/components/forms/PickerFields';
 import { richTextField } from '@/components/forms/RichTextField';
-import { FieldGroup, SchemaFields, type FieldRenderer } from '@/components/forms/SchemaForm';
+import {
+  FieldGroup,
+  FormActionBar,
+  SchemaFields,
+  type FieldRenderer,
+} from '@/components/forms/SchemaForm';
 import { zonedDateTimeField } from '@/components/forms/ZonedDatetimeField';
 import { pushSuccess } from '@/components/shared/ActionFeedback.tsx';
 import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
@@ -40,14 +45,15 @@ import { ErrorSummary } from '@/components/shared/ErrorSummary.tsx';
 import { BLOCK_TYPE_LABEL } from '@/components/shared/siteLabels.ts';
 import { blockSummary, blockText } from '@/components/contents/blockSummary.ts';
 import { IconButton } from '@/components/shared/IconButton';
-import StickyFooter from '@/components/shared/StickyFooter';
 import { Button } from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
 import Dropdown from '@/components/ui/Dropdown';
 import { FormItem } from '@/components/ui/Form';
 import Notification from '@/components/ui/Notification';
 import Select from '@/components/ui/Select';
 import toast from '@/components/ui/toast';
 import Tooltip from '@/components/ui/Tooltip';
+import classNames from '@/components/ui/utils/classNames';
 import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
 import { useLeaveGuard } from '@/components/shared/useLeaveGuard.ts';
 import type { ContentEdit } from '@/domain/content/contents.ts';
@@ -55,9 +61,11 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 // Editor de artigos e páginas (#45): um formulário só; os metadados e cada bloco são
 // desenhados pelo gerador, e a lista de blocos (tipo, ordem, remoção) é daqui. O `n` de
 // bloco novo é do servidor; a permissão e as referências são conferidas no domínio. Salvar
-// fica numa barra fixa no rodapé e mantém a pessoa no editor (#109): a edição recomeça da
-// versão salva relida do servidor; a criação vai para a edição do conteúdo criado. O retorno
-// segue o padrão das ações: o sucesso vai para o toast e o resumo de erros para o Alert da barra.
+// mantém a pessoa no editor (#109): a edição recomeça da versão salva relida do servidor; a
+// criação vai para a edição do conteúdo criado. O retorno segue o padrão das ações: o sucesso
+// vai para o toast e o resumo de erros para o Alert da barra. Esqueleto do formulário de tela
+// (#332), como o `SchemaForm`: metadados e cada bloco num `Card` e a barra fixa
+// (`FormActionBar`) com "Descartar" (criação) ou "Voltar" (edição), "Ver prévia" e o envio.
 
 const META_LABELS: Record<string, string> = {
   kind: 'Tipo',
@@ -104,6 +112,12 @@ export type ContentEditorOptions = {
   taxonomies: readonly PickerOption[];
 };
 
+/** Rótulo do envio, parado e durante o envio (#332: criar diz "Criando…"). */
+const SUBMIT_LABEL = {
+  create: { idle: 'Criar conteúdo', pending: 'Criando…' },
+  edit: { idle: 'Salvar nova versão', pending: 'Salvando…' },
+} as const;
+
 /** Por quanto tempo o "Desfazer" da remoção de bloco fica disponível no toast (#112). */
 export const UNDO_MS = 10_000;
 
@@ -137,6 +151,8 @@ export function ContentEditor({
   defaultValues,
   options,
   action,
+  backHref,
+  contentClassName,
   created = false,
   previewUrl,
 }: {
@@ -147,6 +163,13 @@ export function ContentEditor({
   defaultValues: FieldValues;
   options: ContentEditorOptions;
   action: (input: ContentEdit) => Promise<ContentFormResult>;
+  /**
+   * Destino de "Voltar" (edição: link, com o aviso de saída) e de "Descartar" (criação:
+   * confirmado num diálogo): o nível anterior da trilha.
+   */
+  backHref: string;
+  /** Largura da coluna de cartões e da barra (`form-width`); quem decide é a página. */
+  contentClassName?: string;
   /** Acabou de ser criado (`?criado=1`): anuncia a confirmação e tira a marca da URL. */
   created?: boolean;
   /** Prévia da última versão salva (#110); sem ela (criação), "Ver prévia" fica desabilitada. */
@@ -301,6 +324,7 @@ export function ContentEditor({
   // Sair com alterações não salvas pede confirmação (#111); salvar zera o `isDirty`.
   useLeaveGuard(form.formState.isDirty);
   const blocksError = errorAt(form.formState.errors, 'blocks');
+  const busy = pending || form.formState.isSubmitting;
   const previewNote = !previewUrl
     ? 'Salve para ver a prévia.'
     : form.formState.isDirty
@@ -311,7 +335,7 @@ export function ContentEditor({
       <form
         id={`${id}-form`}
         noValidate
-        className="space-y-6"
+        className="flex flex-col"
         onSubmit={(event) =>
           void form.handleSubmit(onValid, (errors) => {
             setSummary(['Corrija os campos destacados.']);
@@ -324,180 +348,197 @@ export function ContentEditor({
           })(event)
         }
       >
-        <fieldset className="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-          <legend className="px-1 text-sm font-semibold">Dados do conteúdo</legend>
-          <SchemaFields
-            schema={ContentMetaSchema}
-            labels={META_LABELS}
-            hints={{ ...META_HINTS, publishedAt: `Horário de ${timeZone}` }}
-            // O tipo não muda depois de criado; `updatedAt` é do site, não do editor.
-            hidden={mode === 'edit' ? ['kind', 'updatedAt'] : ['updatedAt']}
-            fields={metaFields}
-          />
-        </fieldset>
-
-        {/* O erro da lista ("ao menos um bloco") é a mensagem do `FormItem` (#329). */}
-        <FieldGroup
-          as="section"
-          message={blocksError}
-          aria-labelledby={`${id}-blocks`}
-          className="space-y-4"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 id={`${id}-blocks`} className="mr-auto text-lg font-semibold">
-              Blocos
-            </h2>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setCollapsed(new Set(blocks.fields.map((field) => field.id)))}
-            >
-              Recolher todos
-            </Button>
-            <Button type="button" size="sm" onClick={() => setCollapsed(new Set())}>
-              Expandir todos
-            </Button>
-          </div>
-          {blocks.fields.map((field, index) => {
-            const { type } = field as { type?: unknown };
-            if (!isBlockType(type)) return null;
-            const position = index + 1;
-            const isCollapsed = collapsed.has(field.id);
-            return (
-              <Fragment key={field.id}>
-                <Tooltip title={`Inserir bloco na posição ${position}`} wrapperClass="inline-flex">
-                  <InsertMenu
-                    aria-label={`Inserir bloco na posição ${position}`}
-                    toggleClassName={INSERT_TOGGLE_CLASS}
-                    renderTitle={<PiPlus aria-hidden />}
-                  >
-                    {offered.map((option) => (
-                      <Dropdown.Item
-                        key={option}
-                        eventKey={option}
-                        onClick={() => insertBlock(index, option)}
-                      >
-                        {BLOCK_TYPE_LABEL[option]}
-                      </Dropdown.Item>
-                    ))}
-                  </InsertMenu>
-                </Tooltip>
-                <fieldset
-                  id={`${id}-block-${index}`}
-                  tabIndex={-1}
-                  className="rounded-xl border border-gray-200 p-4 dark:border-gray-700"
-                >
-                  {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
-                  <legend className="sr-only">{`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}</legend>
-                  <div className="flex items-center gap-2">
-                    <IconButton
-                      label={`Conteúdo do bloco ${position}`}
-                      icon={isCollapsed ? <PiCaretRight /> : <PiCaretDown />}
-                      aria-expanded={!isCollapsed}
-                      aria-controls={`${id}-block-body-${index}`}
-                      onClick={() => toggleBlock(field.id)}
-                    />
-                    <span aria-hidden="true" className="shrink-0 text-sm font-semibold">
-                      {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
-                    </span>
-                    {isCollapsed && (
-                      <span
-                        className="min-w-0 flex-1 truncate text-sm"
-                        title={blockText(form.getValues(`blocks.${index}`)) || undefined}
-                      >
-                        {blockSummary(form.getValues(`blocks.${index}`))}
-                      </span>
-                    )}
-                    <div className="ml-auto flex shrink-0 gap-1">
-                      <IconButton
-                        label={`Mover bloco ${position} para cima`}
-                        icon={<PiArrowUp />}
-                        // aria-disabled (não disabled): o foco fica no botão depois de mover.
-                        aria-disabled={index === 0}
-                        onClick={() => index > 0 && blocks.move(index, index - 1)}
-                      />
-                      <IconButton
-                        label={`Mover bloco ${position} para baixo`}
-                        icon={<PiArrowDown />}
-                        aria-disabled={index === blocks.fields.length - 1}
-                        onClick={() =>
-                          index < blocks.fields.length - 1 && blocks.move(index, index + 1)
-                        }
-                      />
-                      <IconButton
-                        label={`Remover bloco ${position}`}
-                        icon={<PiTrash />}
-                        onClick={() => removeBlock(index)}
-                      />
-                    </div>
-                  </div>
-                  {/* Recolhido, só oculto: os campos seguem registrados e o TipTap guarda o texto. */}
-                  <div id={`${id}-block-body-${index}`} hidden={isCollapsed} className="mt-4">
-                    <SchemaFields
-                      schema={BLOCK_SCHEMAS[type]}
-                      prefix={`blocks.${index}`}
-                      labels={BLOCK_LABELS}
-                      hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
-                      fields={blockFields[type]}
-                    />
-                  </div>
-                </fieldset>
-              </Fragment>
-            );
-          })}
-          <div className="flex flex-wrap items-end gap-2">
-            {/* Um `FormItem` próprio: o tipo do novo bloco não herda o erro da lista em volta. */}
-            <FormItem
-              htmlFor={`${id}-new-type`}
-              label="Tipo do novo bloco"
-              className="mb-0 min-w-52"
-            >
-              <Select<{ value: Block['type']; label: string }>
-                size="sm"
-                options={typeOptions}
-                value={typeOptions.find((option) => option.value === nextType) ?? null}
-                onChange={(option) => setNextType(option?.value)}
+        <div className={classNames('flex flex-col gap-4', contentClassName)}>
+          <section aria-labelledby={`${id}-meta`}>
+            <Card>
+              {/* Como o título de seção do `SchemaForm`: o `h4 mb-6` do Ecme, `h2` na estrutura. */}
+              <h2
+                id={`${id}-meta`}
+                className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100"
+              >
+                Dados do conteúdo
+              </h2>
+              <SchemaFields
+                schema={ContentMetaSchema}
+                labels={META_LABELS}
+                hints={{ ...META_HINTS, publishedAt: `Horário de ${timeZone}` }}
+                // O tipo não muda depois de criado; `updatedAt` é do site, não do editor.
+                hidden={mode === 'edit' ? ['kind', 'updatedAt'] : ['updatedAt']}
+                fields={metaFields}
               />
-            </FormItem>
-            <Button
-              type="button"
-              size="sm"
-              disabled={nextType === undefined}
-              onClick={() => nextType && blocks.append(newBlock(nextType))}
-            >
-              Adicionar bloco
-            </Button>
-          </div>
-        </FieldGroup>
+            </Card>
+          </section>
 
-        <StickyFooter
-          className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-200 bg-white py-3 dark:border-gray-700 dark:bg-gray-800"
-          stickyClass="z-10"
+          {/* O erro da lista ("ao menos um bloco") é a mensagem do `FormItem` (#329). */}
+          <FieldGroup
+            as="section"
+            message={blocksError}
+            aria-labelledby={`${id}-blocks`}
+            className="space-y-4"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id={`${id}-blocks`} className="mr-auto text-lg font-semibold">
+                Blocos
+              </h2>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setCollapsed(new Set(blocks.fields.map((field) => field.id)))}
+              >
+                Recolher todos
+              </Button>
+              <Button type="button" size="sm" onClick={() => setCollapsed(new Set())}>
+                Expandir todos
+              </Button>
+            </div>
+            {blocks.fields.map((field, index) => {
+              const { type } = field as { type?: unknown };
+              if (!isBlockType(type)) return null;
+              const position = index + 1;
+              const isCollapsed = collapsed.has(field.id);
+              return (
+                <Fragment key={field.id}>
+                  <Tooltip
+                    title={`Inserir bloco na posição ${position}`}
+                    wrapperClass="inline-flex"
+                  >
+                    <InsertMenu
+                      aria-label={`Inserir bloco na posição ${position}`}
+                      toggleClassName={INSERT_TOGGLE_CLASS}
+                      renderTitle={<PiPlus aria-hidden />}
+                    >
+                      {offered.map((option) => (
+                        <Dropdown.Item
+                          key={option}
+                          eventKey={option}
+                          onClick={() => insertBlock(index, option)}
+                        >
+                          {BLOCK_TYPE_LABEL[option]}
+                        </Dropdown.Item>
+                      ))}
+                    </InsertMenu>
+                  </Tooltip>
+                  <Card>
+                    <fieldset id={`${id}-block-${index}`} tabIndex={-1}>
+                      {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
+                      <legend className="sr-only">{`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}</legend>
+                      <div className="flex items-center gap-2">
+                        <IconButton
+                          label={`Conteúdo do bloco ${position}`}
+                          icon={isCollapsed ? <PiCaretRight /> : <PiCaretDown />}
+                          aria-expanded={!isCollapsed}
+                          aria-controls={`${id}-block-body-${index}`}
+                          onClick={() => toggleBlock(field.id)}
+                        />
+                        <span aria-hidden="true" className="shrink-0 text-sm font-semibold">
+                          {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
+                        </span>
+                        {isCollapsed && (
+                          <span
+                            className="min-w-0 flex-1 truncate text-sm"
+                            title={blockText(form.getValues(`blocks.${index}`)) || undefined}
+                          >
+                            {blockSummary(form.getValues(`blocks.${index}`))}
+                          </span>
+                        )}
+                        <div className="ml-auto flex shrink-0 gap-1">
+                          <IconButton
+                            label={`Mover bloco ${position} para cima`}
+                            icon={<PiArrowUp />}
+                            // aria-disabled (não disabled): o foco fica no botão depois de mover.
+                            aria-disabled={index === 0}
+                            onClick={() => index > 0 && blocks.move(index, index - 1)}
+                          />
+                          <IconButton
+                            label={`Mover bloco ${position} para baixo`}
+                            icon={<PiArrowDown />}
+                            aria-disabled={index === blocks.fields.length - 1}
+                            onClick={() =>
+                              index < blocks.fields.length - 1 && blocks.move(index, index + 1)
+                            }
+                          />
+                          <IconButton
+                            label={`Remover bloco ${position}`}
+                            icon={<PiTrash />}
+                            onClick={() => removeBlock(index)}
+                          />
+                        </div>
+                      </div>
+                      {/* Recolhido, só oculto: os campos seguem registrados e o TipTap guarda o texto. */}
+                      <div id={`${id}-block-body-${index}`} hidden={isCollapsed} className="mt-4">
+                        <SchemaFields
+                          schema={BLOCK_SCHEMAS[type]}
+                          prefix={`blocks.${index}`}
+                          labels={BLOCK_LABELS}
+                          hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
+                          fields={blockFields[type]}
+                        />
+                      </div>
+                    </fieldset>
+                  </Card>
+                </Fragment>
+              );
+            })}
+            <div className="flex flex-wrap items-end gap-2">
+              {/* Um `FormItem` próprio: o tipo do novo bloco não herda o erro da lista em volta. */}
+              <FormItem
+                htmlFor={`${id}-new-type`}
+                label="Tipo do novo bloco"
+                className="mb-0 min-w-52"
+              >
+                <Select<{ value: Block['type']; label: string }>
+                  size="sm"
+                  options={typeOptions}
+                  value={typeOptions.find((option) => option.value === nextType) ?? null}
+                  onChange={(option) => setNextType(option?.value)}
+                />
+              </FormItem>
+              <Button
+                type="button"
+                size="sm"
+                disabled={nextType === undefined}
+                onClick={() => nextType && blocks.append(newBlock(nextType))}
+              >
+                Adicionar bloco
+              </Button>
+            </div>
+          </FieldGroup>
+        </div>
+
+        <FormActionBar
+          kind={mode}
+          href={backHref}
+          contentClassName={contentClassName}
+          pending={busy}
+          submit={
+            <Button type="submit" variant="solid" disabled={busy}>
+              {SUBMIT_LABEL[mode][busy ? 'pending' : 'idle']}
+            </Button>
+          }
+          extra={
+            previewUrl ? (
+              <Button
+                asElement="a"
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-describedby={`${id}-preview-note`}
+              >
+                Ver prévia<span className="sr-only"> (abre em nova aba)</span>
+              </Button>
+            ) : (
+              <Button type="button" disabled aria-describedby={`${id}-preview-note`}>
+                Ver prévia
+              </Button>
+            )
+          }
         >
-          <Button type="submit" variant="solid" disabled={pending || form.formState.isSubmitting}>
-            {pending ? 'Salvando…' : mode === 'create' ? 'Criar conteúdo' : 'Salvar nova versão'}
-          </Button>
-          {previewUrl ? (
-            <Button
-              asElement="a"
-              href={previewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-describedby={`${id}-preview-note`}
-            >
-              Ver prévia<span className="sr-only"> (abre em nova aba)</span>
-            </Button>
-          ) : (
-            <Button type="button" disabled aria-describedby={`${id}-preview-note`}>
-              Ver prévia
-            </Button>
-          )}
           {/* aria-live sem role: o `status` é o do toast, que confirma o salvamento. */}
-          <p id={`${id}-preview-note`} aria-live="polite" className="text-sm empty:hidden">
+          <p id={`${id}-preview-note`} aria-live="polite" className="mt-2 text-sm empty:hidden">
             {previewNote}
           </p>
-          <ErrorSummary lines={summary} />
-        </StickyFooter>
+          <ErrorSummary lines={summary} className="not-empty:mt-3" />
+        </FormActionBar>
       </form>
     </FormProvider>
   );

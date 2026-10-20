@@ -9,6 +9,8 @@ import { toast, ToastProvider } from '@/components/ui/toast';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
 import type { ContentFormResult } from './contentEditorValues.ts';
+import { LEAVE_MESSAGE } from '@/components/shared/useLeaveGuard.ts';
+
 import { ContentEditor, UNDO_MS, type ContentEditorOptions } from './ContentEditor.tsx';
 import { fieldLabel } from '@/test/fieldLabel.ts';
 
@@ -68,6 +70,9 @@ const meta = {
 
 const toc = (n: number, title: string) => ({ n, type: 'toc', title });
 
+/** "Voltar" da edição: o conteúdo, nível anterior da trilha. */
+const BACK = '/sites/exemplo-a/conteudos/7';
+
 type RenderProps = {
   defaultValues?: FieldValues;
   blockTypes?: readonly string[];
@@ -97,6 +102,7 @@ function renderEditor({
         defaultValues={defaultValues}
         options={{ ...options, blockTypes }}
         action={action}
+        backHref={mode === 'create' ? '/sites/exemplo-a/conteudos' : BACK}
         created={created}
         previewUrl={previewUrl}
       />
@@ -251,13 +257,33 @@ describe('editor de conteúdo', () => {
 });
 
 describe('barra de ações e continuar no editor (#109)', () => {
-  it('o botão e o resumo de erros ficam juntos na barra do StickyFooter; o sucesso vai para o toast', () => {
+  it('a barra fixa (#332) reúne Voltar, Ver prévia, o envio no mesmo tamanho e o resumo de erros; o sucesso vai para o toast', () => {
     // A fixação no rodapé é visual: o E2E contents.spec.ts confere.
     renderEditor();
 
-    const bar = screen.getByRole('button', { name: 'Salvar nova versão' }).parentElement;
+    const submit = screen.getByRole('button', { name: 'Salvar nova versão' });
+    const bar = submit.closest('.sticky');
+    expect(bar).not.toBeNull();
+    const back = screen.getByRole('link', { name: 'Voltar' });
+    expect(back.getAttribute('href')).toBe(BACK);
+    const preview = screen.getByRole('button', { name: 'Ver prévia' });
+    for (const control of [back, preview]) expect(bar?.contains(control)).toBe(true);
+    // O mesmo `size` (o padrão, `md`) nos três.
+    for (const control of [back, preview, submit]) expect(control.className).toContain('h-12');
     expect(bar?.querySelector('[role="alert"]')).toBeTruthy();
     expect(bar?.querySelector('[role="status"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Descartar' })).toBeNull();
+  });
+
+  it('metadados e cada bloco ficam num Card (#332)', () => {
+    renderEditor();
+
+    const meta = screen.getByRole('region', { name: 'Dados do conteúdo' });
+    expect(meta.querySelector('.card')).toBeTruthy();
+    for (const position of [1, 2, 3]) {
+      const block = screen.getByRole('group', { name: `Bloco ${position}: Sumário` });
+      expect(block.closest('.card')).toBeTruthy();
+    }
   });
 
   it('o resumo de validação usa o Alert do Ecme e o foco vai ao primeiro campo inválido', async () => {
@@ -295,6 +321,29 @@ describe('barra de ações e continuar no editor (#109)', () => {
 
     act(() => finish({ ok: true, message: 'Versão 2 salva.', id: 7 }));
     expect(await screen.findByRole('button', { name: 'Salvar nova versão' })).toBeTruthy();
+  });
+
+  it('criação (#332): "Criando…" durante o envio, e Descartar no lugar de Voltar', async () => {
+    const user = userEvent.setup();
+    let finish: (result: ContentFormResult) => void = () => {};
+    renderEditor({
+      mode: 'create',
+      respond: () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    });
+    expect(screen.queryByRole('link', { name: 'Voltar' })).toBeNull();
+
+    await save(user);
+    const button = await screen.findByRole('button', { name: 'Criando…' });
+    expect(button).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Descartar' })).toHaveProperty('disabled', true);
+
+    act(() => finish({ ok: true, message: 'Conteúdo criado.', id: 7 }));
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/sites/exemplo-a/conteudos/7/editar?criado=1'),
+    );
   });
 
   it('recomeça da versão salva: o bloco novo ganha o n do servidor e salvar de novo não duplica', async () => {
@@ -416,6 +465,50 @@ describe('aviso ao sair (#111)', () => {
     await save(user);
     await screen.findByText('Versão 2 salva.');
     await waitFor(() => expect(leave()).toBe(false));
+  });
+
+  it('Voltar (#332), com alterações, pergunta antes e, recusado, fica no editor', async () => {
+    window.confirm = confirm;
+    const user = userEvent.setup();
+    renderEditor();
+    const back = screen.getByRole('link', { name: 'Voltar' });
+    const clicks: MouseEvent[] = [];
+    const record = (event: MouseEvent) => {
+      if (event.target instanceof Node && back.contains(event.target)) clicks.push(event);
+    };
+    document.addEventListener('click', record);
+    try {
+      await user.type(screen.getByLabelText(fieldLabel('Título'), { exact: true }), '!');
+      await waitFor(() => expect(leave()).toBe(true));
+      await user.click(back);
+    } finally {
+      document.removeEventListener('click', record);
+    }
+
+    expect(confirm).toHaveBeenCalledWith(LEAVE_MESSAGE);
+    // Ficar cancela o clique já na captura do `window`: nem o `Link` nem o resto o recebem.
+    expect(clicks).toEqual([]);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('Descartar (#332) só sai depois de confirmado no diálogo, sem um segundo aviso', async () => {
+    window.confirm = confirm;
+    const user = userEvent.setup();
+    renderEditor({ mode: 'create' });
+
+    await user.type(screen.getByLabelText(fieldLabel('Título'), { exact: true }), '!');
+    await user.click(screen.getByRole('button', { name: 'Descartar' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Descartar o que foi preenchido?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(router.push).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Descartar' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Descartar' }),
+    );
+    expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/conteudos');
+    expect(confirm).not.toHaveBeenCalled();
   });
 });
 

@@ -59,23 +59,31 @@ export default async function EditContentPage({ params, searchParams }: Params &
   if (options === undefined) return noRead;
   const latest = versions.value.at(-1);
   if (latest === undefined) notFound();
+  // "Voltar" vai ao nível anterior da trilha: o conteúdo.
+  const back = `/sites/${siteId}/conteudos/${contentId}`;
 
   return (
-    <section aria-labelledby="edit-content-title" className="form-width space-y-4">
-      <PageHeader
-        id="edit-content-title"
-        trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
-          { label: latest.data.title, href: `/sites/${siteId}/conteudos/${contentId}` },
-          { label: 'Editar' },
-        ])}
-        title={<>Editar “{latest.data.title}”</>}
-      />
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Partindo da versão {latest.version}; salvar grava a versão {latest.version + 1} em rascunho.
-      </p>
+    <section aria-labelledby="edit-content-title" className="space-y-4">
+      {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
+      <div className="form-width space-y-4">
+        <PageHeader
+          id="edit-content-title"
+          trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
+            { label: latest.data.title, href: back },
+            { label: 'Editar' },
+          ])}
+          title={<>Editar “{latest.data.title}”</>}
+        />
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Partindo da versão {latest.version}; salvar grava a versão {latest.version + 1} em
+          rascunho.
+        </p>
+      </div>
       <ContentEditor
         mode="edit"
         siteId={siteId}
+        backHref={back}
+        contentClassName="form-width"
         timeZone={timeZone}
         defaultValues={latest.data}
         options={options}

@@ -385,7 +385,13 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   `ActionResult` com as `issues` da recusa no erro.
   Dentro de um formulário maior (`FormProvider`), `SchemaFields` desenha um schema sob um
   prefixo (`blocks.2`), com os caminhos completos no registro (`blocks.*.content`): é como o
-  editor de conteúdo monta cada bloco, com o rodapé de ações no `StickyFooter`. Referências do
+  editor de conteúdo monta cada bloco. O editor tem formulário próprio (lista de blocos, ação
+  com `pending`) e o mesmo esqueleto do formulário de tela (#332): metadados num `Card` com
+  título ("Dados do conteúdo"), cada bloco num `Card`, e a barra pelo `FormActionBar` exportado
+  do `SchemaForm`, com "Ver prévia" em `extra` (entre "Descartar" e o envio) e a nota da prévia
+  e o resumo de erros em `children` (abaixo dos botões); "Criando…" na criação, "Salvando…" na
+  edição. "Voltar" passa pelo aviso de saída (`useLeaveGuard`); "Descartar" já confirma no
+  diálogo e não pergunta de novo. Referências do
   site: `mediaField(source)` (miniatura do valor atual lida por ID, "Escolher imagem"/"Trocar"
   pelo `MediaPicker` e, com `{ optional: true }` para capa e avatar, "Remover"; `source` são as
   actions da leitura paginada e por IDs ligadas ao site pela página) e

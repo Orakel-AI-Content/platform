@@ -24,17 +24,22 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
   if (options === undefined) return noRead;
 
   return (
-    <section aria-labelledby="new-content-title" className="form-width space-y-4">
-      <PageHeader
-        id="new-content-title"
-        trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
-          { label: 'Criar conteúdo' },
-        ])}
-        title="Criar conteúdo"
-      />
+    <section aria-labelledby="new-content-title" className="space-y-4">
+      {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
+      <div className="form-width">
+        <PageHeader
+          id="new-content-title"
+          trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
+            { label: 'Criar conteúdo' },
+          ])}
+          title="Criar conteúdo"
+        />
+      </div>
       <ContentEditor
         mode="create"
         siteId={site.id}
+        backHref={`/sites/${site.id}/conteudos`}
+        contentClassName="form-width"
         timeZone={site.timeZone}
         defaultValues={{
           kind: 'article',
