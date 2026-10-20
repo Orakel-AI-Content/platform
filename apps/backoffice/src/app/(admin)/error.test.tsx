@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import AdminError from './error.tsx';
 
 // Tela de erro de (admin) (#77): frase, código para os logs, "Tentar de novo" e nada da
-// mensagem da exceção.
+// mensagem da exceção. A saída tem a variante padrão das outras telas de estado (#380).
 
 afterEach(cleanup);
 
@@ -28,6 +28,13 @@ describe('tela de erro', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Tentar de novo' }));
     await user.keyboard('{Enter}');
     expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Tentar de novo" usa a variante padrão do Button, não a solid', () => {
+    render(<AdminError error={failure} retry={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Tentar de novo' }).className).not.toContain(
+      'bg-primary',
+    );
   });
 
   it('sem digest, não mostra a linha do código', () => {

@@ -13,9 +13,8 @@ export function ErrorScreen({ digest, retry }: { digest?: string; retry: () => v
       title="Algo deu errado"
       illustration={<NoDataFound height={280} width={280} />}
       action={
-        <Button variant="solid" onClick={() => retry()}>
-          Tentar de novo
-        </Button>
+        // Variante padrão, como as saídas das outras telas de estado (#380).
+        <Button onClick={() => retry()}>Tentar de novo</Button>
       }
     >
       <p>A tela não pôde ser carregada. Tente de novo; se continuar, avise a equipe.</p>
