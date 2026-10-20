@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 
+import FileNotFound from '@/assets/svg/FileNotFound';
 import { StatusScreen } from '@/components/shared/StatusScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 
@@ -13,6 +14,7 @@ export default function SiteNotFound() {
   return (
     <StatusScreen
       title="Página não encontrada"
+      illustration={<FileNotFound height={280} width={280} />}
       action={<ButtonLink href={`/sites/${site}`}>Ir para o site {site}</ButtonLink>}
     >
       O endereço não existe neste site ou o item foi removido.
