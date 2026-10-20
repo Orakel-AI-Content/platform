@@ -154,20 +154,14 @@ describe('sitesTrail nas telas fora de um site (#307)', () => {
   });
 
   it('com itens, Sites vira link e os itens vêm depois', () => {
-    expect(sitesTrail([{ label: 'Cadastrar site' }])).toEqual([
+    expect(sitesTrail([{ label: 'Criar site' }])).toEqual([
       { label: 'Sites', href: '/sites' },
-      { label: 'Cadastrar site' },
+      { label: 'Criar site' },
     ]);
   });
 
   it('no cabeçalho: Sites é link e o item é a tela atual', () => {
-    render(
-      <PageHeader
-        id="t"
-        trail={sitesTrail([{ label: 'Cadastrar site' }])}
-        title="Cadastrar site"
-      />,
-    );
+    render(<PageHeader id="t" trail={sitesTrail([{ label: 'Criar site' }])} title="Criar site" />);
 
     const nav = screen.getByRole('navigation', { name: 'Trilha de navegação' });
     expect(
@@ -175,7 +169,7 @@ describe('sitesTrail nas telas fora de um site (#307)', () => {
         .getAllByRole('link')
         .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([['Sites', '/sites']]);
-    expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe('Cadastrar site');
+    expect(nav.querySelector('[aria-current="page"]')?.textContent).toBe('Criar site');
   });
 
   it('sem itens no cabeçalho, Sites leva aria-current e não é link', () => {

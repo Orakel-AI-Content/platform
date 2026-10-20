@@ -89,7 +89,7 @@ describe('Button', () => {
     render(
       <>
         <Button asElement={Link} href="/sites/novo" variant="solid" size="sm">
-          Cadastrar site
+          Criar site
         </Button>
         <Button asElement="a" href="/sites/tfvars" download="sites.auto.tfvars.json" size="sm">
           Baixar
@@ -97,7 +97,7 @@ describe('Button', () => {
       </>,
     );
 
-    const link = screen.getByRole('link', { name: 'Cadastrar site' });
+    const link = screen.getByRole('link', { name: 'Criar site' });
     expect(link.getAttribute('href')).toBe('/sites/novo');
     expect(link.className).toContain('bg-primary');
     const download = screen.getByRole('link', { name: 'Baixar' });
