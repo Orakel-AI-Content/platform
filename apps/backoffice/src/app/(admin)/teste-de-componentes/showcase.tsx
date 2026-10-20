@@ -2,8 +2,7 @@
 
 import { motion } from 'motion/react';
 import { useState } from 'react';
-import { HiOutlinePlus } from 'react-icons/hi';
-import { PiArrowUp, PiLinkSimple } from 'react-icons/pi';
+import { PiArrowUp, PiLinkSimple, PiPlus } from 'react-icons/pi';
 import AsyncSelect from 'react-select/async';
 import CreatableSelect from 'react-select/creatable';
 
@@ -173,10 +172,10 @@ export function Showcase({ linkPage }: { linkPage: number }) {
           </Button>
           <Button variant="plain">Plain</Button>
           <Button>Default</Button>
-          <Button variant="solid" icon={<HiOutlinePlus aria-hidden />}>
+          <Button variant="solid" icon={<PiPlus aria-hidden />}>
             Com ícone
           </Button>
-          <Button icon={<HiOutlinePlus aria-hidden />} aria-label="Só ícone" />
+          <Button icon={<PiPlus aria-hidden />} aria-label="Só ícone" />
           <Button variant="solid" loading>
             Carregando
           </Button>
