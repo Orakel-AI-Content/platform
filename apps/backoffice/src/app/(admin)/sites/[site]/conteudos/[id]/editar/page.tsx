@@ -8,6 +8,7 @@ import { can } from '@/domain/access/rbac.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { getEnv } from '@/env.ts';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
 
 import { noWrite } from '../../../editorial-page.tsx';
@@ -74,10 +75,12 @@ export default async function EditContentPage({ params, searchParams }: Params &
           ])}
           title={<>Editar “{latest.data.title}”</>}
         />
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Partindo da versão {latest.version}; salvar grava a versão {latest.version + 1} em
-          rascunho.
-        </p>
+        <PageMeta
+          items={[
+            `Partindo da versão ${latest.version}`,
+            `Salvar grava a versão ${latest.version + 1} em rascunho`,
+          ]}
+        />
       </div>
       <ContentEditor
         mode="edit"

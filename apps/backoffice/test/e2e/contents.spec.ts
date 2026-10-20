@@ -681,7 +681,7 @@ test.describe('barra de ações do editor (#109)', () => {
     await save.click();
     await expect(toast).toContainText('Versão 2 salva.');
     await expect(page).toHaveURL(new RegExp(`${editPath}$`));
-    await expect(page.getByText('Partindo da versão 2;')).toBeVisible();
+    await expect(page.getByText('Partindo da versão 2', { exact: true })).toBeVisible();
 
     // Salvar de novo sem mudar nada: nova versão, os mesmos 20 blocos.
     await save.click();
