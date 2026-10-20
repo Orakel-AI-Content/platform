@@ -56,6 +56,7 @@ import { DataTableShowcase } from './data-table-showcase.tsx';
 import { FormsShowcase } from './forms-showcase.tsx';
 import { MediaShowcase } from './media-showcase.tsx';
 import { MenuShowcase } from './menu-showcase.tsx';
+import { StatesShowcase } from './states-showcase.tsx';
 
 /** Imagem do Avatar sem rede: um quadrado na cor primária. */
 const AVATAR_IMAGE =
@@ -885,7 +886,7 @@ export function Showcase({ linkPage }: { linkPage: number }) {
 
       <MenuShowcase />
 
-      <MediaShowcase />
+      <StatesShowcase />
 
       <FormsShowcase />
 
