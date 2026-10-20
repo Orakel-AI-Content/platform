@@ -15,7 +15,8 @@ import type { SendFile } from './UploadQueue.tsx';
 // Biblioteca de mídia (#52, #186): envio pela rota, "processando" até o total da página
 // crescer, recusa com o motivo, grade sem envio para quem não edita, nome e data de cada
 // imagem no fuso do site, e busca e página pela URL (`useListState`). O envio é pelo diálogo
-// "Enviar imagens" (#376); soltar sobre a grade não envia.
+// "Enviar imagens" (#376); soltar sobre a grade não envia. No cartão do padrão de lista (#377):
+// biblioteca vazia só com o `EmptyState`; busca sem resultado com o `NoResults` e a contagem.
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
 const search = vi.hoisted(() => ({ value: '' }));
@@ -72,6 +73,8 @@ type Props = ComponentProps<typeof MediaLibrary>;
 function renderLibrary(props: Partial<Props> & Pick<Props, 'items' | 'canWrite' | 'refresh'>) {
   return render(
     <MediaLibrary
+      titleId="media-title"
+      title="Mídia"
       siteId="exemplo-a"
       timeZone="America/Sao_Paulo"
       total={props.items.length}
@@ -88,7 +91,8 @@ function renderLibrary(props: Partial<Props> & Pick<Props, 'items' | 'canWrite' 
 
 /** Abre o diálogo de envio e devolve o campo de arquivo da área de soltar. */
 async function openUpload(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Enviar imagens' }));
+  // Com a biblioteca vazia, a ação aparece no cabeçalho e no vazio: a primeira é a do cabeçalho.
+  await user.click(screen.getAllByRole('button', { name: 'Enviar imagens' })[0]!);
   const dialog = screen.getByRole('dialog', { name: 'Enviar imagens' });
   return within(dialog).getByLabelText<HTMLInputElement>(/^Solte as imagens aqui/);
 }
@@ -229,7 +233,7 @@ describe('biblioteca de mídia', () => {
     });
   });
 
-  it('busca sem resultado diz que não há imagem com esse nome', () => {
+  it('busca sem resultado mostra o NoResults e "0 resultados", com a toolbar', () => {
     renderLibrary({
       items: [],
       search: 'nada',
@@ -237,6 +241,26 @@ describe('biblioteca de mídia', () => {
       refresh: vi.fn(() => Promise.resolve(null)),
     });
 
-    expect(screen.getByText('Nenhuma imagem com esse nome.')).toBeTruthy();
+    expect(screen.getByText('Nenhuma imagem encontrada.')).toBeTruthy();
+    expect(screen.getByText('0 resultados').getAttribute('role')).toBe('status');
+    expect(screen.getByRole('searchbox', { name: 'Buscar por nome do arquivo' })).toBeTruthy();
+    expect(screen.queryByRole('list', { name: 'Imagens do site' })).toBeNull();
+  });
+
+  it('biblioteca vazia mostra só o EmptyState, com "Enviar imagens" no cabeçalho e no vazio', () => {
+    renderLibrary({ items: [], canWrite: true, refresh: vi.fn(() => Promise.resolve(null)) });
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Mídia' }).id).toBe('media-title');
+    expect(screen.getByText('Nenhuma imagem na biblioteca.')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Enviar imagens' })).toHaveLength(2);
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByText(/resultados?$/)).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Paginação' })).toBeNull();
+  });
+
+  it('biblioteca vazia sem content.write não oferece envio', () => {
+    renderLibrary({ items: [], canWrite: false, refresh: vi.fn(() => Promise.resolve(null)) });
+    expect(screen.getByText('Nenhuma imagem na biblioteca.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Enviar imagens' })).toBeNull();
   });
 });

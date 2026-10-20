@@ -156,7 +156,7 @@ const IndeterminateCheckbox = (props: IndeterminateCheckboxProps) => {
 const count = new Intl.NumberFormat('pt-BR');
 
 /** "1 resultado", "1.250 resultados". */
-function resultCount(total: number): string {
+export function resultCount(total: number): string {
   return total === 1 ? '1 resultado' : `${count.format(total)} resultados`;
 }
 
