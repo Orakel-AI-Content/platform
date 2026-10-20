@@ -35,9 +35,9 @@ function hydrationMessages(page: Page): string[] {
   return messages;
 }
 
-/** Leva o foco até o controle só com Tab (no máximo 300 passos: a vitrine cresce a cada Task). */
+/** Leva o foco até o controle só com Tab (no máximo 200 passos: a vitrine cresce a cada Task). */
 async function tabTo(page: Page, target: Locator): Promise<void> {
-  for (let step = 0; step < 300; step += 1) {
+  for (let step = 0; step < 200; step += 1) {
     if (await target.evaluate((element) => element === document.activeElement)) return;
     await page.keyboard.press('Tab');
   }
@@ -2159,24 +2159,73 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
-// Mídia (#389): o seletor do editor, os detalhes da biblioteca e a fila de envio, com dados
-// fixos. Os dois diálogos abrem por teclado, prendem o foco, fecham com Esc e devolvem o foco a
-// quem abriu; a fila mostra cada estado em texto, a barra só no envio e um anúncio só.
+// Cabeçalho de página e peças de estado (#388): a trilha nomeada com o item atual em
+// aria-current, as seis cores do StateTag, a etapa atual do ciclo com aria-current="step" e a
+// ação na etapa seguinte. Por tema, o foco de 2px no --ring nos links e nas ações, e o axe em
+// cada seção. O foco parte do h2 da seção: a vitrine tem mais paradas de Tab que o `tabTo` dá.
+const STATES_SECTIONS = ['PageHeader', 'StatusScreen', 'StateTag', 'LifecycleSteps'] as const;
 
-/** Tab e Shift+Tab repetidos não saem do diálogo. */
-async function expectFocusTrapped(page: Page, dialog: Locator): Promise<void> {
-  for (const key of ['Tab', 'Shift+Tab'] as const) {
-    for (let step = 0; step < 4; step += 1) {
-      await page.keyboard.press(key);
-      expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(
-        true,
-      );
-    }
-  }
+/** Põe o foco no h2 da seção, para o próximo Tab entrar nela. */
+async function focusSection(page: Page, id: string): Promise<void> {
+  await page.locator(`#${id}`).evaluate((heading) => {
+    heading.setAttribute('tabindex', '-1');
+    (heading as HTMLElement).focus();
+  });
 }
 
+test('cabeçalho e estados: trilha, status em seis cores e ciclo com a etapa atual', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+
+  const header = section(page, 'PageHeader');
+  const trail = header.getByRole('navigation', { name: 'Trilha de navegação' });
+  await expect(trail.getByRole('listitem')).toHaveCount(3);
+  await expect(trail.getByRole('link')).toHaveText(['Sites', 'Portal Exemplo']);
+  await expect(trail.getByText('Mudanças pendentes')).toHaveAttribute('aria-current', 'page');
+  await expect(header.getByRole('heading', { level: 1, name: 'Mudanças pendentes' })).toBeVisible();
+  await expect(header.getByRole('link', { name: 'Criar conteúdo' })).toBeVisible();
+
+  const status = section(page, 'StatusScreen');
+  const screen = status.getByRole('region', { name: 'Página não encontrada' });
+  await expect(screen.getByRole('heading', { level: 1 })).toHaveText('Página não encontrada');
+  await expect(screen.locator('svg[aria-hidden="true"]')).toHaveCount(1);
+  await expect(screen.getByRole('link', { name: 'Voltar para os sites' })).toBeVisible();
+
+  const tags = section(page, 'StateTag').getByRole('listitem');
+  await expect(tags).toHaveText([
+    'Rascunho',
+    'Em revisão',
+    'Aprovado',
+    'Agendado',
+    'Publicado',
+    'Despublicado',
+  ]);
+  const dots = await tags.evaluateAll((items) =>
+    items.map((item) => getComputedStyle(item.querySelector('.tag-affix')!).backgroundColor),
+  );
+  expect(new Set(dots).size).toBe(6);
+
+  const steps = section(page, 'LifecycleSteps');
+  const [withAction, done] = await steps.getByRole('list').all();
+  await expect(withAction!.locator('[aria-current="step"]')).toContainText('Infra aplicada');
+  await expect(withAction!.getByRole('button', { name: 'Avançar etapa' })).toBeVisible();
+  await expect(done!.locator('[aria-current="step"]')).toContainText('Publicado');
+  await expect(done!.getByRole('button')).toHaveCount(0);
+
+  // A ação avança a etapa até a última, onde some.
+  const advance = steps.getByRole('button', { name: 'Avançar etapa' });
+  await advance.click();
+  await expect(withAction!.locator('[aria-current="step"]')).toContainText('Zona ativa');
+  await advance.click();
+  await expect(withAction!.locator('[aria-current="step"]')).toContainText('Publicado');
+  await expect(steps.getByRole('button')).toHaveCount(0);
+});
+
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`MediaPicker: abre por teclado, pagina, escolhe, Esc fecha e sem violação do axe (${colorScheme})`, async ({
+  test(`cabeçalho e estados pelo teclado, com foco de 2px e sem violação do axe (${colorScheme})`, async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
@@ -2184,125 +2233,52 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const hydration = hydrationMessages(page);
     await page.goto(SHOWCASE);
     await page.waitForLoadState('networkidle');
-    const picker = section(page, 'MediaPicker');
+    const ring = await ringColor(page);
 
-    const closed = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .include('[aria-labelledby="vitrine-media-picker"]')
-      .analyze();
-    expect(closed.violations).toEqual([]);
+    const header = section(page, 'PageHeader');
+    await focusSection(page, 'vitrine-page-header');
+    for (const target of [
+      header.getByRole('link', { name: 'Sites' }),
+      header.getByRole('link', { name: 'Portal Exemplo' }),
+      header.getByRole('link', { name: 'Criar conteúdo' }),
+    ]) {
+      await page.keyboard.press('Tab');
+      await expect(target).toBeFocused();
+      expect(await outline(target)).toEqual({ color: ring, style: 'solid', width: '2px' });
+    }
 
-    const opener = picker.getByRole('button', { name: 'Escolher imagem' });
-    await tabTo(page, opener);
+    const back = section(page, 'StatusScreen').getByRole('link', { name: 'Voltar para os sites' });
+    await focusSection(page, 'vitrine-status-screen');
+    await page.keyboard.press('Tab');
+    await expect(back).toBeFocused();
+    expect(await outline(back)).toEqual({ color: ring, style: 'solid', width: '2px' });
+
+    const steps = section(page, 'LifecycleSteps');
+    const advance = steps.getByRole('button', { name: 'Avançar etapa' });
+    await focusSection(page, 'vitrine-lifecycle-steps');
+    await page.keyboard.press('Tab');
+    await expect(advance).toBeFocused();
+    expect(await outline(advance)).toEqual({ color: ring, style: 'solid', width: '2px' });
     await page.keyboard.press('Enter');
-    const dialog = page.getByRole('dialog', { name: 'Escolher imagem' });
-    const status = dialog.getByRole('status');
-    await expect(status).toHaveText('Página 1 de 3 · 30 imagens');
-    const grid = dialog.getByRole('list', { name: 'Imagens da biblioteca' });
-    await expect(grid.getByRole('listitem')).toHaveCount(12);
-    await expectFocusTrapped(page, dialog);
-
-    const open = await audit(page);
-    expect(open.violations).toEqual([]);
-
-    await tabTo(page, dialog.getByRole('button', { name: 'Próxima página' }));
-    await page.keyboard.press('Enter');
-    await expect(status).toHaveText('Página 2 de 3 · 30 imagens');
-    await expect(dialog.getByRole('button', { name: 'Página 2' })).toHaveAttribute(
-      'aria-current',
-      'page',
+    await expect(steps.getByRole('list').first().locator('[aria-current="step"]')).toContainText(
+      'Zona ativa',
     );
 
-    const tile = grid.getByRole('button', { name: 'Mídia 13 · 480×320', exact: true });
-    await tabTo(page, tile);
-    await page.keyboard.press('Enter');
-    await expect(dialog).toHaveCount(0);
-    await expect(opener).toBeFocused();
-    await expect(picker.getByText('Escolhida: Mídia 13 · 480×320')).toBeVisible();
-
-    await page.keyboard.press('Enter');
-    await expect(status).toHaveText('Página 1 de 3 · 30 imagens');
-    await page.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    await expect(opener).toBeFocused();
+    for (const id of [
+      'vitrine-page-header',
+      'vitrine-status-screen',
+      'vitrine-state-tag',
+      'vitrine-lifecycle-steps',
+    ]) {
+      const accessibility = await new AxeBuilder({ page })
+        .withTags(WCAG)
+        .include(`[aria-labelledby="${id}"]`)
+        .analyze();
+      expect(accessibility.violations, id).toEqual([]);
+    }
+    for (const name of STATES_SECTIONS) {
+      await expect(section(page, name).getByRole('heading', { level: 2 })).toHaveText(name);
+    }
     expect(hydration).toEqual([]);
-  });
-}
-
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`MediaDetails: a miniatura abre os dados por teclado, Esc devolve o foco e sem violação do axe (${colorScheme})`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await login(page);
-    await page.goto(SHOWCASE);
-    await page.waitForLoadState('networkidle');
-    const details = section(page, 'MediaDetails');
-    const name = 'capa-da-materia-sobre-o-festival-de-inverno-de-2026-na-serra.jpg';
-
-    const closed = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .include('[aria-labelledby="vitrine-media-details"]')
-      .analyze();
-    expect(closed.violations).toEqual([]);
-
-    const tile = details.getByRole('button', { name: new RegExp(`^${name} · `) });
-    await expect(tile).toHaveAttribute('aria-haspopup', 'dialog');
-    await tabTo(page, tile);
-    await page.keyboard.press('Enter');
-    const dialog = page.getByRole('dialog', { name });
-    await expect(dialog.getByRole('heading', { name })).toBeVisible();
-    await expect(dialog.getByText('1200×800 px')).toBeVisible();
-    await expect(dialog.getByText('AVIF, JPEG, WebP')).toBeVisible();
-    await expectFocusTrapped(page, dialog);
-
-    const open = await audit(page);
-    expect(open.violations).toEqual([]);
-
-    await page.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    await expect(tile).toBeFocused();
-
-    // Sem envio registrado: o nome e a data de reserva.
-    const fallback = details.getByRole('button', { name: /^Sem nome \(Mídia 42\) · / });
-    await tabTo(page, fallback);
-    await page.keyboard.press('Enter');
-    const unnamed = page.getByRole('dialog', { name: 'Sem nome (Mídia 42)' });
-    await expect(unnamed.getByText('Data de envio não registrada')).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(unnamed).toHaveCount(0);
-    await expect(fallback).toBeFocused();
-  });
-}
-
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`Fila de envio: um estado por arquivo, barra só no envio, um anúncio e sem violação do axe (${colorScheme})`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await login(page);
-    await page.goto(SHOWCASE);
-    await page.waitForLoadState('networkidle');
-    const queue = section(page, 'Fila de envio');
-
-    await expect(queue.getByRole('status')).toHaveCount(1);
-    await expect(queue.getByRole('status')).toHaveText(
-      'Só as 20 primeiras imagens foram enviadas; envie as outras em seguida. 6 envios: 1 aguardando, 1 enviando, 1 processando, 1 pronta, 1 recusada, 1 ainda processando',
-    );
-    const items = queue.getByRole('list', { name: 'Envios' }).getByRole('listitem');
-    await expect(items).toHaveCount(6);
-    await expect(items.nth(4)).toContainText('recusada: formato não aceito');
-    await expect(items.nth(5)).toContainText('ainda processando; recarregue a página mais tarde');
-
-    const bar = queue.getByRole('progressbar');
-    await expect(bar).toHaveCount(1);
-    await expect(bar).toHaveAccessibleName('Envio de galeria-01.png');
-    await expect(bar).toHaveAttribute('aria-valuenow', '42');
-
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .include('[aria-labelledby="vitrine-fila-de-envio"]')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
   });
 }
