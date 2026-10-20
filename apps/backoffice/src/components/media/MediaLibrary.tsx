@@ -12,6 +12,7 @@ import {
 
 import { ListPagination, ListToolbar } from '@/components/shared/ListControls.tsx';
 import { MediaDetails } from '@/components/media/MediaDetails';
+import { MediaGrid } from '@/components/media/MediaGrid';
 import {
   UploadList,
   useUploadQueue,
@@ -190,16 +191,13 @@ export function MediaLibrary({
         onSearchChange={list.setSearch}
         onClear={list.clearFilters}
       />
-      <ul
-        aria-label="Imagens do site"
-        className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4"
-      >
+      <MediaGrid label="Imagens do site">
         {items.map((item) => (
           <li key={item.id}>
             <MediaDetails item={item} timeZone={timeZone} />
           </li>
         ))}
-      </ul>
+      </MediaGrid>
       {items.length === 0 && (
         <p className="text-sm text-gray-600 dark:text-gray-400">
           {search === '' ? 'Nenhuma imagem na biblioteca.' : 'Nenhuma imagem com esse nome.'}

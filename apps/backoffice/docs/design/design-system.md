@@ -194,27 +194,39 @@ Não negociável, em toda tela e todo componente portado:
   `aria-hidden`. Ação indisponível que deve continuar focável (o foco fica no botão depois de
   mover) usa `aria-disabled`, desenhado como indisponível (opacidade e cursor), e o `onClick`
   confere a condição; `disabled` só quando o foco não precisa ficar no botão.
+- **Grade e miniatura da mídia:** `MediaGrid` (`src/components/media/MediaGrid.tsx`) é a `<ul>`
+  das miniaturas, com o nome de quem usa (`label`) e um tamanho só,
+  `grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4`: três colunas na largura padrão do
+  `Dialog` (520 px), a mesma grade na biblioteca e no seletor; os `<li>` vêm de quem usa.
+  `MediaTile` (`src/components/media/MediaTile.tsx`) é a miniatura clicável: um `<button>`
+  (`type="button"` fixo, porque o seletor fica dentro do formulário do editor; aceita as props
+  de botão, como `aria-haspopup` e `onClick`) com a `MediaThumbnail`
+  (`src/components/media/MediaLibrary.tsx`, `alt=""`) e a legenda em `text-xs` cinza, que é o
+  nome do botão. Só o texto da legenda vem de quem usa.
 - **Diálogo de grade de miniaturas:** `MediaPicker` (`src/components/media/MediaPicker.tsx`), no
   `Dialog` do Ecme. Um `Button` (`type="button"`, porque fica dentro de formulários, com
-  `aria-haspopup="dialog"`) abre o diálogo controlado. Dentro ficam o título "Escolher imagem"
-  (`h2` em `aria-labelledby`, com `closable={false}` e o "Fechar" ao lado) e a página de
-  miniaturas vinda de `load(page)` (a Server Action da leitura paginada), cada uma um botão
-  comum "Mídia N · L×A". Abaixo vêm a `Pagination` (`nav "Paginação"`, pontas desabilitadas,
-  `aria-current="page"`) e "Página X de Y · N imagens" em `role="status"` (também carregando,
-  erro e vazio). A paginação só aparece depois da primeira página lida. Enquanto a próxima
-  carrega, a grade anterior continua na tela, para o foco não se perder, e só a resposta mais
-  recente vale. Escolher chama `onSelect(id)` e fecha; Esc, o fundo e "Fechar" fecham sem
-  escolher. A miniatura é a `MediaThumbnail` (`src/components/media/MediaLibrary.tsx`), a mesma da
-  biblioteca.
-- **Detalhes da imagem:** `MediaDetails` (`src/components/media/MediaDetails.tsx`): na biblioteca,
-  cada imagem é um botão (`aria-haspopup="dialog"`) com a miniatura e a legenda "<nome> ·
-  <data>", que abre o `Dialog` do Ecme, como o `MediaPicker`: nome no `h2`, miniatura e a lista
-  de dados (`InfoList`, numa coluna; ver "Tela de detalhe") com dimensões, formatos
-  disponíveis, identificador e data de envio. "Copiar identificador" usa
-  `navigator.clipboard.writeText` no retorno padrão (ver "Retorno das ações"): o sucesso vai
-  para o toast ("Identificador copiado."), anunciado com o diálogo aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
-  `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o fundo ou "Fechar" fecham, e o foco
-  volta à imagem.
+  `aria-haspopup="dialog"`) abre o diálogo controlado, na largura padrão do `Dialog`. O
+  cabeçalho é o nativo do `Dialog`, como o `UploadFile` do FileManager do Ecme: o X do
+  `CloseButton` ("Fechar", o primeiro controle do diálogo) e o título "Escolher imagem" num
+  `h4` no corpo, ligado por `aria-labelledby` (não o `title` do `Dialog`, que gera `h5`).
+  Abaixo vêm "Página X de Y · N imagens" em `role="status"` (também carregando, erro e vazio) e
+  a página de miniaturas vinda de `load(page)` (a Server Action da leitura paginada), na
+  `MediaGrid` ("Imagens da biblioteca"), cada uma uma `MediaTile` "Mídia N · L×A". Depois, a
+  `Pagination` (`nav "Paginação"`, pontas desabilitadas, `aria-current="page"`), que só aparece
+  depois da primeira página lida. Enquanto a próxima carrega, a grade anterior continua na
+  tela, para o foco não se perder, e só a resposta mais recente vale. Escolher chama
+  `onSelect(id)` e fecha; Esc, o fundo e o X fecham sem escolher.
+- **Detalhes da imagem:** `MediaDetails` (`src/components/media/MediaDetails.tsx`): na biblioteca
+  (`MediaGrid` "Imagens do site"), cada imagem é uma `MediaTile` (`aria-haspopup="dialog"`) com
+  a legenda "<nome> · <data>", que abre o `Dialog` do Ecme com o mesmo cabeçalho nativo do
+  `MediaPicker`: o X "Fechar" e o nome num `h4` no corpo (`break-all`, com recuo à direita para
+  não passar sob o X), depois a miniatura e a lista de dados (`InfoList`, numa coluna; ver
+  "Tela de detalhe") com dimensões, formatos disponíveis, identificador e data de envio.
+  "Copiar identificador" usa `navigator.clipboard.writeText` no retorno padrão (ver "Retorno
+  das ações"): o sucesso vai para o toast ("Identificador copiado."), anunciado com o diálogo
+  aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
+  `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o fundo ou o X fecham, e o foco volta
+  à imagem.
 - **Retorno das ações:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
   `src/components/shared/actionResult.ts`, importável pela Server Action), e
   `useActionResult` (`src/components/shared/ActionFeedback.tsx`) o mostra num lugar só: o

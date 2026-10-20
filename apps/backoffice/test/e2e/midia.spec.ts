@@ -266,7 +266,8 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
   });
 
   // "Copiar identificador" no retorno padrão (#326): o toast fica fora da app que o diálogo
-  // deixa inerte e é anunciado com ele aberto; nos dois temas.
+  // deixa inerte e é anunciado com ele aberto; nos dois temas. O cabeçalho é o nativo do Dialog
+  // (#374): o nome num `h4` e um X "Fechar" só, que fecha e devolve o foco à imagem.
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`copiar o identificador com o diálogo aberto confirma no toast (${colorScheme})`, async ({
       page,
@@ -276,9 +277,12 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
       await loginAs(page, 'editor@orakel.local');
       await page.goto(`/sites/${LIBRARY_SITE}/midia`);
-      await page.getByRole('button', { name: /^foto-1\.jpg ·/ }).click();
+      const image = page.getByRole('button', { name: /^foto-1\.jpg ·/ });
+      await image.click();
       const details = page.getByRole('dialog', { name: 'foto-1.jpg' });
       await expect(details).toBeVisible();
+      await expect(details.getByRole('heading', { level: 4 })).toHaveText('foto-1.jpg');
+      await expect(details.getByRole('button', { name: 'Fechar' })).toHaveCount(1);
 
       await details.getByRole('button', { name: 'Copiar identificador' }).click();
       const toast = page.locator('[data-toast-placement="top-end"]');
@@ -292,6 +296,10 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
       await page.mouse.move(0, 0);
       const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
       expect(accessibility.violations).toEqual([]);
+
+      await details.getByRole('button', { name: 'Fechar' }).click();
+      await expect(details).toBeHidden();
+      await expect(image).toBeFocused();
     });
   }
 
