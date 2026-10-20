@@ -26,6 +26,7 @@ export function EntityForm({
   defaultValues,
   media,
   action,
+  contentClassName,
 }: {
   kind: EntityKind;
   mode: 'create' | 'edit';
@@ -34,9 +35,12 @@ export function EntityForm({
   /** Biblioteca do site para o avatar (#182); as outras entidades não usam mídia. */
   media?: MediaSource;
   action: (value: unknown) => Promise<EntityFormResult>;
+  /** Largura da coluna de cartões e da barra, dada pela página (`form-width`). */
+  contentClassName?: string;
 }) {
   const router = useRouter();
   const config = ENTITY_CONFIG[kind];
+  const list = `/sites/${siteId}/${config.segment}`;
   return (
     <SchemaForm
       schema={config.schema}
@@ -44,6 +48,9 @@ export function EntityForm({
       labels={config.labels}
       hints={config.hints}
       fields={config.fields?.(media)}
+      sideBySide={config.sideBySide}
+      actionBar={{ kind: mode, href: list }}
+      contentClassName={contentClassName}
       submitLabel={mode === 'create' ? 'Criar' : 'Salvar'}
       pendingLabel={mode === 'create' ? 'Criando…' : 'Salvando…'}
       onSubmit={async (value) => {
@@ -53,7 +60,7 @@ export function EntityForm({
         }
         // O toast vive no layout raiz: o aviso continua na lista para onde a tela volta.
         pushSuccess(result.message);
-        router.push(`/sites/${siteId}/${config.segment}`);
+        router.push(list);
         router.refresh();
       }}
     />
@@ -76,9 +83,15 @@ const INSTITUTIONAL_FIELDS = Object.fromEntries(
 export function InstitutionalTextsForm({
   defaultValues,
   action,
+  backHref,
+  contentClassName,
 }: {
   defaultValues: Record<string, unknown>;
   action: (value: unknown) => Promise<EntityFormResult>;
+  /** Tela anterior da trilha (a página do site): destino de "Voltar". */
+  backHref: string;
+  /** Largura da coluna de cartões e da barra, dada pela página (`form-width`). */
+  contentClassName?: string;
 }) {
   const router = useRouter();
   return (
@@ -87,6 +100,8 @@ export function InstitutionalTextsForm({
       defaultValues={defaultValues}
       labels={INSTITUTIONAL_LABELS}
       fields={INSTITUTIONAL_FIELDS}
+      actionBar={{ kind: 'edit', href: backHref }}
+      contentClassName={contentClassName}
       submitLabel="Salvar textos"
       onSubmit={async (value) => {
         const result = await action(value);

@@ -19,6 +19,9 @@ import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { SchemaFields, SchemaForm, type FieldProps } from './SchemaForm.tsx';
 
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
+
 // Gerador de formulários (#42): campos por tipo, listas, registro, erros e teclado.
 
 // A mensagem de erro do FormItem (#245) anima com o motion, que o happy-dom cancela no `cleanup`.
@@ -697,5 +700,162 @@ describe('SchemaForm: seções com índice', () => {
 
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(screen.queryByRole('heading')).toBeNull();
+  });
+});
+
+describe('SchemaForm: formulário de tela (#328)', () => {
+  const schema = z.object({ name: z.string().min(1), slug: z.string(), bio: z.string() });
+  const labels = { name: 'Nome', slug: 'Slug', bio: 'Biografia' };
+
+  afterEach(() => vi.clearAllMocks());
+
+  it('sem seções, todos os campos num Card só; pares lado a lado a partir de md', () => {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ name: 'A', slug: 'a', bio: '' }}
+        labels={labels}
+        sideBySide={[['name', 'slug']]}
+        actionBar={{ kind: 'edit', href: '/sites/x/autores' }}
+        contentClassName="form-width"
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const cards = document.querySelectorAll('.card');
+    expect(cards).toHaveLength(1);
+    for (const label of ['Nome', 'Slug', 'Biografia']) {
+      expect(cards[0]?.contains(screen.getByLabelText(label))).toBe(true);
+    }
+    const pair = screen.getByLabelText('Nome').closest('.grid');
+    expect(pair?.className.split(' ')).toEqual(
+      expect.arrayContaining(['grid', 'md:grid-cols-2', 'gap-4']),
+    );
+    expect(pair?.contains(screen.getByLabelText('Slug'))).toBe(true);
+    expect(pair?.contains(screen.getByLabelText('Biografia'))).toBe(false);
+    // A coluna de cartões leva a largura que a página deu.
+    expect(cards[0]?.closest('.form-width')).not.toBeNull();
+  });
+
+  it('pares dentro de lista: o caminho com * agrupa os campos de cada item', () => {
+    render(
+      <SchemaForm
+        schema={z.object({
+          items: z.array(z.object({ label: z.string(), href: z.string() })),
+        })}
+        defaultValues={{ items: [{ label: 'A', href: '/a' }] }}
+        labels={{
+          items: 'Itens',
+          'items.*': 'item',
+          'items.*.label': 'Rótulo',
+          'items.*.href': 'Link',
+        }}
+        sideBySide={[['items.*.label', 'items.*.href']]}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const pair = screen.getByLabelText('Rótulo').closest('.grid');
+    expect(pair?.contains(screen.getByLabelText('Link'))).toBe(true);
+  });
+
+  it('edição: Voltar é um link para a tela anterior e o envio fica na barra', () => {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ name: 'A', slug: 'a', bio: '' }}
+        labels={labels}
+        actionBar={{ kind: 'edit', href: '/sites/x/autores' }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const back = screen.getByRole('link', { name: 'Voltar' });
+    expect(back.getAttribute('href')).toBe('/sites/x/autores');
+    const bar = back.closest('.sticky');
+    expect(bar).not.toBeNull();
+    expect(bar?.contains(screen.getByRole('button', { name: 'Salvar' }))).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Descartar' })).toBeNull();
+  });
+
+  it('criação: Descartar confirma; Cancelar fica com o que foi digitado, Confirmar sai sem enviar', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ name: '', slug: '', bio: '' }}
+        labels={labels}
+        actionBar={{ kind: 'create', href: '/sites/x/autores' }}
+        submitLabel="Criar"
+        onSubmit={onSubmit}
+      />,
+    );
+    await user.type(screen.getByLabelText('Nome'), 'Ana');
+    const discard = screen.getByRole('button', { name: 'Descartar' });
+    expect(discard.className).toContain('text-error');
+    expect(screen.queryByRole('link', { name: 'Voltar' })).toBeNull();
+
+    await user.click(discard);
+    const dialog = screen.getByRole('alertdialog', { name: 'Descartar o que foi preenchido?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(screen.getByLabelText<HTMLInputElement>('Nome').value).toBe('Ana');
+    expect(router.push).not.toHaveBeenCalled();
+
+    await user.click(discard);
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Descartar' }),
+    );
+    expect(router.push).toHaveBeenCalledWith('/sites/x/autores');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('um segundo clique ou Enter durante o envio não dispara outro envio', async () => {
+    const user = userEvent.setup();
+    let finish: () => void = () => {};
+    const onSubmit = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ name: 'Ana', slug: 'ana', bio: '' }}
+        labels={labels}
+        actionBar={{ kind: 'create', href: '/sites/x/autores' }}
+        submitLabel="Criar"
+        pendingLabel="Criando…"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Criar' }));
+    const pending = await screen.findByRole('button', { name: 'Criando…' });
+    await user.click(pending);
+    await user.type(screen.getByLabelText('Nome'), '{Enter}');
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Criar' })).toBeTruthy());
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('sem actionBar não há barra fixa nem cartão (formulário dentro de outra tela)', () => {
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ name: 'A', slug: 'a', bio: '' }}
+        labels={labels}
+        submitLabel="Aprovar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(document.querySelector('.sticky')).toBeNull();
+    expect(document.querySelector('.card')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Aprovar' })).toBeTruthy();
   });
 });

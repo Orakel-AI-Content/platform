@@ -136,20 +136,24 @@ export function editorialCreatePage<K extends EntityKind>(kind: K): EditorialPag
     const titleId = `new-${config.htmlId.one}-title`;
 
     return (
-      <section aria-labelledby={titleId} className="form-width space-y-4">
-        <PageHeader
-          id={titleId}
-          trail={siteTrail(site, { label: config.area, segment: config.segment }, [
-            { label: config.createLabel },
-          ])}
-          title={config.createLabel}
-        />
+      <section aria-labelledby={titleId} className="space-y-4">
+        {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
+        <div className="form-width space-y-4">
+          <PageHeader
+            id={titleId}
+            trail={siteTrail(site, { label: config.area, segment: config.segment }, [
+              { label: config.createLabel },
+            ])}
+            title={config.createLabel}
+          />
+        </div>
         <EntityForm
           kind={kind}
           mode="create"
           siteId={site.id}
           defaultValues={config.newValues}
           media={routes.media ? mediaSource(site.id) : undefined}
+          contentClassName="form-width"
           action={routes.create.bind(null, site.id)}
         />
       </section>
@@ -195,20 +199,24 @@ export function editorialEditPage<K extends EntityKind>(kind: K): EditorialPage<
     const titleId = `edit-${config.htmlId.one}-title`;
 
     return (
-      <section aria-labelledby={titleId} className="form-width space-y-4">
-        <PageHeader
-          id={titleId}
-          trail={siteTrail(site, { label: config.area, segment: config.segment }, [
-            { label: name },
-          ])}
-          title={`Editar “${name}”`}
-        />
+      <section aria-labelledby={titleId} className="space-y-4">
+        {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
+        <div className="form-width space-y-4">
+          <PageHeader
+            id={titleId}
+            trail={siteTrail(site, { label: config.area, segment: config.segment }, [
+              { label: name },
+            ])}
+            title={`Editar “${name}”`}
+          />
+        </div>
         <EntityForm
           kind={kind}
           mode="edit"
           siteId={site.id}
           defaultValues={withoutId(item)}
           media={routes.media ? mediaSource(site.id) : undefined}
+          contentClassName="form-width"
           action={routes.update.bind(null, site.id, item.id)}
         />
       </section>

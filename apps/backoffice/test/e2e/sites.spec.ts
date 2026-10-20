@@ -255,6 +255,38 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Configuração no formulário do template (#328): seções em Card, ID e Nome lado a lado, a barra
+// fixa na largura do main e Voltar para a página do site, sem salvar.
+test('configuração: pares lado a lado, barra na largura do main e Voltar', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await loginAs(page, 'operacao@orakel.local');
+  await page.goto('/sites/exemplo-a/configuracao');
+  await expect(page.getByRole('heading', { name: 'Identidade' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+
+  const identity = page.getByRole('region', { name: 'Identidade' });
+  for (const [first, second] of [
+    ['ID', 'Nome'],
+    ['Idioma', 'Fuso horário'],
+  ] as const) {
+    const a = await identity.getByLabel(first, { exact: true }).boundingBox();
+    const b = await identity.getByLabel(second, { exact: true }).boundingBox();
+    expect(a?.y).toBe(b?.y);
+  }
+  const bar = page
+    .locator('.sticky')
+    .filter({ has: page.getByRole('button', { name: 'Salvar configuração' }) });
+  const main = await page.locator('main').boundingBox();
+  const barBox = await bar.boundingBox();
+  expect(barBox?.x).toBe(main?.x);
+  expect(barBox?.width).toBe(main?.width);
+
+  await identity.getByLabel('Nome', { exact: true }).fill('Nome que não fica');
+  await bar.getByRole('link', { name: 'Voltar' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-a$/);
+  await expect(page.getByText('Nome que não fica')).toHaveCount(0);
+});
+
 test('editor não cadastra nem edita a configuração', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
   await expect(page.getByRole('link', { name: 'Cadastrar site' })).toHaveCount(0);

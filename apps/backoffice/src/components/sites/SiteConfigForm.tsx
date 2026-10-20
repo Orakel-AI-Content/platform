@@ -80,6 +80,12 @@ export const SITE_CONFIG_SECTIONS: SchemaFormSection[] = [
   { id: 'integracoes', title: 'Integrações', paths: ['integrations'] },
 ];
 
+/** Campos curtos relacionados, lado a lado a partir de `md` (#328). */
+export const SITE_CONFIG_SIDE_BY_SIDE = [
+  ['siteId', 'name'],
+  ['language', 'timeZone'],
+];
+
 /** Chaves do schema sem campo na tela (os textos têm formulário próprio). */
 export const SITE_CONFIG_HIDDEN = ['institutionalTexts'];
 
@@ -95,11 +101,17 @@ export function SiteConfigForm({
   defaultValues,
   options,
   action,
+  backHref,
+  contentClassName,
 }: {
   mode: 'create' | 'edit';
   defaultValues: Record<string, unknown>;
   options: Options;
   action: (config: SiteConfig) => Promise<SiteFormResult>;
+  /** Tela anterior da trilha: destino de "Descartar" (cadastro) e de "Voltar" (edição). */
+  backHref: string;
+  /** Largura da coluna de cartões e da barra, dada pela página (`form-width`). */
+  contentClassName?: string;
 }) {
   const router = useRouter();
   const fields: Record<string, FieldRenderer> = {
@@ -132,6 +144,9 @@ export function SiteConfigForm({
       readOnly={mode === 'edit' ? ['siteId'] : []}
       fields={fields}
       sections={SITE_CONFIG_SECTIONS}
+      sideBySide={SITE_CONFIG_SIDE_BY_SIDE}
+      actionBar={{ kind: mode, href: backHref }}
+      contentClassName={contentClassName}
       submitLabel={mode === 'create' ? 'Cadastrar site' : 'Salvar configuração'}
       pendingLabel={mode === 'create' ? 'Cadastrando…' : 'Salvando…'}
       onSubmit={async (config) => {

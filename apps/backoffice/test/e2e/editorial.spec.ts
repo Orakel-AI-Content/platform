@@ -161,6 +161,75 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Formulário do template (#328), nos dois temas: campos em Card, Nome e Slug lado a lado a
+// partir de md, a barra fixa na largura do main com Descartar (criar) ou Voltar (editar).
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`formulário de autor no template, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a/autores/novo');
+    await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+    await page.waitForLoadState('networkidle');
+
+    // Todo campo dentro de um Card.
+    const form = page.locator('main form');
+    const controls = form.locator('input:not([type=hidden]), textarea, select');
+    for (const control of await controls.all()) {
+      expect(await control.evaluate((el) => el.closest('.card') !== null)).toBe(true);
+    }
+    // Nome e Slug na mesma linha a 1280 px; um embaixo do outro a 767 px.
+    const name = page.getByLabel('Nome', { exact: true });
+    const slug = page.getByLabel('Slug');
+    expect((await name.boundingBox())?.y).toBe((await slug.boundingBox())?.y);
+    // A barra encosta nas bordas do main.
+    const bar = page
+      .locator('.sticky')
+      .filter({ has: page.getByRole('button', { name: 'Criar' }) });
+    const main = await page.locator('main').boundingBox();
+    const barBox = await bar.boundingBox();
+    expect(barBox?.x).toBe(main?.x);
+    expect(barBox?.width).toBe(main?.width);
+    await page.setViewportSize({ width: 767, height: 800 });
+    // Uma coluna: cada campo na sua linha (o schema põe o Slug antes do Nome).
+    expect((await name.boundingBox())!.y).toBeGreaterThan((await slug.boundingBox())!.y);
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // Descartar confirma: Cancelar fica com o que foi digitado; Descartar volta à lista sem criar.
+    await name.fill('Rascunho descartado');
+    await page.getByRole('button', { name: 'Descartar' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Descartar o que foi preenchido?' });
+    await expect(dialog).toBeVisible();
+    await expectNoViolations(page);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(name).toHaveValue('Rascunho descartado');
+    await expectNoViolations(page);
+    await page.getByRole('button', { name: 'Descartar' }).click();
+    await dialog.getByRole('button', { name: 'Descartar' }).click();
+    await expect(page).toHaveURL(/\/sites\/exemplo-a\/autores$/);
+    await expect(page.getByRole('row', { name: /Rascunho descartado/ })).toHaveCount(0);
+  });
+}
+
+test('editar menu: Voltar leva à lista sem salvar', async ({ page }) => {
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites/exemplo-a/menus');
+  await page.getByRole('link', { name: 'Editar principal' }).click();
+  await page.waitForLoadState('networkidle');
+  // Rótulo e Link do item lado a lado.
+  const label = page.getByLabel('Rótulo').first();
+  const href = page.getByLabel('Link').first();
+  expect((await label.boundingBox())?.y).toBe((await href.boundingBox())?.y);
+  const original = await label.inputValue();
+  await label.fill(`${original} sem salvar`);
+  await page.getByRole('link', { name: 'Voltar' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-a\/menus$/);
+  await expect(page.getByRole('row', { name: /sem salvar/ })).toHaveCount(0);
+});
+
 test('editor edita um item do menu e o vê na lista', async ({ page }) => {
   const label = `Guias ${Date.now()}`;
   await loginAs(page, 'editor@orakel.local');

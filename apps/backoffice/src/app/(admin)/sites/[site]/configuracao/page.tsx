@@ -32,12 +32,15 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
   const config = await currentConfig(getDb().db, site);
   if (config === undefined) notFound();
   return (
-    <section aria-labelledby="site-config-title" className="form-width space-y-6">
-      <PageHeader
-        id="site-config-title"
-        trail={siteTrail({ id: site, name: config.name }, 'Configuração')}
-        title="Configuração"
-      />
+    <section aria-labelledby="site-config-title" className="space-y-6">
+      {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
+      <div className="form-width space-y-6">
+        <PageHeader
+          id="site-config-title"
+          trail={siteTrail({ id: site, name: config.name }, 'Configuração')}
+          title="Configuração"
+        />
+      </div>
       <SiteConfigForm
         mode="edit"
         defaultValues={editValues(config)}
@@ -46,6 +49,8 @@ export default async function SiteConfigPage({ params }: { params: Promise<{ sit
           variants: RESOURCES.variants,
           themes: THEME_SUMMARIES,
         }}
+        backHref={backToSite(site).href}
+        contentClassName="form-width"
         action={updateSiteConfigAction.bind(null, site)}
       />
     </section>

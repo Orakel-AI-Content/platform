@@ -79,6 +79,11 @@ describe('painel de revisão', () => {
     expect(card?.contains(screen.getByRole('heading', { name: 'Validação da release' }))).toBe(
       true,
     );
+    // O checklist fica no cartão do painel: sem a barra fixa nem cartão próprio (#328).
+    expect(panel.querySelector('.sticky')).toBeNull();
+    expect(card?.querySelectorAll('.card')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Descartar' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Voltar' })).toBeNull();
   });
 
   it('liga para a visualização em nova aba', () => {
