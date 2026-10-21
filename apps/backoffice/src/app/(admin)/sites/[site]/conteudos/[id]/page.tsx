@@ -10,6 +10,10 @@ import {
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { SubmitForReview, SubmitForReviewScope } from '@/components/contents/SubmitForReview';
 import { can } from '@/domain/access/rbac.ts';
+import {
+  DETAIL_SUMMARY_CLASS,
+  DETAIL_SUMMARY_LIST_CLASS,
+} from '@/components/shared/detailSummary.ts';
 import { InfoField, InfoList } from '@/components/shared/InfoList';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
@@ -88,8 +92,8 @@ export default async function ContentVersionsPage({ params }: Params) {
     <section aria-labelledby="content-title" className="list-width space-y-4">
       {canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header}
       <div className="flex flex-col gap-4 xl:flex-row">
-        <Card className="min-w-[330px] xl:max-w-[330px] 2xl:max-w-[400px] 2xl:min-w-[400px]">
-          <InfoList className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-1">
+        <Card className={DETAIL_SUMMARY_CLASS}>
+          <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
             <InfoField label="Tipo">{CONTENT_KIND_LABEL[latest.data.kind]}</InfoField>
             <InfoField label="ID" className="tabular-nums">
               {contentId}

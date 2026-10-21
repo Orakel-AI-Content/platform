@@ -9,6 +9,7 @@ import { StateTag } from '@/components/sites/SiteStatus';
 import { can } from '@/domain/access/rbac.ts';
 import { REVIEW_CHECKLIST, reviewIssues } from '@/domain/reviews/reviews.ts';
 import { getEnv } from '@/env.ts';
+import { DETAIL_SUMMARY_CLASS } from '@/components/shared/detailSummary.ts';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
@@ -101,7 +102,7 @@ export default async function ReviewPage({ params }: Params) {
             className="h-[75vh] w-full rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
           />
         </Card>
-        <div className="xl:min-w-[330px] 2xl:min-w-[400px]">
+        <div className={DETAIL_SUMMARY_CLASS}>
           <ReviewPanel
             version={latest.version}
             status={latest.status}
