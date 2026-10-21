@@ -395,21 +395,27 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   apoio em `text-sm` no cinza do body, itens separados por " · " (o separador é `aria-hidden`)
   e espaço para a `StateTag` do estado. Itens vazios ficam de fora. Nunca uma linha cinza
   escrita à mão.
-- **Corpo:** `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, de largura
-  mínima `min-w-[330px]` (`2xl:min-w-[400px]`), e o conteúdo à direita num
-  `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção (na página do
-  site, o `SiteTabs`: Ciclo de vida, G1 e Janela; o nome da aba é o título da seção, e um
-  formulário dentro dela é o `SchemaForm` com `card`, de botões `size: 'sm'`). Abaixo de `xl`,
-  empilha. Largura `list-width` (a versão, sem resumo ao lado, fica em `form-width`) e espaçamento da Moldura. Uma tabela no cartão da direita, mais
+- **Corpo:** `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, e o
+  conteúdo à direita num `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de
+  uma seção (na página do site, o `SiteTabs`: Ciclo de vida, G1 e Janela; o nome da aba é o
+  título da seção, e um formulário dentro dela é o `SchemaForm` com `card`, de botões
+  `size: 'sm'`). Abaixo de `xl`, empilha. Largura `list-width` (a versão, sem resumo ao lado,
+  fica em `form-width`) e espaçamento da Moldura. Uma tabela no cartão da direita, mais
   estreito que a largura de lista, pode rolar na horizontal dentro do próprio contêiner (o
   `overflow-x-auto` do `Table`), como no `CustomerDetails`; a página nunca rola (#371).
+- **Coluna de resumo:** a mesma largura no site, no conteúdo e no painel da revisão (#445):
+  `DETAIL_SUMMARY_CLASS` (`src/components/shared/detailSummary.ts`), a do cartão de perfil do
+  `CustomerDetails`: `min-w-[330px] xl:max-w-[330px] 2xl:min-w-[400px] 2xl:max-w-[400px]`.
+  Nunca a largura escrita à mão.
 - **Dados de rótulo e valor:** `InfoList` e `InfoField` (`src/components/shared/InfoList.tsx`),
   o `CustomerInfoField` do `ProfileSection`: um `<dl>` em `text-sm`, cada campo com o rótulo
   (`dt`, `font-semibold`, cinza do body) em cima e o valor (`dd`, `font-bold`, cor dos títulos)
   embaixo. O valor quebra em qualquer ponto (`wrap-anywhere`, com `min-w-0` no item), então
-  slug e URL longos não rolam a página no celular. As colunas ficam com quem usa: a grade do
-  `ProfileSection` (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1`) no resumo, uma coluna no
-  diálogo. Nunca a grade `grid-cols-[auto_1fr]`, que estoura a 375 px.
+  slug e URL longos não rolam a página no celular. As colunas e o espaçamento ficam com quem
+  usa: no resumo, `DETAIL_SUMMARY_LIST_CLASS`, a grade e o espaçamento do `ProfileSection`
+  (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-y-7 gap-x-4`); no diálogo da mídia (uma
+  coluna) e nos "Dados" da versão, o padrão do `InfoList` (`gap-4`). Nunca a grade
+  `grid-cols-[auto_1fr]`, que estoura a 375 px.
 - **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
   processo de ordem fixa (ciclo de vida do site), não tag. Usa o `Steps` vertical
   (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
