@@ -147,14 +147,16 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
   listando os sites visíveis (`readVisibleSites`, uma leitura por requisição), cada um levando à
   mesma área (`sameAreaIn`: item, criar e editar caem na lista); o atual com
   `aria-current="true"`. Recolhida, a barra mostra as iniciais, com o nome na dica.
-- **Cabeçalho de página:** `PageHeader` (`src/components/shared/PageHeader.tsx`),
-  em toda tela de lista: trilha (`nav` "Trilha de navegação", com `aria-current="page"` no item
-  atual; opcional, Sites é a raiz), título (`h1`) à esquerda e a ação principal à direita
-  (`action`), que quebra para baixo em tela estreita. A página monta a ação no servidor e só a
-  passa com permissão; sem ela, o cabeçalho é só o título. Ação principal em `ButtonLink`
-  (`src/components/ui/Button/ButtonLink.tsx`, o `Button` sobre `next/link` para Server
-  Components) com `variant="solid" size="sm"`; a secundária (baixar o tfvars em Sites) ao lado,
-  no `Button` padrão. A tabela nunca desenha o link de criar.
+- **Cabeçalho de página:** `PageHeader` (`src/components/shared/PageHeader.tsx`), nas telas
+  de detalhe e de formulário: trilha (`nav` "Trilha de navegação", com `aria-current="page"` no
+  item atual; opcional, Sites é a raiz), título (`h1`) à esquerda e a ação principal à direita
+  (`action`), que quebra para baixo em tela estreita. Nas listas, a trilha (`PageTrail`) fica
+  sozinha acima do cartão e o título e a ação vão para o `ListHeader`, dentro dele (ver
+  "Lista"). A página monta a ação no servidor e só a passa com permissão; sem ela, o cabeçalho
+  é só o título. Ação principal em `ButtonLink` (`src/components/ui/Button/ButtonLink.tsx`, o
+  `Button` sobre `next/link` para Server Components) com `variant="solid" size="sm"`; a
+  secundária (baixar o tfvars em Sites) ao lado, no `Button` padrão em `size="sm"`. A tabela
+  nunca desenha o link de criar.
 - **Larguras:** duas utilities de `globals.css`, na `section` (ou `article`) de topo da página,
   nunca um `max-w-*` solto. `form-width` (`max-w-3xl`) para criar e editar, configuração,
   textos institucionais e telas que leem um item (versão de um conteúdo): uma coluna legível. Nos formulários de tela (#328), o `form-width` sai da `section` e vai
@@ -206,31 +208,234 @@ Não negociável, em toda tela e todo componente portado:
 
 ## Padrões de tela
 
-- **Menu "Mais ações":** o `Dropdown` do Ecme (`src/components/ui/Dropdown/`), para as ações
-  secundárias de uma linha de tabela quando não cabem sem aumentar a altura dela; a ação
-  principal da linha fica visível, fora do menu. O nome acessível leva o item ("Mais ações:
-  exemplo-a"); os itens são `Dropdown.Item` (links por `asElement={Link}`), com o item da
-  linha em `sr-only` quando o texto visível não o diz. O Dropdown abre, fecha (clique fora e
-  Esc), navega por setas e devolve o foco ao gatilho.
-- **Botão de "mais ações":** `EllipsisButton` (`src/components/shared/EllipsisButton.tsx`), o
-  do Ecme: `Button` `plain`, `circle`, `xs` (32 px) com os três pontos do `react-icons/pi`,
-  `aria-hidden`. O tipo exige o nome: `aria-label` quando é só o ícone ("Mais ações do
-  formulário"), ou texto visível nos filhos. Sem dica; quando ela for necessária, `IconButton`.
-- **Barra de ações do formulário:** `BottomStickyBar` (`src/components/template/BottomStickyBar.tsx`),
-  sempre `sticky` no fim da janela, com fundo e borda do cartão, encostada nas bordas do `main`
-  (margem negativa igual aos gutters de `PAGE_CONTAINER_GUTTER_X`). Por dentro, como no Ecme, um
-  `Container` (`src/components/shared/Container.tsx`, `container mx-auto`, com `asElement`) e os
-  mesmos gutters, com as ações à direita.
-- **Botão de ícone:** `IconButton` (`src/components/shared/IconButton.tsx`), sobre o `Button`
-  (`plain`, `xs`: 32 px, acima do mínimo de 24 px) e o `Tooltip` do Ecme, para ações repetidas
-  e compactas, como os controles de cada bloco do editor. O nome vem de `label` (`aria-label`,
-  com a posição: "Mover bloco 3 para cima"); a dica é só visual e repete o nome, então o botão
-  descarta o `aria-describedby` do Tooltip; o ícone (`react-icons/pi`, 16 px) fica
-  `aria-hidden`. Ação indisponível que deve continuar focável (o foco fica no botão depois de
-  mover) usa `aria-disabled`, desenhado como indisponível (opacidade e cursor), e o `onClick`
-  confere a condição; `disabled` só quando o foco não precisa ficar no botão.
-- **Grade e miniatura da mídia:** `MediaGrid` (`src/components/media/MediaGrid.tsx`) é a `<ul>`
-  das miniaturas, com o nome de quem usa (`label`) e um tamanho só,
+Um padrão por tipo de tela; a tela nova parte do padrão do seu tipo. As peças usadas em mais de
+um padrão (datas, estados, botões de ícone) ficam em "Peças comuns", no fim.
+
+### Lista
+
+O padrão do `CustomerList` do Ecme (#361), em todas as listas (conteúdos, autores, taxonomias,
+menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo cartão, ver "Mídia"):
+
+- **Moldura:** a trilha (`PageTrail`) acima do cartão; no `AdaptiveCard`, um
+  `div.flex.flex-col.gap-4` com o `ListHeader` (`src/components/shared/PageHeader.tsx`: título
+  e a ação principal, só com permissão), a `ListToolbar` e o `DataTable`
+  (`conteudos/page.tsx`).
+- **Toolbar:** `ListToolbar` (`src/components/shared/ListControls.tsx`), em coluna abaixo de `md`
+  e em linha a partir dele: a busca no `Input` com rótulo visível do que procura, um `Select`
+  por filtro com "Todos", e "Limpar filtros" só com algo ativo, que devolve o foco à busca.
+  Busca em toda lista que pode crescer; filtro só onde o dado tem estado ou categoria.
+- **Tabela:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (colunas com
+  `createColumnHelper` e `tableFeatures`); a biblioteca traz skills em
+  `node_modules/@tanstack/react-table/skills/`. As tabelas de lista são todas cliente, pelo
+  `DataTable`; a página continua Server Component e passa as linhas já carregadas.
+- **Linhas:** `useListTable` (`src/components/shared/useListTable.ts`) recebe as colunas, a
+  `ListConfig` e as linhas carregadas, e aplica a busca, os filtros e a ordem do
+  `useListState` e corta a página; devolve `list` (para a toolbar), `found` e `tableProps`. O
+  `DataTable` (`src/components/shared/DataTable.tsx`) fica manual, como no Ecme: desenha a
+  página recebida, o cabeçalho ordenável (botão no `Th`, com `aria-sort`) e o rodapé com a
+  `Pagination`, a contagem "N resultados" em `role="status"` (`resultCount`) e o seletor de
+  tamanho (`pageSizes` da `ListConfig`).
+- **Estado na URL:** `useListState` (`src/components/shared/useListState.ts`) lê e grava `q`
+  (busca), um parâmetro por filtro, `ordem` (id da coluna, com `-` na frente se decrescente),
+  `pagina` e `por-pagina` (padrão 25) com `router.replace` (sem entrada no histórico por tecla);
+  valor padrão não aparece na URL e parâmetro inválido cai no padrão. A busca ignora maiúsculas
+  e acentos (`normalizeText`) e só olha as colunas com `enableGlobalFilter`; mudar a busca, um
+  filtro ou o tamanho volta à página 1, e página além da última mostra a última. Recarregar
+  mantém a mesma visão.
+- **Estado vazio:** dois casos, de `src/components/shared/EmptyState.tsx`, nunca uma tabela só
+  com cabeçalho:
+  - lista vazia (nada cadastrado): `EmptyState` no lugar da toolbar e da tabela (ou da grade da
+    mídia), com a mensagem ("Nenhum autor cadastrado.") e, com permissão, a mesma ação
+    principal do cabeçalho (`emptyAction` das tabelas). A ação aparece duas vezes; no E2E,
+    clique na primeira (a do cabeçalho);
+  - busca ou filtro sem resultado: a tabela fica, com "0 resultados", e o `NoResults`
+    ("Nenhum autor encontrado.") vai no `customNoDataIcon` do `DataTable`. Só a mensagem: a
+    única ação de limpar é a "Limpar filtros" da toolbar.
+- **Células:** no máximo duas linhas por célula, `TwoLines` (`src/components/shared/TwoLines.tsx`)
+  com a principal e a secundária em `text-xs` (ex.: nome com `id · domínio` embaixo); texto
+  longo é cortado pelo `Truncated` (`truncate` com `max-w-*` de quem usa) com o inteiro em
+  `title`, em vez de quebrar. O link principal da linha usa `ROW_LINK_CLASS`
+  (`src/components/shared/rowLink.ts`). Nenhuma lista rola na horizontal a 1280px, nem no
+  contêiner da tabela.
+- **Ações da linha:** a principal fica visível; as secundárias, quando não cabem sem aumentar a
+  altura da linha, vão para o menu "Mais ações": o `Dropdown` do Ecme
+  (`src/components/ui/Dropdown/`), cujo nome acessível leva o item ("Mais ações: exemplo-a"),
+  com os itens em `Dropdown.Item` (links por `asElement={Link}`) e o item da linha em `sr-only`
+  quando o texto visível não o diz. O Dropdown abre, fecha (clique fora e Esc), navega por
+  setas e devolve o foco ao gatilho. O sucesso de uma ação vai para o toast e o erro para um
+  `ActionAlert` acima da tabela, nunca para a linha (ver "Retorno das ações").
+
+### Formulário
+
+Todo formulário é gerado do schema; nenhum é escrito à mão (o da configuração do site também
+usa o gerador, #47).
+
+- **Gerador:** `SchemaForm` (`src/components/forms/`), sobre react-hook-form + zodResolver; a
+  validação é só a do schema. Visual do Ecme: cada campo num `FormItem` (rótulo e erro ligados
+  ao controle), texto e número no `Input`, booleano no `Checkbox`, enum no `Select`, botões no
+  `Button` e as seções em `Card`. O gerador desenha texto, número, booleano, enum, objeto
+  (`fieldset`) e lista de objetos (adicionar e remover). Rótulos e dicas por caminho
+  (`items.*.question`); `hidden` para o que é do servidor (`n`, `type`). O que o schema sozinho
+  não descreve (rich text, seletor de mídia ou de entidade) entra por `fields`, um campo
+  registrado por caminho, com `*` no lugar dos índices, que recebe `id`, `label`, `value`,
+  `onChange`, `invalid` e `describedBy` (ligue esses dois ao controle), `required` (ponha
+  `aria-required` se o papel do controle admitir: campo de texto, `select`, `radiogroup`;
+  `group` não), `ref` (ligue ao controle focável, para o foco do erro chegar) e `readOnly`
+  (caminhos em `readOnly`). Nó sem desenho e sem campo registrado aparece como aviso, num
+  `Alert type="warning"` do Ecme.
+- **Controles:** **lista de opções é sempre o `Select` do Ecme** (#330), nunca `<select>`
+  nativo nem grade de caixas: uma opção no simples, várias no `isMulti`. Dentro de um
+  `FormItem`, passe `components={selectInFormItem}` (de `SchemaForm.tsx`) para a dica e o erro
+  entrarem no `aria-describedby` do combobox, que o react-select não aceita como prop; num
+  campo registrado, ligue o `ref` ao `inputRef` da instância, para o foco do erro chegar.
+  Campos registrados (#331): liga/desliga no `Switcher` (`switchField` e os recursos do site,
+  em `SiteFields`), escolha visual entre poucas opções no `Radio.Group` (o tema) e data e hora
+  no `DateTimepicker` com o `timeZone` do site (`zonedDateTimeField`); a caixa de seleção fica
+  para marcar itens (checklist da revisão e os booleanos do gerador). Referências do site, em
+  `src/components/forms/PickerFields.tsx`: `mediaField(source)` (miniatura do valor atual lida
+  por ID, "Escolher imagem"/"Trocar" pelo `MediaPicker` e, com `{ optional: true }` para capa e
+  avatar, "Remover"; `source` são as actions da leitura paginada e por IDs ligadas ao site pela
+  página) e `entityField(opções, aviso)` (`Select` múltiplo para `authorIds` e `taxonomyIds`,
+  com os IDs na ordem das opções). Para listas de texto, feature flags e opções de `RESOURCES`:
+  `linesField`, `flagsField` e `choiceField` (`src/components/forms/SiteFields.tsx`).
+- **Rich text:** TipTap só com o que o `RichTextSchema` aceita (`src/components/forms/`).
+  Registre `richTextField('richText')` para texto e textos institucionais, e
+  `richTextField('inlines')` (um parágrafo, sem intertítulo nem lista) para citação, resposta
+  de FAQ e legenda. O valor é sempre a árvore do content-model; colar HTML descarta o que o
+  schema não aceita, e link com endereço inválido vira texto.
+- **Erro, dica e obrigatório só no `FormItem`** (#329), em todo formulário: a dica é a prop
+  `hint` (`.form-hint`, no fluxo sob o controle), o erro é a mensagem `.form-explain`, e os
+  dois entram no `aria-describedby` do campo pelo contexto do `FormItem` (o `Input` os soma
+  sozinho; os outros controles os recebem em `describedBy`). Nunca `<p>` de dica ou de erro à
+  mão. Caixa de seleção fica num `FormItem` sem rótulo (o rótulo é o do `Checkbox`); lista (do
+  `SchemaForm` e os blocos do editor) fica no `FieldGroup`, um `FormItem` sem rótulo cujo erro
+  vai ao `aria-describedby` do `fieldset` ou da `section`. Campo não opcional no schema
+  (`optional` do `schemaWalk`) leva o asterisco do `FormItem` (oculto do leitor de tela) e
+  `aria-required`; booleano (caixa de seleção ou `Switcher` registrado) e lista não levam
+  (`false` e lista vazia são valores do campo, e a regra mínima aparece no erro).
+- **Recusa do servidor e resumo de erros:** o `onSubmit` pode devolver a recusa do servidor
+  (`{ path, message }[]`): com `path`, vira erro do campo; sem, vai para o resumo. Lista vazia
+  em campo opcional (rich text apagado) é enviada como ausente. O resumo é o `ErrorSummary`
+  (`src/components/shared/`): um `Alert` do Ecme (`type="danger"`) dentro de um contêiner
+  `role="alert"` sempre montado, como o `ActionAlert`. Sai de `formState.errors`: um item por
+  campo inválido, "<rótulo>: <mensagem>", com a posição em cada lista ("Pergunta (pergunta
+  2)"), na ordem do schema, e acompanha a correção. Cada item é um botão que leva o foco ao
+  campo (`setFocus`; campo registrado precisa ligar o `ref`); o erro da lista inteira vem sem
+  botão. A recusa do servidor sem `path` aparece acima da lista. Os resultados das Server
+  Actions de formulário (`EntityFormResult`, `SiteFormResult`, `ApproveResult`) são
+  `FormActionResult<issue>`: o `ActionResult` com as `issues` da recusa no erro.
+- **Formulário de tela** (#328), como o `CustomerForm` do Ecme: cadastro e configuração de
+  site, autores, taxonomias, menus e textos institucionais passam `actionBar`
+  (`{ kind, href }`). O `SchemaForm` monta o `Form` (com `FormContainer`), uma coluna de
+  `Card`s com `gap-4` (um por seção, com o título no visual do `h4 mb-6` do Ecme e `h2` na
+  estrutura; sem seções, um `Card` só) e a barra de ações. Na criação (`kind: 'create'`),
+  "Descartar" (cor de erro) abre um `ConfirmDialog type="danger"` e, confirmado, vai para
+  `href` sem enviar, como o `CustomerCreate`; na edição, "Voltar" (`plain`, seta) é um link
+  para `href`, como o `CustomerEdit`. `href` é o nível anterior da trilha (a lista, a página do
+  site), nunca `history.back()`. Campos curtos relacionados ficam lado a lado a partir de `md`
+  por `sideBySide` (grupos de caminhos com `*`, em `grid md:grid-cols-2 gap-4`): ID e nome,
+  idioma e fuso, nome e slug, rótulo e link do item de menu. A largura e o espaçamento seguem
+  a Moldura (`form-width` no cabeçalho e na coluna, `space-y-4`).
+- **Barra de ações:** `BottomStickyBar` (`src/components/template/BottomStickyBar.tsx`), só das
+  telas que são um formulário inteiro, sempre `sticky` no fim da janela, com fundo e borda do
+  cartão, encostada nas bordas do `main` (margem negativa igual aos gutters de
+  `PAGE_CONTAINER_GUTTER_X`). Por dentro, como no Ecme, um `Container`
+  (`src/components/shared/Container.tsx`, `container mx-auto`, com `asElement`) e os mesmos
+  gutters, com "Descartar" ou "Voltar" e a ação principal à direita.
+- **Formulário dentro de outra tela** (#333: registro do G1 e janela de agrupamento na página
+  do site, checklist da revisão) passa `card` em vez de `actionBar`, sem barra fixa: o
+  `SchemaForm` monta um `Card` só com `card.intro` (título, dica e estado da seção) e os campos
+  no corpo, e os botões no rodapé (`footer` com borda), à direita, todos do mesmo tamanho e a
+  ação principal `solid`. A ação secundária (`card.extra`, ex.: "Usar padrão" da janela) fica à
+  esquerda do envio, não passa pelo schema e tem o mesmo retorno do envio (toast, erro de campo
+  ou resumo). O cartão é o da seção inteira: sem permissão para o formulário, a página mostra a
+  mesma introdução num `Card` só de leitura; na revisão, o checklist tem o seu próprio cartão,
+  separado do da validação.
+- **Formulário longo** (a configuração do site) passa `sections` (`{ id, title, paths }`,
+  chaves de topo): cada seção vira `<section>` com `h2` (`#secao-<id>`), todas na mesma página,
+  sem abas, com um índice de âncoras no topo (`nav` "Seções do formulário"). Chave de topo fora
+  de todas as seções aparece depois delas; sem `sections`, uma coluna só.
+- **Envio e pendência** (#334), em todo formulário: o formulário de tela envia com "Criar" na
+  criação e "Salvar" na edição, sem complemento, como o "Create"/"Save" do
+  `CustomerCreate`/`CustomerEdit` do Ecme; o objeto já está no título da tela ("Criar site",
+  "Criar conteúdo"), que não muda. O formulário em cartão e a ação de domínio usam o verbo do
+  que acontece: "Registrar G1", "Aprovar", "Usar padrão", "Enviar para revisão", "Marcar zona
+  ativa"; a janela de agrupamento, que só grava um valor, envia com "Salvar". Durante o envio o
+  botão fica desabilitado e mostra `pendingLabel`, sem segundo envio: sempre o rótulo inteiro no
+  gerúndio, com reticências ("Criando…", "Salvando…", "Registrando G1…", "Aprovando…", "Usando
+  padrão…", "Enviando para revisão…", "Marcando zona ativa…"). Todo botão que roda uma ação tem
+  pendência, inclusive a ação secundária do cartão (`card.extra.pendingLabel`).
+- **Confirmação do envio:** quem fica na tela devolve `{ success: mensagem }`, que vai para o
+  toast do retorno padrão (`pushSuccess`, ver "Retorno das ações"), como a aprovação na
+  revisão. Quem sai da tela também confirma no toast, que vive no layout raiz: criar autor,
+  taxonomia ou menu chama `pushSuccess` antes de voltar para a lista. O cadastro de site
+  confirma no destino: vai para `/sites?cadastrado=<id>`, e a tabela anuncia no toast depois de
+  montar e tira a marca da URL (como o `?criado=1` do conteúdo).
+- **Editor de conteúdo** (#332): dentro de um formulário maior (`FormProvider`),
+  `SchemaFields` desenha um schema sob um prefixo (`blocks.2`), com os caminhos completos no
+  registro (`blocks.*.content`): é como o editor monta cada bloco. O editor tem formulário
+  próprio (lista de blocos, ação com `pending`) e o mesmo esqueleto do formulário de tela:
+  metadados num `Card` com título ("Dados do conteúdo"), cada bloco num `Card`, e a barra pelo
+  `FormActionBar` exportado do `SchemaForm`, com "Ver prévia" em `extra` (entre "Descartar" e
+  o envio) e a nota da prévia e o resumo de erros em `children` (abaixo dos botões);
+  "Criando…" na criação, "Salvando…" na edição. "Voltar" passa pelo aviso de saída
+  (`useLeaveGuard`); "Descartar" já confirma no diálogo e não pergunta de novo. Os controles de
+  cada bloco são `IconButton` (ver "Peças comuns"), e remover bloco se desfaz no toast (ver
+  "Retorno das ações").
+
+### Detalhe
+
+O layout do `CustomerDetails` do Ecme (`views/concepts/customers/CustomerDetails`) para a
+página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
+
+- **Cabeçalho:** `PageHeader` (`src/components/shared/PageHeader.tsx`) com a trilha, o título e
+  as ações principais em `size="sm"`, a principal `variant="solid"` e o "Voltar" `plain` com
+  seta, como no `CustomerEdit`; só as ações que quem pede pode usar.
+- **Metadados:** abaixo do título, `PageMeta` (`src/components/shared/PageMeta.tsx`): texto de
+  apoio em `text-sm` no cinza do body, itens separados por " · " (o separador é `aria-hidden`)
+  e espaço para a `StateTag` do estado. Itens vazios ficam de fora. Nunca uma linha cinza
+  escrita à mão.
+- **Corpo:** `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, de largura
+  mínima `min-w-[330px]` (`2xl:min-w-[400px]`), e o conteúdo à direita num
+  `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção (na página do
+  site, o `SiteTabs`: Ciclo de vida, G1 e Janela; o nome da aba é o título da seção, e um
+  formulário dentro dela é o `SchemaForm` com `card`, de botões `size: 'sm'`). Abaixo de `xl`,
+  empilha. Largura `list-width` (a versão, sem resumo ao lado, fica em `form-width`) e espaçamento da Moldura. Uma tabela no cartão da direita, mais
+  estreito que a largura de lista, pode rolar na horizontal dentro do próprio contêiner (o
+  `overflow-x-auto` do `Table`), como no `CustomerDetails`; a página nunca rola (#371).
+- **Dados de rótulo e valor:** `InfoList` e `InfoField` (`src/components/shared/InfoList.tsx`),
+  o `CustomerInfoField` do `ProfileSection`: um `<dl>` em `text-sm`, cada campo com o rótulo
+  (`dt`, `font-semibold`, cinza do body) em cima e o valor (`dd`, `font-bold`, cor dos títulos)
+  embaixo. O valor quebra em qualquer ponto (`wrap-anywhere`, com `min-w-0` no item), então
+  slug e URL longos não rolam a página no celular. As colunas ficam com quem usa: a grade do
+  `ProfileSection` (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1`) no resumo, uma coluna no
+  diálogo. Nunca a grade `grid-cols-[auto_1fr]`, que estoura a 375 px.
+- **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
+  processo de ordem fixa (ciclo de vida do site), não tag. Usa o `Steps` vertical
+  (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
+  `title`; o `Steps` desenha marcador e conector, põe `aria-current="step"` na atual e diz o
+  estado ("concluída", "atual", "pendente") em `sr-only`. A atual e as pendentes repetem o
+  estado em texto visível no `title`, `aria-hidden`, para não ficarem só na cor da borda. A
+  ordem vem de `LIFECYCLE_ORDER` em `siteLabels.ts`. A ação manual fica na `description` do
+  item da etapa que ela conclui (sem `onChange`, as etapas não viram botões); o sucesso vai
+  para o toast e o erro para o `ActionAlert` abaixo da lista (`LifecycleActionScope`), que
+  sobrevive à revalidação que move o botão de item.
+
+### Mídia
+
+- **Biblioteca:** `MediaLibrary` (`src/components/media/MediaLibrary.tsx`) no padrão de lista
+  (#377, `CustomerList` do Ecme): a trilha (`PageTrail`) acima do cartão; no `AdaptiveCard`
+  (`flex flex-col gap-4`), o `ListHeader` com "Mídia" e "Enviar imagens" (o `MediaUpload`, só
+  com content.write), a fila de envio, a `ListToolbar`, a grade e o rodapé do `DataTable`
+  copiado: a `Pagination` do Ecme (`ui/Pagination`) e "N resultados" em `role="status"` com
+  `tabular-nums` (`resultCount`). O cabeçalho fica no componente cliente porque o botão
+  alimenta a fila dele. Sem `DataTable` nem `useListTable`: é grade paginada no servidor (`q`
+  e `pagina` na URL), com tamanho fixo (`MEDIA_PAGE_SIZE`), sem seletor. Biblioteca vazia
+  (total zero sem busca): só o `EmptyState` "Nenhuma imagem na biblioteca.", com "Enviar
+  imagens" quando há permissão, sem toolbar, grade nem contagem. Busca sem resultado: o
+  `NoResults` "Nenhuma imagem encontrada." no lugar da grade, com "0 resultados".
+- **Grade e miniatura:** `MediaGrid` (`src/components/media/MediaGrid.tsx`) é a `<ul>` das
+  miniaturas, com o nome de quem usa (`label`) e um tamanho só,
   `grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4`: três colunas na largura padrão do
   `Dialog` (520 px), a mesma grade na biblioteca e no seletor; os `<li>` vêm de quem usa.
   `MediaTile` (`src/components/media/MediaTile.tsx`) é a miniatura clicável: um `<button>`
@@ -238,8 +443,8 @@ Não negociável, em toda tela e todo componente portado:
   de botão, como `aria-haspopup` e `onClick`) com a `MediaThumbnail`
   (`src/components/media/MediaLibrary.tsx`, `alt=""`) e a legenda em `text-xs` cinza, que é o
   nome do botão. Só o texto da legenda vem de quem usa.
-- **Diálogo de grade de miniaturas:** `MediaPicker` (`src/components/media/MediaPicker.tsx`), no
-  `Dialog` do Ecme. Um `Button` (`type="button"`, porque fica dentro de formulários, com
+- **Seletor de imagem:** `MediaPicker` (`src/components/media/MediaPicker.tsx`), no `Dialog` do
+  Ecme. Um `Button` (`type="button"`, porque fica dentro de formulários, com
   `aria-haspopup="dialog"`) abre o diálogo controlado, na largura padrão do `Dialog`. O
   cabeçalho é o nativo do `Dialog`, como o `UploadFile` do FileManager do Ecme: o X do
   `CloseButton` ("Fechar", o primeiro controle do diálogo) e o título "Escolher imagem" num
@@ -251,45 +456,35 @@ Não negociável, em toda tela e todo componente portado:
   depois da primeira página lida. Enquanto a próxima carrega, a grade anterior continua na
   tela, para o foco não se perder, e só a resposta mais recente vale. Escolher chama
   `onSelect(id)` e fecha; Esc, o fundo e o X fecham sem escolher.
-- **Detalhes da imagem:** `MediaDetails` (`src/components/media/MediaDetails.tsx`): na biblioteca
-  (`MediaGrid` "Imagens do site"), cada imagem é uma `MediaTile` (`aria-haspopup="dialog"`) com
-  a legenda "<nome> · <data>", que abre o `Dialog` do Ecme com o mesmo cabeçalho nativo do
-  `MediaPicker`: o X "Fechar" e o nome num `h4` no corpo (`break-all`, com recuo à direita para
-  não passar sob o X), depois a miniatura e a lista de dados (`InfoList`, numa coluna; ver
-  "Tela de detalhe") com dimensões, formatos disponíveis, identificador e data de envio.
-  "Copiar identificador" usa `navigator.clipboard.writeText` no retorno padrão (ver "Retorno
-  das ações"): o sucesso vai para o toast ("Identificador copiado."), anunciado com o diálogo
-  aberto, e a falha (sem contexto seguro, permissão negada) mostra o identificador num
-  `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o fundo ou o X fecham, e o foco volta
-  à imagem.
-- **Biblioteca de mídia:** `MediaLibrary` (`src/components/media/MediaLibrary.tsx`) no padrão de
-  lista do template (#377, `CustomerList` do Ecme): a trilha (`PageTrail`) acima do cartão; no
-  `AdaptiveCard` (`flex flex-col gap-4`), o `ListHeader` com "Mídia" e "Enviar imagens" (o
-  `MediaUpload`, só com content.write), a fila de envio, a `ListToolbar`, a grade e o rodapé do
-  `DataTable` copiado: a `Pagination` do Ecme (`ui/Pagination`) e "N resultados" em
-  `role="status"` com `tabular-nums` (`resultCount`). O cabeçalho fica no componente cliente
-  porque o botão alimenta a fila dele. Sem `DataTable` nem `useListTable`: é grade paginada no
-  servidor (`q` e `pagina` na URL), com tamanho fixo (`MEDIA_PAGE_SIZE`), sem seletor. Biblioteca
-  vazia (total zero sem busca): só o `EmptyState` "Nenhuma imagem na biblioteca.", com "Enviar
-  imagens" quando há permissão, sem toolbar, grade nem contagem. Busca sem resultado: o
-  `NoResults` "Nenhuma imagem encontrada." no lugar da grade, com "0 resultados".
-- **Retorno das ações:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
-  `src/components/shared/actionResult.ts`, importável pela Server Action), e
-  `useActionResult` (`src/components/shared/ActionFeedback.tsx`) o mostra num lugar só: o
-  sucesso num toast `Notification type="success"` (`toast.push`, anunciado pela região
-  `role="status"` do `ToastProvider`, também com diálogo aberto) e o erro num `Alert` do Ecme
-  (`type="danger"`) junto da ação, pelo `ActionAlert`. O Alert não tem papel de região viva:
-  o `ActionAlert` é um contêiner `role="alert"` sempre montado, que recebe o Alert quando há
-  erro. `run(ação)` roda numa transição e limpa o erro anterior; `fail(mensagem)` mostra a
-  validação local no mesmo Alert; `report(resultado)` serve ao botão com a própria transição
-  (o "Publicar agora" de cada linha). Nenhuma tela cria `role="status"` próprio para o retorno
-  de uma ação.
-  O editor de conteúdo segue o mesmo padrão: salvar e criar confirmam no toast, e o resumo de
-  validação da barra do rodapé é o `ErrorSummary` do `SchemaForm` (o foco vai ao primeiro
-  campo inválido). Remover bloco é imediato e se desfaz (#112): um toast `Notification
-type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`UNDO_MS`)
-  devolve o bloco na mesma posição; só a remoção mais recente se desfaz, e salvar ou sair do
-  editor tiram o toast.
+- **Detalhes da imagem:** `MediaDetails` (`src/components/media/MediaDetails.tsx`): na
+  biblioteca (`MediaGrid` "Imagens do site"), cada imagem é uma `MediaTile`
+  (`aria-haspopup="dialog"`) com a legenda "<nome> · <data>", que abre o `Dialog` do Ecme com o
+  mesmo cabeçalho nativo do `MediaPicker`: o X "Fechar" e o nome num `h4` no corpo
+  (`break-all`, com recuo à direita para não passar sob o X), depois a miniatura e a lista de
+  dados (`InfoList`, numa coluna; ver "Detalhe") com dimensões, formatos disponíveis,
+  identificador e data de envio. "Copiar identificador" usa `navigator.clipboard.writeText` no
+  retorno padrão (ver "Retorno das ações"): o sucesso vai para o toast ("Identificador
+  copiado."), anunciado com o diálogo aberto, e a falha (sem contexto seguro, permissão
+  negada) mostra o identificador num `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o
+  fundo ou o X fecham, e o foco volta à imagem.
+
+### Retorno das ações
+
+- **Retorno:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
+  `src/components/shared/actionResult.ts`, importável pela Server Action), e `useActionResult`
+  (`src/components/shared/ActionFeedback.tsx`) o mostra num lugar só: o sucesso num toast
+  `Notification type="success"` (`toast.push`, anunciado pela região `role="status"` do
+  `ToastProvider`, também com diálogo aberto) e o erro num `Alert` do Ecme (`type="danger"`)
+  junto da ação, pelo `ActionAlert`. O Alert não tem papel de região viva: o `ActionAlert` é um
+  contêiner `role="alert"` sempre montado, que recebe o Alert quando há erro. `run(ação)` roda
+  numa transição e limpa o erro anterior; `fail(mensagem)` mostra a validação local no mesmo
+  Alert; `report(resultado)` serve ao botão com a própria transição (o "Publicar agora" de cada
+  linha). Nenhuma tela cria `role="status"` próprio para o retorno de uma ação.
+- **Editor de conteúdo:** salvar e criar confirmam no toast, e o resumo de validação da barra
+  do rodapé é o `ErrorSummary` do `SchemaForm` (o foco vai ao primeiro campo inválido).
+  Remover bloco é imediato e se desfaz (#112): um toast `Notification type="info"` "Bloco N
+  removido." com o botão "Desfazer" e `duration` de 10 s (`UNDO_MS`) devolve o bloco na mesma
+  posição; só a remoção mais recente se desfaz, e salvar ou sair do editor tiram o toast.
 - **Confirmação e ação destrutiva:** remover algo que não se desfaz e as ações que afetam o
   site publicado pedem confirmação num `ConfirmDialog type="danger"`
   (`src/components/shared/ConfirmDialog.tsx`), como o "Delete" do `CustomerEdit` do Ecme
@@ -298,68 +493,80 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   agora?"), e o "Confirmar" diz o verbo ("Remover", "Publicar"). O botão que abre a
   confirmação usa o `dangerButtonClass` no `customColorClass` (contorno e texto em `error`;
   branco no claro, transparente no escuro), e o "Confirmar", o `dangerConfirmButtonProps` no
-  `confirmButtonProps` (`bg-error`). "Cancelar", Esc e o fundo fecham sem efeito e o
-  foco volta ao botão de origem; quando o botão some com a ação ("Remover" da mídia, "Remover
-  link"), o foco vai ao controle que fica, no `onAfterClose`. Depois de confirmar, o retorno
-  segue o padrão acima (toast ou `ActionAlert`). Confirmam hoje:
+  `confirmButtonProps` (`bg-error`). "Cancelar", Esc e o fundo fecham sem efeito e o foco volta
+  ao botão de origem; quando o botão some com a ação ("Remover" da mídia, "Remover link"), o
+  foco vai ao controle que fica, no `onAfterClose`. Depois de confirmar, o retorno segue o
+  padrão acima (toast ou `ActionAlert`). Confirmam hoje:
   - remover item de lista do `SchemaForm` ("Remover <item> N");
   - "Remover recurso N" da configuração do site;
   - "Remover" da mídia de um campo (capa, avatar);
   - "Remover link" do rich text: o popover fecha antes de abrir o diálogo;
+  - "Descartar" do formulário de tela na criação (ver "Formulário");
   - **ações que afetam o site publicado:** só "Publicar agora" (lista e página do site), que
     muda o site no ar sem esperar a janela de agrupamento. Salvar configuração ou conteúdo,
-    aprovar na revisão, as etapas do ciclo de vida, o G1 e a janela não confirmam: passam
-    pela janela ou não mudam o que está no ar.
+    aprovar na revisão, as etapas do ciclo de vida, o G1 e a janela não confirmam: passam pela
+    janela ou não mudam o que está no ar.
 
   Remover bloco do editor não confirma (desfaz no toast, acima), nem o "Remover <arquivo>" da
   fila de envio e o "Remover <opção>" do `Select` múltiplo, que não apagam dado salvo.
 
-- **Tabelas:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (colunas
-  com `createColumnHelper` e `tableFeatures`); a biblioteca traz skills em
-  `node_modules/@tanstack/react-table/skills/`. As tabelas de lista são todas cliente, pelo
-  `DataTable` (abaixo); a página continua Server Component e passa as linhas já carregadas.
-- **Lista:** o padrão do `CustomerList` do Ecme (#361), em todas as listas (conteúdos, autores,
-  taxonomias, menus, sites, revisão, pendências, versões):
-  - Moldura: a trilha (`PageTrail`) acima do cartão; no `AdaptiveCard`, um
-    `div.flex.flex-col.gap-4` com o `ListHeader` (título e a ação principal, só com
-    permissão), a `ListToolbar` e o `DataTable` (`conteudos/page.tsx`).
-  - Toolbar: `ListToolbar` (`src/components/shared/ListControls.tsx`), em coluna abaixo de `md`
-    e em linha a partir dele: a busca no `Input` com rótulo visível do que procura, um `Select`
-    por filtro com "Todos", e "Limpar filtros" só com algo ativo, que devolve o foco à busca.
-    Busca em toda lista que pode crescer; filtro só onde o dado tem estado ou categoria.
-  - Linhas: `useListTable` (`src/components/shared/useListTable.ts`) recebe as colunas, a
-    `ListConfig` e as linhas carregadas, e aplica a busca, os filtros e a ordem do
-    `useListState` e corta a página; devolve `list` (para a toolbar), `found` e `tableProps`.
-    O `DataTable` (`src/components/shared/DataTable.tsx`) fica manual, como no Ecme: desenha a
-    página recebida, o cabeçalho ordenável (botão no `Th`, com `aria-sort`) e o rodapé com a
-    `Pagination`, a contagem "N resultados" em `role="status"` (`resultCount`) e o seletor de
-    tamanho (`pageSizes` da `ListConfig`).
-  - Estado na URL: `useListState` (`src/components/shared/useListState.ts`) lê e grava `q`
-    (busca), um parâmetro por filtro, `ordem` (id da coluna, com `-` na frente se decrescente),
-    `pagina` e `por-pagina` (padrão 25) com `router.replace` (sem entrada no histórico por
-    tecla); valor padrão não aparece na URL e parâmetro inválido cai no padrão. A busca ignora
-    maiúsculas e acentos (`normalizeText`) e só olha as colunas com `enableGlobalFilter`; mudar
-    a busca, um filtro ou o tamanho volta à página 1, e página além da última mostra a última.
-    Recarregar mantém a mesma visão.
-  - Estados vazios: ver "Estado vazio".
-  - Células: no máximo duas linhas por célula, `TwoLines` (`src/components/shared/TwoLines.tsx`)
-    com a principal e a secundária em `text-xs` (ex.: nome com `id · domínio` embaixo); texto
-    longo é cortado pelo `Truncated` (`truncate` com `max-w-*` de quem usa) com o inteiro em
-    `title`, em vez de quebrar. O link principal da linha usa `ROW_LINK_CLASS`
-    (`src/components/shared/rowLink.ts`). Nenhuma lista rola na horizontal a 1280px, nem no
-    contêiner da tabela.
-  - Ações da linha: a principal fica visível e as demais vão para o menu "Mais ações" (abaixo);
-    o sucesso de uma ação vai para o toast e o erro para um `ActionAlert` acima da tabela,
-    nunca para a linha (ver "Retorno das ações").
-- **Datas:** `formatDateTime(data, fuso)` de `src/components/shared/siteLabels.ts`, sempre com o fuso
-  do site (`SiteSummary.timeZone`, da configuração corrente), nunca o do navegador nem um fixo:
-  "01/10/2026, 09:00 BRT" (dia, mês, ano, hora e minuto, com a sigla ou o deslocamento, como
-  "GMT+1" em Lisboa). Telas de um site usam `site.timeZone`; a lista de sites mostra cada linha
-  no fuso do próprio site. Componente cliente recebe o fuso por prop, para o texto sair igual
-  no servidor e no navegador.
-- **Estados:** a `Tag` do Ecme com o texto do estado e um ponto na cor dele (`prefixClass`,
-  pelo `StateTag` de `src/components/sites/SiteStatus.tsx`), sem ícone; o texto fica no cinza da
-  Tag e é o que distingue os estados sem cor. O mapa fica ao lado dos rótulos, em
+### Telas de estado
+
+`StatusScreen` (`src/components/shared/StatusScreen.tsx`), a tela vazia do template (o
+`AccessDenied` e o "No user found" do `CustomerEdit`): coluna centrada, com a ilustração
+decorativa em 280 × 280 por cima, o título (`h1`) na cor de heading, uma frase do que aconteceu
+e o que fazer em `text-sm` no cinza do body e a ação de saída (link de volta ou "Tentar de
+novo") centrada. Sem `max-w-*` nem `space-y-*`: o espaçamento é por margens, como no template.
+A ilustração vem por prop (`illustration`), de `src/assets/svg/`, sempre `aria-hidden`, e cada
+tela escolhe a sua:
+
+- "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo catch-all
+  `(admin)/[...rest]` e para o site inexistente, e `sites/[site]/not-found.tsx`) →
+  `FileNotFound`;
+- falta de permissão (`ForbiddenScreen`) → `SpaceSignBoard`;
+- "Sem acesso" (`NoAccessScreen`, do layout de `(admin)` quando a identidade não tem cadastro
+  nem papel) → `SpaceSignBoard`. Sem a moldura, o `<main>` do layout dá a altura
+  (`min-h-screen`) e os gutters (`PAGE_CONTAINER_GUTTER_X`/`_Y`); a saída é "Sair", um `<a>`
+  para o `LOGOUT_PATH` do Access (`Button asElement="a"`, nunca `ButtonLink`);
+- erro (`(admin)/error.tsx` e `global-error.tsx`, pelo `ErrorScreen`) → `NoDataFound`. O
+  `global-error` usa os gutters da moldura, sem `max-w-*`.
+
+A saída de toda tela de estado (link de volta, "Sair" ou "Tentar de novo") usa a variante
+padrão do `Button`, nunca `solid`. Fora a ilustração, as telas mudam só o conteúdo, sem
+variante visual. A tela de erro nunca mostra a mensagem da exceção, só o `digest`. Não confunda
+com o `EmptyState`, o vazio de lista com borda tracejada (ver "Lista").
+
+### Vocabulário
+
+Glossário dos rótulos da interface (#385, Story #62): a mesma coisa tem o mesmo nome em colunas,
+títulos, trilhas, abas, botões, mensagens e textos ocultos (`sr-only`). Os pares decididos:
+
+| Em vez de                                              | Use                                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| "Estado" (lista de sites)                              | **"Status"**, como em conteúdos, versões e filtros                                          |
+| "Pendências" (coluna da lista de sites)                | **"Mudanças pendentes"**, como no título, na trilha e na página do site                     |
+| "Cadastrar site"                                       | **"Criar"** em todo título e ação: "Criar site", como "Criar conteúdo"                      |
+| "Configuração" (`h1` e trilha da configuração do site) | **"Configuração do site"** no `h1`, na aba e na trilha; o botão segue "Editar configuração" |
+| "(versões)" no texto oculto do link da linha           | **o verbo da ação**, como em "(revisar)": "(ver versões)"                                   |
+
+Rótulos de envio e de pendência: ver "Envio e pendência" em "Formulário".
+
+**Termo novo:** vale o que já predomina nas telas. Por esse critério ficam as mensagens e os
+estados vazios com "cadastrado" ("Site X cadastrado.", "Nenhum conteúdo cadastrado."); a rota
+`/sites/novo`, o parâmetro `?cadastrado=` e o estado `cadastrado` do ciclo de vida são do
+domínio e não mudam com os rótulos.
+
+### Peças comuns
+
+- **Datas:** `formatDateTime(data, fuso)` de `src/components/shared/siteLabels.ts`, sempre com o
+  fuso do site (`SiteSummary.timeZone`, da configuração corrente), nunca o do navegador nem um
+  fixo: "01/10/2026, 09:00 BRT" (dia, mês, ano, hora e minuto, com a sigla ou o deslocamento,
+  como "GMT+1" em Lisboa). Telas de um site usam `site.timeZone`; a lista de sites mostra cada
+  linha no fuso do próprio site. Componente cliente recebe o fuso por prop, para o texto sair
+  igual no servidor e no navegador.
+- **Estados:** a `Tag` do Ecme com o texto do estado e um ponto na cor dele (`prefixClass`, pelo
+  `StateTag` de `src/components/sites/SiteStatus.tsx`), sem ícone; o texto fica no cinza da Tag
+  e é o que distingue os estados sem cor. O mapa fica ao lado dos rótulos, em
   `src/components/shared/siteLabels.ts` (`CONTENT_STATUS_TAG`, `SITE_STATE_VARIANT`,
   `BUILD_STATUS_VARIANT`, tipados por `StateTagColor`); nunca escreva a cor de um estado na
   tela. O `siteLabels.test.ts` reprova dois estados do mesmo grupo com a mesma cor.
@@ -368,206 +575,18 @@ type="info"` "Bloco N removido." com o botão "Desfazer" e `duration` de 10 s (`
   - Site: ativo `bg-success`, promovendo `bg-info`, pausado `bg-warning` (com o motivo no texto
     e no `title`, sempre visível na lista de sites).
   - Build: publicado `bg-success`, falhou `bg-error`.
-- **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
-  processo de ordem fixa (ciclo de vida do site), não tag. Usa o `Steps` vertical
-  (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
-  `title`; o `Steps` desenha marcador e conector, põe `aria-current="step"` na atual e diz o
-  estado ("concluída", "atual", "pendente") em `sr-only`. A atual e as pendentes repetem o estado
-  em texto visível no `title`, `aria-hidden`, para não ficarem só na cor da borda. A ordem vem de
-  `LIFECYCLE_ORDER` em `siteLabels.ts`. A ação manual fica na `description` do item da etapa que
-  ela conclui (sem `onChange`, as etapas não viram botões); o sucesso vai para o toast e o erro
-  para o
-  `ActionAlert` abaixo da lista (`LifecycleActionScope`), que sobrevive à revalidação que move o
-  botão de item.
-- **Tela de detalhe:** o layout do `CustomerDetails` do Ecme
-  (`views/concepts/customers/CustomerDetails`) para a página de uma coisa só (site, conteúdo,
-  versão, revisão), definido na #368:
-  - Cabeçalho: `PageHeader` com a trilha, o título e as ações principais em `size="sm"`, a
-    principal `variant="solid"` e o "Voltar" `plain` com seta, como no `CustomerEdit`; só as
-    ações que quem pede pode usar.
-  - Abaixo do título, a linha de metadados: `PageMeta` (`src/components/shared/PageMeta.tsx`),
-    texto de apoio em `text-sm` no cinza do body, itens separados por " · " (o separador é
-    `aria-hidden`) e espaço para a `StateTag` do estado. Itens vazios ficam de fora. Nunca uma
-    linha cinza escrita à mão.
-  - Corpo: `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, de largura
-    mínima `min-w-[330px]` (`2xl:min-w-[400px]`), e o conteúdo à direita num
-    `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de uma seção (na página
-    do site, o `SiteTabs`: Ciclo de vida, G1 e Janela; o nome da aba é o título da seção, e um
-    formulário dentro dela é o `SchemaForm` com `card`, de botões `size: 'sm'`). Abaixo de `xl`, empilha. Espaçamento em
-    `space-y-4`/`gap-4`, o mesmo passo dos formulários.
-    Uma tabela no cartão da direita, mais estreito que a largura de lista, pode rolar na
-    horizontal dentro do próprio contêiner (o `overflow-x-auto` do `Table`), como no
-    `CustomerDetails`; a página nunca rola (#371).
-  - Dados de rótulo e valor: `InfoList` e `InfoField` (`src/components/shared/InfoList.tsx`), o
-    `CustomerInfoField` do `ProfileSection`: um `<dl>` em `text-sm`, cada campo com o rótulo
-    (`dt`, `font-semibold`, cinza do body) em cima e o valor (`dd`, `font-bold`, cor dos
-    títulos) embaixo. O valor quebra em qualquer ponto (`wrap-anywhere`, com `min-w-0` no
-    item), então slug e URL longos não rolam a página no celular. As colunas ficam com quem
-    usa: a grade do `ProfileSection` (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1`) no resumo,
-    uma coluna no diálogo. Nunca a grade `grid-cols-[auto_1fr]`, que estoura a 375 px.
-- **Estado vazio:** dois casos, de `src/components/shared/EmptyState.tsx`, nunca uma tabela só
-  com cabeçalho:
-  - lista vazia (nada cadastrado): `EmptyState` no lugar da toolbar e da tabela (ou da grade da
-    mídia), com a mensagem ("Nenhum autor cadastrado.") e, com permissão, a mesma ação
-    principal do cabeçalho (`emptyAction` das tabelas). A ação aparece duas vezes; no E2E,
-    clique na primeira (a do cabeçalho);
-  - busca ou filtro sem resultado: a tabela fica, com "0 resultados", e o `NoResults`
-    ("Nenhum autor encontrado.") vai no `customNoDataIcon` do `DataTable`. Só a mensagem: a
-    única ação de limpar é a "Limpar filtros" da toolbar.
-- **Telas de estado:** `StatusScreen` (`src/components/shared/StatusScreen.tsx`), a tela vazia
-  do template (o `AccessDenied` e o "No user found" do `CustomerEdit`): coluna centrada, com a
-  ilustração decorativa em 280 × 280 por cima, o título (`h1`) na cor de heading, uma frase do
-  que aconteceu e o que fazer em `text-sm` no cinza do body e a ação de saída (link de volta
-  ou "Tentar de novo") centrada. Sem `max-w-*` nem `space-y-*`: o espaçamento é por margens,
-  como no template. A ilustração vem por prop (`illustration`), de `src/assets/svg/`, sempre
-  `aria-hidden`, e cada tela escolhe a sua:
-  - "Não encontrado" (`(admin)/not-found.tsx`, também para endereços sem rota, pelo catch-all
-    `(admin)/[...rest]` e para o site inexistente, e `sites/[site]/not-found.tsx`) →
-    `FileNotFound`;
-  - falta de permissão (`ForbiddenScreen`) → `SpaceSignBoard`;
-  - "Sem acesso" (`NoAccessScreen`, do layout de `(admin)` quando a identidade não tem
-    cadastro nem papel) → `SpaceSignBoard`. Sem a moldura, o `<main>` do layout dá a altura
-    (`min-h-screen`) e os gutters (`PAGE_CONTAINER_GUTTER_X`/`_Y`); a saída é "Sair", um `<a>`
-    para o `LOGOUT_PATH` do Access (`Button asElement="a"`, nunca `ButtonLink`);
-  - erro (`(admin)/error.tsx` e `global-error.tsx`, pelo `ErrorScreen`) → `NoDataFound`. O
-    `global-error` usa os gutters da moldura, sem `max-w-*`.
-
-  A saída de toda tela de estado (link de volta, "Sair" ou "Tentar de novo") usa a variante
-  padrão do `Button`, nunca `solid`. Fora a ilustração, as telas mudam só o conteúdo, sem
-  variante visual. A tela de erro nunca
-  mostra a mensagem da exceção, só o `digest`. Não confunda com o `EmptyState`, o vazio de
-  lista com borda tracejada.
-
-- **Formulários:** gerados do schema Zod com `SchemaForm` (`src/components/forms/`), sobre
-  react-hook-form + zodResolver; a validação é só a do schema. Visual do Ecme: cada campo num
-  `FormItem` (rótulo e erro ligados ao controle), texto e número no `Input`, booleano no
-  `Checkbox`, enum no `Select`, botões no `Button` e as seções em `Card`. O gerador desenha
-  texto, número, booleano, enum, objeto (`fieldset`) e lista de objetos (adicionar e remover).
-  **Lista de opções é sempre o `Select` do Ecme** (#330), nunca `<select>` nativo nem grade de
-  caixas: uma opção no simples, várias no `isMulti`. Dentro de um `FormItem`, passe
-  `components={selectInFormItem}` (de `SchemaForm.tsx`) para a dica e o erro entrarem no
-  `aria-describedby` do combobox, que o react-select não aceita como prop; num campo
-  registrado, ligue o `ref` ao `inputRef` da instância, para o foco do erro chegar.
-  Rótulos e dicas por caminho (`items.*.question`); `hidden` para o que é do servidor
-  (`n`, `type`). O que o schema sozinho não descreve (rich text, seletor de mídia ou de
-  entidade) entra por `fields`, um campo registrado por caminho, com `*` no lugar dos
-  índices, que recebe `id`, `label`, `value`, `onChange`, `invalid` e `describedBy` (ligue
-  esses dois ao controle) e `required` (ponha `aria-required` se o papel do controle admitir:
-  campo de texto, `select`, `radiogroup`; `group` não). Nó sem desenho e sem campo registrado
-  aparece como aviso, num `Alert type="warning"` do Ecme. Controles dos campos registrados
-  (#331): liga/desliga no `Switcher` (`switchField` e os recursos do site, em `SiteFields`),
-  escolha visual entre poucas opções no `Radio.Group` (o tema) e data e hora no
-  `DateTimepicker` com o `timeZone` do site (`zonedDateTimeField`); a caixa de seleção fica
-  para marcar itens (checklist da revisão e os booleanos do gerador).
-  **Erro, dica e obrigatório só no `FormItem`** (#329), em todo formulário: a dica é a prop
-  `hint` (`.form-hint`, no fluxo sob o controle), o erro é a mensagem `.form-explain`, e os
-  dois entram no `aria-describedby` do campo pelo contexto do `FormItem` (o `Input` os soma
-  sozinho; os outros controles os recebem em `describedBy`). Nunca `<p>` de dica ou de erro à
-  mão. Caixa de seleção fica num `FormItem` sem rótulo (o rótulo é o do `Checkbox`); lista
-  (do `SchemaForm` e os blocos do editor) fica no `FieldGroup`, um `FormItem` sem rótulo cujo
-  erro vai ao `aria-describedby` do `fieldset` ou da `section`. Campo não opcional no schema
-  (`optional` do `schemaWalk`) leva o asterisco do `FormItem` (oculto do leitor de tela) e
-  `aria-required`; booleano (caixa de seleção ou `Switcher` registrado) e lista não levam
-  (`false` e lista vazia são valores do campo, e a regra mínima aparece no erro).
-  O `onSubmit` pode devolver a recusa do servidor (`{ path, message }[]`): com `path`, vira
-  erro do campo; sem, vai para o resumo. Lista vazia em campo opcional (rich text apagado) é
-  enviada como ausente. O resumo é o `ErrorSummary` (`src/components/shared/`): um `Alert`
-  do Ecme (`type="danger"`) dentro de um contêiner `role="alert"` sempre montado, como o
-  `ActionAlert`. Sai de `formState.errors`:
-  um item por campo inválido, "<rótulo>: <mensagem>", com a posição em cada lista
-  ("Pergunta (pergunta 2)"), na ordem do schema, e acompanha a correção. Cada item é um botão
-  que leva o foco ao campo (`setFocus`; campo registrado precisa ligar o `ref`); o erro da
-  lista inteira vem sem botão. A recusa do servidor sem `path` aparece acima da lista.
-  Formulário longo (a configuração do site) passa `sections` (`{ id, title, paths }`, chaves
-  de topo): cada seção vira `<section>` com `h2` (`#secao-<id>`), todas na mesma página, sem
-  abas, com um índice de âncoras no topo (`nav` "Seções do formulário"). Chave de topo fora
-  de todas as seções aparece depois delas; sem `sections`, uma coluna só.
-  **Formulário de tela** (#328), como o `CustomerForm` do Ecme: cadastro e configuração de
-  site, autores, taxonomias, menus e textos institucionais passam `actionBar`
-  (`{ kind, href }`). O `SchemaForm` monta o `Form` (com `FormContainer`), uma coluna de
-  `Card`s com `gap-4` (um por seção, com o título no visual do `h4 mb-6` do Ecme e `h2` na
-  estrutura; sem seções, um `Card` só) e o `BottomStickyBar` com a ação principal à direita.
-  Na criação (`kind: 'create'`), "Descartar" (cor de erro) abre um
-  `ConfirmDialog type="danger"` e, confirmado, vai para `href` sem enviar, como o
-  `CustomerCreate`; na edição, "Voltar" (`plain`, seta) é um link para `href`, como o
-  `CustomerEdit`. `href` é o nível anterior da trilha (a lista, a página do site), nunca
-  `history.back()`. Campos curtos relacionados ficam lado a lado a partir de `md` por
-  `sideBySide` (grupos de caminhos com `*`, em `grid md:grid-cols-2 gap-4`): ID e nome, idioma
-  e fuso, nome e slug, rótulo e link do item de menu. **Formulário dentro de outra tela**
-  (#333: registro do G1 e janela de agrupamento na página do site, checklist da revisão) passa
-  `card` em vez de `actionBar`, sem barra fixa (ela é só das telas que são um formulário
-  inteiro): o `SchemaForm` monta um `Card` com `card.intro` (título, dica e estado da seção) e
-  os campos no corpo, e os botões no rodapé (`footer` com borda), à direita, todos do mesmo
-  tamanho e a ação principal `solid`. A ação secundária (`card.extra`, ex.: "Usar padrão" da
-  janela) fica à esquerda do envio, não passa pelo schema e tem o mesmo retorno do envio (toast,
-  erro de campo ou resumo). O cartão é o da seção inteira: sem permissão para o formulário, a
-  página mostra a mesma introdução num `Card` só de leitura; na revisão, o checklist tem o seu
-  próprio cartão, separado do da validação. Durante o envio o botão fica desabilitado e mostra `pendingLabel` (ver "Formulário:
-  rótulos, estrutura e espaçamento"), sem segundo envio; a ação secundária do cartão mostra o
-  seu (`card.extra.pendingLabel`) enquanto roda. Quem fica na tela confirma
-  devolvendo `{ success: mensagem }`, que vai para o toast do retorno padrão (`pushSuccess`,
-  ver "Retorno das ações"), como a aprovação na revisão. Quem sai da tela também confirma no
-  toast, que vive no layout raiz: criar autor, taxonomia ou menu chama `pushSuccess` antes de
-  voltar para a lista. O cadastro de site confirma no destino: vai para
-  `/sites?cadastrado=<id>`, e a tabela anuncia no toast depois de montar e tira a marca da URL
-  (como o `?criado=1` do conteúdo). Os resultados das Server Actions de formulário
-  (`EntityFormResult`, `SiteFormResult`, `ApproveResult`) são `FormActionResult<issue>`: o
-  `ActionResult` com as `issues` da recusa no erro.
-  Dentro de um formulário maior (`FormProvider`), `SchemaFields` desenha um schema sob um
-  prefixo (`blocks.2`), com os caminhos completos no registro (`blocks.*.content`): é como o
-  editor de conteúdo monta cada bloco. O editor tem formulário próprio (lista de blocos, ação
-  com `pending`) e o mesmo esqueleto do formulário de tela (#332): metadados num `Card` com
-  título ("Dados do conteúdo"), cada bloco num `Card`, e a barra pelo `FormActionBar` exportado
-  do `SchemaForm`, com "Ver prévia" em `extra` (entre "Descartar" e o envio) e a nota da prévia
-  e o resumo de erros em `children` (abaixo dos botões); "Criando…" na criação, "Salvando…" na
-  edição. "Voltar" passa pelo aviso de saída (`useLeaveGuard`); "Descartar" já confirma no
-  diálogo e não pergunta de novo. Referências do
-  site: `mediaField(source)` (miniatura do valor atual lida por ID, "Escolher imagem"/"Trocar"
-  pelo `MediaPicker` e, com `{ optional: true }` para capa e avatar, "Remover"; `source` são as
-  actions da leitura paginada e por IDs ligadas ao site pela página) e
-  `entityField(opções, aviso)` (`Select` múltiplo para `authorIds` e `taxonomyIds`, com os IDs
-  na ordem das opções), em
-  `src/components/forms/PickerFields.tsx`. Campos registrados recebem `ref` (ligue ao controle
-  focável, para o foco do erro chegar) e `readOnly` (caminhos em `readOnly`). Para listas de
-  texto, feature flags e opções de `RESOURCES`: `linesField`, `flagsField` e `choiceField`
-  (`src/components/forms/SiteFields.tsx`). Nenhum formulário é escrito à mão: o da
-  configuração do site também usa o gerador (#47).
-- **Formulário: rótulos, estrutura e espaçamento:** regra única de todo formulário (#334).
-  **Envio:** o formulário de tela envia com "Criar" na criação e "Salvar" na edição, sem
-  complemento, como o "Create"/"Save" do `CustomerCreate`/`CustomerEdit` do Ecme; o objeto já
-  está no título da tela ("Criar site", "Criar conteúdo"), que não muda. O formulário em
-  cartão dentro de outra tela e a ação de domínio usam o verbo do que acontece: "Registrar
-  G1", "Aprovar", "Usar padrão", "Enviar para revisão", "Marcar zona ativa"; a janela de
-  agrupamento, que só grava um valor, envia com "Salvar". **Pendência:** é sempre o rótulo
-  inteiro no gerúndio, com reticências: "Criando…", "Salvando…", "Registrando G1…",
-  "Aprovando…", "Usando padrão…", "Enviando para revisão…", "Marcando zona ativa…"; todo
-  botão que roda uma ação tem pendência, inclusive a ação secundária do cartão.
-  **Estrutura:** a tela que é um formulário inteiro tem os campos em `Card`s e a barra fixa
-  (`BottomStickyBar`, com "Descartar" ou "Voltar" e o envio); o formulário dentro de outra
-  tela (G1, janela, checklist da revisão) é a exceção: um `Card` só, com os botões no rodapé
-  dele e sem barra fixa (ver o `SchemaForm` acima). O espaçamento entre os blocos segue a
-  regra da Moldura (`space-y-4`), também na coluna `form-width`.
-- **Rich text:** TipTap só com o que o `RichTextSchema` aceita (`src/components/forms/`).
-  Registre `richTextField('richText')` para texto e textos institucionais, e
-  `richTextField('inlines')` (um parágrafo, sem intertítulo nem lista) para citação, resposta
-  de FAQ e legenda. O valor é sempre a árvore do content-model; colar HTML descarta o que o
-  schema não aceita, e link com endereço inválido vira texto.
-- **Vocabulário:** glossário dos rótulos da interface (#385, Story #62): a mesma coisa tem o
-  mesmo nome em colunas, títulos, trilhas, abas, botões, mensagens e textos ocultos (`sr-only`).
-  Os pares decididos:
-
-  | Em vez de                                              | Use                                                                                         |
-  | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-  | "Estado" (lista de sites)                              | **"Status"**, como em conteúdos, versões e filtros                                          |
-  | "Pendências" (coluna da lista de sites)                | **"Mudanças pendentes"**, como no título, na trilha e na página do site                     |
-  | "Cadastrar site"                                       | **"Criar"** em todo título e ação: "Criar site", como "Criar conteúdo"                      |
-  | "Configuração" (`h1` e trilha da configuração do site) | **"Configuração do site"** no `h1`, na aba e na trilha; o botão segue "Editar configuração" |
-  | "(versões)" no texto oculto do link da linha           | **o verbo da ação**, como em "(revisar)": "(ver versões)"                                   |
-
-  **Termo novo:** vale o que já predomina nas telas. Por esse critério ficam as mensagens e os
-  estados vazios com "cadastrado" ("Site X cadastrado.", "Nenhum conteúdo cadastrado."); a rota
-  `/sites/novo`, o parâmetro `?cadastrado=` e o estado `cadastrado` do ciclo de vida são do
-  domínio e não mudam com os rótulos.
+- **Botão de ícone:** `IconButton` (`src/components/shared/IconButton.tsx`), sobre o `Button`
+  (`plain`, `xs`: 32 px, acima do mínimo de 24 px) e o `Tooltip` do Ecme, para ações repetidas
+  e compactas, como os controles de cada bloco do editor. O nome vem de `label` (`aria-label`,
+  com a posição: "Mover bloco 3 para cima"); a dica é só visual e repete o nome, então o botão
+  descarta o `aria-describedby` do Tooltip; o ícone (`react-icons/pi`, 16 px) fica
+  `aria-hidden`. Ação indisponível que deve continuar focável (o foco fica no botão depois de
+  mover) usa `aria-disabled`, desenhado como indisponível (opacidade e cursor), e o `onClick`
+  confere a condição; `disabled` só quando o foco não precisa ficar no botão.
+- **Botão de "mais ações":** `EllipsisButton` (`src/components/shared/EllipsisButton.tsx`), o do
+  Ecme: `Button` `plain`, `circle`, `xs` (32 px) com os três pontos do `react-icons/pi`,
+  `aria-hidden`. O tipo exige o nome: `aria-label` quando é só o ícone ("Mais ações do
+  formulário"), ou texto visível nos filhos. Sem dica; quando ela for necessária, `IconButton`.
 
 ## Testes
 
