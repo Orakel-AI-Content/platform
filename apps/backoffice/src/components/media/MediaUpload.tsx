@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { TbCloudUpload } from 'react-icons/tb';
 
 import UploadMedia from '@/assets/svg/UploadMedia';
 import Button from '@/components/ui/Button';
@@ -37,7 +38,12 @@ export function MediaUpload({
 
   return (
     <>
-      <Button variant="solid" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+      <Button
+        variant="solid"
+        icon={<TbCloudUpload className="text-xl" aria-hidden />}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+      >
         Enviar imagens
       </Button>
       <Dialog isOpen={open} onClose={() => setOpen(false)} aria={{ labelledby: `${id}-title` }}>
