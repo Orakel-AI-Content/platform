@@ -60,6 +60,29 @@ oferece um usuário por papel.
 `BACKOFFICE_UPSTREAM=host.docker.internal:3000` no `.env.local` (recrie o `caddy`: `infra/local/compose.sh up -d caddy`), para
 o `admin.orakel.localhost` apontar para o `next dev`.
 
+## Sessões em paralelo
+
+O `backoffice-web` e o Caddy do compose são um só para todas as sessões: recriá-los com a
+imagem de uma branch troca o Backoffice que as outras estão testando, e o `local:images`
+regrava a tag `local`. Para o E2E da própria branch, cada sessão sobe um par só seu, a partir do
+worktree, com o ambiente compartilhado já no ar:
+
+```sh
+pnpm local:isolated up 433     # imprime E2E_BASE_URL=https://admin.orakel.localhost:<porta>
+E2E_BASE_URL=https://admin.orakel.localhost:<porta> pnpm --filter @orakel/backoffice exec playwright test
+pnpm local:isolated down 433
+```
+
+O `<id>` (letras minúsculas, dígitos e hífen; ex.: o número da issue) dá nome aos containers
+`orakel-<id>-web` e `orakel-<id>-caddy`, então vários pares convivem. O `up` constrói a imagem
+`backoffice:<SHA do commit>` (sem a tag `local`; mudanças sem commit entram nela), sobe o
+backoffice pelo `compose run` (ambiente e redes do `backoffice-web`) e um Caddy na primeira
+porta livre a partir de 8400 (ou na informada: `up <id> <porta>`), com o mesmo login de teste.
+O Caddy do par tem CA própria: o navegador avisa do certificado, e o Playwright o ignora.
+Banco, S3 e access-mock continuam os compartilhados: E2E que gravam dados (`midia.spec.ts`,
+`sites.spec.ts`) podem disputar dados entre sessões. Num worktree sem `.env.local`, aponte o
+da raiz: `ORAKEL_ENV_FILE=<raiz>/.env.local pnpm local:isolated up <id>`.
+
 ## Comandos
 
 | Comando                                                     | O que faz                                                   |
@@ -77,6 +100,7 @@ o `admin.orakel.localhost` apontar para o `next dev`.
 | `pnpm local:reset`                                          | Para e **apaga os volumes**                                 |
 | `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit) |
 | `pnpm local:e2e`                                            | E2E completo com Playwright                                 |
+| `pnpm local:isolated up <id>` · `down <id>`                 | Backoffice e Caddy só da sessão, numa porta própria         |
 | `infra/local/compose.sh <args>`                             | Qualquer comando do compose com os arquivos certos          |
 
 ## Serviços locais

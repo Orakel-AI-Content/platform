@@ -6,6 +6,8 @@ acrescentar regras, skills e agentes.
 ## Onde abrir
 
 Principalmente **na raiz**, com worktrees para trabalho em paralelo (ADR 0003, M.8).
+Para o E2E local de cada worktree, `pnpm local:isolated up <id>` sobe um Backoffice só da
+sessão (`docs/guides/local-setup.md`, "Sessões em paralelo").
 Cada unidade também terá `CLAUDE.md`, regras e `settings.json` próprios, para quando
 a sessão for aberta direto nela.
 
