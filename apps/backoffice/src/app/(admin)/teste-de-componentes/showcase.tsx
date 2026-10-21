@@ -886,6 +886,8 @@ export function Showcase({ linkPage }: { linkPage: number }) {
 
       <MenuShowcase />
 
+      <MediaShowcase />
+
       <StatesShowcase />
 
       <FormsShowcase />
