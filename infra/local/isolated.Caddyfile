@@ -1,0 +1,30 @@
+# Caddy do par isolado (pnpm local:isolated): só o admin.orakel.localhost, na porta da sessão,
+# para o backoffice da sessão. Mesmo login de teste do Caddyfile compartilhado (access-mock e
+# forward_auth). CA própria, sem o volume caddy-data: dois Caddy no mesmo diretório disputam
+# travas. O navegador avisa do certificado; o Playwright o ignora (ignoreHTTPSErrors).
+{
+	local_certs
+	auto_https disable_redirects
+}
+
+admin.orakel.localhost:{$ISOLATED_PORT} {
+	# A API de exportação e a interna só existem na rede dos containers.
+	handle /api/export/* {
+		respond 404
+	}
+	handle /api/internal/* {
+		respond 404
+	}
+	# Login, callback e JWKS do access-mock em blocos handle separados do forward_auth, como no
+	# bloco (protected) do Caddyfile.
+	handle /cdn-cgi/access/* {
+		reverse_proxy access-mock:8788
+	}
+	handle {
+		forward_auth access-mock:8788 {
+			uri /cdn-cgi/access/authorize
+			copy_headers Cf-Access-Jwt-Assertion
+		}
+		reverse_proxy {$BACKOFFICE_UPSTREAM}
+	}
+}
