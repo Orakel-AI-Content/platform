@@ -424,7 +424,7 @@ test('operação vê a publicação do site e o publica pela página', async ({ 
   const terms = [
     'Domínio',
     'Indexável',
-    'Estado',
+    'Status',
     'Release',
     'Mudanças pendentes',
     'Último build',
@@ -434,7 +434,7 @@ test('operação vê a publicação do site e o publica pela página', async ({ 
   await expect(publication.getByRole('term')).toHaveText(terms);
   await expect(value('Domínio')).not.toBeEmpty();
   await expect(value('Indexável')).toHaveText(/^(Sim|Não)$/);
-  await expect(value('Estado')).toHaveText('Ativo');
+  await expect(value('Status')).toHaveText('Ativo');
   await expect(value('Release')).not.toBeEmpty();
   await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
   await expect(value('Último build')).toHaveText(/^(—|Publicado|Falhou)/);

@@ -2126,7 +2126,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const showcase = section(page, 'Lista de dados e linha de metadados');
 
     const terms = showcase.getByRole('term');
-    await expect(terms).toHaveText(['Domínio', 'Identificador', 'Slug', 'Estado']);
+    await expect(terms).toHaveText(['Domínio', 'Identificador', 'Slug', 'Status']);
     await expect(showcase.getByText('Publicado')).toBeVisible();
 
     // O valor longo ocupa várias linhas, dentro da largura do cartão.
