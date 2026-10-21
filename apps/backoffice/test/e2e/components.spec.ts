@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { Editor } from '@tiptap/core';
 import { fieldLabel } from './fieldLabel.ts';
 
 // Vitrine dos componentes do Ecme (#205; workspace#45): cada componente portado auditado com
@@ -35,9 +36,9 @@ function hydrationMessages(page: Page): string[] {
   return messages;
 }
 
-/** Leva o foco até o controle só com Tab (no máximo 200 passos: a vitrine cresce a cada Task). */
+/** Leva o foco até o controle só com Tab (no máximo 300 passos: a vitrine cresce a cada Task). */
 async function tabTo(page: Page, target: Locator): Promise<void> {
-  for (let step = 0; step < 200; step += 1) {
+  for (let step = 0; step < 300; step += 1) {
     if (await target.evaluate((element) => element === document.activeElement)) return;
     await page.keyboard.press('Tab');
   }
@@ -1629,7 +1630,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.goto(SHOWCASE);
     await page.waitForLoadState('networkidle');
 
-    await page.getByRole('button', { name: 'Título' }).click();
+    await page.getByRole('button', { name: 'Título', exact: true }).click();
     await page.getByRole('tab', { name: 'Tema' }).click();
     await page.getByRole('tab', { name: 'Publicados' }).click();
     await expect(page.getByRole('tab', { name: 'Publicados' })).toHaveAttribute(
@@ -2159,6 +2160,154 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Mídia (#389): o seletor do editor, os detalhes da biblioteca e a fila de envio, com dados
+// fixos. Os dois diálogos abrem por teclado, prendem o foco, fecham com Esc e devolvem o foco a
+// quem abriu; a fila mostra cada estado em texto, a barra só no envio e um anúncio só.
+
+/** Tab e Shift+Tab repetidos não saem do diálogo. */
+async function expectFocusTrapped(page: Page, dialog: Locator): Promise<void> {
+  for (const key of ['Tab', 'Shift+Tab'] as const) {
+    for (let step = 0; step < 4; step += 1) {
+      await page.keyboard.press(key);
+      expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(
+        true,
+      );
+    }
+  }
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`MediaPicker: abre por teclado, pagina, escolhe, Esc fecha e sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const picker = section(page, 'MediaPicker');
+
+    const closed = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-media-picker"]')
+      .analyze();
+    expect(closed.violations).toEqual([]);
+
+    const opener = picker.getByRole('button', { name: 'Escolher imagem' });
+    await tabTo(page, opener);
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Escolher imagem' });
+    const status = dialog.getByRole('status');
+    await expect(status).toHaveText('Página 1 de 3 · 30 imagens');
+    const grid = dialog.getByRole('list', { name: 'Imagens da biblioteca' });
+    await expect(grid.getByRole('listitem')).toHaveCount(12);
+    await expectFocusTrapped(page, dialog);
+
+    const open = await audit(page);
+    expect(open.violations).toEqual([]);
+
+    await tabTo(page, dialog.getByRole('button', { name: 'Próxima página' }));
+    await page.keyboard.press('Enter');
+    await expect(status).toHaveText('Página 2 de 3 · 30 imagens');
+    await expect(dialog.getByRole('button', { name: 'Página 2' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+
+    const tile = grid.getByRole('button', { name: 'Mídia 13 · 480×320', exact: true });
+    await tabTo(page, tile);
+    await page.keyboard.press('Enter');
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+    await expect(picker.getByText('Escolhida: Mídia 13 · 480×320')).toBeVisible();
+
+    await page.keyboard.press('Enter');
+    await expect(status).toHaveText('Página 1 de 3 · 30 imagens');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+    expect(hydration).toEqual([]);
+  });
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`MediaDetails: a miniatura abre os dados por teclado, Esc devolve o foco e sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const details = section(page, 'MediaDetails');
+    const name = 'capa-da-materia-sobre-o-festival-de-inverno-de-2026-na-serra.jpg';
+
+    const closed = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-media-details"]')
+      .analyze();
+    expect(closed.violations).toEqual([]);
+
+    const tile = details.getByRole('button', { name: new RegExp(`^${name} · `) });
+    await expect(tile).toHaveAttribute('aria-haspopup', 'dialog');
+    await tabTo(page, tile);
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name });
+    await expect(dialog.getByRole('heading', { name })).toBeVisible();
+    await expect(dialog.getByText('1200×800 px')).toBeVisible();
+    await expect(dialog.getByText('AVIF, JPEG, WebP')).toBeVisible();
+    await expectFocusTrapped(page, dialog);
+
+    const open = await audit(page);
+    expect(open.violations).toEqual([]);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(tile).toBeFocused();
+
+    // Sem envio registrado: o nome e a data de reserva.
+    const fallback = details.getByRole('button', { name: /^Sem nome \(Mídia 42\) · / });
+    await tabTo(page, fallback);
+    await page.keyboard.press('Enter');
+    const unnamed = page.getByRole('dialog', { name: 'Sem nome (Mídia 42)' });
+    await expect(unnamed.getByText('Data de envio não registrada')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(unnamed).toHaveCount(0);
+    await expect(fallback).toBeFocused();
+  });
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`Fila de envio: um estado por arquivo, barra só no envio, um anúncio e sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const queue = section(page, 'Fila de envio');
+
+    await expect(queue.getByRole('status')).toHaveCount(1);
+    await expect(queue.getByRole('status')).toHaveText(
+      'Só as 20 primeiras imagens foram enviadas; envie as outras em seguida. 6 envios: 1 aguardando, 1 enviando, 1 processando, 1 pronta, 1 recusada, 1 ainda processando',
+    );
+    const items = queue.getByRole('list', { name: 'Envios' }).getByRole('listitem');
+    await expect(items).toHaveCount(6);
+    await expect(items.nth(4)).toContainText('recusada: formato não aceito');
+    await expect(items.nth(5)).toContainText('ainda processando; recarregue a página mais tarde');
+
+    const bar = queue.getByRole('progressbar');
+    await expect(bar).toHaveCount(1);
+    await expect(bar).toHaveAccessibleName('Envio de galeria-01.png');
+    await expect(bar).toHaveAttribute('aria-valuenow', '42');
+
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('[aria-labelledby="vitrine-fila-de-envio"]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
+}
+
 // Cabeçalho de página e peças de estado (#388): a trilha nomeada com o item atual em
 // aria-current, as seis cores do StateTag, a etapa atual do ciclo com aria-current="step" e a
 // ação na etapa seguinte. Por tema, o foco de 2px no --ring nos links e nas ações, e o axe em
@@ -2279,6 +2428,249 @@ for (const colorScheme of ['light', 'dark'] as const) {
     for (const name of STATES_SECTIONS) {
       await expect(section(page, name).getByRole('heading', { level: 2 })).toHaveText(name);
     }
+    expect(hydration).toEqual([]);
+  });
+}
+
+// Formulário e moldura (#390): o `SchemaForm` de tela e em cartão, o rich text com o popover de
+// link e a data no fuso do site (registrados pelo `fields`, como nas telas) e o `SiteSwitcher`
+// aberto e recolhido. Cada seção pelo teclado e com o axe nos dois temas, no estado aberto. O
+// foco começa no controle (`focus()`): com tantas seções antes, o Tab passaria do `tabTo`.
+
+/** Axe só numa seção da vitrine, e no menu ou painel que ela abriu num portal. */
+const auditSection = (page: Page, id: string, ...extra: string[]) => {
+  const builder = new AxeBuilder({ page })
+    .withTags(WCAG)
+    .include(`[aria-labelledby="${id}"]`)
+    .exclude('[data-floating-ui-focus-guard]');
+  for (const selector of extra) builder.include(selector);
+  return builder.analyze();
+};
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`SchemaForm de tela e em cartão pelo teclado: erro no campo, resumo e toast, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const forms = section(page, 'SchemaForm');
+
+    // De tela: título obrigatório vazio; Enter no envio marca o campo, leva o foco a ele e
+    // lista o erro no resumo, que leva de volta ao campo.
+    const create = forms.getByRole('button', { name: 'Criar matéria' });
+    await expect(forms.getByRole('button', { name: 'Descartar' })).toBeVisible();
+    await create.focus();
+    await page.keyboard.press('Enter');
+    const title = forms.getByRole('textbox', { name: 'Título' }).first();
+    await expect(title).toHaveAttribute('aria-invalid', 'true');
+    await expect(title).toHaveAccessibleDescription('Informe o título');
+    await expect(title).toBeFocused();
+    const summary = forms.getByRole('button', { name: 'Título: Informe o título' });
+    await summary.focus();
+    await page.keyboard.press('Enter');
+    await expect(title).toBeFocused();
+
+    expect((await auditSection(page, 'vitrine-schema-form')).violations).toEqual([]);
+
+    await page.keyboard.type('Nova matéria');
+    await create.focus();
+    await page.keyboard.press('Enter');
+    await expect(toastRegion(page).getByText('Matéria criada.')).toBeVisible();
+    await expect(title).toHaveAttribute('aria-invalid', 'false');
+
+    // Em cartão: apagar o título e enviar com Enter no próprio campo.
+    const cardTitle = forms.getByRole('textbox', { name: 'Título' }).last();
+    await expect(cardTitle).toHaveValue('Matéria de exemplo');
+    await expect(forms.getByRole('checkbox', { name: 'Destaque na capa' }).last()).toBeChecked();
+    await cardTitle.focus();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Enter');
+    await expect(cardTitle).toHaveAttribute('aria-invalid', 'true');
+    await expect(cardTitle).toBeFocused();
+    await page.keyboard.type('Outra matéria');
+    await page.keyboard.press('Enter');
+    await expect(toastRegion(page).getByText('Matéria salva.')).toBeVisible();
+
+    expect(hydration).toEqual([]);
+  });
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`rich text: o popover de link aplica o endereço pelo teclado e o Esc volta ao editor, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const rich = section(page, 'Rich text e link');
+    const editor = rich.getByRole('textbox', { name: 'Corpo do texto' });
+    const toolbar = rich.getByRole('toolbar', { name: 'Formatação: Corpo do texto' });
+    const linkButton = toolbar.getByRole('button', { name: 'Link', exact: true });
+    const address = rich.getByRole('textbox', { name: 'Endereço do link' });
+
+    // Seleciona a palavra "link" pelo teclado e abre o popover pelo botão da barra. O link fica
+    // dentro da frase (alvo em linha, exceção do 2.5.8).
+    await expect(editor).toHaveText('Texto de exemplo para o link.');
+    // O ProseMirror lê a seleção do DOM no `selectionchange`, e uma tecla que chega antes dele
+    // se perde (o link entrava com o endereço no início do texto): repete o gesto até o estado
+    // do editor (o Tiptap o expõe em `dom.editor`) ser a palavra.
+    await expect(async () => {
+      await editor.focus();
+      // Fim do texto sem o End (no macOS ele só rola): seleciona tudo e recolhe para a direita.
+      await page.keyboard.press('ControlOrMeta+a');
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('ArrowLeft');
+      for (let step = 0; step < 4; step += 1) await page.keyboard.press('Shift+ArrowLeft');
+      await expect
+        .poll(
+          () =>
+            editor.evaluate((dom) => {
+              const { state } = (dom as HTMLElement & { editor: Editor }).editor;
+              return state.doc.textBetween(state.selection.from, state.selection.to);
+            }),
+          { timeout: 1000 },
+        )
+        .toBe('link');
+    }).toPass({ timeout: 10_000 });
+    await linkButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(address).toBeVisible();
+    await expect(address).toBeFocused();
+    await expect(address).toHaveValue('');
+
+    // Endereço inválido: o erro fica no campo do popover, que continua aberto.
+    await page.keyboard.type('exemplo');
+    await page.keyboard.press('Enter');
+    await expect(address).toHaveAttribute('aria-invalid', 'true');
+    await expect(address).toBeVisible();
+    expect((await auditSection(page, 'vitrine-rich-text')).violations).toEqual([]);
+
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('https://exemplo.com/guia');
+    await page.keyboard.press('Enter');
+    await expect(address).toBeHidden();
+    await expect(editor).toBeFocused();
+    await expect(editor.getByRole('link', { name: 'link', exact: true })).toHaveAttribute(
+      'href',
+      'https://exemplo.com/guia',
+    );
+    await expect(linkButton).toHaveAttribute('aria-pressed', 'true');
+
+    // Com o cursor no link, o popover reabre com o endereço e "Remover link"; Esc fecha e
+    // devolve o foco ao editor.
+    await linkButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(address).toHaveValue('https://exemplo.com/guia');
+    await expect(rich.getByRole('button', { name: 'Remover link' })).toBeVisible();
+    expect((await auditSection(page, 'vitrine-rich-text')).violations).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(address).toBeHidden();
+    await expect(editor).toBeFocused();
+
+    await rich.getByRole('button', { name: 'Salvar texto' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(toastRegion(page).getByText('Texto salvo.')).toBeVisible();
+
+    expect(hydration).toEqual([]);
+  });
+}
+
+test.describe('data com fuso no SchemaForm', () => {
+  // Navegador em UTC: o campo mostra a hora de parede de São Paulo, o fuso do site.
+  test.use({ timezoneId: 'UTC' });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`data com fuso pelo teclado, sem violação do axe com o painel aberto (${colorScheme})`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await login(page);
+      const hydration = hydrationMessages(page);
+      await page.goto(SHOWCASE);
+      await page.waitForLoadState('networkidle');
+      const agenda = section(page, 'Data com fuso');
+      const field = agenda.getByRole('combobox', { name: 'Publicar em' });
+      const panel = page.getByRole('dialog', { name: 'Escolher data e hora' });
+      await expect(field).toHaveValue('15/07/2026 13:00');
+      await expect(field).toHaveAccessibleDescription('Hora de São Paulo, o fuso do site.');
+
+      await field.focus();
+      await page.keyboard.press('Enter');
+      await expect(panel).toBeVisible();
+      await expect
+        .poll(() => panel.evaluate((element) => element.contains(document.activeElement)))
+        .toBe(true);
+      await expect(
+        panel.getByRole('button', { name: '15 de julho de 2026', pressed: true }),
+      ).toBeVisible();
+      expect((await auditSection(page, 'vitrine-data-fuso')).violations).toEqual([]);
+
+      await page.keyboard.press('Escape');
+      await expect(panel).toBeHidden();
+      await expect(field).toBeFocused();
+
+      await agenda.getByRole('button', { name: 'Agendar' }).focus();
+      await page.keyboard.press('Enter');
+      await expect(toastRegion(page).getByText('Publicação agendada.')).toBeVisible();
+
+      expect(hydration).toEqual([]);
+    });
+  }
+});
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`SiteSwitcher aberto e recolhido pelo teclado: setas, site atual e Esc, sem violação do axe (${colorScheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(page);
+    const hydration = hydrationMessages(page);
+    await page.goto(SHOWCASE);
+    await page.waitForLoadState('networkidle');
+    const switchers = section(page, 'SiteSwitcher');
+    const menu = page.getByRole('menu');
+
+    for (const current of ['Receitas da Vó', 'Viagem Leve']) {
+      const button = switchers.getByRole('button', { name: `${current}, trocar de site` });
+      await button.focus();
+      await page.keyboard.press('Enter');
+      await expect(menu).toBeVisible();
+      await expect(menu.getByRole('menuitem')).toHaveText([
+        'Receitas da Vó',
+        'Viagem Leve',
+        'Casa e Jardim',
+      ]);
+      await expect(menu.locator('[aria-current="true"]')).toHaveText(current);
+      // Como nos outros menus da moldura, o foco abre no primeiro item e anda pelas setas.
+      await expect(menu.getByRole('menuitem').first()).toBeFocused();
+      await page.keyboard.press('ArrowDown');
+      const viagem = menu.getByRole('menuitem', { name: 'Viagem Leve' });
+      await expect(viagem).toBeFocused();
+      await expect(viagem).toHaveAttribute('href', '/sites/viagem-leve');
+
+      // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
+      // opacidade sobe; o axe roda depois dela.
+      await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+      expect(
+        (await auditSection(page, 'vitrine-site-switcher', '[role="menu"]')).violations,
+      ).toEqual([]);
+
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+      await expect(button).toBeFocused();
+    }
+
+    // Recolhido: as iniciais na tela, o nome na dica do foco.
+    const collapsed = switchers.getByRole('button', { name: 'Viagem Leve, trocar de site' });
+    await expect(collapsed).toHaveText(/^VL/);
+    await expect(page.getByRole('tooltip')).toHaveText('Viagem Leve');
+
     expect(hydration).toEqual([]);
   });
 }
