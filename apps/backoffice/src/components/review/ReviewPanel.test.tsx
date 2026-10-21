@@ -67,6 +67,7 @@ describe('painel de revisão', () => {
     }
     expect(screen.getAllByRole('checkbox')).toHaveLength(5);
     expect(screen.getByText('Nenhum problema de validação.')).toBeTruthy();
+    expect(document.querySelector('.bg-error-subtle')).toBeNull();
   });
 
   it('fica em Cards dentro do complementar; o checklist tem cartão próprio com Aprovar no rodapé', () => {
@@ -111,14 +112,21 @@ describe('painel de revisão', () => {
       issues: [{ message: 'O bloco faq não é suportado pela release do site' }],
     });
 
+    // Lista e aviso no Alert de erro do Ecme, com ícone, sem `text-error` à mão e sem região
+    // viva: os problemas chegam no carregamento (#444).
     const issue = screen.getByText('O bloco faq não é suportado pela release do site');
-    expect(issue.closest('ul')?.classList.contains('text-error')).toBe(true);
+    const blocked = screen.getByText('Corrija os problemas de validação antes de aprovar.');
+    for (const text of [issue, blocked]) {
+      const alert = text.closest('.bg-error-subtle');
+      expect(alert).toBeTruthy();
+      expect(alert?.querySelector('[aria-hidden="true"] svg')).toBeTruthy();
+      expect(text.closest('[role="alert"]')).toBeNull();
+    }
+    expect(document.querySelector('.text-error:not([aria-hidden="true"])')).toBeNull();
     const button = screen.getByRole('button', { name: 'Aprovar' });
     expect(button.hasAttribute('disabled')).toBe(true);
     expect(button.getAttribute('aria-describedby')).toBeTruthy();
-    expect(
-      document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent,
-    ).toBe('Corrija os problemas de validação antes de aprovar.');
+    expect(document.getElementById(button.getAttribute('aria-describedby') ?? '')).toBe(blocked);
   });
 
   it('sem content.publish, não há ação de aprovar; o checklist aparece só para leitura', () => {
