@@ -13,7 +13,7 @@ usage="uso: pnpm local:isolated up <id> [porta] | down <id>"
 verb="${1:?$usage}"
 id="${2:?$usage}"
 case "$id" in
-  *[!a-z0-9-]* | -*) echo "id só com letras minúsculas, dígitos e hífen: $id" >&2; exit 2 ;;
+  *[!abcdefghijklmnopqrstuvwxyz0123456789-]* | -*) echo "id só com letras minúsculas, dígitos e hífen: $id" >&2; exit 2 ;;
 esac
 web="orakel-$id-web"
 caddy="orakel-$id-caddy"
