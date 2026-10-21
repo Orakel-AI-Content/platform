@@ -434,6 +434,15 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'bg-gray-200',
     minimum: 4.5,
   },
+  // Prefixo e sufixo do Input (#436): `.input-suffix-start` e `.input-suffix-end` de `input.css`,
+  // sobre o fundo do campo.
+  {
+    name: 'prefixo e sufixo do campo',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-gray-100',
+    minimum: 4.5,
+  },
   {
     name: 'mensagem de erro no body',
     theme: 'escuro',
@@ -468,6 +477,15 @@ const ECME_PAIRS: readonly EcmePair[] = [
     theme: 'escuro',
     text: 'dark:text-gray-100',
     background: 'dark:bg-gray-600',
+    minimum: 4.5,
+    ecme: 'dark:text-gray-400',
+  },
+  {
+    // O Ecme herdava a cor do texto do body.
+    name: 'prefixo e sufixo do campo',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-700',
     minimum: 4.5,
     ecme: 'dark:text-gray-400',
   },
