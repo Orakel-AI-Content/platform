@@ -3,7 +3,11 @@ import { Fragment, type ReactNode } from 'react';
 
 import { InfoField, InfoList } from '@/components/shared/InfoList';
 import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
-import { BLOCK_TYPE_LABEL, CONTENT_KIND_LABEL } from '@/components/shared/siteLabels.ts';
+import {
+  BLOCK_TYPE_LABEL,
+  CONTENT_KIND_LABEL,
+  formatDateTime,
+} from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
 import type { ContentData } from '@/db/schema/index.ts';
 
@@ -120,8 +124,8 @@ function BlockBody({ block }: { block: Block }) {
   }
 }
 
-/** Metadados e blocos de uma versão, só para ler. */
-export function ContentVersionView({ data }: { data: ContentData }) {
+/** Metadados e blocos de uma versão, só para ler; a data de publicação no fuso do site. */
+export function ContentVersionView({ data, timeZone }: { data: ContentData; timeZone: string }) {
   const ids = (values: number[]) => (values.length > 0 ? values.join(', ') : '—');
   const meta: [string, ReactNode][] = [
     ['Tipo', CONTENT_KIND_LABEL[data.kind]],
@@ -131,7 +135,7 @@ export function ContentVersionView({ data }: { data: ContentData }) {
     ['Autores (IDs)', ids(data.authorIds)],
     ['Taxonomias (IDs)', ids(data.taxonomyIds)],
     ['Capa (mídia)', data.coverMediaId ?? '—'],
-    ['Data de publicação', data.publishedAt],
+    ['Data de publicação', formatDateTime(new Date(data.publishedAt), timeZone)],
     ['Título SEO', data.seo?.title ?? '—'],
     ['Descrição SEO', data.seo?.description ?? '—'],
     ['Canônico', data.seo?.canonical ?? '—'],

@@ -53,7 +53,7 @@ const data: ContentData = {
 
 describe('visualização de versão', () => {
   it('mostra o título e o texto de cada bloco', () => {
-    render(<ContentVersionView data={data} />);
+    render(<ContentVersionView data={data} timeZone="America/Sao_Paulo" />);
 
     expect(screen.getByText('Guia de uso')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Primeiros passos' })).toBeTruthy();
@@ -67,8 +67,15 @@ describe('visualização de versão', () => {
     expect(screen.getByText('FAQ · bloco 6')).toBeTruthy();
   });
 
+  it('mostra a data de publicação no formato e no fuso do site, não em ISO', () => {
+    render(<ContentVersionView data={data} timeZone="America/Sao_Paulo" />);
+
+    expect(screen.getByText('01/10/2026, 09:00 BRT')).toBeTruthy();
+    expect(screen.queryByText(data.publishedAt)).toBeNull();
+  });
+
   it('não tem nenhum controle de edição', () => {
-    const { container } = render(<ContentVersionView data={data} />);
+    const { container } = render(<ContentVersionView data={data} timeZone="America/Sao_Paulo" />);
 
     for (const role of ['textbox', 'button', 'checkbox', 'combobox']) {
       expect(screen.queryAllByRole(role)).toEqual([]);
@@ -77,7 +84,7 @@ describe('visualização de versão', () => {
   });
 
   it('põe "Dados" e cada bloco num cartão, sem a grade rótulo/valor antiga', () => {
-    const { container } = render(<ContentVersionView data={data} />);
+    const { container } = render(<ContentVersionView data={data} timeZone="America/Sao_Paulo" />);
 
     expect(container.querySelectorAll('.card')).toHaveLength(1 + data.blocks.length);
     expect(
@@ -90,6 +97,7 @@ describe('visualização de versão', () => {
       <>
         <h1>Versão 1</h1>
         <ContentVersionView
+          timeZone="America/Sao_Paulo"
           data={{
             ...data,
             blocks: [
