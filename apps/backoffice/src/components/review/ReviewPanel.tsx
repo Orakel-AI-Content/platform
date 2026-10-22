@@ -8,6 +8,7 @@ import { SchemaForm, type SchemaFormIssue } from '@/components/forms/SchemaForm'
 import type { FormActionResult } from '@/components/shared/actionResult.ts';
 import { CONTENT_STATUS_LABEL } from '@/components/shared/siteLabels.ts';
 import { SECTION_HINT_CLASS, SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
+import Alert from '@/components/ui/Alert';
 import Card from '@/components/ui/Card';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
@@ -18,7 +19,9 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 // cores do `@theme`; o `<aside>` fica por fora para manter o landmark. O checklist tem cartão
 // próprio, com "Aprovar" no rodapé dele (#333). As duas seções são seções da tela (`h2`, como
 // "Dados" e "Blocos" na versão, #372); o `<aside>` tem o nome por `aria-label`, sem `h2` oculto,
-// e a prévia em nova aba é ação do cabeçalho da página.
+// e a prévia em nova aba é ação do cabeçalho da página. Os problemas de validação e o aviso de
+// bloqueio ficam no `Alert` de erro do Ecme (#444), sem `role="alert"`: chegam no carregamento,
+// não são retorno de uma ação.
 
 export type ChecklistItem = { key: string; label: string };
 
@@ -69,11 +72,13 @@ export function ReviewPanel({
             Validação da release
           </h2>
           {blocked ? (
-            <ul className="list-disc space-y-1 pl-5 text-sm text-error">
-              {issues.map((issue) => (
-                <li key={issue.message}>{issue.message}</li>
-              ))}
-            </ul>
+            <Alert type="danger" showIcon duration={0}>
+              <ul className="list-disc space-y-1 pl-5 text-sm">
+                {issues.map((issue) => (
+                  <li key={issue.message}>{issue.message}</li>
+                ))}
+              </ul>
+            </Alert>
           ) : (
             <p className={SECTION_HINT_CLASS}>Nenhum problema de validação.</p>
           )}
@@ -91,9 +96,11 @@ export function ReviewPanel({
                 <>
                   {checklistTitle}
                   {blocked && (
-                    <p id={`${id}-blocked`} className="text-sm text-error">
-                      Corrija os problemas de validação antes de aprovar.
-                    </p>
+                    <Alert type="danger" showIcon duration={0}>
+                      <p id={`${id}-blocked`} className="text-sm">
+                        Corrija os problemas de validação antes de aprovar.
+                      </p>
+                    </Alert>
                   )}
                 </>
               ),
