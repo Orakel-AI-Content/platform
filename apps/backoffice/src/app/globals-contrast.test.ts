@@ -637,8 +637,8 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 4.5,
   },
   // Alert e Notification (#212). O fundo do alerta é o `-subtle` do tipo (10 a 27% da cor sobre
-  // a página, alfa que este teste ignora): o par é contra a página, com folga para o tingido. O
-  // texto da notificação herda o do body.
+  // a página, alfa que este teste ignora): o par é contra a página, com folga para o tingido. A
+  // descrição da notificação (`.notification-description`, #455) tinha a cor herdada do body.
   {
     name: 'texto do alerta',
     theme: 'claro',
@@ -654,9 +654,9 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 4.5,
   },
   {
-    name: 'texto da notificação',
+    name: 'descrição da notificação',
     theme: 'claro',
-    text: 'text-gray-900',
+    text: 'text-gray-600',
     background: 'bg-white',
     minimum: 4.5,
   },
@@ -675,11 +675,12 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 4.5,
   },
   {
-    name: 'texto da notificação',
+    name: 'descrição da notificação',
     theme: 'escuro',
-    text: 'dark:text-gray-100',
+    text: 'dark:text-gray-300',
     background: 'dark:bg-gray-700',
     minimum: 4.5,
+    ecme: 'dark:text-gray-400',
   },
   // Table e Tabs (#213): cabeçalho da tabela, aba e aba ativa (sublinhado e pílula). O
   // cabeçalho no claro é medido sobre o body, o fundo mais escuro em que aparece; o resto, sobre

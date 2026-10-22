@@ -86,6 +86,7 @@ ThemeConfigurator completo.
   | Texto do body, claro                                         | `text-gray-500` (4,35:1)                         | `text-gray-600` (7,17:1)                   |
   | Placeholder do campo, claro                                  | `placeholder:text-gray-400` (2,31:1)             | `placeholder:text-gray-600`                |
   | Placeholder do campo, escuro                                 | `placeholder:text-gray-400` (4,11:1)             | `dark:placeholder:text-gray-300`           |
+  | Descrição da notificação, escuro                             | `dark:text-gray-400` herdado do body (4,11:1)    | `dark:text-gray-300`                       |
   | `primary` como texto no cartão, escuro                       | `text-primary` (4,25:1)                          | `dark:text-primary-mild`                   |
   | Texto do Badge, escuro                                       | `text-white` (2,82:1)                            | `text-neutral dark:text-gray-950` (7,02:1) |
   | Fundo das iniciais do Avatar, claro                          | `bg-gray-400` (2,31:1)                           | `bg-gray-600` (7,17:1)                     |
