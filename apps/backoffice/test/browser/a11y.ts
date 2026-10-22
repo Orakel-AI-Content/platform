@@ -28,11 +28,25 @@ const toElement = (target: Target): Element =>
   target instanceof Element ? target : target.element();
 
 /**
+ * Espera as animações com fim (as de entrada, como a mensagem de erro do FormItem): no meio da
+ * transição de opacidade, a cor se mistura com o fundo e o axe acusa contraste. As infinitas
+ * (Spinner) não têm fim e ficam de fora.
+ */
+async function settleAnimations(): Promise<void> {
+  const finite = document
+    .getAnimations()
+    .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity);
+  await Promise.all(finite.map((animation) => animation.finished.catch(() => undefined)));
+}
+
+/**
  * Violações do axe nas tags WCAG 2.2 AA, como `rule: seletores`, para a falha dizer onde. Os
  * "focus guards" do floating-ui ficam de fora, como no E2E (decisão no escalonamento da #210).
- * Sem alvo, audita o documento inteiro (portais incluídos).
+ * Sem alvo, audita o documento inteiro (portais incluídos). Antes, espera as animações de
+ * entrada terminarem.
  */
 export async function audit(...targets: Target[]): Promise<string[]> {
+  await settleAnimations();
   const include = targets.length === 0 ? [document] : targets.map(toElement);
   const result = await axe.run(
     { include, exclude: [['[data-floating-ui-focus-guard]']] },

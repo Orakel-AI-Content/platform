@@ -71,11 +71,6 @@ function Selects() {
   );
 }
 
-/** Espera a mensagem de erro da "Seção" terminar de entrar: na transição, o axe acusa contraste. */
-async function settled(screen: Awaited<ReturnType<typeof renderUi>>) {
-  await expect.element(screen.getByText('Escolha uma seção')).toHaveStyle({ opacity: '1' });
-}
-
 /** Textos dos elementos da classe dentro do contêiner (as peças do react-select não têm papel). */
 const texts = (root: Element, selector: string) =>
   [...root.querySelectorAll(selector)].map((element) => element.textContent);
@@ -84,7 +79,6 @@ describe.each(COLOR_SCHEMES)('Select no navegador (%s)', (scheme) => {
   it('pelo teclado: rótulo, setas, Enter e Esc, sem violação do axe com o menu aberto', async () => {
     await setTheme(scheme);
     const screen = await renderUi(<Selects />);
-    await settled(screen);
     const root = screen.container;
 
     const categoria = screen.getByRole('combobox', { name: 'Categoria', exact: true });
@@ -116,7 +110,6 @@ describe.each(COLOR_SCHEMES)('Select no navegador (%s)', (scheme) => {
   it('múltiplo pelo teclado: adiciona, remove e anuncia em pt-BR, sem violação do axe', async () => {
     await setTheme(scheme);
     const screen = await renderUi(<Selects />);
-    await settled(screen);
     const combobox = screen.getByRole('combobox', { name: 'Categorias secundárias' });
     const multi = combobox.element().closest('.select')!;
     const values = () => texts(multi, '.select-multi-value-label');
