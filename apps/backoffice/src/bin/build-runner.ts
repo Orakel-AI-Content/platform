@@ -2,6 +2,7 @@ import { run } from 'graphile-worker';
 
 import { getDb } from '../db/client.ts';
 import type { BuildSettings } from '../domain/builds/plan.ts';
+import { recoverInterruptedBuilds } from '../domain/builds/recover.ts';
 import { getBuildRunnerEnv, getEnv, type BuildRunnerEnv, type Env } from '../env.ts';
 import { BUILD_RUNNER_CONCURRENCY, buildRunnerTasks } from '../jobs/task-lists.ts';
 import { dockerRuntime } from '../lib/docker.ts';
@@ -38,6 +39,11 @@ function settingsFrom(env: Env, runner: BuildRunnerEnv): BuildSettings {
 await runProcess('build-runner', async (logger) => {
   const runner = getBuildRunnerEnv();
   const { pool, db } = getDb();
+  // Antes de pegar jobs: build de um runner que morreu no meio da tentativa vira falha
+  // transitória e a fila build:<site> é liberada (o Graphile Worker só a solta depois de 4 h).
+  for (const build of await recoverInterruptedBuilds(db, runner.SITE_BUILDER_TAG)) {
+    logger.warn(build, `build de ${build.siteId} interrompido; fila liberada`);
+  }
   const worker = await run({
     pgPool: pool,
     taskList: buildRunnerTasks({
