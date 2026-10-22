@@ -201,7 +201,7 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
 const LIBRARY_SITE = `e2e-biblioteca-${Date.now()}`;
 const LIBRARY_COUNT = 2000;
 
-test.describe('biblioteca com 2.000 imagens (#186)', () => {
+test.describe('biblioteca com 2.000 imagens (#186)', { tag: '@perf' }, () => {
   test.beforeAll(async () => {
     const config = (await readFixture('exemplo-b')).find((line) => line.type === 'config');
     if (config?.type !== 'config') throw new Error('fixture sem config');
@@ -346,49 +346,51 @@ test.describe('biblioteca com 2.000 imagens (#186)', () => {
   }
 });
 
-test('envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com o motivo (#188)', async ({
-  page,
-}) => {
-  const small = await sharp({
-    create: { width: 640, height: 480, channels: 3, background: '#2a9d8f' },
-  })
-    .jpeg()
-    .toBuffer();
-  await loginAs(page, 'editor@orakel.local');
-  await page.goto(`/sites/${SITE}/midia`);
+test(
+  'envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com o motivo (#188)',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    const small = await sharp({
+      create: { width: 640, height: 480, channels: 3, background: '#2a9d8f' },
+    })
+      .jpeg()
+      .toBuffer();
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${SITE}/midia`);
 
-  // Só com teclado (#376): Enter no botão abre o diálogo; Tab passa pelo X "Fechar" e chega ao
-  // campo que cobre a área; Enter nele abre o seletor de arquivos do navegador. Escolher fecha o
-  // diálogo e o foco volta ao botão.
-  const trigger = page.getByRole('button', { name: 'Enviar imagens' }).first();
-  await trigger.focus();
-  await page.keyboard.press('Enter');
-  const upload = uploadDialog(page);
-  await expect(upload.dialog).toBeVisible();
-  await page.keyboard.press('Tab');
-  await expect(upload.dialog.getByRole('button', { name: 'Fechar' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(upload.input).toBeFocused();
-  const chooser = page.waitForEvent('filechooser');
-  await page.keyboard.press('Enter');
-  await (
-    await chooser
-  ).setFiles([
-    { name: 'foto-gps.jpg', mimeType: 'image/jpeg', buffer: await readFile(FIXTURE) },
-    { name: 'paisagem.jpg', mimeType: 'image/jpeg', buffer: small },
-    { name: 'notas.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('não é imagem') },
-  ]);
-  await expect(upload.dialog).toBeHidden();
-  await expect(trigger).toBeFocused();
+    // Só com teclado (#376): Enter no botão abre o diálogo; Tab passa pelo X "Fechar" e chega ao
+    // campo que cobre a área; Enter nele abre o seletor de arquivos do navegador. Escolher fecha o
+    // diálogo e o foco volta ao botão.
+    const trigger = page.getByRole('button', { name: 'Enviar imagens' }).first();
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    const upload = uploadDialog(page);
+    await expect(upload.dialog).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(upload.dialog.getByRole('button', { name: 'Fechar' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(upload.input).toBeFocused();
+    const chooser = page.waitForEvent('filechooser');
+    await page.keyboard.press('Enter');
+    await (
+      await chooser
+    ).setFiles([
+      { name: 'foto-gps.jpg', mimeType: 'image/jpeg', buffer: await readFile(FIXTURE) },
+      { name: 'paisagem.jpg', mimeType: 'image/jpeg', buffer: small },
+      { name: 'notas.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('não é imagem') },
+    ]);
+    await expect(upload.dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
 
-  const row = (name: string) =>
-    page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
-  await expect(row('notas.jpg')).toContainText(
-    'recusada: O arquivo não é uma imagem JPEG, PNG, WebP ou AVIF',
-  );
-  await expect(row('foto-gps.jpg')).toContainText('pronta', { timeout: 60_000 });
-  await expect(row('paisagem.jpg')).toContainText('pronta', { timeout: 60_000 });
-});
+    const row = (name: string) =>
+      page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
+    await expect(row('notas.jpg')).toContainText(
+      'recusada: O arquivo não é uma imagem JPEG, PNG, WebP ou AVIF',
+    );
+    await expect(row('foto-gps.jpg')).toContainText('pronta', { timeout: 60_000 });
+    await expect(row('paisagem.jpg')).toContainText('pronta', { timeout: 60_000 });
+  },
+);
 
 // Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, nos dois temas, com
 // um único `role="status"` para a fila (#375), e o diálogo de envio aberto (#376).

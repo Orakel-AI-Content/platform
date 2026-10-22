@@ -193,60 +193,63 @@ async function loginPreview(page: Page, email: string): Promise<void> {
   await page.getByRole('link', { name: email }).click();
 }
 
-test('enviar, achar na fila e aprovar com o checklist; o artigo sai da fila', async ({
-  page,
-  browser,
-}) => {
-  const slug = `e2e-aprovar-${Date.now()}`;
-  const title = `Artigo ${slug}`;
-  await loginAs(page, 'editor@orakel.local');
-  await createDraft(page, title, slug);
-  await page.getByRole('button', { name: 'Enviar para revisão' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
+test(
+  'enviar, achar na fila e aprovar com o checklist; o artigo sai da fila',
+  { tag: '@smoke' },
+  async ({ page, browser }) => {
+    const slug = `e2e-aprovar-${Date.now()}`;
+    const title = `Artigo ${slug}`;
+    await loginAs(page, 'editor@orakel.local');
+    await createDraft(page, title, slug);
+    await page.getByRole('button', { name: 'Enviar para revisão' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Enviado para revisão.' }),
+    ).toBeVisible();
 
-  // Editor abre a revisão: vê a visualização e o checklist, sem a ação de aprovar.
-  await page.goto(queueFor(slug));
-  await page.getByRole('link', { name: `${title} (revisar)` }).click();
-  await expect(
-    page.getByRole('heading', { level: 1, name: `Revisão de “${title}”` }),
-  ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Aprovar' })).toHaveCount(0);
+    // Editor abre a revisão: vê a visualização e o checklist, sem a ação de aprovar.
+    await page.goto(queueFor(slug));
+    await page.getByRole('link', { name: `${title} (revisar)` }).click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: `Revisão de “${title}”` }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Aprovar' })).toHaveCount(0);
 
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
-  const reviewer = await context.newPage();
-  await loginAs(reviewer, 'revisor@orakel.local');
-  await loginPreview(reviewer, 'revisor@orakel.local');
-  await reviewer.goto(queueFor(slug));
-  await reviewer.getByRole('link', { name: `${title} (revisar)` }).click();
+    const context = await browser.newContext({ ignoreHTTPSErrors: true });
+    const reviewer = await context.newPage();
+    await loginAs(reviewer, 'revisor@orakel.local');
+    await loginPreview(reviewer, 'revisor@orakel.local');
+    await reviewer.goto(queueFor(slug));
+    await reviewer.getByRole('link', { name: `${title} (revisar)` }).click();
 
-  // A visualização do site, no iframe, com o artigo em revisão.
-  const frame = reviewer.locator('iframe');
-  await expect(frame).toHaveAttribute('src', `${PREVIEW}/exemplo-a/${slug}/`);
-  await expect(frame).toHaveAttribute('title', `Visualização de “${title}” no site`);
-  await expect(
-    reviewer.frameLocator('iframe').getByRole('heading', { level: 1, name: title }),
-  ).toBeVisible();
-  await expect(reviewer.getByText('Nenhum problema de validação.')).toBeVisible();
+    // A visualização do site, no iframe, com o artigo em revisão.
+    const frame = reviewer.locator('iframe');
+    await expect(frame).toHaveAttribute('src', `${PREVIEW}/exemplo-a/${slug}/`);
+    await expect(frame).toHaveAttribute('title', `Visualização de “${title}” no site`);
+    await expect(
+      reviewer.frameLocator('iframe').getByRole('heading', { level: 1, name: title }),
+    ).toBeVisible();
+    await expect(reviewer.getByText('Nenhum problema de validação.')).toBeVisible();
 
-  // Os 5 itens do checklist (REVIEW_CHECKLIST), marcados pelo teclado.
-  const items = reviewer.getByRole('checkbox');
-  await expect(items).toHaveCount(5);
-  for (let index = 0; index < 5; index += 1) {
-    await items.nth(index).focus();
-    await reviewer.keyboard.press('Space');
-  }
-  await reviewer.getByRole('button', { name: 'Aprovar' }).click();
-  // O "aprovado" vai para o toast do template (#325), fora do painel.
-  await expect(
-    reviewer.getByRole('status').filter({ hasText: 'Versão 1 aprovada.' }),
-  ).toBeVisible();
-  await expect(reviewer.getByRole('button', { name: 'Aprovar' })).toHaveCount(0);
+    // Os 5 itens do checklist (REVIEW_CHECKLIST), marcados pelo teclado.
+    const items = reviewer.getByRole('checkbox');
+    await expect(items).toHaveCount(5);
+    for (let index = 0; index < 5; index += 1) {
+      await items.nth(index).focus();
+      await reviewer.keyboard.press('Space');
+    }
+    await reviewer.getByRole('button', { name: 'Aprovar' }).click();
+    // O "aprovado" vai para o toast do template (#325), fora do painel.
+    await expect(
+      reviewer.getByRole('status').filter({ hasText: 'Versão 1 aprovada.' }),
+    ).toBeVisible();
+    await expect(reviewer.getByRole('button', { name: 'Aprovar' })).toHaveCount(0);
 
-  await reviewer.goto(queueFor(slug));
-  await expect(reviewer.getByRole('heading', { level: 1, name: /Revisão/ })).toBeVisible();
-  await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toHaveCount(0);
-  await context.close();
-});
+    await reviewer.goto(queueFor(slug));
+    await expect(reviewer.getByRole('heading', { level: 1, name: /Revisão/ })).toBeVisible();
+    await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toHaveCount(0);
+    await context.close();
+  },
+);
 
 // Tela de revisão no Ecme (#277): o painel junto da visualização, com checklist e "Aprovar", e
 // o axe sem violação nos dois temas (fora o iframe, que é o site).

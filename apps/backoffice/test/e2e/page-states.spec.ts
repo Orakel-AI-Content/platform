@@ -20,21 +20,23 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
   expect(accessibility.violations).toEqual([]);
 }
 
-test('endereço inexistente mostra "não encontrado" com o cabeçalho e status 404', async ({
-  page,
-}) => {
-  await loginAs(page, OPERATOR);
+test(
+  'endereço inexistente mostra "não encontrado" com o cabeçalho e status 404',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    await loginAs(page, OPERATOR);
 
-  for (const path of ['/qualquer', '/sites/inexistente', '/sites/exemplo-a/nada/aqui']) {
-    const response = await page.goto(path);
-    expect(response?.status(), path).toBe(404);
-    await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
-    await expect(page.getByRole('banner')).toContainText(OPERATOR);
-  }
+    for (const path of ['/qualquer', '/sites/inexistente', '/sites/exemplo-a/nada/aqui']) {
+      const response = await page.goto(path);
+      expect(response?.status(), path).toBe(404);
+      await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
+      await expect(page.getByRole('banner')).toContainText(OPERATOR);
+    }
 
-  await page.getByRole('link', { name: 'Ir para a lista de sites' }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-});
+    await page.getByRole('link', { name: 'Ir para a lista de sites' }).click();
+    await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+  },
+);
 
 // Telas de estado no visual do Ecme (#283), nos dois temas.
 for (const colorScheme of ['light', 'dark'] as const) {

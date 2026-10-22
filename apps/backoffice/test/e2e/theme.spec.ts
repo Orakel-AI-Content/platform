@@ -120,29 +120,30 @@ for (const scheme of SCHEMES) {
     expect(hydration).toEqual([]);
   });
 
-  test(`com cookie ${scheme}, o HTML do servidor já traz a classe, mesmo com o sistema no oposto`, async ({
-    page,
-    context,
-  }) => {
-    await page.emulateMedia({ colorScheme: opposite(scheme) });
-    await login(page);
-    await setThemeCookie(context, scheme);
-    const hydration = hydrationMessages(page);
+  test(
+    `com cookie ${scheme}, o HTML do servidor já traz a classe, mesmo com o sistema no oposto`,
+    { tag: '@smoke' },
+    async ({ page, context }) => {
+      await page.emulateMedia({ colorScheme: opposite(scheme) });
+      await login(page);
+      await setThemeCookie(context, scheme);
+      const hydration = hydrationMessages(page);
 
-    const tag = await serverHtmlTag(page);
-    expect(tag).toMatch(new RegExp(`class="[^"]*\\b${scheme}\\b`));
-    expect(tag).not.toMatch(new RegExp(`\\b${opposite(scheme)}\\b`));
+      const tag = await serverHtmlTag(page);
+      expect(tag).toMatch(new RegExp(`class="[^"]*\\b${scheme}\\b`));
+      expect(tag).not.toMatch(new RegExp(`\\b${opposite(scheme)}\\b`));
 
-    await recordFrames(page);
-    await page.goto('/sites');
-    await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-    for (const frame of await frames(page)) {
-      expect(frame.theme).toBe(scheme);
-      if (frame.background !== null) expect(frame.background).toBe(BACKGROUND[scheme]);
-    }
-    expect(await darkUtilityDisplay(page)).toBe(EXPECTED_DISPLAY[scheme]);
-    expect(hydration).toEqual([]);
-  });
+      await recordFrames(page);
+      await page.goto('/sites');
+      await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+      for (const frame of await frames(page)) {
+        expect(frame.theme).toBe(scheme);
+        if (frame.background !== null) expect(frame.background).toBe(BACKGROUND[scheme]);
+      }
+      expect(await darkUtilityDisplay(page)).toBe(EXPECTED_DISPLAY[scheme]);
+      expect(hydration).toEqual([]);
+    },
+  );
 }
 
 test('cookie com valor desconhecido vale como modo sistema', async ({ page, context }) => {
