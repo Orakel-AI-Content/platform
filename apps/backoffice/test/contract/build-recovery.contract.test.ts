@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { Logger, runOnce } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
@@ -86,6 +87,30 @@ describe('recuperação dos builds interrompidos', () => {
       sql`select state from sites where id = 'exemplo-a'`,
     );
     expect(rows).toEqual([{ state: 'ativo' }]);
+  });
+
+  it('o job preso na fila do worker morto roda depois da recuperação', async () => {
+    await lock('build:exemplo-a', DEAD);
+    await db.execute(sql`update graphile_worker._private_jobs set run_at = now()`);
+    const ran: unknown[] = [];
+    const runBuildOnce = () =>
+      runOnce({
+        pgPool: db.$client,
+        logger: new Logger(() => () => {}),
+        taskList: {
+          build: (payload) => {
+            ran.push(payload);
+          },
+        },
+      });
+
+    // Fila presa: o Graphile Worker não pega o job (só soltaria a trava depois de 4 h).
+    await runBuildOnce();
+    expect(ran).toEqual([]);
+
+    await recoverInterruptedBuilds(db, 'local');
+    await runBuildOnce();
+    expect(ran).toEqual([expect.objectContaining({ siteId: 'exemplo-a' })]);
   });
 
   it('não toca a trava de um job de outra task', async () => {
