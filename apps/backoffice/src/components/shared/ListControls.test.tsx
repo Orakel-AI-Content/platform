@@ -212,6 +212,24 @@ describe('ListToolbar: layout do template (#361)', () => {
     expect(within(form).getByRole('button', { name: 'Limpar filtros' })).toBeTruthy();
   });
 
+  it('a busca mostra a lupa como sufixo decorativo, sem mudar o nome acessível (#442)', () => {
+    render(
+      <ListToolbar
+        search=""
+        searchLabel="Buscar por nome"
+        onSearchChange={() => {}}
+        onClear={() => {}}
+      />,
+    );
+
+    const input = screen.getByRole('searchbox', { name: 'Buscar por nome' });
+    const suffix = input.parentElement?.querySelector('.input-suffix-end');
+    const icon = suffix?.querySelector('svg');
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+    expect(icon?.getAttribute('class')).toContain('text-lg');
+    expect(screen.getByText('Buscar por nome')).toBeTruthy();
+  });
+
   it('sem filtro ativo nem busca, não mostra "Limpar filtros"', () => {
     render(
       <ListToolbar
