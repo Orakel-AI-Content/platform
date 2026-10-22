@@ -20,27 +20,29 @@ async function tabTo(page: Page, target: Locator): Promise<void> {
   throw new Error('O controle não recebeu o foco pelo teclado');
 }
 
-test('a primeira parada do Tab é "Pular para o conteúdo", que leva o foco ao <main>', async ({
-  page,
-}) => {
-  await loginAs(page, 'editor@orakel.local');
+test(
+  'a primeira parada do Tab é "Pular para o conteúdo", que leva o foco ao <main>',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    await loginAs(page, 'editor@orakel.local');
 
-  for (const path of ['/sites', '/sites/exemplo-a/conteudos']) {
-    await page.goto(path);
-    await page.keyboard.press('Tab');
-    const skip = page.getByRole('link', { name: 'Pular para o conteúdo' });
-    await expect(skip).toBeFocused();
-    await expect(skip).toBeInViewport();
+    for (const path of ['/sites', '/sites/exemplo-a/conteudos']) {
+      await page.goto(path);
+      await page.keyboard.press('Tab');
+      const skip = page.getByRole('link', { name: 'Pular para o conteúdo' });
+      await expect(skip).toBeFocused();
+      await expect(skip).toBeInViewport();
 
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('main')).toBeFocused();
-    // O Tab seguinte já é do conteúdo, não do cabeçalho.
-    await page.keyboard.press('Tab');
-    expect(
-      await page.evaluate(() => document.querySelector('main')?.contains(document.activeElement)),
-    ).toBe(true);
-  }
-});
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('main')).toBeFocused();
+      // O Tab seguinte já é do conteúdo, não do cabeçalho.
+      await page.keyboard.press('Tab');
+      expect(
+        await page.evaluate(() => document.querySelector('main')?.contains(document.activeElement)),
+      ).toBe(true);
+    }
+  },
+);
 
 test('a marca "Orakel Backoffice" leva à lista de sites', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');

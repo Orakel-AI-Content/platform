@@ -32,172 +32,176 @@ async function addBlock(page: Page, type: string): Promise<void> {
   await page.getByRole('button', { name: 'Adicionar bloco' }).click();
 }
 
-test('editor cria um artigo com texto, imagem e FAQ e o encontra na lista', async ({ page }) => {
-  const slug = `e2e-${Date.now()}`;
-  const title = `Artigo ${slug}`;
-  await loginAs(page, 'editor@orakel.local');
-  await page.goto('/sites/exemplo-a/conteudos');
-  // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
-  await page.getByRole('link', { name: 'Criar conteúdo' }).first().click();
-  await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
+test(
+  'editor cria um artigo com texto, imagem e FAQ e o encontra na lista',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    const slug = `e2e-${Date.now()}`;
+    const title = `Artigo ${slug}`;
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a/conteudos');
+    // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
+    await page.getByRole('link', { name: 'Criar conteúdo' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
 
-  await page.getByLabel(fieldLabel('Título')).fill(title);
-  await page.getByLabel('Slug').fill(slug);
-  await chooseOption(page.getByRole('combobox', { name: fieldLabel('Autores') }), 'Ana Souza');
-  await chooseOption(
-    page.getByRole('combobox', { name: fieldLabel('Taxonomias') }),
-    'Guias (categoria)',
-  );
+    await page.getByLabel(fieldLabel('Título')).fill(title);
+    await page.getByLabel('Slug').fill(slug);
+    await chooseOption(page.getByRole('combobox', { name: fieldLabel('Autores') }), 'Ana Souza');
+    await chooseOption(
+      page.getByRole('combobox', { name: fieldLabel('Taxonomias') }),
+      'Guias (categoria)',
+    );
 
-  await addBlock(page, 'Texto');
-  // A barra de formatação do bloco de texto cabe numa linha a 1280 px (#133): a altura da
-  // toolbar é a de um botão de ícone (32 px), sem segunda fileira.
-  expect(page.viewportSize()?.width).toBe(1280);
-  const toolbarBox = await page.getByRole('toolbar', { name: 'Formatação: Texto' }).boundingBox();
-  expect(toolbarBox?.height).toBeLessThanOrEqual(40);
-  await page.getByRole('textbox', { name: 'Texto', exact: true }).click();
-  await page.keyboard.type('Primeiro parágrafo do artigo.');
+    await addBlock(page, 'Texto');
+    // A barra de formatação do bloco de texto cabe numa linha a 1280 px (#133): a altura da
+    // toolbar é a de um botão de ícone (32 px), sem segunda fileira.
+    expect(page.viewportSize()?.width).toBe(1280);
+    const toolbarBox = await page.getByRole('toolbar', { name: 'Formatação: Texto' }).boundingBox();
+    expect(toolbarBox?.height).toBeLessThanOrEqual(40);
+    await page.getByRole('textbox', { name: 'Texto', exact: true }).click();
+    await page.keyboard.type('Primeiro parágrafo do artigo.');
 
-  // Link pelo popover, só com teclado (#132): inválido não aplica, Enter aplica, Esc fecha, e
-  // o foco volta ao editor.
-  const textEditor = page.getByRole('textbox', { name: 'Texto', exact: true });
-  const linkButton = page.getByRole('button', { name: 'Link', exact: true });
-  const linkPopover = page.locator(`[id="${await linkButton.getAttribute('popovertarget')}"]`);
-  const href = linkPopover.getByLabel('Endereço do link');
-  // Sem seleção, com o cursor no fim do parágrafo: o endereço entra como link dentro da frase
-  // (um link que fosse o parágrafo inteiro perderia a exceção de alvo em linha do axe).
-  await page.keyboard.type(' Veja ');
-  await linkButton.focus();
-  await page.keyboard.press('Enter');
-  await expect(href).toBeFocused();
-  await page.keyboard.type('javascript:alert(1)');
-  await page.keyboard.press('Enter');
-  await expect(href).toHaveAttribute('aria-invalid', 'true');
-  await expect(href).toHaveAccessibleDescription(
-    /Use um caminho iniciado por \/ ou uma URL http\(s\)/,
-  );
-  await expect(textEditor.locator('a')).toHaveCount(0);
-  await href.fill('/guias/');
-  await page.keyboard.press('Enter');
-  await expect(linkPopover).toBeHidden();
-  await expect(textEditor).toBeFocused();
-  await expect(textEditor.locator('a')).toHaveAttribute('href', '/guias/');
-  await expect(textEditor).toContainText('Primeiro parágrafo do artigo. Veja /guias/');
-  // Cursor dentro do link (não na borda do fim): o campo abre com o endereço atual.
-  await page.keyboard.press('ArrowLeft');
-  await page.keyboard.press('ArrowLeft');
-  await expect(linkButton).toHaveAttribute('aria-pressed', 'true');
-  await linkButton.focus();
-  await page.keyboard.press('Enter');
-  await expect(href).toHaveValue('/guias/');
-  await page.keyboard.press('Escape');
-  await expect(linkPopover).toBeHidden();
-  await expect(textEditor).toBeFocused();
+    // Link pelo popover, só com teclado (#132): inválido não aplica, Enter aplica, Esc fecha, e
+    // o foco volta ao editor.
+    const textEditor = page.getByRole('textbox', { name: 'Texto', exact: true });
+    const linkButton = page.getByRole('button', { name: 'Link', exact: true });
+    const linkPopover = page.locator(`[id="${await linkButton.getAttribute('popovertarget')}"]`);
+    const href = linkPopover.getByLabel('Endereço do link');
+    // Sem seleção, com o cursor no fim do parágrafo: o endereço entra como link dentro da frase
+    // (um link que fosse o parágrafo inteiro perderia a exceção de alvo em linha do axe).
+    await page.keyboard.type(' Veja ');
+    await linkButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(href).toBeFocused();
+    await page.keyboard.type('javascript:alert(1)');
+    await page.keyboard.press('Enter');
+    await expect(href).toHaveAttribute('aria-invalid', 'true');
+    await expect(href).toHaveAccessibleDescription(
+      /Use um caminho iniciado por \/ ou uma URL http\(s\)/,
+    );
+    await expect(textEditor.locator('a')).toHaveCount(0);
+    await href.fill('/guias/');
+    await page.keyboard.press('Enter');
+    await expect(linkPopover).toBeHidden();
+    await expect(textEditor).toBeFocused();
+    await expect(textEditor.locator('a')).toHaveAttribute('href', '/guias/');
+    await expect(textEditor).toContainText('Primeiro parágrafo do artigo. Veja /guias/');
+    // Cursor dentro do link (não na borda do fim): o campo abre com o endereço atual.
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await expect(linkButton).toHaveAttribute('aria-pressed', 'true');
+    await linkButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(href).toHaveValue('/guias/');
+    await page.keyboard.press('Escape');
+    await expect(linkPopover).toBeHidden();
+    await expect(textEditor).toBeFocused();
 
-  // "Remover link" fecha o popover e confirma num diálogo (#327): Esc mantém o link e devolve
-  // o foco ao botão Link; "Remover" tira o link, o texto fica e o foco volta ao editor.
-  const removeLinkDialog = page.getByRole('alertdialog', { name: 'Remover o link?' });
-  await linkButton.focus();
-  await page.keyboard.press('Enter');
-  await linkPopover.getByRole('button', { name: 'Remover link' }).click();
-  await expect(linkPopover).toBeHidden();
-  await expect(removeLinkDialog).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(removeLinkDialog).toHaveCount(0);
-  await expect(linkButton).toBeFocused();
-  await expect(textEditor.locator('a')).toHaveAttribute('href', '/guias/');
-  await page.keyboard.press('Enter');
-  await linkPopover.getByRole('button', { name: 'Remover link' }).click();
-  await removeLinkDialog.getByRole('button', { name: 'Remover' }).click();
-  await expect(removeLinkDialog).toHaveCount(0);
-  await expect(textEditor.locator('a')).toHaveCount(0);
-  await expect(textEditor).toContainText('Primeiro parágrafo do artigo. Veja /guias/');
-  await expect(textEditor).toBeFocused();
+    // "Remover link" fecha o popover e confirma num diálogo (#327): Esc mantém o link e devolve
+    // o foco ao botão Link; "Remover" tira o link, o texto fica e o foco volta ao editor.
+    const removeLinkDialog = page.getByRole('alertdialog', { name: 'Remover o link?' });
+    await linkButton.focus();
+    await page.keyboard.press('Enter');
+    await linkPopover.getByRole('button', { name: 'Remover link' }).click();
+    await expect(linkPopover).toBeHidden();
+    await expect(removeLinkDialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(removeLinkDialog).toHaveCount(0);
+    await expect(linkButton).toBeFocused();
+    await expect(textEditor.locator('a')).toHaveAttribute('href', '/guias/');
+    await page.keyboard.press('Enter');
+    await linkPopover.getByRole('button', { name: 'Remover link' }).click();
+    await removeLinkDialog.getByRole('button', { name: 'Remover' }).click();
+    await expect(removeLinkDialog).toHaveCount(0);
+    await expect(textEditor.locator('a')).toHaveCount(0);
+    await expect(textEditor).toContainText('Primeiro parágrafo do artigo. Veja /guias/');
+    await expect(textEditor).toBeFocused();
 
-  // A imagem do bloco pela grade de miniaturas (#182), só com o teclado.
-  await addBlock(page, 'Imagem');
-  const imageField = page.getByRole('group', { name: 'Mídia', exact: true });
-  await imageField.getByRole('button', { name: 'Escolher imagem' }).focus();
-  await page.keyboard.press('Enter');
-  const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
-  await expect(grid.getByRole('list', { name: 'Imagens da biblioteca' })).toBeVisible();
-  const firstImage = grid.getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ }).first();
-  const chosen = (await firstImage.textContent()) ?? '';
-  for (let step = 0; step < 5; step += 1) {
-    if (await firstImage.evaluate((element) => element === document.activeElement)) break;
-    await page.keyboard.press('Tab');
-  }
-  await expect(firstImage).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(grid).toBeHidden();
-  await expect(imageField.getByText(chosen, { exact: true }).first()).toBeVisible();
-  await expect(imageField.getByRole('button', { name: 'Trocar' })).toBeFocused();
+    // A imagem do bloco pela grade de miniaturas (#182), só com o teclado.
+    await addBlock(page, 'Imagem');
+    const imageField = page.getByRole('group', { name: 'Mídia', exact: true });
+    await imageField.getByRole('button', { name: 'Escolher imagem' }).focus();
+    await page.keyboard.press('Enter');
+    const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
+    await expect(grid.getByRole('list', { name: 'Imagens da biblioteca' })).toBeVisible();
+    const firstImage = grid.getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ }).first();
+    const chosen = (await firstImage.textContent()) ?? '';
+    for (let step = 0; step < 5; step += 1) {
+      if (await firstImage.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(firstImage).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(grid).toBeHidden();
+    await expect(imageField.getByText(chosen, { exact: true }).first()).toBeVisible();
+    await expect(imageField.getByRole('button', { name: 'Trocar' })).toBeFocused();
 
-  await addBlock(page, 'FAQ');
-  await page.getByRole('button', { name: 'Adicionar pergunta' }).click();
-  await page.getByLabel(fieldLabel('Pergunta')).fill('Funciona offline?');
-  await page.getByRole('textbox', { name: 'Resposta' }).click();
-  await page.keyboard.type('Não, precisa de conexão.');
-  // Remover pergunta confirma num diálogo (#327).
-  await page.getByRole('button', { name: 'Adicionar pergunta' }).click();
-  await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveCount(2);
-  await page.getByRole('button', { name: 'Remover pergunta 2' }).click();
-  await page
-    .getByRole('alertdialog', { name: 'Remover pergunta 2?' })
-    .getByRole('button', { name: 'Remover' })
-    .click();
-  await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveCount(1);
-  await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveValue('Funciona offline?');
+    await addBlock(page, 'FAQ');
+    await page.getByRole('button', { name: 'Adicionar pergunta' }).click();
+    await page.getByLabel(fieldLabel('Pergunta')).fill('Funciona offline?');
+    await page.getByRole('textbox', { name: 'Resposta' }).click();
+    await page.keyboard.type('Não, precisa de conexão.');
+    // Remover pergunta confirma num diálogo (#327).
+    await page.getByRole('button', { name: 'Adicionar pergunta' }).click();
+    await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveCount(2);
+    await page.getByRole('button', { name: 'Remover pergunta 2' }).click();
+    await page
+      .getByRole('alertdialog', { name: 'Remover pergunta 2?' })
+      .getByRole('button', { name: 'Remover' })
+      .click();
+    await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveCount(1);
+    await expect(page.getByLabel(fieldLabel('Pergunta'))).toHaveValue('Funciona offline?');
 
-  // Sem texto alternativo nem decorativa: recusado com a mensagem junto do campo.
-  await page.getByRole('button', { name: 'Criar', exact: true }).click();
-  const alt = page.getByRole('textbox', { name: 'Texto alternativo' });
-  await expect(alt).toHaveAttribute('aria-invalid', 'true');
-  await expect(alt).toHaveAccessibleDescription(
-    'Informe o texto alternativo ou marque a imagem como decorativa',
-  );
-  await expect(page).toHaveURL(/\/conteudos\/novo$/);
+    // Sem texto alternativo nem decorativa: recusado com a mensagem junto do campo.
+    await page.getByRole('button', { name: 'Criar', exact: true }).click();
+    const alt = page.getByRole('textbox', { name: 'Texto alternativo' });
+    await expect(alt).toHaveAttribute('aria-invalid', 'true');
+    await expect(alt).toHaveAccessibleDescription(
+      'Informe o texto alternativo ou marque a imagem como decorativa',
+    );
+    await expect(page).toHaveURL(/\/conteudos\/novo$/);
 
-  // Controles de bloco são botões de ícone com alvo de pelo menos 24×24 px (#131).
-  for (const name of ['Mover bloco 2 para cima', 'Mover bloco 2 para baixo', 'Remover bloco 2']) {
-    const box = await page.getByRole('button', { name }).boundingBox();
-    expect(box?.width).toBeGreaterThanOrEqual(24);
-    expect(box?.height).toBeGreaterThanOrEqual(24);
-  }
-  await expect(page.getByRole('button', { name: 'Mover bloco 1 para cima' })).toHaveAttribute(
-    'aria-disabled',
-    'true',
-  );
+    // Controles de bloco são botões de ícone com alvo de pelo menos 24×24 px (#131).
+    for (const name of ['Mover bloco 2 para cima', 'Mover bloco 2 para baixo', 'Remover bloco 2']) {
+      const box = await page.getByRole('button', { name }).boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(24);
+      expect(box?.height).toBeGreaterThanOrEqual(24);
+    }
+    await expect(page.getByRole('button', { name: 'Mover bloco 1 para cima' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
 
-  // Reordenar e remover pelo teclado: a FAQ sobe e volta, nada se perde.
-  await page.getByRole('button', { name: 'Mover bloco 3 para cima' }).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('group', { name: 'Bloco 2: FAQ' })).toBeVisible();
-  await page.getByRole('button', { name: 'Mover bloco 2 para baixo' }).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('group', { name: 'Bloco 3: FAQ' })).toBeVisible();
+    // Reordenar e remover pelo teclado: a FAQ sobe e volta, nada se perde.
+    await page.getByRole('button', { name: 'Mover bloco 3 para cima' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('group', { name: 'Bloco 2: FAQ' })).toBeVisible();
+    await page.getByRole('button', { name: 'Mover bloco 2 para baixo' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('group', { name: 'Bloco 3: FAQ' })).toBeVisible();
 
-  // A mensagem do FormItem (#245) volta a entrar, com transição de opacidade, quando o bloco é
-  // remontado na troca de posição; o axe roda depois dela.
-  await expect(page.locator('.form-explain')).toHaveCSS('opacity', '1');
-  // O ponteiro ficou sobre "Criar conteúdo" desde o clique; o axe audita o rodapé em repouso.
-  await page.mouse.move(0, 0);
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(accessibility.violations).toEqual([]);
+    // A mensagem do FormItem (#245) volta a entrar, com transição de opacidade, quando o bloco é
+    // remontado na troca de posição; o axe roda depois dela.
+    await expect(page.locator('.form-explain')).toHaveCSS('opacity', '1');
+    // O ponteiro ficou sobre "Criar conteúdo" desde o clique; o axe audita o rodapé em repouso.
+    await page.mouse.move(0, 0);
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
 
-  await alt.fill('Mesa organizada');
-  await page.getByRole('button', { name: 'Criar', exact: true }).click();
+    await alt.fill('Mesa organizada');
+    await page.getByRole('button', { name: 'Criar', exact: true }).click();
 
-  // Fica no editor do conteúdo criado (#109), com a confirmação no toast, fora do main (#326).
-  await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos\/\d+\/editar$/);
-  await expect(page.getByRole('heading', { name: `Editar “${title}”` })).toBeVisible();
-  await expect(toastRegion(page)).toContainText('Conteúdo criado.');
+    // Fica no editor do conteúdo criado (#109), com a confirmação no toast, fora do main (#326).
+    await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos\/\d+\/editar$/);
+    await expect(page.getByRole('heading', { name: `Editar “${title}”` })).toBeVisible();
+    await expect(toastRegion(page)).toContainText('Conteúdo criado.');
 
-  await page.goto('/sites/exemplo-a/conteudos');
-  const row = page.getByRole('row', { name: new RegExp(title) });
-  await expect(row).toContainText('Artigo');
-  await expect(row).toContainText('Rascunho');
-});
+    await page.goto('/sites/exemplo-a/conteudos');
+    const row = page.getByRole('row', { name: new RegExp(title) });
+    await expect(row).toContainText('Artigo');
+    await expect(row).toContainText('Rascunho');
+  },
+);
 
 // Campos de imagem, de entidades e de data no Ecme (#272, #331): com os seletores abertos (#280) e com a
 // capa escolhida (miniatura, "Trocar" e "Remover" na tela), sem violação do axe nos dois temas.
@@ -273,23 +277,27 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
-test('revisor não tem editor nem link para criar ou editar', async ({ page }) => {
-  await loginAs(page, 'revisor@orakel.local');
-  await page.goto('/sites/exemplo-a/conteudos');
-  await expect(page.getByRole('heading', { name: /Conteúdos/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Criar conteúdo' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /^Editar/ })).toHaveCount(0);
+test(
+  'revisor não tem editor nem link para criar ou editar',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    await loginAs(page, 'revisor@orakel.local');
+    await page.goto('/sites/exemplo-a/conteudos');
+    await expect(page.getByRole('heading', { name: /Conteúdos/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Criar conteúdo' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /^Editar/ })).toHaveCount(0);
 
-  // Tela de permissão (#80): título, a ação com os papéis que a permitem e a volta ao site.
-  for (const path of ['conteudos/1/editar', 'conteudos/novo']) {
-    await page.goto(`/sites/exemplo-a/${path}`);
-    await expect(page.getByRole('heading', { level: 1, name: 'Sem permissão' })).toBeVisible();
-    await expect(page.getByText('Editar conteúdo exige o papel admin ou editor.')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Salvar/ })).toHaveCount(0);
-  }
-  await page.getByRole('link', { name: 'Ir para o site Exemplo A — Guias' }).click();
-  await expect(page).toHaveURL(/\/sites\/exemplo-a$/);
-});
+    // Tela de permissão (#80): título, a ação com os papéis que a permitem e a volta ao site.
+    for (const path of ['conteudos/1/editar', 'conteudos/novo']) {
+      await page.goto(`/sites/exemplo-a/${path}`);
+      await expect(page.getByRole('heading', { level: 1, name: 'Sem permissão' })).toBeVisible();
+      await expect(page.getByText('Editar conteúdo exige o papel admin ou editor.')).toBeVisible();
+      await expect(page.getByRole('button', { name: /Salvar/ })).toHaveCount(0);
+    }
+    await page.getByRole('link', { name: 'Ir para o site Exemplo A — Guias' }).click();
+    await expect(page).toHaveURL(/\/sites\/exemplo-a$/);
+  },
+);
 
 // Histórico de versões e leitura de uma versão no Ecme (#271): Table e Tag sem violação do axe.
 // Versões no DataTable do template (#366), nos dois temas, no cartão "Versões" da tela de detalhe
@@ -579,7 +587,7 @@ const BIG_COUNT = 2000;
 /** Abrir a lista e atualizar a busca ou o filtro: teto da #35 (CA1). */
 const MAX_MS = 2000;
 
-test.describe('lista com 2.000 conteúdos (#107)', () => {
+test.describe('lista com 2.000 conteúdos (#107)', { tag: '@perf' }, () => {
   test.beforeAll(async () => {
     const fixture = await readFixture('exemplo-b');
     const config = fixture.find((line) => line.type === 'config');
@@ -1158,7 +1166,7 @@ test.describe('barra de ações do editor (#109)', () => {
 const MEDIA_SITE = `e2e-midia-grade-${Date.now()}`;
 const MEDIA_COUNT = 2000;
 
-test.describe('grade de imagens com 2.000 mídias (#182)', () => {
+test.describe('grade de imagens com 2.000 mídias (#182)', { tag: '@perf' }, () => {
   test.beforeAll(async () => {
     const config = (await readFixture('exemplo-b')).find((line) => line.type === 'config');
     if (config?.type !== 'config') throw new Error('fixture sem config');

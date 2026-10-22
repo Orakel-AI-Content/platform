@@ -24,7 +24,7 @@ test.afterAll(async () => {
 // ainda transparente no meio do fade.
 test.use({ reducedMotion: 'reduce' });
 
-test('login pelo Access e registro de instâncias', async ({ page }) => {
+test('login pelo Access e registro de instâncias', { tag: '@smoke' }, async ({ page }) => {
   await page.goto('/sites');
 
   // Sem sessão, o Access (access-mock) pede login.
@@ -109,7 +109,7 @@ async function typeInto(page: Page, target: Locator, text: string): Promise<void
   await page.keyboard.type(text);
 }
 
-test('operação cadastra e edita um site só com o teclado', async ({ page }) => {
+test('operação cadastra e edita um site só com o teclado', { tag: '@smoke' }, async ({ page }) => {
   const siteId = `e2e-${Date.now()}`;
   created.push(siteId);
   await loginAs(page, 'operacao@orakel.local');
@@ -416,53 +416,57 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   ).toBeVisible();
 });
 
-test('operação vê a publicação do site e o publica pela página', async ({ page }) => {
-  await loginAs(page, 'operacao@orakel.local');
-  await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
-  // O resumo ao lado das abas (#370): os dados de publicação e "Publicar agora".
-  const publication = siteSummary(page);
-  const terms = [
-    'Domínio',
-    'Indexável',
-    'Status',
-    'Release',
-    'Mudanças pendentes',
-    'Último build',
-    'G1',
-  ];
-  const value = (term: string) => publication.getByRole('definition').nth(terms.indexOf(term));
-  await expect(publication.getByRole('term')).toHaveText(terms);
-  await expect(value('Domínio')).not.toBeEmpty();
-  await expect(value('Indexável')).toHaveText(/^(Sim|Não)$/);
-  await expect(value('Status')).toHaveText('Ativo');
-  await expect(value('Release')).not.toBeEmpty();
-  await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
-  await expect(value('Último build')).toHaveText(/^(—|Publicado|Falhou)/);
-  await expect(value('G1')).toHaveText(/^(Registrado|Não registrado)$/);
+test(
+  'operação vê a publicação do site e o publica pela página',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    await loginAs(page, 'operacao@orakel.local');
+    await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
+    // O resumo ao lado das abas (#370): os dados de publicação e "Publicar agora".
+    const publication = siteSummary(page);
+    const terms = [
+      'Domínio',
+      'Indexável',
+      'Status',
+      'Release',
+      'Mudanças pendentes',
+      'Último build',
+      'G1',
+    ];
+    const value = (term: string) => publication.getByRole('definition').nth(terms.indexOf(term));
+    await expect(publication.getByRole('term')).toHaveText(terms);
+    await expect(value('Domínio')).not.toBeEmpty();
+    await expect(value('Indexável')).toHaveText(/^(Sim|Não)$/);
+    await expect(value('Status')).toHaveText('Ativo');
+    await expect(value('Release')).not.toBeEmpty();
+    await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
+    await expect(value('Último build')).toHaveText(/^(—|Publicado|Falhou)/);
+    await expect(value('G1')).toHaveText(/^(Registrado|Não registrado)$/);
 
-  // Mesma ação da lista; o sucesso vai para o toast e a seção fica sem erro (#324).
-  await page.waitForLoadState('networkidle');
-  // Confirma num diálogo (#327): Esc e Cancelar não publicam e devolvem o foco ao botão.
-  const publish = publication.getByRole('button', { name: 'Publicar agora exemplo-a' });
-  const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
-  await publish.click();
-  await expect(dialog).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
-  await expect(publish).toBeFocused();
-  await publish.click();
-  await dialog.getByRole('button', { name: 'Cancelar' }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(publish).toBeFocused();
-  await expect(page.getByRole('status').filter({ hasText: 'enfileirado' })).toHaveCount(0);
-  await publish.click();
-  await dialog.getByRole('button', { name: 'Publicar' }).click();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Build de exemplo-a enfileirado.' }),
-  ).toBeVisible();
-  await expect(publish.locator('xpath=..').getByRole('alert')).toBeEmpty();
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
-});
+    // Mesma ação da lista; o sucesso vai para o toast e a seção fica sem erro (#324).
+    await page.waitForLoadState('networkidle');
+    // Confirma num diálogo (#327): Esc e Cancelar não publicam e devolvem o foco ao botão.
+    const publish = publication.getByRole('button', { name: 'Publicar agora exemplo-a' });
+    const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
+    await publish.click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(publish).toBeFocused();
+    await publish.click();
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(publish).toBeFocused();
+    await expect(page.getByRole('status').filter({ hasText: 'enfileirado' })).toHaveCount(0);
+    await publish.click();
+    await dialog.getByRole('button', { name: 'Publicar' }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Build de exemplo-a enfileirado.' }),
+    ).toBeVisible();
+    await expect(publish.locator('xpath=..').getByRole('alert')).toBeEmpty();
+    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  },
+);
 
 /**
  * Site pausado gravado pelo domínio (#155): a tela não pausa site, e um site pausado no seed

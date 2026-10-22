@@ -149,7 +149,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
-test('a vitrine vem renderizada do servidor', async ({ page }) => {
+test('a vitrine vem renderizada do servidor', { tag: '@smoke' }, async ({ page }) => {
   await login(page);
   const response = await page.request.get(SHOWCASE);
   expect(response.status()).toBe(200);

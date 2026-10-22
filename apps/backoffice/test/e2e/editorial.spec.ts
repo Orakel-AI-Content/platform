@@ -29,79 +29,83 @@ async function expectNoViolations(page: Page): Promise<void> {
   expect(accessibility.violations).toEqual([]);
 }
 
-test('editor cria autor e categoria e os escolhe no editor de artigos', async ({ page }) => {
-  const stamp = Date.now();
-  const author = `Autora ${stamp}`;
-  const category = `Categoria ${stamp}`;
-  await loginAs(page, 'editor@orakel.local');
-  await page.goto('/sites/exemplo-a');
-  const nav = page.getByRole('navigation', { name: 'Áreas do site' });
+test(
+  'editor cria autor e categoria e os escolhe no editor de artigos',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    const stamp = Date.now();
+    const author = `Autora ${stamp}`;
+    const category = `Categoria ${stamp}`;
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto('/sites/exemplo-a');
+    const nav = page.getByRole('navigation', { name: 'Áreas do site' });
 
-  await nav.getByRole('link', { name: 'Autores' }).click();
-  // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
-  await page.getByRole('link', { name: 'Criar autor' }).first().click();
-  // "Nome" exato: a lista também tem "Buscar por nome" (#108).
-  await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
-  await page.getByLabel(fieldLabel('Nome')).fill(author);
-  await page.getByLabel('Slug').fill(`autora-${stamp}`);
-  await expectNoViolations(page);
-  await page.getByRole('button', { name: 'Criar' }).click();
-  await expect(page).toHaveURL(/\/sites\/exemplo-a\/autores$/);
-  // O sucesso vai para o toast do template (#325), fora do main, e continua na lista.
-  await expect(page.getByRole('status').filter({ hasText: 'Autor criado.' })).toBeVisible();
-  await page.getByLabel('Buscar por nome').fill(author.toUpperCase());
-  await expect(page.getByRole('row', { name: new RegExp(author) })).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-    '1 resultado',
-  );
-  await expectNoViolations(page);
+    await nav.getByRole('link', { name: 'Autores' }).click();
+    // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
+    await page.getByRole('link', { name: 'Criar autor' }).first().click();
+    // "Nome" exato: a lista também tem "Buscar por nome" (#108).
+    await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+    await page.getByLabel(fieldLabel('Nome')).fill(author);
+    await page.getByLabel('Slug').fill(`autora-${stamp}`);
+    await expectNoViolations(page);
+    await page.getByRole('button', { name: 'Criar' }).click();
+    await expect(page).toHaveURL(/\/sites\/exemplo-a\/autores$/);
+    // O sucesso vai para o toast do template (#325), fora do main, e continua na lista.
+    await expect(page.getByRole('status').filter({ hasText: 'Autor criado.' })).toBeVisible();
+    await page.getByLabel('Buscar por nome').fill(author.toUpperCase());
+    await expect(page.getByRole('row', { name: new RegExp(author) })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '1 resultado',
+    );
+    await expectNoViolations(page);
 
-  // A URL leva a busca para outra aba.
-  await expect(page).toHaveURL(/q=/);
-  const other = await page.context().newPage();
-  await other.goto(page.url());
-  await expect(other.getByLabel('Buscar por nome')).toHaveValue(author.toUpperCase());
-  await expect(other.getByRole('row', { name: new RegExp(author) })).toBeVisible();
-  await other.close();
+    // A URL leva a busca para outra aba.
+    await expect(page).toHaveURL(/q=/);
+    const other = await page.context().newPage();
+    await other.goto(page.url());
+    await expect(other.getByLabel('Buscar por nome')).toHaveValue(author.toUpperCase());
+    await expect(other.getByRole('row', { name: new RegExp(author) })).toBeVisible();
+    await other.close();
 
-  // Slug repetido: a recusa do domínio aparece junto do campo.
-  await page.getByRole('link', { name: 'Criar autor' }).first().click();
-  await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
-  await page.getByLabel(fieldLabel('Nome')).fill('Outra');
-  await page.getByLabel('Slug').fill(`autora-${stamp}`);
-  await page.getByRole('button', { name: 'Criar' }).click();
-  await expect(page.getByLabel('Slug')).toHaveAttribute('aria-invalid', 'true');
-  await expect(page).toHaveURL(/\/autores\/novo$/);
+    // Slug repetido: a recusa do domínio aparece junto do campo.
+    await page.getByRole('link', { name: 'Criar autor' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+    await page.getByLabel(fieldLabel('Nome')).fill('Outra');
+    await page.getByLabel('Slug').fill(`autora-${stamp}`);
+    await page.getByRole('button', { name: 'Criar' }).click();
+    await expect(page.getByLabel('Slug')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page).toHaveURL(/\/autores\/novo$/);
 
-  await page.goto('/sites/exemplo-a/taxonomias');
-  await page.getByRole('link', { name: 'Criar taxonomia' }).first().click();
-  await expect(page.getByRole('heading', { name: 'Criar taxonomia' })).toBeVisible();
-  await chooseOption(page.getByRole('combobox', { name: fieldLabel('Tipo') }), 'Categoria');
-  await page.getByLabel(fieldLabel('Nome')).fill(category);
-  await page.getByLabel('Slug').fill(`categoria-${stamp}`);
-  await page.getByRole('button', { name: 'Criar' }).click();
-  await expect(page).toHaveURL(/\/sites\/exemplo-a\/taxonomias$/);
-  await page.getByLabel('Buscar por nome').fill(category);
-  await expect(page.getByRole('row', { name: new RegExp(category) })).toContainText('Categoria');
+    await page.goto('/sites/exemplo-a/taxonomias');
+    await page.getByRole('link', { name: 'Criar taxonomia' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Criar taxonomia' })).toBeVisible();
+    await chooseOption(page.getByRole('combobox', { name: fieldLabel('Tipo') }), 'Categoria');
+    await page.getByLabel(fieldLabel('Nome')).fill(category);
+    await page.getByLabel('Slug').fill(`categoria-${stamp}`);
+    await page.getByRole('button', { name: 'Criar' }).click();
+    await expect(page).toHaveURL(/\/sites\/exemplo-a\/taxonomias$/);
+    await page.getByLabel('Buscar por nome').fill(category);
+    await expect(page.getByRole('row', { name: new RegExp(category) })).toContainText('Categoria');
 
-  // Busca sem resultado: a tabela fica com a mensagem, e "Limpar filtros" volta a lista (#361).
-  await page.getByLabel('Buscar por nome').fill(`nada-${stamp}`);
-  await expect(page.getByText('Nenhuma taxonomia encontrada.')).toBeVisible();
-  await page.getByRole('button', { name: 'Limpar filtros' }).click();
-  await expect(page.getByLabel('Buscar por nome')).toHaveValue('');
-  await expect(page.getByRole('table')).toBeVisible();
+    // Busca sem resultado: a tabela fica com a mensagem, e "Limpar filtros" volta a lista (#361).
+    await page.getByLabel('Buscar por nome').fill(`nada-${stamp}`);
+    await expect(page.getByText('Nenhuma taxonomia encontrada.')).toBeVisible();
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page.getByLabel('Buscar por nome')).toHaveValue('');
+    await expect(page.getByRole('table')).toBeVisible();
 
-  await page.goto('/sites/exemplo-a/conteudos/novo');
-  await chooseOption(page.getByRole('combobox', { name: fieldLabel('Autores') }), author);
-  await chooseOption(
-    page.getByRole('combobox', { name: fieldLabel('Taxonomias') }),
-    `${category} (categoria)`,
-  );
-  // No múltiplo, cada valor escolhido tem o próprio "Remover <opção>" (#319).
-  await expect(page.getByRole('button', { name: `Remover ${author}` })).toBeVisible();
-  await page.getByRole('combobox', { name: fieldLabel('Autores') }).press('Backspace');
-  await expect(page.getByRole('button', { name: `Remover ${author}` })).toHaveCount(0);
-});
+    await page.goto('/sites/exemplo-a/conteudos/novo');
+    await chooseOption(page.getByRole('combobox', { name: fieldLabel('Autores') }), author);
+    await chooseOption(
+      page.getByRole('combobox', { name: fieldLabel('Taxonomias') }),
+      `${category} (categoria)`,
+    );
+    // No múltiplo, cada valor escolhido tem o próprio "Remover <opção>" (#319).
+    await expect(page.getByRole('button', { name: `Remover ${author}` })).toBeVisible();
+    await page.getByRole('combobox', { name: fieldLabel('Autores') }).press('Backspace');
+    await expect(page.getByRole('button', { name: `Remover ${author}` })).toHaveCount(0);
+  },
+);
 
 // Cabeçalho da tela de site (trilha, título e ação) no visual do Ecme (#247), nos dois temas.
 for (const colorScheme of ['light', 'dark'] as const) {
