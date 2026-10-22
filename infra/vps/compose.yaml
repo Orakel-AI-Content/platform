@@ -87,6 +87,9 @@ services:
   build-runner:
     <<: *backoffice
     command: ['node', 'src/bin/build-runner.ts']
+    # Um deploy espera o build em andamento terminar: render (20 min) + publish (10 min) +
+    # 30 s de folga. Se o processo morrer mesmo assim, a partida libera a fila (#453).
+    stop_grace_period: 1830s
     environment:
       <<: *backoffice-env
       DOCKER_HOST: tcp://docker-socket-proxy:2375
