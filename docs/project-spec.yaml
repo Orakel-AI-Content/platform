@@ -221,7 +221,7 @@ decisions:
   # Bloco 6 – Qualidade
   quality.tests:
     {
-      value: 'Vitest (config comum em @orakel/vitest-config); Playwright para E2E e axe; cobertura 90% linhas/branches em content-model, core e events, sem meta nos demais',
+      value: 'Vitest (config comum em @orakel/vitest-config); Playwright para E2E e axe; E2E em camadas — componente, E2E da área no local, suíte completa no CI a cada PR do Backoffice (ADR 0016); cobertura 90% linhas/branches em content-model, core e events, sem meta nos demais',
       source: user,
       input_ref: 'Testes',
     }
@@ -302,7 +302,7 @@ decisions:
     }
   ops.ci:
     {
-      value: 'GitHub Actions sem segredos: ci.yml (filtros de caminho, turbo --affected, fixtures NDJSON para os sites de exemplo), images.yml (bake → GHCR, tag = SHA, mantém 30 versões), release.yml (tag core-v*), e2e.yml (manual)',
+      value: 'GitHub Actions sem segredos: ci.yml (filtros de caminho, turbo --affected, fixtures NDJSON para os sites de exemplo), images.yml (bake → GHCR, tag = SHA, mantém 30 versões), release.yml (tag core-v*), e2e.yml (suíte completa em todo PR do Backoffice, 2 shards; ADR 0016)',
       source: input,
       input_ref: 'CI',
     }

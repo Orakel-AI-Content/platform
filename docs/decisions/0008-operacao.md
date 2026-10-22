@@ -1,6 +1,6 @@
 # 0008 – Operação: ambiente local, CI, imagens, logs e erros
 
-- Status: aceito
+- Status: aceito (o E2E foi parcialmente substituído pelo 0016: suíte completa no CI a cada PR)
 - Data: 2026-09-29
 
 ## Contexto
@@ -31,6 +31,7 @@ infraestrutura mínimo.
 - **Release (`release.yml`):** tag `core-v*` → imagem `site-builder`; pula enquanto o
   Dockerfile não existir.
 - **E2E (`e2e.yml`):** só manual (`workflow_dispatch`) ou local (`pnpm local:e2e`).
+  Substituído pelo 0016: suíte completa em todo PR que afeta o Backoffice, em 2 shards.
 - **Logs:** pino (JSON) nos processos Node; console JSON nos Workers; Sentry desligado
   com `SENTRY_DSN` vazio; heartbeat dos jobs em `HEARTBEAT_BASE_URL`; sem tracing.
 - **Erros:** o domínio devolve erro esperado como valor (união discriminada, estilo
