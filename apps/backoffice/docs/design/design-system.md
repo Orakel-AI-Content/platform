@@ -264,8 +264,12 @@ menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo ca
   `title`, em vez de quebrar. O link principal da linha usa `ROW_LINK_CLASS`
   (`src/components/shared/rowLink.ts`). Nenhuma lista rola na horizontal a 1280px, nem no
   contêiner da tabela.
-- **Ações da linha:** a principal fica visível; as secundárias, quando não cabem sem aumentar a
-  altura da linha, vão para o menu "Mais ações": o `Dropdown` do Ecme
+- **Ações da linha:** a principal fica visível; editar é o botão de ícone do `CustomerListTable`
+  (#441): `IconButton` como link (`asElement={Link}`, `href`) com `TbPencil` e o nome com o
+  item ("Editar Guia de uso"), numa coluna `actions` de cabeçalho `sr-only` ("Ações") e
+  `size: 1`, só com permissão (`ContentsTable`, `EntityTable`). O link do título continua sendo
+  o da leitura (versões). As secundárias, quando não cabem sem aumentar a altura da linha, vão
+  para o menu "Mais ações": o `Dropdown` do Ecme
   (`src/components/ui/Dropdown/`), cujo nome acessível leva o item ("Mais ações: exemplo-a"),
   com os itens em `Dropdown.Item` (links por `asElement={Link}`) e o item da linha em `sr-only`
   quando o texto visível não o diz. O Dropdown abre, fecha (clique fora e Esc), navega por
@@ -590,8 +594,10 @@ domínio e não mudam com os rótulos.
   - Build: publicado `bg-success`, falhou `bg-error`.
 - **Botão de ícone:** `IconButton` (`src/components/shared/IconButton.tsx`), sobre o `Button`
   (`plain`, `xs`: 32 px, acima do mínimo de 24 px) e o `Tooltip` do Ecme, para ações repetidas
-  e compactas, como os controles de cada bloco do editor. O nome vem de `label` (`aria-label`,
-  com a posição: "Mover bloco 3 para cima"); a dica é só visual e repete o nome, então o botão
+  e compactas, como os controles de cada bloco do editor e a ação de editar de cada linha das
+  listas. Para navegar, vira link com `asElement={Link}` e `href` (só em Client Component; o
+  `Link` não atravessa a fronteira do servidor). O nome vem de `label` (`aria-label`, com a
+  posição ou o item: "Mover bloco 3 para cima", "Editar principal"); a dica é só visual e repete o nome, então o botão
   descarta o `aria-describedby` do Tooltip; o ícone (16 px; nas telas, `react-icons/tb`) fica
   `aria-hidden`. Ação indisponível que deve continuar focável (o foco fica no botão depois de
   mover) usa `aria-disabled`, desenhado como indisponível (opacidade e cursor), e o `onClick`
