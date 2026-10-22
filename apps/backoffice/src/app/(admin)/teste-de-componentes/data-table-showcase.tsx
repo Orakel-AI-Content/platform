@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { TbPlus } from 'react-icons/tb';
+import { TbPencil, TbPlus } from 'react-icons/tb';
 
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable';
 import { EmptyState, NoResults } from '@/components/shared/EmptyState';
+import { IconButton } from '@/components/shared/IconButton';
 import { ListToolbar } from '@/components/shared/ListControls';
 import { ROW_LINK_CLASS } from '@/components/shared/rowLink';
 import { Truncated } from '@/components/shared/Truncated';
@@ -17,9 +18,10 @@ import { Card } from '@/components/ui/Card';
 
 // Seção do DataTable na vitrine (#215, #361), com nomes que não colidem com os da Table: a lista
 // completa no padrão do template (`CustomerList` do Ecme) — cartão com título e ação principal,
-// toolbar, tabela, contagem e paginação —, calculada no cliente pelo `useListTable` com busca,
-// filtro, ordem, página e tamanho na URL; a lista vazia (com a ação principal) e o esqueleto
-// de carregamento. Busca sem resultado é a própria lista com uma busca que não acha nada.
+// toolbar, tabela com a ação de editar em cada linha (#441), contagem e paginação —, calculada
+// no cliente pelo `useListTable` com busca, filtro, ordem, página e tamanho na URL; a lista
+// vazia (com a ação principal) e o esqueleto de carregamento. Busca sem resultado é a própria
+// lista com uma busca que não acha nada.
 
 type Status = 'publicado' | 'rascunho' | 'revisao';
 
@@ -63,6 +65,21 @@ const COLUNAS: ColumnDef<Materia>[] = [
     enableGlobalFilter: false,
     filterFn: 'equalsString',
     cell: ({ row }) => STATUS_LABEL[row.original.status],
+  },
+  {
+    // A ação da linha (#441): botão de ícone que é link, com o nome do item e a dica.
+    id: 'actions',
+    header: () => <span className="sr-only">Ações</span>,
+    enableSorting: false,
+    size: 1,
+    cell: ({ row }) => (
+      <IconButton
+        asElement={Link}
+        href="#vitrine-data-table"
+        label={`Editar ${row.original.titulo}`}
+        icon={<TbPencil />}
+      />
+    ),
   },
 ];
 
