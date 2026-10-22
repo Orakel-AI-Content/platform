@@ -7,7 +7,7 @@ import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { getMediaByIds, listMediaPage } from '../../src/domain/content/media.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
-import { createVolumeSite, seedMedia as seedVolumeMedia } from '../volume.ts';
+import { analyzeTables, createVolumeSite, seedMedia as seedVolumeMedia } from '../volume.ts';
 import { profileQueries, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Leitura paginada e por IDs da biblioteca de mídia (#180), para a grade do editor.
@@ -103,6 +103,7 @@ describe('leitura paginada', () => {
 
   it('com 2.000 mídias, a primeira página volta em menos de 500 ms', async () => {
     await seedMedia(SITE, 2000);
+    await analyzeTables(db, media, mediaVariants, mediaUploads);
 
     const started = performance.now();
     const result = await listMediaPage(db, revisor, SITE, { page: 1, pageSize: 24 });
@@ -194,6 +195,9 @@ describe('nome, data e busca por nome (#186)', () => {
         name: id % 100 === 0 ? `Promoção ${id}.jpg` : `foto-${id}.jpg`,
       })),
     );
+    // O truncate não apaga as estatísticas: sem o ANALYZE, valem as do caso de volume da
+    // execução anterior (#461), e o plano volta ao Nested Loop de 1,6 s do #186.
+    await analyzeTables(db, media, mediaVariants, mediaUploads);
 
     let started = performance.now();
     const firstPage = await listMediaPage(db, revisor, SITE, { page: 1, pageSize: 24 });
