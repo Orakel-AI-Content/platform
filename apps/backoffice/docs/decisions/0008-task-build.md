@@ -52,3 +52,16 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
   e a versão anterior no ar; `edge-local` fora → falha transitória e sucesso na 2ª tentativa;
   nenhum container ou volume restante.
 - Retomar o site, rollback e reconstruir em outra release: L4 (Registro de instâncias).
+- **Recuperação na partida (#453):** o Graphile Worker só solta a trava de um worker morto
+  depois de 4 h, e a fila `build:<site>` deixaria o site sem build até lá. Antes do `run()`, o
+  `build-runner` chama `recoverInterruptedBuilds` (`src/domain/builds/recover.ts`): cada job
+  `build` travado vira uma linha `failed`/`transient` em `builds` ("build interrompido…", com
+  `job_id`, `attempt` e `started_at` = `locked_at`), e os donos das travas dos jobs `build` e das
+  filas `build:%` são liberados com `graphile_worker.force_unlock_workers`, numa transação. O
+  job volta à fila com a tentativa já contada; a política de retry segue igual. Toda trava
+  presente na partida é tratada como de um processo morto, o que só vale enquanto houver um
+  `build-runner` por ambiente (dois em paralelo exigem rever esta decisão). Travas das outras
+  tasks não são tocadas, e os containers órfãos da tentativa ficam para uma issue própria (o
+  proxy não lista containers).
+- O `build-runner` tem `stop_grace_period` de 1.830 s (render + publish + 30 s): um deploy
+  normal espera o build em andamento terminar em vez de cortá-lo.
