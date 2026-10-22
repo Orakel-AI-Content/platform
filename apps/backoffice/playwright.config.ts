@@ -9,6 +9,10 @@ import { defineConfig, devices } from '@playwright/test';
 // @next/env é CommonJS: fora do Next, só o import padrão funciona.
 nextEnv.loadEnvConfig(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'));
 
+// Banco do par isolado (pnpm local:isolated): os specs e a limpeza abrem o banco pela
+// DATABASE_URL do env.ts do app. O config roda no processo principal e em cada worker.
+if (process.env.E2E_DATABASE_URL) process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
+
 // E2E contra o ambiente local (pnpm local:up && pnpm local:seed): Caddy + access-mock +
 // backoffice-web. Local (por área) ou no e2e.yml (suíte completa em todo PR, ADR 0016 da raiz).
 // O certificado é da CA interna do Caddy. No CI, o relatório HTML vira artefato de cada shard.
