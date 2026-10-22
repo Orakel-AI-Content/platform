@@ -5,11 +5,21 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
 | Tarefa          | Configuração                | Precisa                            |
 | --------------- | --------------------------- | ---------------------------------- |
 | `test`          | `vitest.config.ts`          | nada                               |
+| `test:browser`  | `vitest.browser.config.ts`  | Chromium do Playwright             |
 | `test:contract` | `vitest.contract.config.ts` | `DATABASE_URL` (Postgres limpo)    |
 | `test:e2e`      | `playwright.config.ts`      | `pnpm local:up && pnpm local:seed` |
 
 - **Unitários** ao lado do código; o domínio é testado sem banco quando a regra é pura
   (RBAC, mapeamentos) e pela suíte de contrato quando depende de transação.
+- **Componente em Chromium** (`src/**/*.browser.test.tsx`, ao lado do componente; #457): teclado,
+  foco, axe, tema e movimento no navegador de verdade, com o CSS de `globals.css`, sem servidor
+  nem banco. É onde ficam os testes de acessibilidade de um componente (antes na vitrine do E2E).
+  Render com `renderUi` (`test/browser/render.tsx`, com o `MotionProvider` do layout); helpers em
+  `test/browser/a11y.ts`: `audit` (axe WCAG 2.2 AA), `setTheme` (classe `dark` e mídia emulada),
+  `setReducedMotion`, `tabTo`, `outline`, `focusRing` e `targetSize`. Tema e movimento pela mídia
+  emulada do Playwright (comandos em `test/browser/commands.ts`), nunca mock de `matchMedia`. O
+  navegador fica no fuso de São Paulo. Instale o Chromium uma vez:
+  `pnpm --filter @orakel/backoffice exec playwright install chromium`.
 - **Contrato** (`test/contract/`): cada arquivo migra e limpa o banco (`helpers.ts`);
   rodam um arquivo por vez. Antes de migrar, a suíte recusa um banco com sites que ela não
   marcou (tabela `contract_suite`, fora das migrations): apontada para o banco do
