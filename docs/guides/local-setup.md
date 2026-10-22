@@ -69,7 +69,7 @@ worktree, com o ambiente compartilhado já no ar:
 
 ```sh
 pnpm local:isolated up 433     # imprime E2E_BASE_URL=https://admin.orakel.localhost:<porta>
-E2E_BASE_URL=https://admin.orakel.localhost:<porta> pnpm --filter @orakel/backoffice exec playwright test
+E2E_BASE_URL=https://admin.orakel.localhost:<porta> pnpm local:e2e:area sites,header
 pnpm local:isolated down 433
 ```
 
@@ -83,25 +83,36 @@ Banco, S3 e access-mock continuam os compartilhados: E2E que gravam dados (`midi
 `sites.spec.ts`) podem disputar dados entre sessões. Num worktree sem `.env.local`, aponte o
 da raiz: `ORAKEL_ENV_FILE=<raiz>/.env.local pnpm local:isolated up <id>`.
 
+A sessão roda só o E2E da área que tocou, nunca a suíte inteira (essa roda no CI):
+
+- `pnpm local:e2e:area <área>[,<área>…]` roda `apps/backoffice/test/e2e/<área>.spec.ts`;
+  `pnpm local:e2e:area smoke` roda as jornadas marcadas com `@smoke` (uma por área). Argumentos
+  a mais vão para o Playwright (ex.: `--list`, `-g <título>`).
+- Antes de abrir o navegador, o comando ocupa uma das `E2E_SLOTS` vagas da máquina (padrão 2);
+  com todas ocupadas, espera. Cada execução usa `E2E_WORKERS` workers (padrão 2).
+- Os testes `@perf` (listas com 2.000 linhas e metas de tempo) só rodam no CI; localmente,
+  com `E2E_PERF=1`.
+
 ## Comandos
 
-| Comando                                                     | O que faz                                                   |
-| ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `pnpm dev`                                                  | Todas as unidades em modo dev                               |
-| `pnpm build` · `pnpm lint` · `pnpm typecheck` · `pnpm test` | Pipeline do Turborepo                                       |
-| `pnpm format`                                               | Prettier no repositório                                     |
-| `pnpm local:up`                                             | Sobe o compose (base + override local) e roda `db:migrate`  |
-| `pnpm local:check`                                          | Confere o ambiente; sai com 1 se algo falhar                |
-| `pnpm local:publish <site>`                                 | `render` (rede export) + `publish` (rede publish) no edge   |
-| `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere no ClickHouse         |
-| `pnpm local:trust`                                          | Instala a CA atual do Caddy no Keychain (macOS)             |
-| `pnpm local:seed`                                           | Roda `db:seed` (usuários, exemplos e `infra/local/seeds/`)  |
-| `pnpm local:down`                                           | Para os containers (mantém os dados)                        |
-| `pnpm local:reset`                                          | Para e **apaga os volumes**                                 |
-| `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit) |
-| `pnpm local:e2e`                                            | E2E completo com Playwright                                 |
-| `pnpm local:isolated up <id>` · `down <id>`                 | Backoffice e Caddy só da sessão, numa porta própria         |
-| `infra/local/compose.sh <args>`                             | Qualquer comando do compose com os arquivos certos          |
+| Comando                                                     | O que faz                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------ |
+| `pnpm dev`                                                  | Todas as unidades em modo dev                                |
+| `pnpm build` · `pnpm lint` · `pnpm typecheck` · `pnpm test` | Pipeline do Turborepo                                        |
+| `pnpm format`                                               | Prettier no repositório                                      |
+| `pnpm local:up`                                             | Sobe o compose (base + override local) e roda `db:migrate`   |
+| `pnpm local:check`                                          | Confere o ambiente; sai com 1 se algo falhar                 |
+| `pnpm local:publish <site>`                                 | `render` (rede export) + `publish` (rede publish) no edge    |
+| `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere no ClickHouse          |
+| `pnpm local:trust`                                          | Instala a CA atual do Caddy no Keychain (macOS)              |
+| `pnpm local:seed`                                           | Roda `db:seed` (usuários, exemplos e `infra/local/seeds/`)   |
+| `pnpm local:down`                                           | Para os containers (mantém os dados)                         |
+| `pnpm local:reset`                                          | Para e **apaga os volumes**                                  |
+| `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit)  |
+| `pnpm local:e2e`                                            | E2E completo com Playwright                                  |
+| `pnpm local:e2e:area <área>` · `smoke`                      | E2E de uma área ou só os `@smoke`, numa das vagas da máquina |
+| `pnpm local:isolated up <id>` · `down <id>`                 | Backoffice e Caddy só da sessão, numa porta própria          |
+| `infra/local/compose.sh <args>`                             | Qualquer comando do compose com os arquivos certos           |
 
 ## Serviços locais
 

@@ -14,7 +14,7 @@ sites é configuração.
 - Uma unidade: `pnpm turbo run <tarefa> --filter=@orakel/<nome>`
 - Um teste (na pasta da unidade): `pnpm vitest run <caminho>`
 - Formatar: `pnpm format`
-- Ambiente local: `pnpm local:up` · `local:seed` · `local:check` · `local:publish <site>` · `local:load` · `local:trust` · `local:down` · `local:e2e`
+- Ambiente local: `pnpm local:up` · `local:seed` · `local:check` · `local:publish <site>` · `local:load` · `local:trust` · `local:down` · `local:e2e` · `local:e2e:area <área>|smoke`
 - Compose direto: `infra/local/compose.sh <args>`
 
 ## Unidades

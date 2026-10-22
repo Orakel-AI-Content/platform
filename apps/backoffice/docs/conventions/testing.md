@@ -18,7 +18,10 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
 - **E2E** (`test/e2e/`): login pelo access-mock, telas de sites e o editor de conteúdo, e axe
   (WCAG 2.2 AA). Rodam contra a imagem `backoffice:local`: depois de mudar o código,
   `docker/bake.sh backoffice` e `infra/local/compose.sh up -d --wait backoffice-web`. Use
-  `E2E_BASE_URL` para outro endereço.
+  `E2E_BASE_URL` para outro endereço. Numa sessão, rode só a área tocada:
+  `pnpm local:e2e:area <arquivo sem .spec.ts>` (ou `smoke`), na raiz. Jornada principal de uma
+  área nova leva `{ tag: '@smoke' }`; teste que semeia milhares de linhas ou mede tempo leva
+  `@perf` (fora do local por padrão; `E2E_PERF=1`).
 - **Sites do E2E**: quem cadastra site (`e2e-<timestamp>`) registra o ID e o remove do banco
   no `afterAll` com `removeSites` (`test/e2e/cleanup.ts`), junto com o build agendado.
 
