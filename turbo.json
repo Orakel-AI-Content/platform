@@ -19,6 +19,10 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "test:browser": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
     "test:contract": {
       "dependsOn": ["^build"],
       "passThroughEnv": ["DATABASE_URL"]
