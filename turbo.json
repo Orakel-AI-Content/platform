@@ -42,6 +42,7 @@
       "passThroughEnv": ["DATABASE_URL"]
     },
     "db:seed": {
+      "dependsOn": ["^build"],
       "cache": false,
       "passThroughEnv": ["DATABASE_URL"]
     },
