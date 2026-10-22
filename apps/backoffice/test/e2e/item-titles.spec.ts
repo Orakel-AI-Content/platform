@@ -13,9 +13,13 @@ async function loginAs(page: Page, email: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
 }
 
-/** Nome acessível de um link, sem o prefixo ou sufixo que só serve ao leitor de tela. */
+/**
+ * Nome acessível de um link, sem o prefixo ou sufixo que só serve ao leitor de tela: o
+ * `aria-label` quando houver (o botão de ícone, #450), senão o texto.
+ */
 async function linkName(link: Locator, strip: RegExp): Promise<string> {
-  return ((await link.textContent()) ?? '').replace(strip, '').trim();
+  const name = (await link.getAttribute('aria-label')) ?? (await link.textContent()) ?? '';
+  return name.replace(strip, '').trim();
 }
 
 test('editor, versões e uma versão mostram o título do conteúdo', async ({ page }) => {
@@ -23,9 +27,9 @@ test('editor, versões e uma versão mostram o título do conteúdo', async ({ p
   await page.goto(`/sites/${SITE}/conteudos`);
   const first = page
     .getByRole('table')
-    .getByRole('link', { name: / \(versões\)$/ })
+    .getByRole('link', { name: / \(ver versões\)$/ })
     .first();
-  const title = await linkName(first, / \(versões\)$/);
+  const title = await linkName(first, / \(ver versões\)$/);
   await first.click();
   await expect(page).toHaveTitle(`${title} · Versões · ${SUFFIX}`);
   const versions = page.url();

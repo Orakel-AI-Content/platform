@@ -287,7 +287,7 @@ test('configuração: h1, aba e trilha dizem Configuração do site', async ({ p
   await expect(
     page.getByRole('heading', { level: 1, name: 'Configuração do site', exact: true }),
   ).toBeVisible();
-  await expect(page).toHaveTitle('Configuração do site · Orakel Backoffice');
+  await expect(page).toHaveTitle('Configuração do site · Exemplo A — Guias · Orakel Backoffice');
   await expect(
     page.getByRole('navigation', { name: 'Trilha de navegação' }).locator('[aria-current="page"]'),
   ).toHaveText('Configuração do site');
