@@ -5,15 +5,14 @@ Consulte ao escrever ou rodar testes. Cada unidade complementa em
 
 ## Tipos
 
-| Tipo                               | Ferramenta                 | Onde                                | Tarefa                             |
-| ---------------------------------- | -------------------------- | ----------------------------------- | ---------------------------------- |
-| Unitário                           | Vitest                     | `src/**/*.test.ts`, junto do código | `test`                             |
-| Contrato da API de exportação      | Vitest + Postgres          | backoffice                          | `test:contract`                    |
-| Componente em Chromium real        | Vitest Browser Mode        | backoffice, `*.browser.test.tsx`    | `test:browser`                     |
-| Sites de exemplo (orçamento de JS) | build do blog com fixtures | blog                                | `build:examples`                   |
-| Acessibilidade                     | Playwright + axe           | blog                                | `test:a11y`                        |
-| Paridade estático × SSR            | Playwright                 | blog                                | `test:parity`                      |
-| E2E completo                       | Playwright                 | apps                                | `test:e2e` (só local ou `e2e.yml`) |
+| Tipo                               | Ferramenta                 | Onde                                | Tarefa                           |
+| ---------------------------------- | -------------------------- | ----------------------------------- | -------------------------------- |
+| Unitário                           | Vitest                     | `src/**/*.test.ts`, junto do código | `test`                           |
+| Contrato da API de exportação      | Vitest + Postgres          | backoffice                          | `test:contract`                  |
+| Sites de exemplo (orçamento de JS) | build do blog com fixtures | blog                                | `build:examples`                 |
+| Acessibilidade                     | Playwright + axe           | blog                                | `test:a11y`                      |
+| Paridade estático × SSR            | Playwright                 | blog                                | `test:parity`                    |
+| E2E completo                       | Playwright                 | apps                                | `test:e2e` (CI no PR, `e2e.yml`) |
 
 ## Configuração
 
@@ -44,6 +43,5 @@ export default mergeConfig(baseConfig, withCoverageThreshold(90)); // só nos pa
 - Tudo: `pnpm test`
 - Uma unidade: `pnpm turbo run test --filter=@orakel/<nome>`
 - Um arquivo (na pasta da unidade): `pnpm vitest run src/<arquivo>.test.ts`
-- Componentes do Backoffice em Chromium: `pnpm turbo run test:browser --filter=@orakel/backoffice`
-  (fora do `pnpm test`; precisa do Chromium do Playwright)
-- E2E local: `pnpm local:up && pnpm local:seed && pnpm local:e2e`
+- E2E local, só a área tocada: `pnpm local:up && pnpm local:seed && pnpm local:e2e:area <área>`
+- E2E completo: no CI, em todo PR que afeta o Backoffice (`e2e.yml`, 2 shards; ADR 0016)

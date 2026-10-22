@@ -14,7 +14,8 @@ nextEnv.loadEnvConfig(path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 if (process.env.E2E_DATABASE_URL) process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
 
 // E2E contra o ambiente local (pnpm local:up && pnpm local:seed): Caddy + access-mock +
-// backoffice-web. Só local ou no e2e.yml (manual). O certificado é da CA interna do Caddy.
+// backoffice-web. Local (por área) ou no e2e.yml (suíte completa em todo PR, ADR 0016 da raiz).
+// O certificado é da CA interna do Caddy. No CI, o relatório HTML vira artefato de cada shard.
 // Sessões em paralelo dividem a máquina: 2 workers por padrão (E2E_WORKERS muda). Os testes
 // @perf semeiam milhares de linhas e medem tempo; fora do CI só rodam com E2E_PERF=1.
 const runPerf = Boolean(process.env.CI) || process.env.E2E_PERF === '1';
@@ -23,8 +24,11 @@ export default defineConfig({
   testDir: './test/e2e',
   fullyParallel: false,
   workers: Number(process.env.E2E_WORKERS ?? 2),
+  // No runner Linux, cada build de site cria interfaces de rede no host e o Chromium aborta a
+  // navegação em curso (net::ERR_NETWORK_CHANGED); no CI, o teste repete (ADR 0016 da raiz).
+  retries: process.env.CI ? 2 : 0,
   ...(runPerf ? {} : { grepInvert: /@perf/ }),
-  reporter: [['list']],
+  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'https://admin.orakel.localhost',
     ignoreHTTPSErrors: true,

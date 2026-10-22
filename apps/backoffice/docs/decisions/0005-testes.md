@@ -5,11 +5,11 @@
 
 ## Decisão
 
-| Tarefa          | O quê                                                                                                                                                      | Onde roda            |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `test`          | Vitest sem banco: RBAC, varredura de `recordPendingChange`, JWT, tokens, mapeamento do snapshot, env                                                       | CI (`quality`)       |
-| `test:contract` | Vitest + Postgres (`DATABASE_URL`): snapshot × fixtures do `content-model`, transação das mudanças pendentes, `REPEATABLE READ`, IDs, agendamento de build | CI (job de contrato) |
-| `test:e2e`      | Playwright + axe contra o ambiente local (Caddy, access-mock, imagem)                                                                                      | Local e `e2e.yml`    |
+| Tarefa          | O quê                                                                                                                                                      | Onde roda                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `test`          | Vitest sem banco: RBAC, varredura de `recordPendingChange`, JWT, tokens, mapeamento do snapshot, env                                                       | CI (`quality`)                                                     |
+| `test:contract` | Vitest + Postgres (`DATABASE_URL`): snapshot × fixtures do `content-model`, transação das mudanças pendentes, `REPEATABLE READ`, IDs, agendamento de build | CI (job de contrato)                                               |
+| `test:e2e`      | Playwright + axe contra o ambiente local (Caddy, access-mock, imagem)                                                                                      | Local (por área) e `e2e.yml` (todo PR, 2 shards; ADR 0016 da raiz) |
 
 - As duas configurações do Vitest substituem o `include` da raiz (o `mergeConfig` somaria
   as listas e misturaria as suítes).
