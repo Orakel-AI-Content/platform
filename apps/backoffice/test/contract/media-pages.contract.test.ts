@@ -7,7 +7,8 @@ import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { getMediaByIds, listMediaPage } from '../../src/domain/content/media.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
-import { resetDatabase, setupDatabase } from './helpers.ts';
+import { createVolumeSite, seedMedia as seedVolumeMedia } from '../volume.ts';
+import { profileQueries, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Leitura paginada e por IDs da biblioteca de mídia (#180), para a grade do editor.
 
@@ -290,5 +291,33 @@ describe('importação com a origem da mídia (seed local)', () => {
       originalName: 'Horta 01.jpg',
       uploadedAt,
     });
+  });
+});
+
+// Rede de 5 sites com 2.000 mídias cada: com um site só nas tabelas, o Seq Scan é o plano
+// certo (ele lê as tabelas inteiras), e o teste não diria se a consulta usa o índice do site.
+const VOLUME_SITES = ['volume', 'vizinho-1', 'vizinho-2', 'vizinho-3', 'vizinho-4'];
+
+describe('biblioteca com 2.000 mídias (#461)', () => {
+  it('busca por parte do nome na página 2 por índice, sem Seq Scan, em menos de 300 ms', async () => {
+    for (const siteId of VOLUME_SITES) {
+      await createVolumeSite(db, siteId);
+      await seedVolumeMedia(db, siteId, { count: 2000, promoEvery: 20 });
+    }
+
+    const { result, ms, seqScans } = await profileQueries(db, (traced) =>
+      listMediaPage(traced, revisor, 'volume', { page: 2, pageSize: 30, search: 'promoção' }),
+    );
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.total).toBe(100);
+    expect(result.value.items.map((item) => item.id)).toEqual(
+      Array.from({ length: 30 }, (_, index) => (31 + index) * 20),
+    );
+    for (const item of result.value.items) expect(item.variants).toHaveLength(1);
+    for (const table of ['media', 'media_uploads', 'media_variants']) {
+      expect(seqScans).not.toContain(table);
+    }
+    expect(ms).toBeLessThan(300);
   });
 });
