@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { act, cleanup, renderHook } from '@testing-library/react';
+import { createColumnHelper, useTable } from '@tanstack/react-table';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  listFeatures,
   listStateQuery,
   normalizeText,
   PAGE_SIZE,
@@ -227,5 +229,52 @@ describe('lista sem ordem padrão (#108)', () => {
       '/sites/exemplo-a/conteudos?ordem=-name&q=ana&pagina=2',
       { scroll: false },
     );
+  });
+});
+
+describe('lista de 2.000 conteúdos no cliente (#461)', () => {
+  // Como a lista de Conteúdos: um em 20 se chama "Promoção <id>", um em 3 é página.
+  type Item = { id: number; title: string; kind: 'article' | 'page' };
+  const items: Item[] = Array.from({ length: 2000 }, (_, index) => {
+    const id = index + 1;
+    return {
+      id,
+      title: id % 20 === 0 ? `Promoção ${id}` : `Receita ${id}`,
+      kind: id % 3 === 0 ? 'page' : 'article',
+    };
+  });
+  const column = createColumnHelper<typeof listFeatures, Item>();
+  const columns = column.columns([
+    column.accessor('id', { enableGlobalFilter: false }),
+    column.accessor('title', {}),
+    column.accessor('kind', { enableGlobalFilter: false, filterFn: 'equalsString' }),
+  ]);
+  const volumeConfig: ListConfig = {
+    ...config,
+    sortable: ['id'],
+    defaultSort: { id: 'id', desc: false },
+  };
+  const ids = (search: string) => {
+    navigation.search = search;
+    const { result } = renderHook(() => {
+      const list = useListState(volumeConfig);
+      return useTable({ features: listFeatures, columns, data: items, ...list.table });
+    });
+    return result.current.getPrePaginatedRowModel().rows.map((row) => row.original.id);
+  };
+  const promo = items.filter((item) => item.id % 20 === 0);
+
+  it('a busca "promocao" acha os títulos "Promoção …"', () => {
+    expect(ids('q=promocao')).toEqual(promo.map((item) => item.id));
+  });
+
+  it('o filtro de tipo combina com a busca', () => {
+    const pages = promo.filter((item) => item.kind === 'page').map((item) => item.id);
+    const articles = promo.filter((item) => item.kind === 'article').map((item) => item.id);
+
+    expect(ids('q=PROMOÇÃO&tipo=page')).toEqual(pages);
+    expect(ids('q=promocao&tipo=article')).toEqual(articles);
+    expect(pages).toHaveLength(33);
+    expect(articles).toHaveLength(67);
   });
 });
