@@ -1,3 +1,7 @@
+import {
+  DETAIL_SUMMARY_CLASS,
+  DETAIL_SUMMARY_LIST_CLASS,
+} from '@/components/shared/detailSummary.ts';
 import { InfoField, InfoList } from '@/components/shared/InfoList';
 import { SITE_STATE_LABEL, SITE_STATE_VARIANT } from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
@@ -27,11 +31,8 @@ export function SiteSummaryCard({
   publish?: PublishNow;
 }) {
   return (
-    <Card
-      className="min-w-[330px] xl:max-w-[330px] 2xl:max-w-[400px] 2xl:min-w-[400px]"
-      bodyClass="flex flex-col gap-6"
-    >
-      <InfoList className="grid-cols-1 sm:grid-cols-2 xl:grid-cols-1">
+    <Card className={DETAIL_SUMMARY_CLASS} bodyClass="flex flex-col gap-6">
+      <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
         <InfoField label="Domínio">{site.domain}</InfoField>
         <InfoField label="Indexável">{site.indexavel ? 'Sim' : 'Não'}</InfoField>
         <InfoField label="Estado">
