@@ -43,7 +43,7 @@ describe('SiteSummaryCard', () => {
     expect(list?.className).toContain('text-sm');
     expect(field('Domínio').textContent).toBe('exemplo-a.test');
     expect(field('Indexável').textContent).toBe('Sim');
-    expect(field('Estado').textContent).toBe('Ativo');
+    expect(field('Status').textContent).toBe('Ativo');
     expect(field('Release').textContent).toBe('1.4.0');
     expect(
       within(field('Mudanças pendentes')).getByRole('link', { name: /2 mudanças pendentes/ }),
@@ -75,7 +75,7 @@ describe('SiteSummaryCard', () => {
       />,
     );
 
-    expect(field('Estado').textContent).toBe('PausadoBuild falhou três vezes.');
+    expect(field('Status').textContent).toBe('PausadoBuild falhou três vezes.');
   });
 
   it('"Publicar agora" em sm só quando a página passa a ação', () => {

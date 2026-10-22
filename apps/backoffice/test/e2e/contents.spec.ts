@@ -544,7 +544,7 @@ test.describe('tela do conteúdo no detalhe (#371)', () => {
       const summary = page.locator('.card').filter({ has: page.locator('dl') });
       const versions = page.locator('.card').filter({ has: page.getByRole('table') });
       await expect(summary.getByText(`/${slug}`)).toBeVisible();
-      await expect(summary.locator('dt')).toHaveText(['Tipo', 'ID', 'Slug', 'Estado']);
+      await expect(summary.locator('dt')).toHaveText(['Tipo', 'ID', 'Slug', 'Status']);
       await expect(summary.locator('dd').last()).toHaveText('Rascunho');
 
       for (const width of [1280, 1024, 375]) {

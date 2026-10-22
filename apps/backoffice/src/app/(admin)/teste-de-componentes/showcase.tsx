@@ -961,7 +961,7 @@ export function Showcase({ linkPage }: { linkPage: number }) {
             <InfoField label="Slug">
               <span data-vitrine-valor-longo="">{LONG_VALUE}</span>
             </InfoField>
-            <InfoField label="Estado">
+            <InfoField label="Status">
               <StateTag color="bg-warning">Em revisão</StateTag>
             </InfoField>
           </InfoList>

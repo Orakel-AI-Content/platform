@@ -99,7 +99,7 @@ export default async function ContentVersionsPage({ params }: Params) {
               {contentId}
             </InfoField>
             <InfoField label="Slug">/{latest.data.slug}</InfoField>
-            <InfoField label="Estado">
+            <InfoField label="Status">
               <StateTag color={CONTENT_STATUS_TAG[latest.status]}>
                 {CONTENT_STATUS_LABEL[latest.status]}
               </StateTag>

@@ -35,7 +35,7 @@ export function SiteSummaryCard({
       <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
         <InfoField label="Domínio">{site.domain}</InfoField>
         <InfoField label="Indexável">{site.indexavel ? 'Sim' : 'Não'}</InfoField>
-        <InfoField label="Estado">
+        <InfoField label="Status">
           <StateTag color={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</StateTag>
           {site.state === 'pausado' && site.pausedReason && (
             <p className="mt-1 font-normal">{site.pausedReason}</p>

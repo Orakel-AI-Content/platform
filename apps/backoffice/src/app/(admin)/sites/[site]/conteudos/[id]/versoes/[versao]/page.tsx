@@ -99,7 +99,7 @@ export default async function ContentVersionPage({ params }: Params) {
           version.version === latest ? 'Versão mais recente' : `Mais recente: ${latest}`,
         ]}
       />
-      <ContentVersionView data={version.data} />
+      <ContentVersionView data={version.data} timeZone={timeZone} />
     </article>
   );
 }
