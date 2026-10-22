@@ -15,11 +15,17 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {},
+    "lint": {
+      "dependsOn": ["^build"]
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     },
     "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test:browser": {
       "dependsOn": ["^build"],
       "outputs": []
     },

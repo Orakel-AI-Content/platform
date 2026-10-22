@@ -9,6 +9,7 @@ Stack: Next.js 16 (App Router) + Drizzle/Postgres + Graphile Worker; contratos e
 
 - Rodar: `pnpm dev` · processos: `pnpm worker`
 - Testar: `pnpm test` (um arquivo: `pnpm vitest run <caminho>`)
+- Componentes em Chromium: `pnpm test:browser` (`*.browser.test.tsx`; teclado, foco, axe)
 - Contrato (Postgres): `DATABASE_URL=… pnpm test:contract` · E2E: `pnpm test:e2e`
 - Lint / tipos: `pnpm lint` · `pnpm typecheck`
 - Banco: `pnpm db:generate --name <nome>` · `pnpm db:migrate` · `pnpm db:seed`
@@ -40,7 +41,7 @@ relevantes e leia-os primeiro.
 - `docs/architecture/overview.md` – papel, processos, fluxo gerado
 - `docs/architecture/code-design.md` – camadas e padrões do domínio
 - `docs/architecture/folder-structure.md` – como acrescentar módulo, tabela, tela, rota ou job
-- `docs/conventions/testing.md` – unitários, contrato com Postgres, E2E
+- `docs/conventions/testing.md` – unitários, componentes em Chromium, contrato com Postgres, E2E
 - `docs/migration/ecme.md` – registro do porte do Ecme: onde está o template, regras de porte, testes, histórias
 - `docs/design/design-system.md` – padrão de toda tela no Ecme: componentes, cores e contraste, tema, moldura, acessibilidade
 - `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog; 0008: task build; 0010: janela por site; 0011: sites.auto.tfvars.json; 0012: envio e ingestão de imagens; 0013: variantes e registro da mídia; 0014: reprocessamento; 0015: status mutável da versão; 0016: Ecme como design system)
