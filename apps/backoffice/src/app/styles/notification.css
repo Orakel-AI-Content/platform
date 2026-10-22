@@ -1,4 +1,6 @@
-/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_notification.css */
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/components/_notification.css
+   Adaptado (#455): a descrição ganha cor própria, `text-gray-600 dark:text-gray-300`. No Ecme
+   ela herda o texto do body, e o gray-400 do escuro dá 4,11:1 sobre o gray-700 da notificação. */
 @layer components {
   .notification {
     @apply bg-white shadow-xl dark:shadow-2xl rounded-xl mb-3 relative border border-gray-100 dark:bg-gray-700 dark:border-transparent font-semibold;
@@ -14,6 +16,10 @@
 
   .notification-title {
     @apply font-bold text-base text-gray-800 dark:text-white;
+  }
+
+  .notification-description {
+    @apply text-gray-600 dark:text-gray-300;
   }
 
   .notification-close {
