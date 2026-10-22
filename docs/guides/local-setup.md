@@ -68,20 +68,33 @@ regrava a tag `local`. Para o E2E da própria branch, cada sessão sobe um par s
 worktree, com o ambiente compartilhado já no ar:
 
 ```sh
-pnpm local:isolated up 433     # imprime E2E_BASE_URL=https://admin.orakel.localhost:<porta>
-E2E_BASE_URL=https://admin.orakel.localhost:<porta> pnpm local:e2e:area sites,header
+pnpm local:isolated up 433     # imprime E2E_BASE_URL e E2E_DATABASE_URL
+E2E_BASE_URL=https://admin.orakel.localhost:<porta> \
+  E2E_DATABASE_URL=postgres://…/orakel_433 pnpm local:e2e:area sites,header
 pnpm local:isolated down 433
 ```
 
-O `<id>` (letras minúsculas, dígitos e hífen; ex.: o número da issue) dá nome aos containers
-`orakel-<id>-web` e `orakel-<id>-caddy`, então vários pares convivem. O `up` constrói a imagem
-`backoffice:<SHA do commit>` (sem a tag `local`; mudanças sem commit entram nela), sobe o
-backoffice pelo `compose run` (ambiente e redes do `backoffice-web`) e um Caddy na primeira
-porta livre a partir de 8400 (ou na informada: `up <id> <porta>`), com o mesmo login de teste.
-O Caddy do par tem CA própria: o navegador avisa do certificado, e o Playwright o ignora.
-Banco, S3 e access-mock continuam os compartilhados: E2E que gravam dados (`midia.spec.ts`,
-`sites.spec.ts`) podem disputar dados entre sessões. Num worktree sem `.env.local`, aponte o
-da raiz: `ORAKEL_ENV_FILE=<raiz>/.env.local pnpm local:isolated up <id>`.
+O `<id>` (letras minúsculas, dígitos e hífen; ex.: o número da issue) dá nome ao banco
+`orakel_<id>` e ao container `orakel-<id>-caddy`, então vários pares convivem. O `up` não
+constrói imagem Docker:
+
+- **Banco da sessão:** `orakel_<id>`, cópia do banco compartilhado por `pg_dump | psql` (o
+  `CREATE DATABASE … TEMPLATE` exige o banco de origem sem conexões, e o compartilhado sempre
+  tem). O Playwright lê o banco pelo `E2E_DATABASE_URL`, então os dados que um E2E grava não
+  aparecem nas outras sessões.
+- **Backoffice no host:** `pnpm turbo run build --filter=@orakel/backoffice` (o `.next` fica no
+  cache do turbo, que os worktrees dividem: outro worktree no mesmo commit não refaz o build) e
+  `next start` na primeira porta livre a partir de 3100, com as variáveis do `.env.local` e a
+  `DATABASE_URL` da sessão. PID e log ficam em `.e2e/<id>/`.
+- **Caddy avulso** na primeira porta livre a partir de 8400 (ou na informada: `up <id> <porta>`),
+  com o mesmo login de teste. Tem CA própria: o navegador avisa do certificado, e o Playwright o
+  ignora.
+
+O `down` encerra o `next start`, remove o Caddy e apaga o banco da sessão. S3 e access-mock
+continuam os compartilhados. Não há worker nem build-runner da sessão: jobs agendados no banco
+dela não rodam, então os E2E que esperam um build terminar (o artigo publicado de
+`midia.spec.ts`) só passam na suíte completa (CI) ou no ambiente compartilhado. Num worktree sem
+`.env.local`, aponte o da raiz: `ORAKEL_ENV_FILE=<raiz>/.env.local pnpm local:isolated up <id>`.
 
 A sessão roda só o E2E da área que tocou, nunca a suíte inteira (essa roda no CI):
 
@@ -111,7 +124,7 @@ A sessão roda só o E2E da área que tocou, nunca a suíte inteira (essa roda n
 | `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit)  |
 | `pnpm local:e2e`                                            | E2E completo com Playwright                                  |
 | `pnpm local:e2e:area <área>` · `smoke`                      | E2E de uma área ou só os `@smoke`, numa das vagas da máquina |
-| `pnpm local:isolated up <id>` · `down <id>`                 | Backoffice e Caddy só da sessão, numa porta própria          |
+| `pnpm local:isolated up <id>` · `down <id>`                 | Backoffice no host, banco e Caddy só da sessão               |
 | `infra/local/compose.sh <args>`                             | Qualquer comando do compose com os arquivos certos           |
 
 ## Serviços locais
