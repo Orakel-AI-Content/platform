@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { TbPlus } from 'react-icons/tb';
 
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable';
@@ -75,7 +76,11 @@ const LIST: ListConfig = {
 const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABEL[value] }));
 
 const NOVA = (
-  <ButtonLink variant="solid" href="#vitrine-data-table">
+  <ButtonLink
+    variant="solid"
+    href="#vitrine-data-table"
+    icon={<TbPlus className="text-xl" aria-hidden />}
+  >
     Nova matéria
   </ButtonLink>
 );

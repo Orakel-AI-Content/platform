@@ -1,3 +1,5 @@
+import { TbPlus } from 'react-icons/tb';
+
 import { ContentsTable } from '@/components/contents/ContentsTable';
 import { listContents } from '@/domain/content/contents.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
@@ -26,7 +28,11 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
   if (!contents.ok) return noRead;
 
   const create = canWrite ? (
-    <ButtonLink href={`/sites/${site.id}/conteudos/novo`} variant="solid" size="sm">
+    <ButtonLink
+      href={`/sites/${site.id}/conteudos/novo`}
+      variant="solid"
+      icon={<TbPlus className="text-xl" aria-hidden />}
+    >
       Criar conteúdo
     </ButtonLink>
   ) : undefined;

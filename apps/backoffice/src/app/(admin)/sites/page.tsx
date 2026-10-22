@@ -8,6 +8,8 @@ import { TFVARS_FILENAME } from '@/domain/sites/sites.ts';
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { ListHeader } from '@/components/shared/PageHeader';
 
+import { TbCloudDownload, TbPlus } from 'react-icons/tb';
+
 import { publishNow } from './actions.ts';
 import { readVisibleSites } from '../visible-sites.ts';
 
@@ -32,7 +34,11 @@ export default async function SitesPage({ searchParams }: SearchParams) {
   }
   const canConfigure = can(actor.value, 'site.configure');
   const register = canConfigure ? (
-    <ButtonLink href="/sites/novo" variant="solid" size="sm">
+    <ButtonLink
+      href="/sites/novo"
+      variant="solid"
+      icon={<TbPlus className="text-xl" aria-hidden />}
+    >
       Criar site
     </ButtonLink>
   ) : undefined;
@@ -46,11 +52,16 @@ export default async function SitesPage({ searchParams }: SearchParams) {
             action={
               canConfigure ? (
                 <>
-                  {register}
                   {/* Rota de download (ADR 0011), não navegação: <a> com download, não <Link>. */}
-                  <Button asElement="a" href="/sites/tfvars" download={TFVARS_FILENAME} size="sm">
+                  <Button
+                    asElement="a"
+                    href="/sites/tfvars"
+                    download={TFVARS_FILENAME}
+                    icon={<TbCloudDownload className="text-xl" aria-hidden />}
+                  >
                     Baixar {TFVARS_FILENAME}
                   </Button>
+                  {register}
                 </>
               ) : undefined
             }

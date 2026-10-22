@@ -30,7 +30,8 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   sem import não fica. As classes de cada componente ficam numa folha por componente
   em `src/app/styles/`, em `@layer components`, importada por `src/app/globals.css`. Junte
   classes sempre com o `classNames` de `src/components/ui/utils/` (`twMerge` sobre `classnames`).
-  Ícones do `react-icons` (`react-icons/pi`, como no template), sempre `aria-hidden`.
+  Ícones do `react-icons`, sempre `aria-hidden`: a moldura e a navegação usam `react-icons/pi`
+  (ver "Moldura"), e as telas usam `react-icons/tb`, como as páginas do template.
 - **Cores:** Tailwind 4, só com os tokens do `@theme inline` de `src/app/globals.css`; nada de
   cor solta. Os nomes são os do Ecme: `primary` (com `-deep`, `-mild` e `-subtle`), `error`,
   `success`, `info` e `warning` (com `-subtle`), `neutral` (o branco) e a escala `gray-50` a
@@ -154,9 +155,15 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
   sozinha acima do cartão e o título e a ação vão para o `ListHeader`, dentro dele (ver
   "Lista"). A página monta a ação no servidor e só a passa com permissão; sem ela, o cabeçalho
   é só o título. Ação principal em `ButtonLink` (`src/components/ui/Button/ButtonLink.tsx`, o
-  `Button` sobre `next/link` para Server Components) com `variant="solid" size="sm"`; a
-  secundária (baixar o tfvars em Sites) ao lado, no `Button` padrão em `size="sm"`. A tabela
-  nunca desenha o link de criar.
+  `Button` sobre `next/link` para Server Components) com `variant="solid"`. No `PageHeader`
+  (detalhe e formulário) ela fica em `size="sm"`, já que o template não tem equivalente. Na
+  lista, a ação do `ListHeader` segue o `CustomerListActionTools` do Ecme. O botão fica no
+  tamanho padrão, com o ícone de `react-icons/tb` na prop `icon`, em `text-xl` e `aria-hidden`
+  (`TbPlus` para criar, `TbCloudDownload` para baixar, `TbCloudUpload` para enviar). A
+  secundária vem antes, no `Button` padrão (baixar o tfvars em Sites), e a principal fica na
+  ponta direita. O ícone vai como elemento JSX, que atravessa a fronteira para o
+  `ButtonLink`, nunca como componente. O `EmptyState` recebe o mesmo nó. A tabela nunca desenha
+  o link de criar.
 - **Larguras:** duas utilities de `globals.css`, na `section` (ou `article`) de topo da página,
   nunca um `max-w-*` solto. `form-width` (`max-w-3xl`) para criar e editar, configuração,
   textos institucionais e telas que leem um item (versão de um conteúdo): uma coluna legível. Nos formulários de tela (#328), o `form-width` sai da `section` e vai
@@ -585,7 +592,7 @@ domínio e não mudam com os rótulos.
   (`plain`, `xs`: 32 px, acima do mínimo de 24 px) e o `Tooltip` do Ecme, para ações repetidas
   e compactas, como os controles de cada bloco do editor. O nome vem de `label` (`aria-label`,
   com a posição: "Mover bloco 3 para cima"); a dica é só visual e repete o nome, então o botão
-  descarta o `aria-describedby` do Tooltip; o ícone (`react-icons/pi`, 16 px) fica
+  descarta o `aria-describedby` do Tooltip; o ícone (16 px; nas telas, `react-icons/tb`) fica
   `aria-hidden`. Ação indisponível que deve continuar focável (o foco fica no botão depois de
   mover) usa `aria-disabled`, desenhado como indisponível (opacidade e cursor), e o `onClick`
   confere a condição; `disabled` só quando o foco não precisa ficar no botão.

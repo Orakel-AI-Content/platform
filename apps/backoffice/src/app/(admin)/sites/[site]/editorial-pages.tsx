@@ -2,6 +2,7 @@ import type { Result } from '@orakel/content-model';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { TbPlus } from 'react-icons/tb';
 
 import {
   ENTITY_CONFIG,
@@ -93,7 +94,11 @@ export function editorialListPage<K extends EntityKind>(kind: K): EditorialPage<
     if (!items?.ok) return noRead;
 
     const create = canWrite ? (
-      <ButtonLink href={`/sites/${site.id}/${config.segment}/novo`} variant="solid" size="sm">
+      <ButtonLink
+        href={`/sites/${site.id}/${config.segment}/novo`}
+        variant="solid"
+        icon={<TbPlus className="text-xl" aria-hidden />}
+      >
         {config.createLabel}
       </ButtonLink>
     ) : undefined;
