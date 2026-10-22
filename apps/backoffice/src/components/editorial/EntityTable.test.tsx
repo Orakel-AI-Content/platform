@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MotionGlobalConfig } from 'motion/react';
 import Link from 'next/link';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { EntityTable, type EntityRow } from './EntityTable.tsx';
 
@@ -35,6 +36,14 @@ vi.mock('next/navigation', async () => {
   };
 });
 
+beforeAll(() => {
+  // A dica do botão de editar abre no foco; o happy-dom rejeita a animação nativa que o motion
+  // cancela ao desmontar.
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 afterEach(() => {
   cleanup();
   navigation.set('');
@@ -107,6 +116,10 @@ describe('tabela de entidades', () => {
     const edit = screen.getByRole('link', { name: 'Editar principal' });
     expect(document.activeElement).toBe(edit);
     expect(edit.getAttribute('href')).toBe('/sites/exemplo-a/menus/1');
+    // Botão de ícone (#441): só o lápis, `aria-hidden`, e o nome sem a descrição da dica.
+    expect(edit.textContent).toBe('');
+    expect(edit.querySelector('svg')?.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(edit.getAttribute('aria-describedby')).toBeNull();
   });
 
   it('sem linhas mostra o estado vazio com a ação no lugar da toolbar e da tabela', () => {

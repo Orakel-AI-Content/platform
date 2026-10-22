@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MotionGlobalConfig } from 'motion/react';
 import Link from 'next/link';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
@@ -36,6 +37,14 @@ vi.mock('next/navigation', async () => {
   };
 });
 
+beforeAll(() => {
+  // A dica do botão de editar abre no foco; o happy-dom rejeita a animação nativa que o motion
+  // cancela ao desmontar.
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 afterEach(() => {
   cleanup();
   navigation.set('');
@@ -115,9 +124,13 @@ describe('tabela de conteúdos', () => {
     render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} canWrite />);
 
     expect(screen.queryByRole('link', { name: 'Criar conteúdo' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Editar Guia de uso' }).getAttribute('href')).toBe(
-      '/sites/exemplo-a/conteudos/1/editar',
-    );
+    const edit = screen.getByRole('link', { name: 'Editar Guia de uso' });
+    expect(edit.getAttribute('href')).toBe('/sites/exemplo-a/conteudos/1/editar');
+    // Botão de ícone (#441): sem texto visível, o lápis fora da árvore de acessibilidade e o
+    // nome lido uma vez, sem a descrição da dica.
+    expect(edit.textContent).toBe('');
+    expect(edit.querySelector('svg')?.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(edit.getAttribute('aria-describedby')).toBeNull();
   });
 
   it('o teclado alcança o link de versões de cada linha', async () => {
