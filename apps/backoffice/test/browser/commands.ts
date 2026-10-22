@@ -16,6 +16,17 @@ export const emulateMedia = defineBrowserCommand<[MediaOptions]>(async (context,
 });
 
 /**
+ * Leva o ponteiro ao canto de baixo da página de teste, longe dos componentes: sem isso, o
+ * hover de um teste vale para o seguinte. Fica dentro do iframe, para o Chromium atualizar o
+ * elemento sob o ponteiro (fora dele, o próximo hover não dispara `mouseenter` no gatilho).
+ */
+export const resetPointer = defineBrowserCommand<[]>(async (context) => {
+  const frame = await (await context.frame()).frameElement();
+  const box = await frame.boundingBox();
+  if (box) await context.page.mouse.move(box.x + box.width - 2, box.y + box.height - 2);
+});
+
+/**
  * Aperta a tecla com o foco onde está e responde ao seletor de arquivos nativo que ela abre.
  * Devolve se o seletor aceita vários arquivos. Falha se a tecla não abrir o seletor.
  */

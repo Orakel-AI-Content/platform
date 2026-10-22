@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
-import { emulateMedia, pressAndChooseFiles } from './test/browser/commands.ts';
+import { emulateMedia, pressAndChooseFiles, resetPointer } from './test/browser/commands.ts';
 
 // Testes de componente em Chromium real (Vitest Browser Mode, #457): teclado, foco, axe, tema
 // e movimento sem servidor nem banco, com o CSS de `globals.css`. Fora do `pnpm test`: a
@@ -20,7 +20,7 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
       // Janela de desktop, como a do E2E: o padrão do Browser Mode é de celular.
       viewport: { width: 1280, height: 720 },
-      commands: { emulateMedia, pressAndChooseFiles },
+      commands: { emulateMedia, pressAndChooseFiles, resetPointer },
     },
   },
 });

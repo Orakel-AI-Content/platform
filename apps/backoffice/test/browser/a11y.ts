@@ -11,6 +11,7 @@ declare module 'vitest/browser' {
   interface BrowserCommands {
     emulateMedia: (options: MediaOptions) => Promise<void>;
     pressAndChooseFiles: (key: string, files: ChosenFile[]) => Promise<boolean>;
+    resetPointer: () => Promise<void>;
   }
 }
 
@@ -43,18 +44,33 @@ export async function audit(...targets: Target[]): Promise<string[]> {
   );
 }
 
+/**
+ * Emula a mídia e espera a página de teste ver a mudança: o `change` da media query chega
+ * depois do comando, e quem a ouve (o `useReducedMotion` do motion) leria o valor antigo.
+ */
+async function emulate(query: string, options: MediaOptions): Promise<void> {
+  const media = matchMedia(query);
+  const changed = media.matches
+    ? Promise.resolve()
+    : new Promise<void>((resolve) => {
+        media.addEventListener('change', () => resolve(), { once: true });
+      });
+  await commands.emulateMedia(options);
+  await changed;
+}
+
 /** Tema do Backoffice: a classe no <html> (como o layout raiz) e a mídia do navegador. */
 export async function setTheme(scheme: ColorScheme): Promise<void> {
   document.documentElement.classList.toggle('dark', scheme === 'dark');
   document.documentElement.classList.toggle('light', scheme === 'light');
-  await commands.emulateMedia({ colorScheme: scheme });
+  await emulate(`(prefers-color-scheme: ${scheme})`, { colorScheme: scheme });
 }
 
 /** `prefers-reduced-motion` no navegador, para o `MotionConfig` e as transições do CSS. */
 export async function setReducedMotion(
   reducedMotion: (typeof REDUCED_MOTIONS)[number],
 ): Promise<void> {
-  await commands.emulateMedia({ reducedMotion });
+  await emulate(`(prefers-reduced-motion: ${reducedMotion})`, { reducedMotion });
 }
 
 /** A cor de uma variável CSS como o navegador a calcula, para comparar com o outline-color. */
