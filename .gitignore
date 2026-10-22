@@ -16,6 +16,8 @@ next-env.d.ts
 playwright-report/
 .e2e/
 test-results/
+# Capturas de falha do Vitest Browser Mode (test:browser).
+.vitest/
 
 # Ambiente e segredos (use .env.example como referência)
 .env

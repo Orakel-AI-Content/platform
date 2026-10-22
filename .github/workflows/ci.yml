@@ -109,6 +109,14 @@ jobs:
           restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
       - run: pnpm format:check
       - run: pnpm turbo run lint typecheck test //#lint:root --affected
+      # Testes de componente do Backoffice em Chromium real (Vitest Browser Mode, #457), sem
+      # servidor nem banco: fora do `test` porque precisam do navegador.
+      - name: Navegador dos testes de componente
+        if: needs.changes.outputs.backoffice == 'true' || needs.changes.outputs.workspace == 'true'
+        run: pnpm --filter @orakel/backoffice exec playwright install --with-deps chromium
+      - name: Testes de componente do Backoffice
+        if: needs.changes.outputs.backoffice == 'true' || needs.changes.outputs.workspace == 'true'
+        run: pnpm turbo run test:browser --filter=@orakel/backoffice
 
   contract:
     name: Contrato da API de exportação

@@ -9,6 +9,7 @@ Consulte ao escrever ou rodar testes. Cada unidade complementa em
 | ---------------------------------- | -------------------------- | ----------------------------------- | ---------------------------------- |
 | Unitário                           | Vitest                     | `src/**/*.test.ts`, junto do código | `test`                             |
 | Contrato da API de exportação      | Vitest + Postgres          | backoffice                          | `test:contract`                    |
+| Componente em Chromium real        | Vitest Browser Mode        | backoffice, `*.browser.test.tsx`    | `test:browser`                     |
 | Sites de exemplo (orçamento de JS) | build do blog com fixtures | blog                                | `build:examples`                   |
 | Acessibilidade                     | Playwright + axe           | blog                                | `test:a11y`                        |
 | Paridade estático × SSR            | Playwright                 | blog                                | `test:parity`                      |
@@ -43,4 +44,6 @@ export default mergeConfig(baseConfig, withCoverageThreshold(90)); // só nos pa
 - Tudo: `pnpm test`
 - Uma unidade: `pnpm turbo run test --filter=@orakel/<nome>`
 - Um arquivo (na pasta da unidade): `pnpm vitest run src/<arquivo>.test.ts`
+- Componentes do Backoffice em Chromium: `pnpm turbo run test:browser --filter=@orakel/backoffice`
+  (fora do `pnpm test`; precisa do Chromium do Playwright)
 - E2E local: `pnpm local:up && pnpm local:seed && pnpm local:e2e`

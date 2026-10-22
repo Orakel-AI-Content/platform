@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:contract": "vitest run --config vitest.contract.config.ts",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
@@ -81,12 +82,16 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@types/react-modal": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "axe-core": "catalog:",
     "drizzle-kit": "catalog:",
     "eslint": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",
     "happy-dom": "catalog:",
+    "playwright": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vitest-browser-react": "catalog:"
   }
 }

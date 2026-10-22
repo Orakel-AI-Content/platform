@@ -11,6 +11,7 @@ sites é configuração.
 
 - Instalar: `pnpm install`
 - Pipeline: `pnpm build` · `pnpm lint` · `pnpm typecheck` · `pnpm test`
+- Componentes do Backoffice em Chromium: `pnpm turbo run test:browser --filter=@orakel/backoffice`
 - Uma unidade: `pnpm turbo run <tarefa> --filter=@orakel/<nome>`
 - Um teste (na pasta da unidade): `pnpm vitest run <caminho>`
 - Formatar: `pnpm format`
@@ -43,7 +44,8 @@ Previstas (gere com `/scaffold` no caminho da unidade):
 
 ## Regras invioláveis
 
-- Rode `pnpm lint`, `pnpm typecheck` e `pnpm test` antes de concluir qualquer tarefa.
+- Rode `pnpm lint`, `pnpm typecheck` e `pnpm test` antes de concluir qualquer tarefa; tocou
+  `apps/backoffice/src`, rode também o `test:browser` do Backoffice.
 - Respeite as fronteiras de `.claude/rules/architecture.md`.
 - Versão de dependência só no `catalog` de `pnpm-workspace.yaml`; na unidade, `catalog:`.
 - Use `.env.example` como referência; nunca leia nem escreva `.env` ou `.env.local`.
