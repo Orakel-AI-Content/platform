@@ -1,14 +1,16 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
+import { TbPencil } from 'react-icons/tb';
 
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable';
 import { EmptyState, NoResults } from '@/components/shared/EmptyState';
+import { IconButton } from '@/components/shared/IconButton';
 import { ListToolbar } from '@/components/shared/ListControls.tsx';
 import { Truncated } from '@/components/shared/Truncated';
 import { useListTable } from '@/components/shared/useListTable';
 import type { ListConfig } from '@/components/shared/useListState.ts';
-import ButtonLink from '@/components/ui/Button/ButtonLink';
 
 /** Linha de uma lista de entidades: o servidor já formata as células como texto. */
 export type EntityRow = { id: number; name: string; cells: string[] };
@@ -54,10 +56,12 @@ function columnsFor(
       // Na largura do botão: o resto da tabela vai para o nome e as demais células.
       size: 1,
       cell: ({ row }) => (
-        <ButtonLink href={`${basePath}/${row.original.id}`} size="xs">
-          Editar
-          <span className="sr-only"> {row.original.name}</span>
-        </ButtonLink>
+        <IconButton
+          asElement={Link}
+          href={`${basePath}/${row.original.id}`}
+          label={`Editar ${row.original.name}`}
+          icon={<TbPencil />}
+        />
       ),
     },
   ];

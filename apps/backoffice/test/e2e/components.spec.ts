@@ -1916,6 +1916,27 @@ test('DataTable: lista vazia mostra a ação principal; carregando, o esqueleto 
   await expect(loading.locator('tbody .skeleton').first()).toBeVisible();
 });
 
+test('DataTable: a ação da linha é um link de ícone com dica, alcançado por Tab', async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto(SHOWCASE);
+  await page.waitForLoadState('networkidle');
+  const table = materias(page);
+  const row = table.locator('tbody tr').first();
+  const edit = row.getByRole('link', { name: 'Editar Matéria 01', exact: true });
+
+  // Botão de ícone (#441): sem texto visível, o lápis aria-hidden e a dica no foco.
+  await expect(edit).toHaveText('');
+  await expect(edit.locator('[aria-hidden="true"] svg')).toHaveCount(1);
+  await row.getByRole('link', { name: 'Matéria 01', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(edit).toBeFocused();
+  await expect(page.getByRole('tooltip')).toHaveText('Editar Matéria 01');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#vitrine-data-table$/);
+});
+
 for (const colorScheme of ['light', 'dark'] as const) {
   test(`DataTable sem violação do axe, com e sem resultado (${colorScheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });

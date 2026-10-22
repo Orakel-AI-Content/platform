@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
+import { TbPencil } from 'react-icons/tb';
 
 import DataTable, { type ColumnDef, type Row } from '@/components/shared/DataTable';
 import { EmptyState, NoResults } from '@/components/shared/EmptyState';
+import { IconButton } from '@/components/shared/IconButton';
 import { ListToolbar } from '@/components/shared/ListControls.tsx';
 import { ROW_LINK_CLASS } from '@/components/shared/rowLink';
 import { Truncated } from '@/components/shared/Truncated';
@@ -18,7 +20,6 @@ import {
   formatDateTime,
 } from '@/components/shared/siteLabels.ts';
 import { StateTag } from '@/components/sites/SiteStatus';
-import ButtonLink from '@/components/ui/Button/ButtonLink';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 const KINDS = Object.keys(CONTENT_KIND_LABEL) as ContentListItem['kind'][];
@@ -93,11 +94,16 @@ function columnsFor(
     {
       id: 'actions',
       header: () => <span className="sr-only">Ações</span>,
+      enableSorting: false,
+      // Na largura do botão de ícone, como no `CustomerListTable` do Ecme.
+      size: 1,
       cell: ({ row }) => (
-        <ButtonLink href={`/sites/${siteId}/conteudos/${row.original.id}/editar`} size="xs">
-          Editar
-          <span className="sr-only"> {row.original.title}</span>
-        </ButtonLink>
+        <IconButton
+          asElement={Link}
+          href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
+          label={`Editar ${row.original.title}`}
+          icon={<TbPencil />}
+        />
       ),
     },
   ];
