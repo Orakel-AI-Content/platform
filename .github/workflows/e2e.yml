@@ -1,23 +1,69 @@
-# E2E completo (ADR 0008): só manual. Sobe o ambiente local em containers, como no
-# `pnpm local:up`, e roda `pnpm local:e2e`.
+# E2E completo (ADR 0016): em todo PR que afeta o Backoffice, e manual. Sobe o ambiente
+# local em containers, como no `pnpm local:up`, e divide a suíte em 2 shards. As imagens
+# são construídas uma vez no job `images`; os shards as recarregam do cache do buildx.
 name: E2E
 
 on:
+  pull_request:
+    paths:
+      - 'apps/backoffice/**'
+      - 'packages/**'
+      - 'infra/local/**'
+      - 'docker/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/e2e.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   TURBO_TELEMETRY_DISABLED: '1'
+  # Mesma tag nas imagens do bake e no compose (no CI o bake não gera a tag "local").
+  TAG: ${{ github.sha }}
+  BACKOFFICE_TAG: ${{ github.sha }}
+  EDGE_LOCAL_TAG: ${{ github.sha }}
+  SITE_BUILDER_TAG: ${{ github.sha }}
+  # Cache do buildx por alvo: um escopo comum faria cada alvo sobrescrever o dos outros.
+  BAKE_CACHE: >-
+    --set backoffice.cache-from=type=gha,scope=e2e-backoffice
+    --set edge-local.cache-from=type=gha,scope=e2e-edge-local
+    --set site-builder.cache-from=type=gha,scope=e2e-site-builder
 
 jobs:
-  e2e:
-    name: E2E ponta a ponta
+  images:
+    name: Imagens (cache do buildx)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Bake do grupo default para o cache
+        run: >-
+          docker/bake.sh default $BAKE_CACHE
+          --set '*.output=type=cacheonly'
+          --set backoffice.cache-to=type=gha,mode=max,scope=e2e-backoffice
+          --set edge-local.cache-to=type=gha,mode=max,scope=e2e-edge-local
+          --set site-builder.cache-to=type=gha,mode=max,scope=e2e-site-builder
+
+  e2e:
+    name: E2E ponta a ponta (shard ${{ matrix.shard }}/2)
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Imagens do cache
+        run: docker/bake.sh default $BAKE_CACHE --load
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -28,14 +74,17 @@ jobs:
       - run: pnpm local:up
       - run: pnpm local:seed
       - name: Navegador do Playwright
-        if: hashFiles('apps/blog/package.json') != ''
-        run: pnpm --filter @orakel/blog exec playwright install --with-deps chromium
-      - run: pnpm local:e2e
+        run: pnpm --filter @orakel/backoffice exec playwright install --with-deps chromium
+      - name: Testes do shard
+        run: pnpm turbo run test:e2e -- --list --shard=${{ matrix.shard }}/2
+      - run: pnpm turbo run test:e2e -- --shard=${{ matrix.shard }}/2
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: playwright-report
-          path: '**/playwright-report/'
+          name: playwright-report-shard-${{ matrix.shard }}
+          path: |
+            apps/backoffice/playwright-report/
+            apps/backoffice/test-results/
           if-no-files-found: ignore
       - if: always()
         run: pnpm local:down
