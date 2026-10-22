@@ -24,6 +24,9 @@ export default defineConfig({
   testDir: './test/e2e',
   fullyParallel: false,
   workers: Number(process.env.E2E_WORKERS ?? 2),
+  // No runner Linux, cada build de site cria interfaces de rede no host e o Chromium aborta a
+  // navegação em curso (net::ERR_NETWORK_CHANGED); no CI, o teste repete (ADR 0016 da raiz).
+  retries: process.env.CI ? 2 : 0,
   ...(runPerf ? {} : { grepInvert: /@perf/ }),
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   use: {

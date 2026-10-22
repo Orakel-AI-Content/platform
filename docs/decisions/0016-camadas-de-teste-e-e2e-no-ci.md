@@ -45,5 +45,10 @@ semanas de estabilidade.
 
 - Cada PR do Backoffice gasta minutos do plano Free (2.000 min/mês) em três jobs; os
   filtros de caminho e o `concurrency` com cancelamento limitam o custo.
+- No runner Linux, cada build de site (containers de render e publish) cria interfaces de
+  rede no host, e o Chromium aborta a navegação em curso (`net::ERR_NETWORK_CHANGED`). No
+  CI, o Playwright repete o teste até 2 vezes (`retries`), e o relatório o marca como
+  _flaky_. Rodar o Playwright num container, isolado das interfaces do host, dispensaria os
+  retries.
 - Rebalancear os arquivos entre os shards ou ligar `fullyParallel` fica para quando o
   tempo dos shards divergir.
