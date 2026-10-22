@@ -16,9 +16,11 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
   `local:up`, ela apagaria o seed. Use o Postgres descartável abaixo. O snapshot de cada fixture do `content-model` tem de passar no
   `validateSnapshot` e reproduzir a fixture, menos as mudanças pendentes do header.
 - **E2E** (`test/e2e/`): login pelo access-mock, telas de sites e o editor de conteúdo, e axe
-  (WCAG 2.2 AA). Rodam contra a imagem `backoffice:local`: depois de mudar o código,
-  `docker/bake.sh backoffice` e `infra/local/compose.sh up -d --wait backoffice-web`. Use
-  `E2E_BASE_URL` para outro endereço. Numa sessão, rode só a área tocada:
+  (WCAG 2.2 AA). Por padrão, rodam contra a imagem `backoffice:local` do compose. Numa sessão,
+  rode contra o par isolado do worktree (`pnpm local:isolated up <id>`, na raiz): ele imprime
+  `E2E_BASE_URL` e `E2E_DATABASE_URL`, e o `playwright.config.ts` usa esse banco no lugar da
+  `DATABASE_URL` nos specs e na limpeza. O par não tem worker nem build-runner: o que depende de
+  build roda no CI ou no ambiente compartilhado. Numa sessão, rode só a área tocada:
   `pnpm local:e2e:area <arquivo sem .spec.ts>` (ou `smoke`), na raiz. Jornada principal de uma
   área nova leva `{ tag: '@smoke' }`; teste que semeia milhares de linhas ou mede tempo leva
   `@perf` (fora do local por padrão; `E2E_PERF=1`).
