@@ -19,7 +19,8 @@ import {
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
-import { resetDatabase, setupDatabase } from './helpers.ts';
+import { createVolumeSite, seedContents } from '../volume.ts';
+import { profileQueries, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Edição de conteúdo (#40): versões imutáveis, `n` dos blocos só do servidor e leituras.
 
@@ -477,5 +478,29 @@ describe('leituras de conteúdo', () => {
   it('sem papel, forbidden', async () => {
     const nobody = { email: 'x@orakel.local', roles: [] };
     expect(await listContents(db, nobody, SITE)).toMatchObject({ issues: [{ code: 'forbidden' }] });
+  });
+});
+
+// Rede de 5 sites com 2.000 conteúdos cada: com um site só na tabela, o Seq Scan é o plano
+// certo (ele lê a tabela inteira), e o teste não diria se a consulta usa o índice do site.
+const VOLUME_SITES = ['volume', 'vizinho-1', 'vizinho-2', 'vizinho-3', 'vizinho-4'];
+
+describe('lista com 2.000 conteúdos (#461)', () => {
+  it('lê por índice, sem Seq Scan, em menos de 300 ms', async () => {
+    for (const siteId of VOLUME_SITES) {
+      await createVolumeSite(db, siteId);
+      await seedContents(db, siteId, { count: 2000, pageEvery: 10, promoEvery: 20 });
+    }
+
+    const { result, ms, seqScans } = await profileQueries(db, (traced) =>
+      listContents(traced, SYSTEM_ACTOR, 'volume'),
+    );
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value).toHaveLength(2000);
+    expect(result.value.filter((item) => item.title.startsWith('Promoção'))).toHaveLength(100);
+    expect(seqScans).not.toContain('content_versions');
+    expect(seqScans).not.toContain('contents');
+    expect(ms).toBeLessThan(300);
   });
 });

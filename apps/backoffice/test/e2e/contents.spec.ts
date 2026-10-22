@@ -3,19 +3,17 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { readFixture } from '../../src/bin/seed.ts';
 import { createDb, createPool } from '../../src/db/client.ts';
-import { contents, contentVersions, media, mediaVariants } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
-import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
-import { analyzeTables } from './statistics.ts';
 import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
+import { createVolumeSite, seedContents, seedMedia } from '../volume.ts';
 
 // Editor de conteúdo (#45) contra o ambiente local semeado: o editor cria um artigo com
-// texto, imagem e FAQ e o acha na lista; o revisor não grava nada. Lista com 2.000
-// conteúdos (#107): num site próprio, gravado direto no banco e removido no fim.
+// texto, imagem e FAQ e o acha na lista; o revisor não grava nada. Listas (#107): num site
+// próprio, gravado direto no banco e removido no fim.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 /** Região dos toasts (#212): o retorno das ações vai para ela, fora do main (#326). */
@@ -583,102 +581,85 @@ test.describe('tela do conteúdo no detalhe (#371)', () => {
 });
 
 const BIG_SITE = `e2e-conteudos-${Date.now()}`;
-const BIG_COUNT = 2000;
-/** Abrir a lista e atualizar a busca ou o filtro: teto da #35 (CA1). */
+/** Abrir a lista e atualizar a busca: teto da #35 (CA1). */
 const MAX_MS = 2000;
 
+/**
+ * Site novo com `count` conteúdos, gravado direto no banco: metade páginas (os pares), e um em
+ * `promoEvery` chamado "Promoção" (a busca sem acento por "promocao" acha esses).
+ */
+async function seedContentSite(siteId: string, count: number, promoEvery: number): Promise<void> {
+  const pool = createPool(getEnv().DATABASE_URL);
+  try {
+    const db = createDb(pool);
+    await createVolumeSite(db, siteId);
+    await seedContents(db, siteId, { count, pageEvery: 2, promoEvery });
+  } finally {
+    await pool.end();
+  }
+}
+
+// Só no projeto `perf` (CI ou E2E_PERF=1, #461): o tempo no navegador depende da carga da
+// máquina. A consulta com volume é medida no contrato e o filtro no unitário de useListState.
 test.describe('lista com 2.000 conteúdos (#107)', { tag: '@perf' }, () => {
-  test.beforeAll(async () => {
-    const fixture = await readFixture('exemplo-b');
-    const config = fixture.find((line) => line.type === 'config');
-    const content = fixture.find((line) => line.type === 'content');
-    if (config?.type !== 'config' || content?.type !== 'content') {
-      throw new Error('fixture sem config ou conteúdo');
-    }
-    // Sem o ID do conteúdo da fixture (o JSONB não guarda o ID; undefined some no JSON).
-    const template = { ...content.data, id: undefined };
-    const pool = createPool(getEnv().DATABASE_URL);
-    try {
-      const db = createDb(pool);
-      const site = await db.transaction((tx) =>
-        createSite(tx, SYSTEM_ACTOR, {
-          ...config.data,
-          siteId: BIG_SITE,
-          name: `Site ${BIG_SITE}`,
-          domains: [`${BIG_SITE}.example.com`],
-        }),
-      );
-      if (!site.ok) throw new Error(JSON.stringify(site.issues));
-      // A cada 100, "Promoção": a busca sem acento acha 20. Um em quatro é página.
-      const ids = Array.from({ length: BIG_COUNT }, (_, index) => index + 1);
-      const kind = (id: number) => (id % 4 === 0 ? ('page' as const) : ('article' as const));
-      const title = (id: number) => (id % 100 === 0 ? `Promoção ${id}` : `Receita ${id}`);
-      await db.transaction(async (tx) => {
-        await tx
-          .insert(contents)
-          .values(ids.map((id) => ({ siteId: BIG_SITE, id, kind: kind(id), nextBlockN: 1 })));
-        await tx.insert(contentVersions).values(
-          ids.map((id) => ({
-            siteId: BIG_SITE,
-            contentId: id,
-            version: 1,
-            status: id % 2 === 0 ? ('publicado' as const) : ('rascunho' as const),
-            data: {
-              ...template,
-              kind: kind(id),
-              title: title(id),
-              slug: `conteudo-${id}`,
-              authorIds: [],
-              taxonomyIds: [],
-              blocks: [],
-            },
-          })),
-        );
-      });
-      await analyzeTables(db, contents, contentVersions);
-    } finally {
-      await pool.end();
-    }
-  });
+  test.beforeAll(() => seedContentSite(BIG_SITE, 2000, 100));
 
   test.afterAll(async () => {
     await removeSites([BIG_SITE]);
   });
 
-  test('abre, busca e filtra em menos de 2 s, e a URL leva o estado para outra aba', async ({
-    page,
-    context,
-  }) => {
+  test('abre e busca em menos de 2 s', async ({ page }) => {
     await loginAs(page, 'editor@orakel.local');
-    // A contagem fica ao lado do nav "Paginação" do Ecme, não dentro dele (#269).
     const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
     let started = Date.now();
     await page.goto(`/sites/${BIG_SITE}/conteudos`);
     await expect(count).toHaveText('2.000 resultados');
     expect(Date.now() - started).toBeLessThan(MAX_MS);
+
+    started = Date.now();
+    await page.getByLabel('Buscar por título').fill('promocao');
+    await expect(count).toHaveText('20 resultados');
+    expect(Date.now() - started).toBeLessThan(MAX_MS);
+  });
+});
+
+const LIST_SITE = `e2e-conteudos-lista-${Date.now()}`;
+
+// Lista de conteúdos com mais de uma página de resultados (#107), num site pequeno: 60
+// conteúdos, 30 do tipo Página, 6 "Promoção" (múltiplos de 10, todos do tipo Página).
+test.describe('lista de conteúdos (#107)', () => {
+  test.beforeAll(() => seedContentSite(LIST_SITE, 60, 10));
+
+  test.afterAll(async () => {
+    await removeSites([LIST_SITE]);
+  });
+
+  test('busca e filtra, e a URL leva o estado para outra aba', async ({ page, context }) => {
+    await loginAs(page, 'editor@orakel.local');
+    // A contagem fica ao lado do nav "Paginação" do Ecme, não dentro dele (#269).
+    const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
+
+    await page.goto(`/sites/${LIST_SITE}/conteudos`);
+    await expect(count).toHaveText('60 resultados');
     await expect(page.getByRole('row')).toHaveCount(26);
     await expect(page.getByRole('columnheader', { name: /Última alteração/ })).toHaveAttribute(
       'aria-sort',
       'descending',
     );
 
-    started = Date.now();
     await page.getByLabel('Buscar por título').fill('promocao');
-    await expect(count).toHaveText('20 resultados');
-    expect(Date.now() - started).toBeLessThan(MAX_MS);
+    await expect(count).toHaveText('6 resultados');
 
-    started = Date.now();
     // O filtro é o combobox do react-select (#269): abre com a seta e escolhe pelo nome.
     await page.getByRole('combobox', { name: 'Tipo' }).focus();
     await page.keyboard.press('ArrowDown');
     await page.getByRole('option', { name: 'Página', exact: true }).click();
     await expect(page).toHaveURL(/tipo=page/);
-    // Os 20 "Promoção" (múltiplos de 100) são todos páginas: a busca e o filtro combinam.
-    await expect(count).toHaveText('20 resultados');
+    // Os 6 "Promoção" (múltiplos de 10) são todos páginas: a busca e o filtro combinam.
+    await expect(count).toHaveText('6 resultados');
     await page.getByLabel('Buscar por título').fill('');
-    await expect(count).toHaveText('500 resultados');
-    expect(Date.now() - started).toBeLessThan(MAX_MS);
+    await expect(count).toHaveText('30 resultados');
 
     await page
       .getByRole('columnheader', { name: /Título/ })
@@ -698,7 +679,7 @@ test.describe('lista com 2.000 conteúdos (#107)', { tag: '@perf' }, () => {
     const other = await context.newPage();
     await other.goto(page.url());
     await expect(other.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-      '500 resultados',
+      '30 resultados',
     );
     await expect(other.getByRole('search').getByText('Página', { exact: true })).toBeVisible();
     await expect(
@@ -724,7 +705,7 @@ test.describe('lista com 2.000 conteúdos (#107)', { tag: '@perf' }, () => {
     }) => {
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
       await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/${BIG_SITE}/conteudos`);
+      await page.goto(`/sites/${LIST_SITE}/conteudos`);
       expect(page.viewportSize()?.width).toBe(1280);
       const table = page.getByRole('table');
       await expect(table.locator('tbody tr')).toHaveCount(25);
@@ -774,7 +755,7 @@ test.describe('lista com 2.000 conteúdos (#107)', { tag: '@perf' }, () => {
     page,
   }) => {
     await loginAs(page, 'editor@orakel.local');
-    await page.goto(`/sites/${BIG_SITE}/conteudos?q=nada-com-isso`);
+    await page.goto(`/sites/${LIST_SITE}/conteudos?q=nada-com-isso`);
 
     const table = page.getByRole('table', { name: 'Conteúdos', exact: true });
     await expect(table.getByText('Nenhum conteúdo encontrado.')).toBeVisible();
@@ -793,7 +774,7 @@ test.describe('lista com 2.000 conteúdos (#107)', { tag: '@perf' }, () => {
     page,
   }) => {
     await loginAs(page, 'editor@orakel.local');
-    await page.goto(`/sites/${BIG_SITE}/conteudos`);
+    await page.goto(`/sites/${LIST_SITE}/conteudos`);
 
     await page.getByRole('combobox', { name: 'Itens por página' }).focus();
     await page.keyboard.press('ArrowDown');
@@ -804,14 +785,14 @@ test.describe('lista com 2.000 conteúdos (#107)', { tag: '@perf' }, () => {
     await page.reload();
     await expect(page.locator('tbody tr')).toHaveCount(50);
     await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-      '2.000 resultados',
+      '60 resultados',
     );
   });
 
   // Padrão do template (#362): trilha acima do cartão; título, ação, toolbar e tabela nele.
   test('trilha fora do cartão; título, toolbar e tabela dentro dele', async ({ page }) => {
     await loginAs(page, 'editor@orakel.local');
-    await page.goto(`/sites/${BIG_SITE}/conteudos`);
+    await page.goto(`/sites/${LIST_SITE}/conteudos`);
 
     const card = page.locator('.card').filter({ has: page.getByRole('table') });
     await expect(card).toHaveCount(1);
@@ -1168,36 +1149,11 @@ const MEDIA_COUNT = 2000;
 
 test.describe('grade de imagens com 2.000 mídias (#182)', { tag: '@perf' }, () => {
   test.beforeAll(async () => {
-    const config = (await readFixture('exemplo-b')).find((line) => line.type === 'config');
-    if (config?.type !== 'config') throw new Error('fixture sem config');
     const pool = createPool(getEnv().DATABASE_URL);
     try {
       const db = createDb(pool);
-      const site = await db.transaction((tx) =>
-        createSite(tx, SYSTEM_ACTOR, {
-          ...config.data,
-          siteId: MEDIA_SITE,
-          name: `Site ${MEDIA_SITE}`,
-          domains: [`${MEDIA_SITE}.example.com`],
-        }),
-      );
-      if (!site.ok) throw new Error(JSON.stringify(site.issues));
-      const ids = Array.from({ length: MEDIA_COUNT }, (_, index) => index + 1);
-      await db.transaction(async (tx) => {
-        await tx
-          .insert(media)
-          .values(ids.map((id) => ({ siteId: MEDIA_SITE, id, width: 800, height: 600 })));
-        await tx.insert(mediaVariants).values(
-          ids.map((id) => ({
-            siteId: MEDIA_SITE,
-            mediaId: id,
-            width: 400,
-            format: 'webp',
-            path: `/media/${id}-400.webp`,
-          })),
-        );
-      });
-      await analyzeTables(db, media, mediaVariants);
+      await createVolumeSite(db, MEDIA_SITE);
+      await seedMedia(db, MEDIA_SITE, { count: MEDIA_COUNT });
     } finally {
       await pool.end();
     }

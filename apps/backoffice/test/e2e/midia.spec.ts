@@ -7,8 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
 
 import { getDb } from '../../src/db/client.ts';
-import { media, mediaUploads, mediaVariants } from '../../src/db/schema/index.ts';
-import { readFixture } from '../../src/bin/seed.ts';
+import { media } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { buildNow } from '../../src/domain/builds/schedule.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
@@ -16,11 +15,11 @@ import { listMedia } from '../../src/domain/content/media.ts';
 import { MAX_ORIGINAL_WIDTH } from '../../src/domain/media/ingest.ts';
 import { ORIGINALS_BUCKET } from '../../src/domain/media/store.ts';
 import { profileVariants } from '../../src/domain/media/variants.ts';
-import { createSite, currentConfig } from '../../src/domain/sites/sites.ts';
+import { currentConfig } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { createS3Client, s3ObjectStore } from '../../src/lib/s3.ts';
 import { removeSites } from './cleanup.ts';
-import { analyzeTables } from './statistics.ts';
+import { createVolumeSite, seedMedia } from '../volume.ts';
 
 // Mídia de ponta a ponta no ambiente local (#53, workspace#18): a foto de 4.000 px com GPS
 // enviada pela tela vira original ≤ 2.560 px e variantes sem EXIF em media.<site>.localhost,
@@ -198,66 +197,60 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
     });
 });
 
-const LIBRARY_SITE = `e2e-biblioteca-${Date.now()}`;
-const LIBRARY_COUNT = 2000;
+const BIG_SITE = `e2e-biblioteca-${Date.now()}`;
 
+/**
+ * Site novo com `count` mídias, gravado direto no banco: cada uma com o envio que a gerou,
+ * "Promoção <id>.jpg" a cada `promoEvery` e "foto-<id>.jpg" nas demais.
+ */
+async function seedLibrarySite(siteId: string, count: number, promoEvery: number) {
+  const { db } = getDb();
+  await createVolumeSite(db, siteId);
+  await seedMedia(db, siteId, { count, promoEvery });
+}
+
+// Só no projeto `perf` (CI ou E2E_PERF=1, #461): o tempo no navegador depende da carga da
+// máquina. A consulta com volume é medida no contrato.
 test.describe('biblioteca com 2.000 imagens (#186)', { tag: '@perf' }, () => {
-  test.beforeAll(async () => {
-    const config = (await readFixture('exemplo-b')).find((line) => line.type === 'config');
-    if (config?.type !== 'config') throw new Error('fixture sem config');
-    const { db } = getDb();
-    const site = await db.transaction((tx) =>
-      createSite(tx, SYSTEM_ACTOR, {
-        ...config.data,
-        siteId: LIBRARY_SITE,
-        name: `Site ${LIBRARY_SITE}`,
-        domains: [`${LIBRARY_SITE}.example.com`],
-      }),
-    );
-    if (!site.ok) throw new Error(JSON.stringify(site.issues));
-    const ids = Array.from({ length: LIBRARY_COUNT }, (_, index) => index + 1);
-    await db.transaction(async (tx) => {
-      await tx
-        .insert(media)
-        .values(ids.map((id) => ({ siteId: LIBRARY_SITE, id, width: 800, height: 600 })));
-      await tx.insert(mediaVariants).values(
-        ids.map((id) => ({
-          siteId: LIBRARY_SITE,
-          mediaId: id,
-          width: 400,
-          format: 'webp',
-          path: `${LIBRARY_SITE}/h${id}-400.webp`,
-        })),
-      );
-      // A cada 100, "Promoção": a busca acha 20.
-      await tx.insert(mediaUploads).values(
-        ids.map((id) => ({
-          uploadKey: `uploads/${LIBRARY_SITE}/${id}.jpg`,
-          siteId: LIBRARY_SITE,
-          originalName: id % 100 === 0 ? `Promoção ${id}.jpg` : `foto-${id}.jpg`,
-          status: 'pronta' as const,
-          mediaId: id,
-        })),
-      );
-    });
-    await analyzeTables(db, media, mediaVariants, mediaUploads);
+  test.beforeAll(() => seedLibrarySite(BIG_SITE, 2000, 100));
+
+  test.afterAll(async () => {
+    await removeSites([BIG_SITE]);
   });
+
+  test('abre e busca em menos de 2 s', async ({ page }) => {
+    await loginAs(page, 'editor@orakel.local');
+    const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
+
+    let started = Date.now();
+    await page.goto(`/sites/${BIG_SITE}/midia`);
+    await expect(count).toHaveText('2.000 resultados');
+    expect(Date.now() - started).toBeLessThan(2000);
+
+    started = Date.now();
+    await page.getByRole('searchbox', { name: 'Buscar por nome do arquivo' }).fill('PROMO');
+    await expect(count).toHaveText('20 resultados');
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+});
+
+const LIBRARY_SITE = `e2e-biblioteca-lista-${Date.now()}`;
+
+// Biblioteca com mais de uma página (#186), num site pequeno: 30 mídias, 3 "Promoção".
+test.describe('biblioteca de mídia (#186)', () => {
+  test.beforeAll(() => seedLibrarySite(LIBRARY_SITE, 30, 10));
 
   test.afterAll(async () => {
     await removeSites([LIBRARY_SITE]);
   });
 
-  test('abre e busca por nome em menos de 2 s, só com teclado, com a busca na URL', async ({
-    page,
-  }) => {
+  test('busca por nome e pagina só com teclado, com a busca na URL', async ({ page }) => {
     await loginAs(page, 'editor@orakel.local');
     // A contagem fica ao lado do nav "Paginação" do Ecme, não dentro dele (#269).
     const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
-    let started = Date.now();
     await page.goto(`/sites/${LIBRARY_SITE}/midia`);
-    await expect(count).toHaveText('2.000 resultados');
-    expect(Date.now() - started).toBeLessThan(2000);
+    await expect(count).toHaveText('30 resultados');
     await expect(page.getByText('foto-1.jpg ·', { exact: false })).toBeVisible();
 
     const searchBox = page.getByRole('searchbox', { name: 'Buscar por nome do arquivo' });
@@ -266,11 +259,9 @@ test.describe('biblioteca com 2.000 imagens (#186)', { tag: '@perf' }, () => {
       await page.keyboard.press('Tab');
     }
     await expect(searchBox).toBeFocused();
-    started = Date.now();
     // Maiúsculas ASCII: o ilike não depende da collation do banco para elas.
     await page.keyboard.type('PROMO');
-    await expect(count).toHaveText('20 resultados');
-    expect(Date.now() - started).toBeLessThan(2000);
+    await expect(count).toHaveText('3 resultados');
     await expect(page).toHaveURL(/[?&]q=PROMO/);
 
     // A paginação também só com teclado, sem repetir imagem.
@@ -331,7 +322,7 @@ test.describe('biblioteca com 2.000 imagens (#186)', { tag: '@perf' }, () => {
       await loginAs(page, 'editor@orakel.local');
       await page.goto(`/sites/${LIBRARY_SITE}/midia?pagina=2`);
       await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-        '2.000 resultados',
+        '30 resultados',
       );
       await expect(
         page
