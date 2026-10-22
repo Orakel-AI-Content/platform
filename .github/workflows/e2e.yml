@@ -71,6 +71,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cp .env.example .env.local
+      # No Linux, o docker-socket-proxy precisa do gid do grupo dono do socket (o padrão 0 é o
+      # do Docker Desktop); sem ele, o build-runner não cria os containers de render e publish.
+      - name: Grupo do socket do Docker
+        run: echo "DOCKER_SOCKET_GID=$(stat -c %g /var/run/docker.sock)" >> "$GITHUB_ENV"
       - run: pnpm local:up
       - run: pnpm local:seed
       - name: Navegador do Playwright
@@ -78,6 +82,9 @@ jobs:
       - name: Testes do shard
         run: pnpm turbo run test:e2e -- --list --shard=${{ matrix.shard }}/2
       - run: pnpm turbo run test:e2e -- --shard=${{ matrix.shard }}/2
+      - name: Logs do compose
+        if: failure()
+        run: infra/local/compose.sh logs --no-color --timestamps > compose.log 2>&1 || true
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -85,6 +92,7 @@ jobs:
           path: |
             apps/backoffice/playwright-report/
             apps/backoffice/test-results/
+            compose.log
           if-no-files-found: ignore
       - if: always()
         run: pnpm local:down
