@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useRef, useState } from 'react';
+import { TbSearch } from 'react-icons/tb';
 
 import { Button } from '@/components/ui/Button';
 import { FormItem } from '@/components/ui/Form';
@@ -27,7 +28,8 @@ const ALL: FilterOption = { value: '', label: 'Todos' };
  * Busca e filtros da lista. A busca guarda o texto digitado localmente (a URL chega depois
  * de cada `router.replace`) e esvazia quando a busca da URL volta a vazia, venha a limpeza
  * daqui ou de fora. "Limpar filtros" só aparece com busca ou filtro ativo, é a única ação de
- * limpar da lista (o estado sem resultado não a repete, #361) e devolve o foco à busca. Layout
+ * limpar da lista (o estado sem resultado não a repete, #361) e devolve o foco à busca. A lupa
+ * é sufixo decorativo, como no `CustomerListSearch` (#442); o nome vem do rótulo. Layout
  * do `CustomersListTableTools` do Ecme: em coluna abaixo de `md`, em linha a partir dele, com
  * a busca à esquerda e filtros e limpar à direita.
  */
@@ -68,6 +70,7 @@ export function ListToolbar({
           ref={searchRef}
           id={`${id}-search`}
           type="search"
+          suffix={<TbSearch className="text-lg" aria-hidden />}
           value={text}
           onChange={(event) => {
             setText(event.target.value);

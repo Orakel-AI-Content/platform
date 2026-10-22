@@ -228,7 +228,8 @@ menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo ca
   e a ação principal, só com permissão), a `ListToolbar` e o `DataTable`
   (`conteudos/page.tsx`).
 - **Toolbar:** `ListToolbar` (`src/components/shared/ListControls.tsx`), em coluna abaixo de `md`
-  e em linha a partir dele: a busca no `Input` com rótulo visível do que procura, um `Select`
+  e em linha a partir dele: a busca no `Input` com rótulo visível do que procura e a lupa
+  (`TbSearch`, `text-lg`, `aria-hidden`) como `suffix`, como no `CustomerListSearch`; um `Select`
   por filtro com "Todos", e "Limpar filtros" só com algo ativo, que devolve o foco à busca.
   Busca em toda lista que pode crescer; filtro só onde o dado tem estado ou categoria.
 - **Tabela:** a `Table` do Ecme (`src/components/ui/Table/`) com TanStack Table 9 (colunas com
