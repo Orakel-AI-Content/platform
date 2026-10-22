@@ -103,8 +103,8 @@ A sessão roda só o E2E da área que tocou, nunca a suíte inteira (essa roda n
   a mais vão para o Playwright (ex.: `--list`, `-g <título>`).
 - Antes de abrir o navegador, o comando ocupa uma das `E2E_SLOTS` vagas da máquina (padrão 2);
   com todas ocupadas, espera. Cada execução usa `E2E_WORKERS` workers (padrão 2).
-- Os testes `@perf` (listas com 2.000 linhas e metas de tempo) só rodam no CI; localmente,
-  com `E2E_PERF=1`.
+- Os testes `@perf` (listas com 2.000 linhas e metas de tempo) ficam no projeto Playwright
+  `perf`, que só existe no CI; localmente, com `E2E_PERF=1`.
 
 ## Comandos
 
