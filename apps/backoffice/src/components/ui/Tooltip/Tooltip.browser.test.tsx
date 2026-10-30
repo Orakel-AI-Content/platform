@@ -19,7 +19,9 @@ import { Tooltip } from './index.tsx';
 
 function Tooltips() {
   return (
-    <section aria-label="Tooltip" className="flex gap-6 p-12">
+    // Gatilhos em coluna e afastados: o ponteiro que vai de um até a dica dele nunca passa
+    // pelo outro.
+    <section aria-label="Tooltip" className="flex flex-col items-start gap-32 p-12">
       <Tooltip title="Copia o endereço público do artigo">
         <Button>Copiar link</Button>
       </Tooltip>
@@ -44,7 +46,8 @@ describe('Tooltip no navegador', () => {
     await expect.element(trigger).toHaveAttribute('aria-describedby', tooltip.element().id);
     await expect.element(trigger).toHaveAccessibleDescription(DESCRIPTION);
 
-    // Do gatilho até a dica, a dica continua aberta.
+    // Do gatilho até a dica, a dica continua aberta. O hover mira a dica já posicionada e opaca.
+    await expect.poll(() => getComputedStyle(tooltip.element()).opacity).toBe('1');
     await userEvent.hover(tooltip);
     await new Promise((resolve) => setTimeout(resolve, 300));
     await expect.element(tooltip).toBeVisible();
