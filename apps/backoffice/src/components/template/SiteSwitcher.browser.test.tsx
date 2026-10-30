@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { FormsShowcase } from '@/app/(admin)/teste-de-componentes/forms-showcase.tsx';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
-import { renderUi } from '../../../test/browser/render.tsx';
+import { navigation } from '../../../test/browser/navigation.ts';
+import { renderInFrame, renderUi } from '../../../test/browser/render.tsx';
 
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
@@ -59,5 +60,49 @@ describe.each(COLOR_SCHEMES)('SiteSwitcher no navegador (%s)', (scheme) => {
     const collapsed = switchers.getByRole('button', { name: 'Viagem Leve, trocar de site' });
     expect(collapsed.element().textContent).toMatch(/^VL/);
     await expect.element(page.getByRole('tooltip')).toHaveTextContent('Viagem Leve');
+  });
+});
+
+// Com 20 sites (#460; antes no E2E, `sites-list.spec.ts`, #221, #241): sem altura máxima, a lista
+// passava da borda inferior e os últimos sites ficavam fora de alcance. Na moldura do admin, a
+// 1280 × 720 px, o menu rola por dentro (o <ul>), cabe abaixo do botão, e as setas levam o foco
+// até o último site, que entra na vista.
+describe('SiteSwitcher com 20 sites', () => {
+  const sites = [
+    { id: 'exemplo-a', name: 'Exemplo A — Guias' },
+    ...Array.from({ length: 19 }, (_, index) => ({
+      id: `site-${String(index + 2).padStart(2, '0')}`,
+      name: `Site ${String(index + 2).padStart(2, '0')}`,
+    })),
+  ];
+
+  afterEach(() => {
+    navigation.set('/');
+  });
+
+  it('a lista cabe na janela, rola e alcança o último site pelas setas', async () => {
+    navigation.set('/sites/exemplo-a');
+    await renderInFrame(<p>Visão geral</p>, { sites });
+    const button = page.getByRole('button', { name: 'Exemplo A — Guias, trocar de site' });
+    const menu = page.getByRole('menu');
+
+    (button.element() as HTMLElement).focus();
+    await userEvent.keyboard('{Enter}');
+    await expect.element(menu).toBeVisible();
+    const list = menu.element().querySelector('ul')!;
+    const rect = list.getBoundingClientRect();
+    expect(list.querySelectorAll('[role="menuitem"]')).toHaveLength(20);
+    expect(rect.bottom).toBeLessThanOrEqual(innerHeight);
+    expect(rect.height).toBeLessThanOrEqual(
+      innerHeight - button.element().getBoundingClientRect().bottom,
+    );
+    expect(list.scrollHeight).toBeGreaterThan(list.clientHeight);
+
+    const items = menu.getByRole('menuitem');
+    await expect.element(items.first()).toHaveFocus();
+    for (let step = 1; step < 20; step += 1) await userEvent.keyboard('{ArrowDown}');
+    await expect.element(items.last()).toHaveFocus();
+    await expect.element(items.last()).toBeInViewport();
+    await expect.element(items.last()).toHaveAttribute('href', '/sites/site-20');
   });
 });
