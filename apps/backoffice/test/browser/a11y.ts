@@ -10,6 +10,7 @@ import type { ChosenFile, MediaOptions } from './commands.ts';
 declare module 'vitest/browser' {
   interface BrowserCommands {
     emulateMedia: (options: MediaOptions) => Promise<void>;
+    emulateTimezone: (timezoneId?: string) => Promise<void>;
     pressAndChooseFiles: (key: string, files: ChosenFile[]) => Promise<boolean>;
     resetPointer: () => Promise<void>;
   }
