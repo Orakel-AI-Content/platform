@@ -14,8 +14,13 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
 - **Componente em Chromium** (`src/**/*.browser.test.tsx`, ao lado do componente; #457): teclado,
   foco, axe, tema e movimento no navegador de verdade, com o CSS de `globals.css`, sem servidor
   nem banco. É onde ficam os testes de acessibilidade de um componente (antes na vitrine do E2E).
-  Render com `renderUi` (`test/browser/render.tsx`, com o `MotionProvider` do layout); helpers em
-  `test/browser/a11y.ts`: `audit` (axe WCAG 2.2 AA), `setTheme` (classe `dark` e mídia emulada),
+  Render com `renderUi` (`test/browser/render.tsx`, com o `MotionProvider` do layout) ou, para
+  Dialog, Drawer, ConfirmDialog e toast, `renderInApp` (o corpo do layout: `#app-root` com o
+  `appElement` do react-modal e o `ToastProvider` fora dele; #458), com `appRoot`,
+  `expectFocusTrapped` e `appElementWarnings` de `test/browser/dialog.ts`. O store do toast é do
+  módulo: quem usa toast chama `toast.removeAll()` no `afterEach`. Helpers em
+  `test/browser/a11y.ts`: `audit` (axe WCAG 2.2 AA; `auditWithout` desliga uma regra decidida caso
+  a caso), `setTheme` (classe `dark` e mídia emulada),
   `setReducedMotion`, `tabTo`, `outline`, `focusRing` e `targetSize`. Tema e movimento pela mídia
   emulada do Playwright (comandos em `test/browser/commands.ts`), nunca mock de `matchMedia`. O
   navegador fica no fuso de São Paulo. Instale o Chromium uma vez:
