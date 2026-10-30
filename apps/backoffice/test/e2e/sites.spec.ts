@@ -200,7 +200,7 @@ test('operação cadastra e edita um site só com o teclado', { tag: '@smoke' },
 // Preset fora dos recursos (#330): o Select do Ecme não aceita injetar uma opção pela página,
 // como o `<select>` nativo aceitava. A recusa do domínio fica em `src/app/(admin)/sites/actions.test.ts`,
 // o caminho até o campo (foco, `aria-invalid`, descrição) em `SiteConfigForm.test.tsx` e o
-// Select inválido no FormItem, com o axe, na vitrine (`components.spec.ts`).
+// Select inválido no FormItem, com o axe, no teste de componente (`Select.browser.test.tsx`).
 
 // Formulário no visual do Ecme (#245): cadastro e configuração sem violação do axe nos dois
 // temas, com as seções em Card e os campos do FormItem.

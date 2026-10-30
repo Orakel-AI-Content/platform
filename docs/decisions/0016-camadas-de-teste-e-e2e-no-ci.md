@@ -14,8 +14,9 @@ máquina, rodar a suíte completa em cada uma saturava CPU e memória. O 0008 de
 
 Três camadas, da mais barata para a mais cara:
 
-1. **Componente:** a vitrine de componentes (`components.spec.ts`) migra para o Vitest
-   Browser Mode (#457–#459), sem ambiente local.
+1. **Componente:** os testes da vitrine de componentes migram para o Vitest Browser Mode
+   (#457–#459), sem ambiente local; no E2E fica só o que depende do servidor
+   (`vitrine.spec.ts`).
 2. **E2E da área, local:** a sessão roda só o spec da área que tocou ou as jornadas
    `@smoke` (`pnpm local:e2e:area`), numa das vagas da máquina (`E2E_SLOTS`), com 2 workers.
 3. **Suíte completa, no CI:** o `e2e.yml` roda em todo PR que muda `apps/backoffice/**`,
