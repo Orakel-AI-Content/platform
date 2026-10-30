@@ -46,11 +46,22 @@ async function settleAnimations(): Promise<void> {
  * entrada terminarem.
  */
 export async function audit(...targets: Target[]): Promise<string[]> {
+  return auditWithout([], ...targets);
+}
+
+/**
+ * Como `audit`, com regras do axe desligadas: só para a exceção decidida caso a caso (o
+ * `aria-required-children` do Dropdown com submenu aberto, segundo escalonamento da #210).
+ */
+export async function auditWithout(disabled: string[], ...targets: Target[]): Promise<string[]> {
   await settleAnimations();
   const include = targets.length === 0 ? [document] : targets.map(toElement);
   const result = await axe.run(
     { include, exclude: [['[data-floating-ui-focus-guard]']] },
-    { runOnly: { type: 'tag', values: WCAG } },
+    {
+      runOnly: { type: 'tag', values: WCAG },
+      rules: Object.fromEntries(disabled.map((rule) => [rule, { enabled: false }])),
+    },
   );
   return result.violations.map(
     (violation) =>
