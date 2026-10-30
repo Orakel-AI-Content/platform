@@ -97,10 +97,23 @@ describe('SitesTable no navegador', () => {
       .toHaveAttribute('href', `/sites/${ids[0]}/pendencias`);
   });
 
-  it.each(COLOR_SCHEMES)('sem violação do axe (%s)', async (scheme) => {
-    await setTheme(scheme);
-    await setReducedMotion('reduce');
-    await renderInFrame(<Sites />, { roles: ['admin'] });
-    expect(await audit()).toEqual([]);
-  });
+  it.each(COLOR_SCHEMES)(
+    'sem violação do axe, também com a confirmação de publicar (%s)',
+    async (scheme) => {
+      await setTheme(scheme);
+      await setReducedMotion('reduce');
+      await renderInFrame(<Sites />, { roles: ['admin'] });
+      expect(await audit()).toEqual([]);
+
+      // "Publicar agora" confirma num diálogo (#327); Cancelar fecha e devolve o foco à linha.
+      const publish = page.getByRole('button', { name: `Publicar agora ${ids[0]}` });
+      await publish.click();
+      const dialog = page.getByRole('alertdialog', { name: `Publicar ${ids[0]} agora?` });
+      await expect.element(dialog).toBeVisible();
+      expect(await audit()).toEqual([]);
+      await dialog.getByRole('button', { name: 'Cancelar' }).click();
+      await expect.element(dialog).not.toBeInTheDocument();
+      await expect.element(publish).toHaveFocus();
+    },
+  );
 });
