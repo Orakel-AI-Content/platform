@@ -10,6 +10,7 @@ import { can } from '@/domain/access/rbac.ts';
 import { REVIEW_CHECKLIST, reviewIssues } from '@/domain/reviews/reviews.ts';
 import { getEnv } from '@/env.ts';
 import { DETAIL_SUMMARY_CLASS } from '@/components/shared/detailSummary.ts';
+import { DetailLayout } from '@/components/shared/DetailLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
@@ -94,7 +95,7 @@ export default async function ReviewPage({ params }: Params) {
           `/${latest.data.slug}`,
         ]}
       />
-      <div className="flex flex-col gap-4 xl:flex-row">
+      <DetailLayout>
         <Card className="w-full min-w-0">
           <iframe
             src={previewUrl}
@@ -112,7 +113,7 @@ export default async function ReviewPage({ params }: Params) {
             approve={approveAction.bind(null, site.id, contentId, latest.version)}
           />
         </div>
-      </div>
+      </DetailLayout>
     </section>
   );
 }
