@@ -125,65 +125,25 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
   await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toBeVisible();
 });
 
-// Fila no DataTable do template (#276, #365): a 1280 px nada rola na horizontal, nenhuma célula passa de
-// duas linhas de texto e o axe não acha violação, nos dois temas.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`fila a 1280 px, até duas linhas por célula, sem violação do axe (${colorScheme})`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    const slug = `e2e-fila-${colorScheme}-${Date.now()}`;
-    const title = `Artigo ${slug}`;
-    await loginAs(page, 'editor@orakel.local');
-    await createDraft(page, title, slug);
-    await page.getByRole('button', { name: 'Enviar para revisão' }).click();
-    await expect(
-      page.getByRole('status').filter({ hasText: 'Enviado para revisão.' }),
-    ).toBeVisible();
+// Fila no DataTable do template (#276, #365): o artigo enviado aparece, e o axe não acha violação
+// no tema claro. A 1280 px sem rolagem horizontal, as linhas por célula e o tema escuro ficam em
+// `ReviewQueueTable.browser.test.tsx` (#460).
+test('fila com o artigo enviado, sem violação do axe', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  const slug = `e2e-fila-${Date.now()}`;
+  const title = `Artigo ${slug}`;
+  await loginAs(page, 'editor@orakel.local');
+  await createDraft(page, title, slug);
+  await page.getByRole('button', { name: 'Enviar para revisão' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
 
-    await page.goto(queueFor(slug));
-    expect(page.viewportSize()?.width).toBe(1280);
-    const table = page.getByRole('table', { name: 'Revisão', exact: true });
-    await expect(table.getByRole('row', { name: new RegExp(title) })).toBeVisible();
+  await page.goto(queueFor(slug));
+  const table = page.getByRole('table', { name: 'Revisão', exact: true });
+  await expect(table.getByRole('row', { name: new RegExp(title) })).toBeVisible();
 
-    const overflow = await table.evaluate((element) => [
-      document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      element.parentElement!.scrollWidth - element.parentElement!.clientWidth,
-    ]);
-    expect(overflow).toEqual([0, 0]);
-
-    // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
-    // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
-    const lines = await table.locator('tbody td').evaluateAll((cells) =>
-      cells.map((cell) => {
-        const found: { top: number; bottom: number }[] = [];
-        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-          if (!node.textContent?.trim()) continue;
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          for (const rect of range.getClientRects()) {
-            if (rect.width <= 1 || rect.height <= 1) continue;
-            const middle = (rect.top + rect.bottom) / 2;
-            const line = found.find((l) => l.top <= middle && middle <= l.bottom);
-            if (line === undefined) found.push({ top: rect.top, bottom: rect.bottom });
-            else
-              Object.assign(line, {
-                top: Math.min(line.top, rect.top),
-                bottom: Math.max(line.bottom, rect.bottom),
-              });
-          }
-        }
-        return found.length;
-      }),
-    );
-    expect(lines.length).toBeGreaterThan(0);
-    expect(lines.filter((count) => count > 2)).toEqual([]);
-
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
-  });
-}
+  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(accessibility.violations).toEqual([]);
+});
 
 // Tela de revisão (#75): a visualização fica em preview.*, com sessão própria no Access.
 const PREVIEW = 'https://preview.orakel.localhost';
@@ -252,99 +212,46 @@ test(
 );
 
 // Tela de revisão no Ecme (#277): o painel junto da visualização, com checklist e "Aprovar", e
-// o axe sem violação nos dois temas (fora o iframe, que é o site).
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`tela de revisão sem violação do axe (${colorScheme})`, async ({ page, browser }) => {
-    const slug = `e2e-tela-${colorScheme}-${Date.now()}`;
-    const title = `Artigo ${slug}`;
-    await loginAs(page, 'editor@orakel.local');
-    await createDraft(page, title, slug);
-    await page.getByRole('button', { name: 'Enviar para revisão' }).click();
-    await expect(
-      page.getByRole('status').filter({ hasText: 'Enviado para revisão.' }),
-    ).toBeVisible();
-
-    const context = await browser.newContext({ ignoreHTTPSErrors: true, colorScheme });
-    const reviewer = await context.newPage();
-    await reviewer.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(reviewer, 'revisor@orakel.local');
-    await reviewer.goto(queueFor(slug));
-    await reviewer.getByRole('link', { name: `${title} (revisar)` }).click();
-
-    const panel = reviewer.getByRole('complementary', { name: 'Revisão da versão 1' });
-    await expect(panel.getByText('Nenhum problema de validação.')).toBeVisible();
-    // "Abrir prévia" é ação do cabeçalho (#373), em nova aba; o painel não tem mais o link.
-    const preview = reviewer.getByRole('link', { name: 'Abrir prévia (abre em nova aba)' });
-    await expect(preview).toHaveAttribute('href', `${PREVIEW}/exemplo-a/${slug}/`);
-    await expect(preview).toHaveAttribute('target', '_blank');
-    await expect(panel.getByRole('link')).toHaveCount(0);
-    await expect(reviewer.getByText(`Versão 1·/${slug}`)).toBeVisible();
-    await expect(panel.getByRole('checkbox')).toHaveCount(5);
-    await expect(panel.getByRole('button', { name: 'Aprovar' })).toBeEnabled();
-    // O checklist em cartão próprio, com "Aprovar" no rodapé dele (#333).
-    await expect(
-      panel.locator('.card-footer').getByRole('button', { name: 'Aprovar' }),
-    ).toBeVisible();
-
-    const accessibility = await new AxeBuilder({ page: reviewer })
-      .withTags(WCAG)
-      .exclude('iframe')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
-    await context.close();
-  });
-}
-
-// Tela de detalhe (#373): a prévia num Card com a largura do main e o painel abaixo dela até
-// xl; a partir de xl, o painel ao lado com pelo menos 330 px. A 375 px, empilhados, sem rolar
-// na horizontal.
-test('revisão: prévia em cartão, painel abaixo a 1024 px, ao lado a 1280 px e empilhado a 375 px', async ({
-  page,
-}) => {
-  const slug = `e2e-layout-${Date.now()}`;
+// o axe sem violação no tema claro (fora o iframe, que é o site).
+test(`tela de revisão sem violação do axe`, async ({ page, browser }) => {
+  const slug = `e2e-tela-light-${Date.now()}`;
   const title = `Artigo ${slug}`;
   await loginAs(page, 'editor@orakel.local');
   await createDraft(page, title, slug);
   await page.getByRole('button', { name: 'Enviar para revisão' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
-  await page.goto(queueFor(slug));
-  await page.getByRole('link', { name: `${title} (revisar)` }).click();
 
-  const frame = page.locator('iframe');
-  const panel = page.getByRole('complementary', { name: 'Revisão da versão 1' });
-  await expect(frame).toBeVisible();
-  // O iframe dentro de um Card do template.
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, colorScheme: 'light' });
+  const reviewer = await context.newPage();
+  await reviewer.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(reviewer, 'revisor@orakel.local');
+  await reviewer.goto(queueFor(slug));
+  await reviewer.getByRole('link', { name: `${title} (revisar)` }).click();
+
+  const panel = reviewer.getByRole('complementary', { name: 'Revisão da versão 1' });
+  await expect(panel.getByText('Nenhum problema de validação.')).toBeVisible();
+  // "Abrir prévia" é ação do cabeçalho (#373), em nova aba; o painel não tem mais o link.
+  const preview = reviewer.getByRole('link', { name: 'Abrir prévia (abre em nova aba)' });
+  await expect(preview).toHaveAttribute('href', `${PREVIEW}/exemplo-a/${slug}/`);
+  await expect(preview).toHaveAttribute('target', '_blank');
+  await expect(panel.getByRole('link')).toHaveCount(0);
+  await expect(reviewer.getByText(`Versão 1·/${slug}`)).toBeVisible();
+  await expect(panel.getByRole('checkbox')).toHaveCount(5);
+  await expect(panel.getByRole('button', { name: 'Aprovar' })).toBeEnabled();
+  // O checklist em cartão próprio, com "Aprovar" no rodapé dele (#333).
+  await expect(
+    panel.locator('.card-footer').getByRole('button', { name: 'Aprovar' }),
+  ).toBeVisible();
+
+  // A prévia num Card do template (#373); a grade prévia × painel por largura fica em
+  // `DetailLayout.browser.test.tsx` (#460).
+  const frame = reviewer.locator('iframe');
   expect(await frame.evaluate((element) => element.closest('.card') !== null)).toBe(true);
-  const card = page.locator('.card', { has: frame });
-  // A largura útil do main: a seção da tela ocupa toda ela (`list-width`).
-  const screenSection = page.locator('section[aria-labelledby="review-title"]');
 
-  const box = async () => {
-    const [cardBox, panelBox, sectionBox] = await Promise.all([
-      card.boundingBox(),
-      panel.boundingBox(),
-      screenSection.boundingBox(),
-    ]);
-    return { card: cardBox!, panel: panelBox!, mainWidth: sectionBox!.width };
-  };
-
-  await page.setViewportSize({ width: 1024, height: 900 });
-  let layout = await box();
-  expect(layout.card.width).toBeGreaterThanOrEqual(600);
-  expect(Math.abs(layout.card.width - layout.mainWidth)).toBeLessThanOrEqual(1);
-  expect(layout.panel.y).toBeGreaterThanOrEqual(layout.card.y + layout.card.height);
-
-  await page.setViewportSize({ width: 1280, height: 900 });
-  layout = await box();
-  expect(layout.panel.x).toBeGreaterThanOrEqual(layout.card.x + layout.card.width);
-  expect(layout.panel.width).toBeGreaterThanOrEqual(330);
-
-  await page.setViewportSize({ width: 375, height: 800 });
-  layout = await box();
-  expect(layout.panel.y).toBeGreaterThanOrEqual(layout.card.y + layout.card.height);
-  const viewport = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
+  const accessibility = await new AxeBuilder({ page: reviewer })
+    .withTags(WCAG)
+    .exclude('iframe')
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+  await context.close();
 });

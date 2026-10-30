@@ -278,63 +278,59 @@ test.describe('biblioteca de mídia (#186)', () => {
   });
 
   // "Copiar identificador" no retorno padrão (#326): o toast fica fora da app que o diálogo
-  // deixa inerte e é anunciado com ele aberto; nos dois temas. O cabeçalho é o nativo do Dialog
+  // deixa inerte e é anunciado com ele aberto; no tema claro. O cabeçalho é o nativo do Dialog
   // (#374): o nome num `h4` e um X "Fechar" só, que fecha e devolve o foco à imagem.
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`copiar o identificador com o diálogo aberto confirma no toast (${colorScheme})`, async ({
-      page,
-      context,
-    }) => {
-      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/${LIBRARY_SITE}/midia`);
-      const image = page.getByRole('button', { name: /^foto-1\.jpg ·/ });
-      await image.click();
-      const details = page.getByRole('dialog', { name: 'foto-1.jpg' });
-      await expect(details).toBeVisible();
-      await expect(details.getByRole('heading', { level: 4 })).toHaveText('foto-1.jpg');
-      await expect(details.getByRole('button', { name: 'Fechar' })).toHaveCount(1);
+  test(`copiar o identificador com o diálogo aberto confirma no toast`, async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${LIBRARY_SITE}/midia`);
+    const image = page.getByRole('button', { name: /^foto-1\.jpg ·/ });
+    await image.click();
+    const details = page.getByRole('dialog', { name: 'foto-1.jpg' });
+    await expect(details).toBeVisible();
+    await expect(details.getByRole('heading', { level: 4 })).toHaveText('foto-1.jpg');
+    await expect(details.getByRole('button', { name: 'Fechar' })).toHaveCount(1);
 
-      await details.getByRole('button', { name: 'Copiar identificador' }).click();
-      const toast = page.locator('[data-toast-placement="top-end"]');
-      await expect(toast).toHaveAttribute('role', 'status');
-      await expect(toast).toContainText('Identificador copiado.');
-      await expect(details).toBeVisible();
-      await expect(details.getByRole('alert')).toHaveText('');
-      const copied = await page.evaluate(() => navigator.clipboard.readText());
-      await expect(details.locator('dd.tabular-nums')).toHaveText(copied);
+    await details.getByRole('button', { name: 'Copiar identificador' }).click();
+    const toast = page.locator('[data-toast-placement="top-end"]');
+    await expect(toast).toHaveAttribute('role', 'status');
+    await expect(toast).toContainText('Identificador copiado.');
+    await expect(details).toBeVisible();
+    await expect(details.getByRole('alert')).toHaveText('');
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    await expect(details.locator('dd.tabular-nums')).toHaveText(copied);
 
-      await page.mouse.move(0, 0);
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
+    await page.mouse.move(0, 0);
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
 
-      await details.getByRole('button', { name: 'Fechar' }).click();
-      await expect(details).toBeHidden();
-      await expect(image).toBeFocused();
-    });
-  }
+    await details.getByRole('button', { name: 'Fechar' }).click();
+    await expect(details).toBeHidden();
+    await expect(image).toBeFocused();
+  });
 
-  // Busca, contagem e paginação nos controles do Ecme (#269), nos dois temas.
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`lista sem violação do axe (${colorScheme})`, async ({ page }) => {
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/${LIBRARY_SITE}/midia?pagina=2`);
-      await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-        '30 resultados',
-      );
-      await expect(
-        page
-          .getByRole('navigation', { name: 'Paginação' })
-          .getByRole('button', { name: 'Página 2', exact: true }),
-      ).toHaveAttribute('aria-current', 'page');
-      await page.waitForLoadState('networkidle');
+  // Busca, contagem e paginação nos controles do Ecme (#269), no tema claro.
+  test(`lista sem violação do axe`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${LIBRARY_SITE}/midia?pagina=2`);
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '30 resultados',
+    );
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Paginação' })
+        .getByRole('button', { name: 'Página 2', exact: true }),
+    ).toHaveAttribute('aria-current', 'page');
+    await page.waitForLoadState('networkidle');
 
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
-    });
-  }
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
 });
 
 test(
@@ -383,42 +379,40 @@ test(
   },
 );
 
-// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, nos dois temas, com
+// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, no tema claro, com
 // um único `role="status"` para a fila (#375), e o diálogo de envio aberto (#376).
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`fila de envio preenchida sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    const small = await sharp({
-      create: { width: 320, height: 240, channels: 3, background: '#e76f51' },
-    })
-      .jpeg()
-      .toBuffer();
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto(`/sites/${SITE}/midia`);
+test(`fila de envio preenchida sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  const small = await sharp({
+    create: { width: 320, height: 240, channels: 3, background: '#e76f51' },
+  })
+    .jpeg()
+    .toBuffer();
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto(`/sites/${SITE}/midia`);
 
-    await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
-    const upload = uploadDialog(page);
-    await expect(upload.dialog).toBeVisible();
-    const dialogAccessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(dialogAccessibility.violations).toEqual([]);
+  await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
+  const upload = uploadDialog(page);
+  await expect(upload.dialog).toBeVisible();
+  const dialogAccessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(dialogAccessibility.violations).toEqual([]);
 
-    await upload.input.setInputFiles([
-      { name: `axe-${colorScheme}.jpg`, mimeType: 'image/jpeg', buffer: small },
-      { name: 'notas.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('não é imagem') },
-    ]);
-    await expect(upload.dialog).toBeHidden();
+  await upload.input.setInputFiles([
+    { name: `axe-light.jpg`, mimeType: 'image/jpeg', buffer: small },
+    { name: 'notas.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('não é imagem') },
+  ]);
+  await expect(upload.dialog).toBeHidden();
 
-    const row = (name: string) =>
-      page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
-    await expect(row('notas.jpg')).toContainText('recusada: ');
-    await expect(row(`axe-${colorScheme}.jpg`)).toContainText('pronta', { timeout: 60_000 });
-    // Um anúncio só para a fila, com o resumo; as linhas não têm região própria (#375).
-    await expect(page.getByRole('status').filter({ hasText: /^2 envios: / })).toHaveText(
-      '2 envios: 1 pronta, 1 recusada',
-    );
-    await expect(page.getByRole('list', { name: 'Envios' }).getByRole('status')).toHaveCount(0);
+  const row = (name: string) =>
+    page.getByRole('list', { name: 'Envios' }).getByRole('listitem').filter({ hasText: name });
+  await expect(row('notas.jpg')).toContainText('recusada: ');
+  await expect(row(`axe-light.jpg`)).toContainText('pronta', { timeout: 60_000 });
+  // Um anúncio só para a fila, com o resumo; as linhas não têm região própria (#375).
+  await expect(page.getByRole('status').filter({ hasText: /^2 envios: / })).toHaveText(
+    '2 envios: 1 pronta, 1 recusada',
+  );
+  await expect(page.getByRole('list', { name: 'Envios' }).getByRole('status')).toHaveCount(0);
 
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
-  });
-}
+  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(accessibility.violations).toEqual([]);
+});

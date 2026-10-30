@@ -38,28 +38,26 @@ test(
   },
 );
 
-// Telas de estado no visual do Ecme (#283), nos dois temas.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`"não encontrado" sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, OPERATOR);
-    for (const path of ['/qualquer', '/sites/exemplo-a/nada/aqui']) {
-      await page.goto(path);
-      await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
-      await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${colorScheme}\\b`));
-      await expectNoAxeViolations(page);
-    }
-  });
-
-  test(`tela de erro sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, OPERATOR);
-    await page.goto('/teste-de-erro');
-    await expect(page.getByRole('heading', { name: 'Algo deu errado' })).toBeVisible();
-    await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${colorScheme}\\b`));
+// Telas de estado no visual do Ecme (#283), no tema claro (o escuro, nos testes de componente).
+test(`"não encontrado" sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, OPERATOR);
+  for (const path of ['/qualquer', '/sites/exemplo-a/nada/aqui']) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(new RegExp(`\\blight\\b`));
     await expectNoAxeViolations(page);
-  });
-}
+  }
+});
+
+test(`tela de erro sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, OPERATOR);
+  await page.goto('/teste-de-erro');
+  await expect(page.getByRole('heading', { name: 'Algo deu errado' })).toBeVisible();
+  await expect(page.locator('html')).toHaveClass(new RegExp(`\\blight\\b`));
+  await expectNoAxeViolations(page);
+});
 
 test('exceção numa página mostra a tela de erro, e "Tentar de novo" busca de novo', async ({
   page,

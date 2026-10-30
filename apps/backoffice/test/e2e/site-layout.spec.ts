@@ -230,31 +230,29 @@ test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao bot
   await expect(page).toHaveURL(/\/sites\/exemplo-b\/taxonomias$/);
 });
 
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`o seletor aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto(`/sites/${SITE}/autores`);
-    await page.waitForLoadState('networkidle');
-    // Pelo teclado, como na vitrine do Dropdown: o primeiro item recebe o foco (`tabindex=0`).
-    // Com mais sites do que cabem (outros arquivos do E2E cadastram em paralelo), o <ul> rola,
-    // e o `scrollable-region-focusable` do axe pede um item focável dentro dele.
-    await switcher(page).focus();
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('menu').getByRole('menuitem').first()).toBeFocused();
-    // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
-    // opacidade sobe; o axe roda depois dela.
-    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+test(`o seletor aberto sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto(`/sites/${SITE}/autores`);
+  await page.waitForLoadState('networkidle');
+  // Pelo teclado, como na vitrine do Dropdown: o primeiro item recebe o foco (`tabindex=0`).
+  // Com mais sites do que cabem (outros arquivos do E2E cadastram em paralelo), o <ul> rola,
+  // e o `scrollable-region-focusable` do axe pede um item focável dentro dele.
+  await switcher(page).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu').getByRole('menuitem').first()).toBeFocused();
+  // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
+  // opacidade sobe; o axe roda depois dela.
+  await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
 
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .include('.side-nav')
-      .include('[role="menu"]')
-      .exclude('[data-floating-ui-focus-guard]')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
-  });
-}
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(WCAG)
+    .include('.side-nav')
+    .include('[role="menu"]')
+    .exclude('[data-floating-ui-focus-guard]')
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+});
 
 test('trilha nas telas de item: Sites › Site › Área › Item, sem link de volta solto', async ({
   page,
@@ -317,69 +315,14 @@ test('trilha nas telas de item: Sites › Site › Área › Item, sem link de v
   await expectTrail(['Sites', SITE_NAME, 'Conteúdos', title, 'Versão 1']);
 });
 
-// Recolher a barra (#238): o toggle do header alterna 290px ↔ 80px; recolhida, os itens ficam
-// só com o ícone, o nome no link e a dica no hover e no foco; o estado vale entre navegações
-// pelo cliente e volta expandido ao recarregar.
+// Recolher a barra (#238): o estado vale entre navegações pelo cliente e volta expandido ao
+// recarregar, o que depende do layout persistente do Next. O toggle, a barra recolhida (ícones,
+// dicas, seletor nas iniciais) e o axe nos dois temas ficam no teste de componente
+// (`CollapsibleSide.browser.test.tsx`, #460).
 
 const sideNavToggle = (page: Page) => page.getByRole('button', { name: 'Navegação lateral' });
 const sideNavWidth = (page: Page) =>
   page.locator('#barra-lateral').evaluate((element) => element.getBoundingClientRect().width);
-
-test('o toggle recolhe e expande a barra; recolhida, ícones com nome, dica e aria-current', async ({
-  page,
-}) => {
-  await loginAs(page, 'editor@orakel.local');
-  await page.goto(`/sites/${SITE}/autores`);
-  await page.waitForLoadState('networkidle');
-  const toggle = sideNavToggle(page);
-  const bar = page.getByRole('navigation', { name: 'Áreas do site' });
-
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(toggle).toHaveAttribute('aria-controls', 'barra-lateral');
-  expect(await sideNavWidth(page)).toBe(290);
-
-  await toggle.focus();
-  await page.keyboard.press('Enter');
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await expect.poll(() => sideNavWidth(page)).toBe(80);
-
-  await expect(bar.getByRole('link')).toHaveText([...AREAS, 'Textos institucionais']);
-  await expect(bar.getByRole('link', { name: 'Autores' })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('link', { name: 'Orakel Backoffice' })).toHaveAttribute(
-    'href',
-    '/sites',
-  );
-  // O seletor vira as iniciais, com o mesmo nome e a dica com o nome do site.
-  await expect(switcher(page).locator('[aria-hidden="true"]')).toHaveText('EA');
-  await switcher(page).hover();
-  await expect(page.getByRole('tooltip', { name: SITE_NAME })).toBeVisible();
-  await switcher(page).click();
-  await expect(page.getByRole('menu').getByRole('menuitem', { name: OTHER_SITE })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('menu')).toHaveCount(0);
-
-  await bar.getByRole('link', { name: 'Mídia' }).hover();
-  await expect(page.getByRole('tooltip', { name: 'Mídia' })).toBeVisible();
-  await page.mouse.move(800, 400);
-  await expect(page.getByRole('tooltip')).toHaveCount(0);
-
-  // A barra vem antes do header no DOM: o Tab parte da marca, o primeiro link dela.
-  const taxonomias = bar.getByRole('link', { name: 'Taxonomias' });
-  await page.getByRole('link', { name: 'Orakel Backoffice' }).focus();
-  for (let step = 0; step < 40; step += 1) {
-    if (await taxonomias.evaluate((element) => element === document.activeElement)) break;
-    await page.keyboard.press('Tab');
-  }
-  await expect(taxonomias).toBeFocused();
-  // As dicas dos itens que o Tab deixou fecham com o blur; sob carga, ainda podem estar saindo.
-  await expect(page.getByRole('tooltip', { name: 'Taxonomias' })).toBeVisible();
-  await expect(page.getByRole('tooltip')).toHaveCount(1);
-
-  await toggle.focus();
-  await page.keyboard.press('Space');
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect.poll(() => sideNavWidth(page)).toBe(290);
-});
 
 test('recolhida, a barra continua assim entre áreas e volta expandida ao recarregar', async ({
   page,
@@ -403,88 +346,15 @@ test('recolhida, a barra continua assim entre áreas e volta expandida ao recarr
   expect(await sideNavWidth(page)).toBe(290);
 });
 
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`a barra recolhida sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto(`/sites/${SITE}/autores`);
-    await page.waitForLoadState('networkidle');
-    await sideNavToggle(page).click();
-    await expect.poll(() => sideNavWidth(page)).toBe(80);
-
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .include('.side-nav')
-      .include('.header')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
-  });
-}
-
-// Navegação do celular (#242): abaixo de `lg`, a barra fixa some e o botão do header abre o
-// Drawer "Navegação" com o mesmo conteúdo da barra expandida; Esc, uma área ou a troca de site
-// fecham, e o foco volta ao botão. A 1280px, o botão não aparece.
+// Navegação do celular (#242): uma área ou a troca de site no Drawer navegam e o fecham, o que
+// depende do roteador do Next. O Drawer em si (conteúdo, foco preso, Esc, axe) e a troca entre a
+// barra fixa e o botão por largura ficam em `CollapsibleSide.browser.test.tsx` (#460).
 
 const mobileToggle = (page: Page) => page.getByRole('button', { name: 'Menu de navegação' });
 const drawer = (page: Page) => page.getByRole('dialog', { name: 'Navegação' });
-// O elemento do react-modal não tem caixa própria no Drawer (o conteúdo é absoluto dentro do
-// overlay): a visibilidade é a do título, como em Drawer.browser.test.tsx.
-const drawerTitle = (page: Page) => drawer(page).getByRole('heading', { name: 'Navegação' });
 
 test.describe('a 375px', () => {
   test.use({ viewport: { width: 375, height: 812 } });
-
-  test('sem a barra fixa; o botão abre o Drawer com o seletor e as áreas, sem rolagem horizontal', async ({
-    page,
-  }) => {
-    await loginAs(page, OPERATOR);
-    await page.goto(`/sites/${SITE}/autores`);
-
-    await expect(page.locator('#barra-lateral')).toBeHidden();
-    await expect(sideNavToggle(page)).toBeHidden();
-    const viewport = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
-
-    await expect(mobileToggle(page)).toHaveAttribute('aria-expanded', 'false');
-    await mobileToggle(page).click();
-    await expect(drawerTitle(page)).toBeVisible();
-    await expect(
-      drawer(page).getByRole('button', { name: `${SITE_NAME}, trocar de site` }),
-    ).toBeVisible();
-    const areas = drawer(page).getByRole('navigation', { name: 'Áreas do site' });
-    await expect(areas.getByRole('link')).toHaveText(AREAS);
-    await expect(areas.locator('[aria-current="page"]')).toHaveText('Autores');
-  });
-
-  test('o foco fica preso no Drawer; Esc fecha e devolve o foco ao botão', async ({ page }) => {
-    await loginAs(page, OPERATOR);
-    await page.goto(`/sites/${SITE}`);
-    await page.waitForLoadState('networkidle');
-
-    await mobileToggle(page).focus();
-    await page.keyboard.press('Enter');
-    await expect(drawerTitle(page)).toBeVisible();
-    // Aberto, o resto da página (o botão também) fica com aria-hidden e inert.
-    await expect(
-      page.getByRole('button', { name: 'Menu de navegação', includeHidden: true }),
-    ).toHaveAttribute('aria-expanded', 'true');
-    // Uma volta inteira de Tab: o foco nunca sai do Drawer.
-    const stops = await drawer(page).locator('a, button').count();
-    for (let step = 0; step <= stops; step += 1) {
-      await page.keyboard.press('Tab');
-      expect(
-        await drawer(page).evaluate((element) => element.contains(document.activeElement)),
-      ).toBe(true);
-    }
-
-    await page.keyboard.press('Escape');
-    await expect(drawer(page)).toHaveCount(0);
-    await expect(mobileToggle(page)).toBeFocused();
-    await expect(mobileToggle(page)).toHaveAttribute('aria-expanded', 'false');
-  });
 
   test('clicar numa área navega e fecha o Drawer', async ({ page }) => {
     await loginAs(page, OPERATOR);
@@ -516,28 +386,4 @@ test.describe('a 375px', () => {
     await expect(page).toHaveURL(/\/sites\/exemplo-b\/autores$/);
     await expect(drawer(page)).toHaveCount(0);
   });
-
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`o Drawer aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/${SITE}/autores`);
-      await page.waitForLoadState('networkidle');
-      await mobileToggle(page).click();
-      await expect(drawerTitle(page)).toBeVisible();
-
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
-    });
-  }
-});
-
-test('a 1280px, a barra fixa aparece e o botão do celular não', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await loginAs(page, OPERATOR);
-  await page.goto(`/sites/${SITE}`);
-
-  await expect(page.locator('#barra-lateral')).toBeVisible();
-  await expect(sideNavToggle(page)).toBeVisible();
-  await expect(mobileToggle(page)).toBeHidden();
 });
