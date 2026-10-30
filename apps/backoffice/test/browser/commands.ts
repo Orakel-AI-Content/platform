@@ -1,5 +1,5 @@
 import { defineBrowserCommand } from '@vitest/browser-playwright';
-import type { FileChooser } from 'playwright';
+import type { CDPSession, FileChooser, Page } from 'playwright';
 
 // Comandos do Browser Mode que rodam no Node, com a `Page` do Playwright: o que a página de
 // teste não alcança sozinha. Os tipos do lado do navegador estão em `a11y.ts`.
@@ -9,11 +9,32 @@ export type MediaOptions = {
   reducedMotion?: 'reduce' | 'no-preference';
 };
 
+/** Fuso padrão do navegador nos testes, como no E2E do DateTimepicker. */
+export const TIMEZONE = 'America/Sao_Paulo';
+
 export type ChosenFile = { name: string; mimeType: string; base64: string };
 
 /** `prefers-color-scheme` e `prefers-reduced-motion` de verdade, sem mock de `matchMedia`. */
 export const emulateMedia = defineBrowserCommand<[MediaOptions]>(async (context, options) => {
   await context.page.emulateMedia(options);
+});
+
+/** Sessão CDP de cada página: o fuso emulado vale enquanto a sessão que o pôs existir. */
+const timezoneSessions = new WeakMap<Page, CDPSession>();
+
+/**
+ * Fuso do navegador: o de São Paulo, posto pelo setup (como no E2E do DateTimepicker), ou outro
+ * durante um teste, para provar que um campo mostra a hora no fuso do site e não no do
+ * navegador. Sem fuso, volta ao de São Paulo. Fica fora do `contextOptions.timezoneId`: o
+ * Chromium aceita uma só sessão com o fuso emulado, e a do Playwright não o troca depois.
+ */
+export const emulateTimezone = defineBrowserCommand<[string?]>(async (context, timezoneId) => {
+  let session = timezoneSessions.get(context.page);
+  if (!session) {
+    session = await context.page.context().newCDPSession(context.page);
+    timezoneSessions.set(context.page, session);
+  }
+  await session.send('Emulation.setTimezoneOverride', { timezoneId: timezoneId ?? TIMEZONE });
 });
 
 /**

@@ -428,7 +428,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 const mobileToggle = (page: Page) => page.getByRole('button', { name: 'Menu de navegação' });
 const drawer = (page: Page) => page.getByRole('dialog', { name: 'Navegação' });
 // O elemento do react-modal não tem caixa própria no Drawer (o conteúdo é absoluto dentro do
-// overlay): a visibilidade é a do título, como em components.spec.ts.
+// overlay): a visibilidade é a do título, como em Drawer.browser.test.tsx.
 const drawerTitle = (page: Page) => drawer(page).getByRole('heading', { name: 'Navegação' });
 
 test.describe('a 375px', () => {

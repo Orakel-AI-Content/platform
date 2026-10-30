@@ -22,8 +22,12 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
   `test/browser/a11y.ts`: `audit` (axe WCAG 2.2 AA; `auditWithout` desliga uma regra decidida caso
   a caso), `setTheme` (classe `dark` e mídia emulada),
   `setReducedMotion`, `tabTo`, `outline`, `focusRing` e `targetSize`. Tema e movimento pela mídia
-  emulada do Playwright (comandos em `test/browser/commands.ts`), nunca mock de `matchMedia`. O
-  navegador fica no fuso de São Paulo. Instale o Chromium uma vez:
+  emulada do Playwright (comandos em `test/browser/commands.ts`), nunca mock de `matchMedia`.
+  Largura de tela por `page.viewport` (o setup volta a 1280 × 720 depois de cada teste). Quem
+  usa o roteador do Next mocka `next/navigation` com o roteador em memória
+  (`vi.mock('next/navigation', () => import('<…>/test/browser/navigation.ts'))`; a URL fica em
+  `navigation`). O navegador fica no fuso de São Paulo; `commands.emulateTimezone('UTC')` troca
+  durante um teste (#459). Instale o Chromium uma vez:
   `pnpm --filter @orakel/backoffice exec playwright install chromium`.
 - **Contrato** (`test/contract/`): cada arquivo migra e limpa o banco (`helpers.ts`);
   rodam um arquivo por vez. Antes de migrar, a suíte recusa um banco com sites que ela não

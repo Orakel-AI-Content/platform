@@ -210,8 +210,10 @@ Não negociável, em toda tela e todo componente portado:
   Dropdown e Tooltip acessíveis por teclado (setas, Esc com o foco de volta).
 - **Auditoria:** a vitrine `/teste-de-componentes` (`src/app/(admin)/teste-de-componentes/`,
   só com `E2E_ERROR_ROUTE`, no compose local) é onde se audita cada componente: todo componente
-  novo ou portado ganha uma seção ali, e o E2E `test/e2e/components.spec.ts` o confere com axe
-  (WCAG 2.2 AA) e teclado nos dois temas. Corrija no componente, não na tela.
+  novo ou portado ganha uma seção ali e um teste de componente em Chromium
+  (`*.browser.test.tsx` ao lado dele, `test:browser`) que o confere com axe (WCAG 2.2 AA) e
+  teclado nos dois temas; o E2E `test/e2e/vitrine.spec.ts` fica com o render no servidor e o
+  axe da página inteira. Corrija no componente, não na tela.
 
 ## Padrões de tela
 

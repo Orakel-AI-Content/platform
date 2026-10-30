@@ -1069,7 +1069,7 @@ test.describe('barra de ações do editor (#109)', () => {
 
       await page.mouse.move(0, 0);
       // As guardas de foco do floating-ui (`aria-hidden` e `tabindex=0`, repassam o foco na
-      // hora) ficam de fora, como em components.spec.ts.
+      // hora) ficam de fora, como em vitrine.spec.ts.
       const accessibility = await new AxeBuilder({ page })
         .withTags(WCAG)
         .exclude('[data-floating-ui-focus-guard]')
