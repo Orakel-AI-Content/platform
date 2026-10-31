@@ -61,7 +61,14 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
     await deps.db.transaction((tx) =>
       recordBuild(
         tx,
-        { siteId, release: plan.release, jobId: helpers.job.id, attempt, startedAt },
+        {
+          siteId,
+          release: plan.release,
+          jobId: helpers.job.id,
+          attempt,
+          startedAt,
+          massUnpublishDeclaredAt: target.massUnpublishDeclaredAt,
+        },
         outcome,
       ),
     );

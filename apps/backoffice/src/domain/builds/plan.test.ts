@@ -10,6 +10,7 @@ const target: BuildTarget = {
   release: null,
   domain: 'exemplo-a.localhost',
   activePages: undefined,
+  massUnpublishDeclaredAt: null,
 };
 
 const settings: BuildSettings = {
@@ -50,6 +51,16 @@ describe('planBuild', () => {
     expect(planBuild({ ...target, activePages: 120 }, settings, 'r').render.env).toMatchObject({
       ACTIVE_PAGE_COUNT: '120',
       PAGE_DROP_TOLERANCE: '0.2',
+    });
+  });
+
+  it('a despublicação em massa declarada libera a trava; sem declaração, não', () => {
+    expect(planBuild(target, settings, 'r').render.env).toMatchObject({
+      ALLOW_MASS_UNPUBLISH: 'false',
+    });
+    const declared = { ...target, massUnpublishDeclaredAt: new Date('2026-10-31T12:00:00Z') };
+    expect(planBuild(declared, settings, 'r').render.env).toMatchObject({
+      ALLOW_MASS_UNPUBLISH: 'true',
     });
   });
 });

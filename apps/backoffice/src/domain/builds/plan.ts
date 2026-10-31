@@ -50,7 +50,7 @@ export function planBuild(target: BuildTarget, settings: BuildSettings, runId: s
         EXPORT_API_URL: settings.exportApiUrl,
         EXPORT_BUILD_TOKEN: settings.exportBuildToken,
         PAGE_DROP_TOLERANCE: String(settings.pageDropTolerance),
-        ALLOW_MASS_UNPUBLISH: 'false',
+        ALLOW_MASS_UNPUBLISH: target.massUnpublishDeclaredAt === null ? 'false' : 'true',
         ...(target.activePages !== undefined && {
           ACTIVE_PAGE_COUNT: String(target.activePages),
         }),
