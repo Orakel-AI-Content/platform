@@ -4,6 +4,8 @@ import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { Executor } from '../../db/client.ts';
 import { contents, contentVersions, publications, sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
+import { liveSlug, slugInUse } from '../content/contents.ts';
+import { createRedirect } from '../content/redirects.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 
 /** Fuso do dia do limite: sempre o de São Paulo, não o `timeZone` do site (workspace#20). */
@@ -82,7 +84,11 @@ export async function reservePublicationSlot(
     .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)))
     .for('update');
   const [latest] = await tx
-    .select({ version: contentVersions.version, status: contentVersions.status })
+    .select({
+      version: contentVersions.version,
+      status: contentVersions.status,
+      slug: sql<string>`${contentVersions.data}->>'slug'`,
+    })
     .from(contentVersions)
     .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))
     .orderBy(desc(contentVersions.version))
@@ -102,6 +108,9 @@ export async function reservePublicationSlot(
       `Só uma versão aprovada pode ser publicada: a versão ${version} está ${latest.status}`,
     );
   }
+
+  const taken = await slugInUse(tx, siteId, contentId, latest.slug);
+  if (taken !== undefined) return { ok: false, issues: [taken] };
 
   const [site] = await tx
     .select({ limit: sites.dailyPublishLimit })
