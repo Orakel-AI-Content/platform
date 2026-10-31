@@ -115,7 +115,9 @@ jobs:
       # servidor nem banco: fora do `test` porque precisam do navegador.
       - name: Navegador dos testes de componente
         if: needs.changes.outputs.backoffice == 'true' || needs.changes.outputs.workspace == 'true'
-        run: pnpm --filter @orakel/backoffice exec playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-chromium
+        with:
+          filter: '@orakel/backoffice'
       - name: Testes de componente do Backoffice
         if: needs.changes.outputs.backoffice == 'true' || needs.changes.outputs.workspace == 'true'
         run: pnpm turbo run test:browser --filter=@orakel/backoffice
@@ -237,7 +239,9 @@ jobs:
       # Os sites de exemplo são construídos a partir das fixtures NDJSON versionadas (ADR 0005).
       - name: Navegador do Playwright
         if: hashFiles('apps/blog/package.json') != ''
-        run: pnpm --filter @orakel/blog exec playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-chromium
+        with:
+          filter: '@orakel/blog'
       - run: pnpm turbo run build:examples test:a11y test:parity --affected
 
   # A release do core não deve ser o primeiro build da imagem (ADR 0007 do build-site):

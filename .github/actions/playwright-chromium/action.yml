@@ -1,0 +1,33 @@
+# Chromium do Playwright com o download no cache do Actions: sem ele, cada job baixa o
+# navegador de novo (de 30 s a 9 min no runner). Chave = versão do @playwright/test no catalog
+# do pnpm-workspace.yaml; as bibliotecas do sistema (apt) vêm sempre do install-deps.
+name: Chromium do Playwright
+description: Instala o Chromium do Playwright, com o navegador no cache do Actions.
+
+inputs:
+  filter:
+    description: 'Pacote do pnpm que tem o Playwright, como @orakel/backoffice.'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Versão do Playwright
+      id: version
+      shell: bash
+      run: |
+        version=$(sed -nE "s/^ +'@playwright\/test': *([0-9.]+).*/\1/p" pnpm-workspace.yaml)
+        echo "version=${version:?versão do @playwright/test não encontrada no catalog}" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@v6
+      id: cache
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ runner.os }}-${{ steps.version.outputs.version }}
+    - name: Navegador e dependências
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: pnpm --filter ${{ inputs.filter }} exec playwright install --with-deps chromium
+    - name: Dependências do navegador (navegador do cache)
+      if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: pnpm --filter ${{ inputs.filter }} exec playwright install-deps chromium
