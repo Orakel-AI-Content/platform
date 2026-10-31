@@ -22,6 +22,8 @@ export const EnvSchema = z.object({
   PREVIEW_BASE_URL: z.url(),
   /** Janela de agrupamento dos builds: 900 em produção, 30 no local. */
   BUILD_WINDOW_SECONDS: z.coerce.number().int().min(0).default(900),
+  /** Limite diário de publicações por site (dia de America/Sao_Paulo); o site pode ter o próprio. */
+  PUBLISH_DAILY_LIMIT: z.coerce.number().int().min(0).default(3),
   SENTRY_DSN: z.union([z.url(), z.literal('')]).optional(),
   HEARTBEAT_BASE_URL: z.union([z.url(), z.literal('')]).optional(),
   /** Só no E2E local: liga a página /teste-de-erro, que lança erro de propósito (#77). */

@@ -31,6 +31,8 @@ x-backoffice: &backoffice
     HEARTBEAT_BASE_URL: ${HEARTBEAT_BASE_URL:-}
     # Janela de agrupamento dos builds (12.0, L3): 900 em produção, 30 no local.
     BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-900}
+    # Limite diário de publicações por site (dia de America/Sao_Paulo); o site pode ter o próprio.
+    PUBLISH_DAILY_LIMIT: ${PUBLISH_DAILY_LIMIT:-3}
   networks: [internal]
 
 services:

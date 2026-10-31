@@ -1,4 +1,5 @@
 import { configureBuildWindow } from '../domain/builds/schedule.ts';
+import { configureDailyPublishLimit } from '../domain/publications/publish.ts';
 import { getEnv } from '../env.ts';
 import { createLogger, type Logger } from '../lib/logger.ts';
 import { initSentry } from '../lib/sentry.ts';
@@ -13,6 +14,7 @@ export async function runProcess(
     const env = getEnv();
     initSentry(service, env.SENTRY_DSN);
     configureBuildWindow(env.BUILD_WINDOW_SECONDS * 1000);
+    configureDailyPublishLimit(env.PUBLISH_DAILY_LIMIT);
     await main(logger);
   } catch (error) {
     logger.fatal({ err: error }, `${service} falhou`);
