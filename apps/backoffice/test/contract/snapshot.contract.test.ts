@@ -157,6 +157,14 @@ describe('snapshot de visualização', () => {
     expect(ids).not.toContain(contentId);
   });
 
+  it('o do build não traz de volta a versão publicada anterior à despublicação', async () => {
+    // Versões 1 e 2 publicadas; a 2, a que estava no ar, despublicada (#491).
+    await addVersion('despublicado', { title: 'Versão 2' });
+
+    const ids = contentsOf(await readSnapshot(site)).map((c) => c.id);
+    expect(ids).not.toContain(contentId);
+  });
+
   it('passa no content-model e conta os conteúdos no end', async () => {
     await addVersion('em_revisao', { title: 'Em revisão' });
 

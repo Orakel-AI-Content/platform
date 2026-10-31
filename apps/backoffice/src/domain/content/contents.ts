@@ -7,7 +7,7 @@ import {
   type Content,
   type Resources,
 } from '@orakel/content-model/v1';
-import { and, asc, desc, eq, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import {
@@ -68,32 +68,56 @@ function withN(block: NewBlock, n: number): Block {
   return { ...fresh, n } as Block;
 }
 
-/** Slug da versão no ar (a última `publicado`, a seleção `published` do snapshot). */
-export async function liveSlug(
+/**
+ * Estados que decidem a versão no ar: a mais recente entre eles, e só se for `publicado`. A
+ * despublicação leva só a versão no ar a `despublicado`; olhar só `publicado` traria de volta
+ * uma versão publicada anterior a ela. Regra única do snapshot `published`, de `liveVersion`
+ * e da checagem de slug em uso.
+ */
+export const LIVE_STATUSES = ['publicado', 'despublicado'] as const satisfies readonly Status[];
+
+/** Versão no ar do conteúdo (a seleção `published` do snapshot), se houver. */
+export async function liveVersion(
   tx: Executor,
   siteId: string,
   contentId: number,
-): Promise<string | undefined> {
+): Promise<{ version: number; slug: string } | undefined> {
   const [row] = await tx
-    .select({ slug: sql<string>`${contentVersions.data}->>'slug'` })
+    .select({
+      version: contentVersions.version,
+      status: contentVersions.status,
+      slug: sql<string>`${contentVersions.data}->>'slug'`,
+    })
     .from(contentVersions)
     .where(
       and(
         eq(contentVersions.siteId, siteId),
         eq(contentVersions.contentId, contentId),
-        eq(contentVersions.status, 'publicado'),
+        inArray(contentVersions.status, [...LIVE_STATUSES]),
       ),
     )
     .orderBy(desc(contentVersions.version))
     .limit(1);
-  return row?.slug;
+  return row?.status === 'publicado' ? { version: row.version, slug: row.slug } : undefined;
 }
 
-/** Maior versão do conteúdo da linha externa de `content_versions` (só as publicadas, se pedido). */
-const maxVersion = (published: boolean) => sql`(
+/** Slug da versão no ar (`liveVersion`). */
+export async function liveSlug(
+  tx: Executor,
+  siteId: string,
+  contentId: number,
+): Promise<string | undefined> {
+  return (await liveVersion(tx, siteId, contentId))?.slug;
+}
+
+/**
+ * Maior versão do conteúdo da linha externa de `content_versions`: em qualquer estado ou,
+ * se pedido, entre as que decidem a versão no ar (`LIVE_STATUSES`).
+ */
+const maxVersion = (live: boolean) => sql`(
   select max(v.version) from ${contentVersions} v
   where v.site_id = ${contentVersions.siteId} and v.content_id = ${contentVersions.contentId}
-  ${published ? sql`and v.status = 'publicado'` : sql``}
+  ${live ? sql`and v.status in ('publicado', 'despublicado')` : sql``}
 )`;
 
 /**
@@ -125,7 +149,10 @@ export async function slugInUse(
         sql`${contentVersions.data}->>'slug' = ${slug}`,
         or(
           eq(contentVersions.version, maxVersion(false)),
-          eq(contentVersions.version, maxVersion(true)),
+          and(
+            eq(contentVersions.version, maxVersion(true)),
+            eq(contentVersions.status, 'publicado'),
+          ),
         ),
       ),
     )
