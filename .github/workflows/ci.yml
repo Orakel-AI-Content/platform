@@ -205,7 +205,9 @@ jobs:
           restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
       - run: pnpm turbo run build --filter=@orakel/backoffice
       - name: Navegador do Playwright
-        run: pnpm --filter @orakel/backoffice exec playwright install --with-deps chromium
+        uses: ./.github/actions/playwright-chromium
+        with:
+          filter: '@orakel/backoffice'
       - run: pnpm --filter @orakel/backoffice exec playwright test --project=telas
       - uses: actions/upload-artifact@v7
         if: failure()
