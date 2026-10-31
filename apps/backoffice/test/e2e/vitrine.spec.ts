@@ -1,6 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import { asRole } from './auth.ts';
+
 // Vitrine dos componentes do Ecme (#205; workspace#45), no E2E só com o que depende do servidor
 // (#459): a página renderizada no servidor sem aviso de hidratação, a Pagination com links lida
 // da URL no servidor (`?pagina-link=`) e o axe da página inteira no tema claro, com foco de 2px
@@ -19,12 +21,6 @@ const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 const audit = (page: Page) =>
   new AxeBuilder({ page }).withTags(WCAG).exclude('[data-floating-ui-focus-guard]').analyze();
 const SHOWCASE = '/teste-de-componentes';
-
-async function login(page: Page): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: 'editor@orakel.local' }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 /** Erros e avisos de hidratação (em produção, os erros minificados #418, #423 e #425). */
 function hydrationMessages(page: Page): string[] {
@@ -49,7 +45,7 @@ const section = (page: Page, name: string) => page.getByRole('region', { name })
 
 test('vitrine sem violações do axe, com foco de 2px e alvos de 24 px (light)', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
-  await login(page);
+  await asRole(page, 'editor');
   const hydration = hydrationMessages(page);
   await page.goto(SHOWCASE);
   await expect(page.getByRole('heading', { name: 'Teste de componentes' })).toBeVisible();
@@ -94,7 +90,7 @@ test('vitrine sem violações do axe, com foco de 2px e alvos de 24 px (light)',
 });
 
 test('a vitrine vem renderizada do servidor', { tag: '@smoke' }, async ({ page }) => {
-  await login(page);
+  await asRole(page, 'editor');
   const response = await page.request.get(SHOWCASE);
   expect(response.status()).toBe(200);
   const html = await response.text();
@@ -125,7 +121,7 @@ const paginations = (page: Page) =>
 test('Pagination com links: ?pagina-link= no servidor, ponta sem href e Enter navega', async ({
   page,
 }) => {
-  await login(page);
+  await asRole(page, 'editor');
   const response = await page.request.get(`${SHOWCASE}?pagina-link=7`);
   const html = await response.text();
   expect(html).toContain('href="/teste-de-componentes?pagina-link=8"');

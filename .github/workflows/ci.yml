@@ -50,6 +50,8 @@ jobs:
               - 'apps/generator/**'
               - 'packages/**'
               - 'tooling/**'
+              # O E2E de telas sobe o access-mock como processo.
+              - 'infra/local/access-mock/**'
             infra:
               - 'infra/**'
               - 'docker/**'
@@ -153,6 +155,68 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run test:contract --affected
+
+  # Camada `telas` do E2E do Backoffice (#474): `next start`, o Postgres de serviço e o
+  # access-mock como processo (webServer do playwright.config.ts), sem Docker nem imagem. Os
+  # testes `@stack` precisam da pilha e ficam no e2e.yml. Sem S3: o endpoint não responde.
+  e2e-telas:
+    name: E2E de telas do Backoffice
+    needs: changes
+    if: needs.changes.outputs.backoffice == 'true' || needs.changes.outputs.workspace == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: orakel
+          POSTGRES_PASSWORD: orakel-ci
+          POSTGRES_DB: orakel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orakel -d orakel"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgres://orakel:orakel-ci@localhost:5432/orakel
+      ACCESS_TEAM_DOMAIN: orakel-ci.cloudflareaccess.com
+      ACCESS_AUD: orakel-ci-aud
+      # O mesmo endereço que o playwright.config.ts dá ao access-mock da camada.
+      ACCESS_JWKS_URL: http://localhost:8790/cdn-cgi/access/certs
+      EXPORT_BUILD_TOKEN: ci-build-token-000000000000000000000
+      EXPORT_PREVIEW_TOKEN: ci-preview-token-0000000000000000000
+      GENERATOR_TOKEN: ci-generator-token-00000000000000000
+      S3_ENDPOINT: http://localhost:9
+      S3_ACCESS_KEY_ID: orakel-ci
+      S3_SECRET_ACCESS_KEY: orakel-ci-secret
+      PREVIEW_BASE_URL: https://preview.orakel.localhost
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # O .next do `next build` volta do cache do turbo quando o Backoffice não mudou.
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
+      - run: pnpm turbo run build --filter=@orakel/backoffice
+      - name: Navegador do Playwright
+        uses: ./.github/actions/playwright-chromium
+        with:
+          filter: '@orakel/backoffice'
+      - run: pnpm --filter @orakel/backoffice exec playwright test --project=telas
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report-telas
+          path: |
+            apps/backoffice/playwright-report/
+            apps/backoffice/test-results/
+          if-no-files-found: ignore
 
   sites:
     name: Sites de exemplo (orçamento de JS, axe, paridade)

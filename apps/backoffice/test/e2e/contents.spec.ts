@@ -6,6 +6,7 @@ import { createDb, createPool } from '../../src/db/client.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
 import { getEnv } from '../../src/env.ts';
+import { asRole } from './auth.ts';
 import { removeSites } from './cleanup.ts';
 import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
@@ -19,12 +20,6 @@ const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 /** Região dos toasts (#212): o retorno das ações vai para ela, fora do main (#326). */
 const toastRegion = (page: Page) => page.locator('[data-toast-placement="top-end"]');
 
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
-
 async function addBlock(page: Page, type: string): Promise<void> {
   await chooseOption(page.getByRole('combobox', { name: 'Tipo do novo bloco' }), type);
   await page.getByRole('button', { name: 'Adicionar bloco' }).click();
@@ -36,7 +31,7 @@ test(
   async ({ page }) => {
     const slug = `e2e-${Date.now()}`;
     const title = `Artigo ${slug}`;
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto('/sites/exemplo-a/conteudos');
     // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
     await page.getByRole('link', { name: 'Criar conteúdo' }).first().click();
@@ -205,7 +200,7 @@ test(
 // capa escolhida (miniatura, "Trocar" e "Remover" na tela), sem violação do axe no tema claro.
 test(`campos de imagem, entidades e data sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/conteudos/novo');
   await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
 
@@ -275,7 +270,7 @@ test(
   'revisor não tem editor nem link para criar ou editar',
   { tag: '@smoke' },
   async ({ page }) => {
-    await loginAs(page, 'revisor@orakel.local');
+    await asRole(page, 'revisor');
     await page.goto('/sites/exemplo-a/conteudos');
     await expect(page.getByRole('heading', { name: /Conteúdos/ })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Criar conteúdo' })).toHaveCount(0);
@@ -300,7 +295,7 @@ test(
 // ficam em `ContentVersionsTable.browser.test.tsx` (#460).
 test('versões e uma versão no cartão, sem violação do axe', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/conteudos');
   await page
     .getByRole('table')
@@ -377,7 +372,7 @@ test.describe('versão em cartões (#372)', () => {
   });
 
   test('sem content.write, o cabeçalho só traz o voltar', async ({ page }) => {
-    await loginAs(page, 'revisor@orakel.local');
+    await asRole(page, 'revisor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/versoes/1`);
     await expect(page.getByRole('link', { name: 'Voltar às versões' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Editar', exact: true })).toHaveCount(0);
@@ -420,7 +415,7 @@ test.describe('tela do conteúdo no detalhe (#371)', () => {
     page,
     browser,
   }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(contentPath);
     await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
     const edit = page.getByRole('link', { name: 'Editar', exact: true });
@@ -442,7 +437,7 @@ test.describe('tela do conteúdo no detalhe (#371)', () => {
     await expect(summary.locator('dd').last()).toHaveText('Rascunho');
 
     const reviewer = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
-    await loginAs(reviewer, 'revisor@orakel.local');
+    await asRole(reviewer, 'revisor');
     await reviewer.goto(contentPath);
     await expect(
       reviewer.getByRole('heading', { level: 1, name: title, exact: true }),
@@ -482,7 +477,7 @@ test.describe('lista com 2.000 conteúdos (#107)', { tag: '@perf' }, () => {
   });
 
   test('abre e busca em menos de 2 s', async ({ page }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
     let started = Date.now();
@@ -509,7 +504,7 @@ test.describe('lista de conteúdos (#107)', () => {
   });
 
   test('busca e filtra, e a URL leva o estado para outra aba', async ({ page, context }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     // A contagem fica ao lado do nav "Paginação" do Ecme, não dentro dele (#269).
     const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
@@ -575,7 +570,7 @@ test.describe('lista de conteúdos (#107)', () => {
   // `ContentsTable.browser.test.tsx` (#460).
   test('lista cheia sem violação do axe', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${LIST_SITE}/conteudos`);
     await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(25);
 
@@ -588,7 +583,7 @@ test.describe('lista de conteúdos (#107)', () => {
   test('busca sem resultado mantém a tabela com a mensagem, e "Limpar filtros" volta a lista', async ({
     page,
   }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${LIST_SITE}/conteudos?q=nada-com-isso`);
 
     const table = page.getByRole('table', { name: 'Conteúdos', exact: true });
@@ -607,7 +602,7 @@ test.describe('lista de conteúdos (#107)', () => {
   test('o seletor de tamanho fica na URL e recarregar mantém a mesma visão (#362)', async ({
     page,
   }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${LIST_SITE}/conteudos`);
 
     await page.getByRole('combobox', { name: 'Itens por página' }).focus();
@@ -625,7 +620,7 @@ test.describe('lista de conteúdos (#107)', () => {
 
   // Padrão do template (#362): trilha acima do cartão; título, ação, toolbar e tabela nele.
   test('trilha fora do cartão; título, toolbar e tabela dentro dele', async ({ page }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${LIST_SITE}/conteudos`);
 
     const card = page.locator('.card').filter({ has: page.getByRole('table') });
@@ -672,7 +667,7 @@ test.describe('barra de ações do editor (#109)', () => {
   test('salvar fica visível em qualquer ponto da rolagem e mantém a pessoa no editor', async ({
     page,
   }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
     await page.goto(editPath);
     const save = page.getByRole('button', { name: 'Salvar', exact: true });
@@ -700,7 +695,7 @@ test.describe('barra de ações do editor (#109)', () => {
   // Remover bloco se desfaz pelo toast (#112, #326): sem região nem botão no rodapé.
   test(`remover bloco mostra o toast com Desfazer, que o devolve`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
     const blocks = page.getByRole('group', { name: /^Bloco \d+:/ });
     await expect(blocks).toHaveCount(20);
@@ -724,9 +719,11 @@ test.describe('barra de ações do editor (#109)', () => {
   test('com alterações não salvas, sair pede confirmação; depois de salvar, não (#111)', async ({
     page,
   }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
     await page.goto(editPath);
+    // Digitar antes da hidratação perde o estado do formulário (no `next dev`, ela demora).
+    await page.waitForLoadState('networkidle');
     const titleField = page.getByLabel(fieldLabel('Título'));
     // O conteúdo na trilha (#174) leva às versões; pelo destino, porque o título muda ao salvar.
     const versions = page
@@ -757,6 +754,7 @@ test.describe('barra de ações do editor (#109)', () => {
 
     // Confirmar navega; fechar a aba com alteração dispara o beforeunload.
     await page.goto(editPath);
+    await page.waitForLoadState('networkidle');
     await titleField.fill(`${title} (de novo)`);
     page.once('dialog', (dialog) => {
       dialogs.push(dialog.type());
@@ -781,7 +779,7 @@ test.describe('barra de ações do editor (#109)', () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
     await page.goto(editPath);
     await page.waitForLoadState('networkidle');
@@ -827,7 +825,7 @@ test.describe('barra de ações do editor (#109)', () => {
     page,
   }) => {
     const draft = `Descartado ${Date.now()}`;
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto('/sites/exemplo-a/conteudos/novo');
     await page.getByLabel(fieldLabel('Título')).fill(draft);
     page.on('dialog', (dialog) => {
@@ -850,8 +848,10 @@ test.describe('barra de ações do editor (#109)', () => {
   test('insere um bloco no meio só pelo teclado; Esc fecha a lista e devolve o foco (#134)', async ({
     page,
   }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    // Teclado só depois da hidratação (no `next dev` da camada `telas`, ela demora).
+    await page.waitForLoadState('networkidle');
     const trigger = page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true });
     const menu = page.getByRole('menu');
 
@@ -886,7 +886,7 @@ test.describe('barra de ações do editor (#109)', () => {
   // sem violação do axe no tema claro.
   test(`editar sem violação do axe`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
     await page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Salvar', exact: true })).toBeInViewport();
@@ -910,7 +910,7 @@ test.describe('barra de ações do editor (#109)', () => {
   // sem violação do axe no tema claro. Não salva: o conteúdo da seção fica como está.
   test(`texto rico com o popover de link sem violação do axe`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
     // Os 20 blocos daqui são sumários: um bloco de texto novo traz o editor.
     await addBlock(page, 'Texto');
@@ -934,8 +934,9 @@ test.describe('barra de ações do editor (#109)', () => {
   test('recolhe e expande blocos só pelo teclado; recolhido, o bloco ocupa uma linha (#135)', async ({
     page,
   }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    await page.waitForLoadState('networkidle');
     const toggle = page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true });
     const group = page.getByRole('group', { name: 'Bloco 1: Sumário', exact: true });
 
@@ -988,7 +989,7 @@ test.describe('grade de imagens com 2.000 mídias (#182)', { tag: '@perf' }, () 
   });
 
   test('a grade abre com a primeira página em menos de 2 s', async ({ page }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${MEDIA_SITE}/conteudos/novo`);
     await addBlock(page, 'Imagem');
     const grid = page.getByRole('dialog', { name: 'Escolher imagem' });

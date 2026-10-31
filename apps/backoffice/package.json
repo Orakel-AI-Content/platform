@@ -15,7 +15,7 @@
     "test": "vitest run",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:contract": "vitest run --config vitest.contract.config.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "E2E_STACK=1 playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=../../.env.local src/bin/migrate.ts",
     "db:seed": "node --env-file-if-exists=../../.env.local src/bin/seed.ts",

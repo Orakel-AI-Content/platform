@@ -7,6 +7,7 @@ import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { pauseSite } from '../../src/domain/builds/site-state.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getDatabaseUrl } from '../../src/env.ts';
+import { asRole } from './auth.ts';
 import { removeSites } from './cleanup.ts';
 import { fieldLabel } from './fieldLabel.ts';
 
@@ -24,57 +25,62 @@ test.afterAll(async () => {
 // ainda transparente no meio do fade.
 test.use({ reducedMotion: 'reduce' });
 
-test('login pelo Access e registro de instâncias', { tag: '@smoke' }, async ({ page }) => {
-  await page.goto('/sites');
+test(
+  'login pelo Access e registro de instâncias',
+  { tag: ['@smoke', '@stack'] },
+  async ({ page }) => {
+    await page.goto('/sites');
 
-  // Sem sessão, o Access (access-mock) pede login.
-  await expect(page.getByRole('heading', { name: /Login de teste/ })).toBeVisible();
-  await page.getByRole('link', { name: 'operacao@orakel.local' }).click();
+    // Sem sessão, o Access (access-mock) pede login.
+    await expect(page.getByRole('heading', { name: /Login de teste/ })).toBeVisible();
+    await page.getByRole('link', { name: 'operacao@orakel.local' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-  await expect(page.getByText('operacao@orakel.local · operacao')).toBeVisible();
-  const table = page.getByRole('table');
-  // O nome é o link principal; o ID e o domínio ficam sob ele (#100).
-  await expect(table.getByRole('link', { name: 'Exemplo A — Guias' })).toBeVisible();
-  await expect(table.getByText(/^exemplo-a · /)).toBeVisible();
-  await expect(table.getByRole('link', { name: 'Exemplo B — Receitas' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+    await expect(page.getByText('operacao@orakel.local · operacao')).toBeVisible();
+    const table = page.getByRole('table');
+    // O nome é o link principal; o ID e o domínio ficam sob ele (#100).
+    await expect(table.getByRole('link', { name: 'Exemplo A — Guias' })).toBeVisible();
+    await expect(table.getByText(/^exemplo-a · /)).toBeVisible();
+    await expect(table.getByRole('link', { name: 'Exemplo B — Receitas' })).toBeVisible();
 
-  // Operação baixa a lista de sites do OpenTofu (ADR 0011).
-  const download = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Baixar sites.auto.tfvars.json' }).click();
-  expect((await download).suggestedFilename()).toBe('sites.auto.tfvars.json');
+    // Operação baixa a lista de sites do OpenTofu (ADR 0011).
+    const download = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Baixar sites.auto.tfvars.json' }).click();
+    expect((await download).suggestedFilename()).toBe('sites.auto.tfvars.json');
 
-  // Operação enfileira o build do site sem esperar a janela (12.0, L3). Espera a página
-  // hidratar: um clique antes disso não chega ao onClick (a ação nem é chamada).
-  await page.waitForLoadState('networkidle');
-  // Muda o site publicado: confirma num diálogo (#327).
-  await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
-  await page
-    .getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' })
-    .getByRole('button', { name: 'Publicar' })
-    .click();
-  await expect(page.getByText('Build de exemplo-a enfileirado.')).toBeVisible();
+    // Operação enfileira o build do site sem esperar a janela (12.0, L3). Espera a página
+    // hidratar: um clique antes disso não chega ao onClick (a ação nem é chamada).
+    await page.waitForLoadState('networkidle');
+    // Muda o site publicado: confirma num diálogo (#327).
+    await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+    await page
+      .getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' })
+      .getByRole('button', { name: 'Publicar' })
+      .click();
+    await expect(page.getByText('Build de exemplo-a enfileirado.')).toBeVisible();
 
-  const accessibility = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-    .analyze();
-  expect(accessibility.violations).toEqual([]);
-});
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  },
+);
 
-test('a API de exportação não existe no hostname público', async ({ request }) => {
-  const response = await request.get('/api/export/v1/sites/exemplo-a/snapshot', {
-    headers: { authorization: 'Bearer local-build-token-0000000000000000' },
-  });
-  expect(response.status()).toBe(404);
-});
+test(
+  'a API de exportação não existe no hostname público',
+  { tag: '@stack' },
+  async ({ request }) => {
+    const response = await request.get('/api/export/v1/sites/exemplo-a/snapshot', {
+      headers: { authorization: 'Bearer local-build-token-0000000000000000' },
+    });
+    expect(response.status()).toBe(404);
+  },
+);
 
 test('editor não vê o download do sites.auto.tfvars.json nem o baixa pela rota', async ({
   page,
 }) => {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: 'editor@orakel.local' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+  await asRole(page, 'editor');
   await expect(page.getByRole('link', { name: /sites\.auto\.tfvars\.json/ })).toHaveCount(0);
   expect((await page.request.get('/sites/tfvars')).status()).toBe(403);
 });
@@ -82,12 +88,6 @@ test('editor não vê o download do sites.auto.tfvars.json nem o baixa pela rota
 // Cadastro e edição da configuração (#29): formulário só com teclado, erros anunciados e axe.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
-
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 async function expectNoViolations(page: Page): Promise<void> {
   const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -112,7 +112,7 @@ async function typeInto(page: Page, target: Locator, text: string): Promise<void
 test('operação cadastra e edita um site só com o teclado', { tag: '@smoke' }, async ({ page }) => {
   const siteId = `e2e-${Date.now()}`;
   created.push(siteId);
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
   // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
   await page.getByRole('link', { name: 'Criar site' }).first().click();
   await expect(page.getByRole('heading', { name: 'Criar site' })).toBeVisible();
@@ -206,7 +206,7 @@ test('operação cadastra e edita um site só com o teclado', { tag: '@smoke' },
 // temas, com as seções em Card e os campos do FormItem.
 test(`cadastro e configuração sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
 
   for (const [path, heading] of [
     ['/sites/novo', 'Criar site'],
@@ -248,7 +248,7 @@ test(`cadastro e configuração sem violação do axe`, async ({ page }) => {
 // fixa na largura do main e Voltar para a página do site, sem salvar.
 test('configuração: pares lado a lado, barra na largura do main e Voltar', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
   await page.goto('/sites/exemplo-a/configuracao');
   await expect(page.getByRole('heading', { name: 'Identidade' })).toBeVisible();
   await page.waitForLoadState('networkidle');
@@ -278,7 +278,7 @@ test('configuração: pares lado a lado, barra na largura do main e Voltar', asy
 
 // Vocabulário do guia (#385): o h1, a aba e o item corrente da trilha dizem "Configuração do site".
 test('configuração: h1, aba e trilha dizem Configuração do site', async ({ page }) => {
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
   await page.goto('/sites/exemplo-a/configuracao');
   await expect(
     page.getByRole('heading', { level: 1, name: 'Configuração do site', exact: true }),
@@ -290,7 +290,7 @@ test('configuração: h1, aba e trilha dizem Configuração do site', async ({ p
 });
 
 test('editor não cadastra nem edita a configuração', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await expect(page.getByRole('link', { name: 'Criar site' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Editar configuração/ })).toHaveCount(0);
 
@@ -332,7 +332,7 @@ const status = (page: Page, text: string) => page.getByRole('status').filter({ h
 test('operação marca as etapas, registra o G1 e define a janela do site', async ({ page }) => {
   const siteId = `e2e-pagina-${Date.now()}`;
   created.push(siteId);
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
   await newSite(page, siteId);
   await page.getByRole('link', { name: `Site ${siteId}`, exact: true }).click();
   await expect(page.getByRole('heading', { name: new RegExp(siteId) })).toBeVisible();
@@ -416,7 +416,7 @@ test(
   'operação vê a publicação do site e o publica pela página',
   { tag: '@smoke' },
   async ({ page }) => {
-    await loginAs(page, 'operacao@orakel.local');
+    await asRole(page, 'operacao');
     await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
     // O resumo ao lado das abas (#370): os dados de publicação e "Publicar agora".
     const publication = siteSummary(page);
@@ -495,7 +495,7 @@ test('operação vê o site pausado com o motivo e sem Publicar agora', async ({
     'render: Tema "padrao-editorial-receitas" não existe nesta release do site-builder';
   await createPausedSite(siteId, reason);
 
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
   await page.goto(`/sites/${siteId}`);
   const publication = siteSummary(page);
   await expect(publication.getByText('Pausado', { exact: true })).toBeVisible();
@@ -507,7 +507,7 @@ test('operação vê o site pausado com o motivo e sem Publicar agora', async ({
 });
 
 test('editor vê a página do site sem as ações', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
   await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
   // Cada aba mostra o mesmo que para a operação, só de leitura (#370).
@@ -536,7 +536,7 @@ test('editor vê a página do site sem as ações', async ({ page }) => {
 // aba (#370), no tema claro.
 test(`página do site sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
   await page.goto('/sites/exemplo-a');
   await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
   await expect(page.getByRole('tabpanel', { name: 'Ciclo de vida' })).toBeVisible();
@@ -588,7 +588,7 @@ test('mudanças pendentes do site novo, sem violação do axe', async ({ page })
   const siteId = `e2e-pendencias-${Date.now()}`;
   created.push(siteId);
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
   await newSite(page, siteId);
   await page.goto(`/sites/${siteId}/pendencias`);
   await expect(page.getByRole('heading', { name: 'Mudanças pendentes' })).toBeVisible();
@@ -606,6 +606,6 @@ test('mudanças pendentes do site novo, sem violação do axe', async ({ page })
 });
 
 test('site inexistente responde 404', async ({ page }) => {
-  await loginAs(page, 'operacao@orakel.local');
+  await asRole(page, 'operacao');
   expect((await page.goto('/sites/nao-existe'))?.status()).toBe(404);
 });

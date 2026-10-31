@@ -5,14 +5,15 @@ Consulte ao escrever ou rodar testes. Cada unidade complementa em
 
 ## Tipos
 
-| Tipo                               | Ferramenta                 | Onde                                | Tarefa                           |
-| ---------------------------------- | -------------------------- | ----------------------------------- | -------------------------------- |
-| Unitário                           | Vitest                     | `src/**/*.test.ts`, junto do código | `test`                           |
-| Contrato da API de exportação      | Vitest + Postgres          | backoffice                          | `test:contract`                  |
-| Sites de exemplo (orçamento de JS) | build do blog com fixtures | blog                                | `build:examples`                 |
-| Acessibilidade                     | Playwright + axe           | blog                                | `test:a11y`                      |
-| Paridade estático × SSR            | Playwright                 | blog                                | `test:parity`                    |
-| E2E completo                       | Playwright                 | apps                                | `test:e2e` (CI no PR, `e2e.yml`) |
+| Tipo                               | Ferramenta                 | Onde                                | Tarefa                                              |
+| ---------------------------------- | -------------------------- | ----------------------------------- | --------------------------------------------------- |
+| Unitário                           | Vitest                     | `src/**/*.test.ts`, junto do código | `test`                                              |
+| Contrato da API de exportação      | Vitest + Postgres          | backoffice                          | `test:contract`                                     |
+| Sites de exemplo (orçamento de JS) | build do blog com fixtures | blog                                | `build:examples`                                    |
+| Acessibilidade                     | Playwright + axe           | blog                                | `test:a11y`                                         |
+| Paridade estático × SSR            | Playwright                 | blog                                | `test:parity`                                       |
+| E2E de telas (sem Docker)          | Playwright + Postgres      | backoffice                          | `playwright test --project=telas` (job `e2e-telas`) |
+| E2E completo                       | Playwright                 | apps                                | `test:e2e` (CI no PR, `e2e.yml`)                    |
 
 ## Configuração
 

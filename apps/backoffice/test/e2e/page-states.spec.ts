@@ -1,17 +1,13 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { asRole } from './auth.ts';
+
 // Telas de estado do Backoffice (#77, workspace#32) contra o ambiente local: "não encontrado"
 // e erro dentro do layout, com o cabeçalho, e o carregamento na navegação. A tela de erro usa
 // a página /teste-de-erro, ligada só no local (E2E_ERROR_ROUTE no compose).
 
 const OPERATOR = 'operacao@orakel.local';
-
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
   const accessibility = await new AxeBuilder({ page })
@@ -24,7 +20,7 @@ test(
   'endereço inexistente mostra "não encontrado" com o cabeçalho e status 404',
   { tag: '@smoke' },
   async ({ page }) => {
-    await loginAs(page, OPERATOR);
+    await asRole(page, 'operacao');
 
     for (const path of ['/qualquer', '/sites/inexistente', '/sites/exemplo-a/nada/aqui']) {
       const response = await page.goto(path);
@@ -41,7 +37,7 @@ test(
 // Telas de estado no visual do Ecme (#283), no tema claro (o escuro, nos testes de componente).
 test(`"não encontrado" sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   for (const path of ['/qualquer', '/sites/exemplo-a/nada/aqui']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
@@ -52,7 +48,7 @@ test(`"não encontrado" sem violação do axe`, async ({ page }) => {
 
 test(`tela de erro sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   await page.goto('/teste-de-erro');
   await expect(page.getByRole('heading', { name: 'Algo deu errado' })).toBeVisible();
   await expect(page.locator('html')).toHaveClass(new RegExp(`\\blight\\b`));
@@ -62,7 +58,7 @@ test(`tela de erro sem violação do axe`, async ({ page }) => {
 test('exceção numa página mostra a tela de erro, e "Tentar de novo" busca de novo', async ({
   page,
 }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
 
   await page.goto('/teste-de-erro');
   await expect(page.getByRole('heading', { name: 'Algo deu errado' })).toBeVisible();
@@ -82,7 +78,7 @@ test('exceção numa página mostra a tela de erro, e "Tentar de novo" busca de 
 });
 
 test('a navegação mostra o carregamento, anunciado, em até 100 ms', async ({ page }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   await page.waitForLoadState('networkidle');
 
   // Segura a resposta da próxima tela (não o prefetch) para o carregamento ficar visível.

@@ -18,6 +18,7 @@ import { profileVariants } from '../../src/domain/media/variants.ts';
 import { currentConfig } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { createS3Client, s3ObjectStore } from '../../src/lib/s3.ts';
+import { asRole } from './auth.ts';
 import { removeSites } from './cleanup.ts';
 import { createVolumeSite, seedMedia } from '../volume.ts';
 
@@ -38,12 +39,6 @@ test.afterAll(async () => {
 // Com a biblioteca vazia, "Enviar imagens" aparece no cabeçalho e no `EmptyState` (#377): o E2E
 // usa o primeiro, o do cabeçalho.
 
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
-
 /** O EXIF (após "Exif\0\0") aponta para o bloco de GPS: tag 0x8825 na ordem de bytes do TIFF. */
 /** Diálogo "Enviar imagens" (#376) e o campo de arquivo da área de soltar, nomeado pelo texto. */
 function uploadDialog(page: Page) {
@@ -63,139 +58,142 @@ async function maxMediaId(): Promise<number> {
   return Math.max(0, ...listed.value.map((item) => item.id));
 }
 
-test('foto com GPS vira variantes sem localização e o artigo publicado a carrega', async ({
-  page,
-  request,
-}) => {
-  // A fixture exercita o que se quer provar: 4.000 px e GPS no EXIF.
-  const fixture = await readFile(FIXTURE);
-  const source = await sharp(fixture).metadata();
-  expect(source.width).toBe(4000);
-  expect(source.exif && hasGpsIfd(source.exif)).toBe(true);
+test(
+  'foto com GPS vira variantes sem localização e o artigo publicado a carrega',
+  { tag: '@stack' },
+  async ({ page, request }) => {
+    // A fixture exercita o que se quer provar: 4.000 px e GPS no EXIF.
+    const fixture = await readFile(FIXTURE);
+    const source = await sharp(fixture).metadata();
+    expect(source.width).toBe(4000);
+    expect(source.exif && hasGpsIfd(source.exif)).toBe(true);
 
-  // Envio pela tela da biblioteca (#52), como editor, até a mídia aparecer.
-  const before = await maxMediaId();
-  await loginAs(page, 'editor@orakel.local');
-  await page.goto(`/sites/${SITE}/midia`);
-  // Soltar na área do diálogo (#376): o arrasto destaca a área, e o arquivo solto cai no campo
-  // que a cobre (o Playwright não solta arquivos do sistema; `setInputFiles` faz a parte dele).
-  await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
-  const upload = uploadDialog(page);
-  const dragged = await page.evaluateHandle(() => {
-    const transfer = new DataTransfer();
-    transfer.items.add(new File(['x'], 'foto-gps.jpg', { type: 'image/jpeg' }));
-    return transfer;
-  });
-  await upload.input.dispatchEvent('dragover', { dataTransfer: dragged });
-  await expect(upload.dialog.locator('.upload-draggable')).toHaveClass(/border-primary/);
-  await upload.input.dispatchEvent('drop', { dataTransfer: dragged });
-  await upload.input.setInputFiles(FIXTURE.pathname);
-  await expect(upload.dialog).toBeHidden();
-  // Cada arquivo tem a sua linha na fila de envio (#188).
-  await expect(
-    page
-      .getByRole('list', { name: 'Envios' })
-      .getByRole('listitem')
-      .filter({ hasText: 'foto-gps.jpg' }),
-  ).toContainText('pronta', { timeout: 60_000 });
-
-  const { db } = getDb();
-  const listed = await listMedia(db, SYSTEM_ACTOR, SITE);
-  if (!listed.ok) throw new Error(JSON.stringify(listed.issues));
-  const uploaded = listed.value.find((item) => item.id > before);
-  if (uploaded === undefined) throw new Error('A mídia enviada não foi registrada');
-
-  // Original guardado: no máximo 2.560 px e sem EXIF (logo, sem localização).
-  const [row] = await db
-    .select({ originalKey: media.originalKey })
-    .from(media)
-    .where(and(eq(media.siteId, SITE), eq(media.id, uploaded.id)));
-  expect(row?.originalKey).toBeTruthy();
-  const store = s3ObjectStore(createS3Client(getEnv()));
-  const original = await store.get(ORIGINALS_BUCKET, row?.originalKey ?? '');
-  if (original === undefined) throw new Error(`Original ${row?.originalKey} não existe`);
-  const originalMeta = await sharp(original).metadata();
-  expect(originalMeta.width).toBeLessThanOrEqual(MAX_ORIGINAL_WIDTH);
-  expect(originalMeta.exif).toBeUndefined();
-
-  // Todas as variantes do perfil, servidas por media.<site>.localhost, sem EXIF.
-  const key = (v: { width: number; format: string }) => `${v.width}/${v.format}`;
-  expect(uploaded.variants.map(key).sort()).toEqual(
-    profileVariants(uploaded.width).map(key).sort(),
-  );
-  const config = await currentConfig(db, SITE);
-  if (config === undefined) throw new Error(`Site ${SITE} sem configuração`);
-  for (const variant of uploaded.variants) {
-    const url = mediaUrl(config, variant.path);
-    expect(url).toMatch(new RegExp(`^https://media\\.${SITE}\\.localhost/`));
-    const response = await request.get(url);
-    expect(response.status(), url).toBe(200);
-    expect((await sharp(await response.body()).metadata()).exif, url).toBeUndefined();
-  }
-
-  // Artigo publicado pelo domínio, com a imagem de capa e no corpo; build já.
-  const slug = `e2e-midia-${Date.now()}`;
-  await db.transaction(async (tx) => {
-    const created = await createContent(
-      tx,
-      SYSTEM_ACTOR,
-      SITE,
-      {
-        kind: 'article',
-        slug,
-        title: `Artigo ${slug}`,
-        description: 'Artigo do E2E da mídia.',
-        authorIds: [1],
-        taxonomyIds: [1],
-        coverMediaId: uploaded.id,
-        publishedAt: new Date().toISOString(),
-        blocks: [
-          {
-            new: true,
-            type: 'text',
-            content: [{ type: 'paragraph', children: [{ type: 'text', text: 'Foto da horta.' }] }],
-          },
-          {
-            new: true,
-            type: 'image',
-            mediaId: uploaded.id,
-            alt: 'Horta com três pés de alface ao sol',
-          },
-        ],
-      },
-      { status: 'publicado' },
-    );
-    if (!created.ok) throw new Error(JSON.stringify(created.issues));
-    await buildNow(tx, SITE);
-  });
-
-  const pageUrl = `https://${config.domains[0]}${contentPath({ slug })}`;
-  await expect
-    .poll(async () => (await request.get(pageUrl)).status(), {
-      message: `${pageUrl} publicado`,
-      timeout: 150_000,
-      intervals: [2_000],
-    })
-    .toBe(200);
-
-  // A página referencia a imagem por media.<site>.localhost e ela carrega.
-  await page.goto(pageUrl);
-  const image = page.getByRole('img', { name: 'Horta com três pés de alface ao sol' });
-  await image.scrollIntoViewIfNeeded();
-  const hash = /\/([0-9a-f]{64})-/.exec(uploaded.variants[0]?.path ?? '')?.[1] ?? '';
-  expect(hash).not.toBe('');
-  await expect
-    .poll(() =>
-      image.evaluate((element: HTMLImageElement) => ({
-        src: element.currentSrc,
-        loaded: element.complete && element.naturalWidth > 0,
-      })),
-    )
-    .toEqual({
-      src: expect.stringMatching(new RegExp(`^https://media\\.${SITE}\\.localhost/.*${hash}`)),
-      loaded: true,
+    // Envio pela tela da biblioteca (#52), como editor, até a mídia aparecer.
+    const before = await maxMediaId();
+    await asRole(page, 'editor');
+    await page.goto(`/sites/${SITE}/midia`);
+    // Soltar na área do diálogo (#376): o arrasto destaca a área, e o arquivo solto cai no campo
+    // que a cobre (o Playwright não solta arquivos do sistema; `setInputFiles` faz a parte dele).
+    await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
+    const upload = uploadDialog(page);
+    const dragged = await page.evaluateHandle(() => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(['x'], 'foto-gps.jpg', { type: 'image/jpeg' }));
+      return transfer;
     });
-});
+    await upload.input.dispatchEvent('dragover', { dataTransfer: dragged });
+    await expect(upload.dialog.locator('.upload-draggable')).toHaveClass(/border-primary/);
+    await upload.input.dispatchEvent('drop', { dataTransfer: dragged });
+    await upload.input.setInputFiles(FIXTURE.pathname);
+    await expect(upload.dialog).toBeHidden();
+    // Cada arquivo tem a sua linha na fila de envio (#188).
+    await expect(
+      page
+        .getByRole('list', { name: 'Envios' })
+        .getByRole('listitem')
+        .filter({ hasText: 'foto-gps.jpg' }),
+    ).toContainText('pronta', { timeout: 60_000 });
+
+    const { db } = getDb();
+    const listed = await listMedia(db, SYSTEM_ACTOR, SITE);
+    if (!listed.ok) throw new Error(JSON.stringify(listed.issues));
+    const uploaded = listed.value.find((item) => item.id > before);
+    if (uploaded === undefined) throw new Error('A mídia enviada não foi registrada');
+
+    // Original guardado: no máximo 2.560 px e sem EXIF (logo, sem localização).
+    const [row] = await db
+      .select({ originalKey: media.originalKey })
+      .from(media)
+      .where(and(eq(media.siteId, SITE), eq(media.id, uploaded.id)));
+    expect(row?.originalKey).toBeTruthy();
+    const store = s3ObjectStore(createS3Client(getEnv()));
+    const original = await store.get(ORIGINALS_BUCKET, row?.originalKey ?? '');
+    if (original === undefined) throw new Error(`Original ${row?.originalKey} não existe`);
+    const originalMeta = await sharp(original).metadata();
+    expect(originalMeta.width).toBeLessThanOrEqual(MAX_ORIGINAL_WIDTH);
+    expect(originalMeta.exif).toBeUndefined();
+
+    // Todas as variantes do perfil, servidas por media.<site>.localhost, sem EXIF.
+    const key = (v: { width: number; format: string }) => `${v.width}/${v.format}`;
+    expect(uploaded.variants.map(key).sort()).toEqual(
+      profileVariants(uploaded.width).map(key).sort(),
+    );
+    const config = await currentConfig(db, SITE);
+    if (config === undefined) throw new Error(`Site ${SITE} sem configuração`);
+    for (const variant of uploaded.variants) {
+      const url = mediaUrl(config, variant.path);
+      expect(url).toMatch(new RegExp(`^https://media\\.${SITE}\\.localhost/`));
+      const response = await request.get(url);
+      expect(response.status(), url).toBe(200);
+      expect((await sharp(await response.body()).metadata()).exif, url).toBeUndefined();
+    }
+
+    // Artigo publicado pelo domínio, com a imagem de capa e no corpo; build já.
+    const slug = `e2e-midia-${Date.now()}`;
+    await db.transaction(async (tx) => {
+      const created = await createContent(
+        tx,
+        SYSTEM_ACTOR,
+        SITE,
+        {
+          kind: 'article',
+          slug,
+          title: `Artigo ${slug}`,
+          description: 'Artigo do E2E da mídia.',
+          authorIds: [1],
+          taxonomyIds: [1],
+          coverMediaId: uploaded.id,
+          publishedAt: new Date().toISOString(),
+          blocks: [
+            {
+              new: true,
+              type: 'text',
+              content: [
+                { type: 'paragraph', children: [{ type: 'text', text: 'Foto da horta.' }] },
+              ],
+            },
+            {
+              new: true,
+              type: 'image',
+              mediaId: uploaded.id,
+              alt: 'Horta com três pés de alface ao sol',
+            },
+          ],
+        },
+        { status: 'publicado' },
+      );
+      if (!created.ok) throw new Error(JSON.stringify(created.issues));
+      await buildNow(tx, SITE);
+    });
+
+    const pageUrl = `https://${config.domains[0]}${contentPath({ slug })}`;
+    await expect
+      .poll(async () => (await request.get(pageUrl)).status(), {
+        message: `${pageUrl} publicado`,
+        timeout: 150_000,
+        intervals: [2_000],
+      })
+      .toBe(200);
+
+    // A página referencia a imagem por media.<site>.localhost e ela carrega.
+    await page.goto(pageUrl);
+    const image = page.getByRole('img', { name: 'Horta com três pés de alface ao sol' });
+    await image.scrollIntoViewIfNeeded();
+    const hash = /\/([0-9a-f]{64})-/.exec(uploaded.variants[0]?.path ?? '')?.[1] ?? '';
+    expect(hash).not.toBe('');
+    await expect
+      .poll(() =>
+        image.evaluate((element: HTMLImageElement) => ({
+          src: element.currentSrc,
+          loaded: element.complete && element.naturalWidth > 0,
+        })),
+      )
+      .toEqual({
+        src: expect.stringMatching(new RegExp(`^https://media\\.${SITE}\\.localhost/.*${hash}`)),
+        loaded: true,
+      });
+  },
+);
 
 const BIG_SITE = `e2e-biblioteca-${Date.now()}`;
 
@@ -219,7 +217,7 @@ test.describe('biblioteca com 2.000 imagens (#186)', { tag: '@perf' }, () => {
   });
 
   test('abre e busca em menos de 2 s', async ({ page }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
     let started = Date.now();
@@ -245,7 +243,7 @@ test.describe('biblioteca de mídia (#186)', () => {
   });
 
   test('busca por nome e pagina só com teclado, com a busca na URL', async ({ page }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     // A contagem fica ao lado do nav "Paginação" do Ecme, não dentro dele (#269).
     const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
@@ -286,7 +284,7 @@ test.describe('biblioteca de mídia (#186)', () => {
   }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${LIBRARY_SITE}/midia`);
     const image = page.getByRole('button', { name: /^foto-1\.jpg ·/ });
     await image.click();
@@ -316,7 +314,7 @@ test.describe('biblioteca de mídia (#186)', () => {
   // Busca, contagem e paginação nos controles do Ecme (#269), no tema claro.
   test(`lista sem violação do axe`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${LIBRARY_SITE}/midia?pagina=2`);
     await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
       '30 resultados',
@@ -335,14 +333,14 @@ test.describe('biblioteca de mídia (#186)', () => {
 
 test(
   'envia 3 arquivos de uma vez: 2 ficam prontos e o inválido é recusado com o motivo (#188)',
-  { tag: '@smoke' },
+  { tag: ['@smoke', '@stack'] },
   async ({ page }) => {
     const small = await sharp({
       create: { width: 640, height: 480, channels: 3, background: '#2a9d8f' },
     })
       .jpeg()
       .toBuffer();
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${SITE}/midia`);
 
     // Só com teclado (#376): Enter no botão abre o diálogo; Tab passa pelo X "Fechar" e chega ao
@@ -381,14 +379,14 @@ test(
 
 // Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, no tema claro, com
 // um único `role="status"` para a fila (#375), e o diálogo de envio aberto (#376).
-test(`fila de envio preenchida sem violação do axe`, async ({ page }) => {
+test(`fila de envio preenchida sem violação do axe`, { tag: '@stack' }, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   const small = await sharp({
     create: { width: 320, height: 240, channels: 3, background: '#e76f51' },
   })
     .jpeg()
     .toBuffer();
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto(`/sites/${SITE}/midia`);
 
   await page.getByRole('button', { name: 'Enviar imagens' }).first().click();

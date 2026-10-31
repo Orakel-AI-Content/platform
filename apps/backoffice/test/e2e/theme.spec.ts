@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 import { THEME_COOKIE } from '../../src/configs/theme.config.ts';
+import { asRole } from './auth.ts';
 
 // Tema por classe no <html> (#203): com cookie, a classe vem no HTML do servidor; sem cookie,
 // o script do <head> aplica a preferência do sistema antes da primeira pintura. Nenhum quadro
@@ -18,12 +19,6 @@ const BACKGROUND: Record<Scheme, string> = {
 };
 
 const opposite = (scheme: Scheme): Scheme => (scheme === 'dark' ? 'light' : 'dark');
-
-async function login(page: Page): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: 'editor@orakel.local' }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 async function setThemeCookie(context: BrowserContext, value: string): Promise<void> {
   const url = test.info().project.use.baseURL ?? 'https://admin.orakel.localhost';
@@ -98,7 +93,7 @@ for (const scheme of SCHEMES) {
     page,
   }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    await login(page);
+    await asRole(page, 'editor');
     const hydration = hydrationMessages(page);
     await recordFrames(page);
 
@@ -125,7 +120,7 @@ for (const scheme of SCHEMES) {
     { tag: '@smoke' },
     async ({ page, context }) => {
       await page.emulateMedia({ colorScheme: opposite(scheme) });
-      await login(page);
+      await asRole(page, 'editor');
       await setThemeCookie(context, scheme);
       const hydration = hydrationMessages(page);
 
@@ -148,7 +143,7 @@ for (const scheme of SCHEMES) {
 
 test('cookie com valor desconhecido vale como modo sistema', async ({ page, context }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
-  await login(page);
+  await asRole(page, 'editor');
   await setThemeCookie(context, 'sepia');
 
   const tag = await serverHtmlTag(page);
@@ -201,7 +196,7 @@ for (const scheme of SCHEMES) {
     context,
   }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    await login(page);
+    await asRole(page, 'editor');
     await page.waitForLoadState('networkidle');
     await expect(themeButton(page)).toHaveAccessibleName('Tema: Sistema');
 
@@ -241,7 +236,7 @@ test('escolher Sistema no header apaga o cookie e volta à preferência do siste
   context,
 }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
-  await login(page);
+  await asRole(page, 'editor');
   await setThemeCookie(context, 'light');
   await page.goto('/sites');
   await page.waitForLoadState('networkidle');
@@ -262,7 +257,7 @@ test('escolher Sistema no header apaga o cookie e volta à preferência do siste
 for (const colorScheme of SCHEMES) {
   test(`o menu de tema aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await login(page);
+    await asRole(page, 'editor');
     await page.waitForLoadState('networkidle');
     await themeButton(page).click();
     await expect(page.getByRole('menu')).toBeVisible();
