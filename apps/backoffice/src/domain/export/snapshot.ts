@@ -1,6 +1,6 @@
 import type { Result } from '@orakel/content-model';
 import { SCHEMA_VERSION, type EndLine, type SnapshotLine } from '@orakel/content-model/v1';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 
 import type { Db, Executor } from '../../db/client.ts';
 import {
@@ -12,11 +12,13 @@ import {
   redirects,
   taxonomies,
 } from '../../db/schema/index.ts';
+import { LIVE_STATUSES } from '../content/contents.ts';
 import { currentConfig, siteExists, unresolvedPendingChangeIds } from '../sites/sites.ts';
 import { toAuthor, toContent, toMedia, toRedirect, toTaxonomy } from './mappers.ts';
 
 /**
- * Que versão de cada conteúdo entra no snapshot: `published`, a última publicada (build);
+ * Que versão de cada conteúdo entra no snapshot: `published`, a versão no ar (build): a mais
+ * recente entre `publicado` e `despublicado`, menos o conteúdo em que ela é `despublicado`;
  * `latest`, a mais recente em qualquer estado, menos o conteúdo cuja última versão é
  * `despublicado` (visualização, ADR 0009).
  */
@@ -108,8 +110,9 @@ export async function* snapshotLines(
     yield { type: 'redirect', data: toRedirect(row) };
   }
 
-  // Última versão de cada conteúdo na seleção. O despublicado sai depois do DISTINCT ON:
-  // filtrá-lo antes traria de volta a versão anterior à despublicação.
+  // Última versão de cada conteúdo na seleção (`published`: entre as de `LIVE_STATUSES`). O
+  // despublicado sai depois do DISTINCT ON: filtrá-lo antes traria de volta a versão anterior
+  // à despublicação, nas duas seleções.
   const versions = await tx
     .selectDistinctOn([contentVersions.contentId], {
       contentId: contentVersions.contentId,
@@ -120,7 +123,7 @@ export async function* snapshotLines(
     .where(
       and(
         eq(contentVersions.siteId, siteId),
-        selection === 'published' ? eq(contentVersions.status, 'publicado') : undefined,
+        selection === 'published' ? inArray(contentVersions.status, [...LIVE_STATUSES]) : undefined,
       ),
     )
     .orderBy(asc(contentVersions.contentId), desc(contentVersions.version));
