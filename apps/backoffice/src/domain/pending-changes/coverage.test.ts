@@ -22,10 +22,15 @@ function sourceFiles(dir: string): string[] {
 
 /**
  * Gravam só colunas de uma tabela exportada que não vão para o snapshot: o estado do site e o
- * `status` da versão na revisão (ADR 0015). Gerar mudança pendente ali agendaria um build sem
- * diferença.
+ * `status` da versão na revisão e no agendamento da publicação (ADR 0015 e 0017 da unidade:
+ * `agendado` e a volta a `aprovado` não mudam o snapshot; a mudança pendente nasce no job do
+ * horário marcado). Gerar mudança pendente ali agendaria um build sem diferença.
  */
-const OPERATIONAL_ONLY = [path.join('builds', 'site-state.ts'), path.join('reviews', 'reviews.ts')];
+const OPERATIONAL_ONLY = [
+  path.join('builds', 'site-state.ts'),
+  path.join('reviews', 'reviews.ts'),
+  path.join('publications', 'schedule.ts'),
+];
 
 const writes = new RegExp(`\\.(?:insert|update|delete)\\((?:${EXPORTED_TABLES.join('|')})\\)`);
 
