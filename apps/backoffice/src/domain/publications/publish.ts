@@ -39,10 +39,14 @@ const notFound = (siteId: string, contentId: number): Issue => ({
   path: [],
 });
 
-/** Publicações do site no dia de São Paulo que contém `now` (faixa do índice por site e data). */
-async function publishedOnDay(tx: Executor, siteId: string, now: Date): Promise<number> {
-  const at = sql`${now.toISOString()}::timestamptz`;
-  const dayStart = sql`(date_trunc('day', ${at} at time zone ${PUBLISH_DAY_TIME_ZONE}) at time zone ${PUBLISH_DAY_TIME_ZONE})`;
+/**
+ * Publicações do site no dia de São Paulo que contém `at` (faixa do índice por site e data).
+ * Conta as feitas e as agendadas: a reserva do agendamento grava `published_at` no horário
+ * marcado (schedule.ts).
+ */
+async function publishedOnDay(tx: Executor, siteId: string, at: Date): Promise<number> {
+  const instant = sql`${at.toISOString()}::timestamptz`;
+  const dayStart = sql`(date_trunc('day', ${instant} at time zone ${PUBLISH_DAY_TIME_ZONE}) at time zone ${PUBLISH_DAY_TIME_ZONE})`;
   const [row] = await tx
     .select({ total: count() })
     .from(publications)
@@ -56,26 +60,22 @@ async function publishedOnDay(tx: Executor, siteId: string, now: Date): Promise<
   return row?.total ?? 0;
 }
 
+const dayLabel = new Intl.DateTimeFormat('pt-BR', { timeZone: PUBLISH_DAY_TIME_ZONE });
+
 /**
- * Publica a versão aprovada: precisa ser a mais recente e estar `aprovado`, e o site não pode
- * ter chegado ao limite do dia de São Paulo. Leva a versão a `publicado`, grava a linha em
- * `publications` e registra a mudança pendente, que agenda o build na janela do site. Trava a
- * linha de `contents`, como a aprovação, e depois a do site (`for no key update`, que não
+ * Confere se a versão pode ocupar uma vaga no dia de São Paulo que contém `day`: precisa ser a
+ * mais recente e estar `aprovado`, e o site não pode ter chegado ao limite daquele dia. Trava
+ * a linha de `contents`, como a aprovação, e depois a do site (`for no key update`, que não
  * espera as gravações com chave estrangeira para ele), para duas publicações simultâneas no
- * mesmo site não passarem do limite.
+ * mesmo site não passarem do limite. Usada pela publicação e pelo agendamento.
  */
-export async function publishVersion(
+export async function reservePublicationSlot(
   tx: Executor,
-  actor: Actor,
   siteId: string,
   contentId: number,
   version: number,
-  options: { now?: Date } = {},
-): Promise<Result<{ publicationId: number }>> {
-  const allowed = requireRole(actor, 'content.publish');
-  if (!allowed.ok) return allowed;
-  const now = options.now ?? new Date();
-
+  day: { at: Date; today: boolean },
+): Promise<Result<void>> {
   const [content] = await tx
     .select({ id: contents.id })
     .from(contents)
@@ -110,14 +110,24 @@ export async function publishVersion(
     .for('no key update');
   if (site === undefined) return { ok: false, issues: [notFound(siteId, contentId)] };
   const limit = effectiveDailyPublishLimit(site.limit);
-  const published = await publishedOnDay(tx, siteId, now);
+  const published = await publishedOnDay(tx, siteId, day.at);
   if (published >= limit) {
+    const when = day.today ? 'hoje' : `em ${dayLabel.format(day.at)}`;
     return refused(
       'publication.daily_limit',
-      `O site ${siteId} já tem ${published} publicação(ões) hoje (dia de São Paulo), e o limite é ${limit}`,
+      `O site ${siteId} já tem ${published} publicação(ões) ${when} (dia de São Paulo), e o limite é ${limit}`,
     );
   }
+  return { ok: true, value: undefined };
+}
 
+/** Leva a versão a `publicado` e registra a mudança pendente, que agenda o build na janela. */
+async function markPublished(
+  tx: Executor,
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<void> {
   await tx
     .update(contentVersions)
     .set({ status: 'publicado' })
@@ -128,11 +138,68 @@ export async function publishVersion(
         eq(contentVersions.version, version),
       ),
     );
+  await recordPendingChange(tx, siteId, 'content', String(contentId));
+}
+
+/**
+ * Publica a versão aprovada: confere a vaga do dia de São Paulo de `now`
+ * (`reservePublicationSlot`), leva a versão a `publicado`, grava a linha em `publications` e
+ * registra a mudança pendente, que agenda o build na janela do site.
+ */
+export async function publishVersion(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  options: { now?: Date } = {},
+): Promise<Result<{ publicationId: number }>> {
+  const allowed = requireRole(actor, 'content.publish');
+  if (!allowed.ok) return allowed;
+  const now = options.now ?? new Date();
+
+  const slot = await reservePublicationSlot(tx, siteId, contentId, version, {
+    at: now,
+    today: true,
+  });
+  if (!slot.ok) return slot;
+
   const [publication] = await tx
     .insert(publications)
     .values({ siteId, contentId, version, publishedBy: actor.email, publishedAt: now })
     .returning({ id: publications.id });
   if (publication === undefined) throw new Error('INSERT em publications não devolveu o id');
-  await recordPendingChange(tx, siteId, 'content', String(contentId));
+  await markPublished(tx, siteId, contentId, version);
   return { ok: true, value: { publicationId: publication.id } };
+}
+
+/**
+ * Publica a versão agendada, no job do horário marcado: sem conferir o limite (a vaga já foi
+ * reservada no agendamento) e sem outra linha em `publications`. Trava o conteúdo, como o
+ * cancelamento; se a versão não está mais `agendado` (cancelada antes), não faz nada.
+ */
+export async function publishScheduledVersion(
+  tx: Executor,
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<'published' | 'not_scheduled'> {
+  await tx
+    .select({ id: contents.id })
+    .from(contents)
+    .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)))
+    .for('update');
+  const [row] = await tx
+    .select({ status: contentVersions.status })
+    .from(contentVersions)
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        eq(contentVersions.contentId, contentId),
+        eq(contentVersions.version, version),
+      ),
+    );
+  if (row?.status !== 'agendado') return 'not_scheduled';
+  await markPublished(tx, siteId, contentId, version);
+  return 'published';
 }
