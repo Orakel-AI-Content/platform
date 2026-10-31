@@ -1,4 +1,3 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 import { THEME_COOKIE } from '../../src/configs/theme.config.ts';
@@ -7,7 +6,7 @@ import { asRole } from './auth.ts';
 // Tema por classe no <html> (#203): com cookie, a classe vem no HTML do servidor; sem cookie,
 // o script do <head> aplica a preferência do sistema antes da primeira pintura. Nenhum quadro
 // sai no tema oposto, e a hidratação não reclama da classe posta pelo script.
-// A troca pelo header (#240) está no fim do arquivo.
+// A persistência da troca pelo header (#240) está no fim do arquivo.
 
 const SCHEMES = ['light', 'dark'] as const;
 type Scheme = (typeof SCHEMES)[number];
@@ -154,10 +153,11 @@ test('cookie com valor desconhecido vale como modo sistema', async ({ page, cont
   expect(await darkUtilityDisplay(page)).toBe('none');
 });
 
-// Troca pelo header (#240): Claro e Escuro gravam o cookie e trocam a classe na hora; Sistema
-// apaga o cookie. Ao recarregar, nenhum quadro sai no tema oposto e a hidratação não reclama.
-
-const LABEL: Record<Scheme, string> = { light: 'Claro', dark: 'Escuro' };
+// Troca pelo header (#240): a escolha persiste pelo cookie, que o servidor lê. Com o sistema
+// claro, Escuro faz o HTML do servidor já trazer a classe, e a recarga não pisca nem reclama na
+// hidratação, também nas outras telas; Sistema apaga o cookie e volta ao sistema. A troca na
+// hora, o item marcado, o teclado e o axe do menu ficam no teste de componente
+// (`ThemeSwitcher.browser.test.tsx`, #476).
 
 const themeButton = (page: Page) => page.getByRole('button', { name: /^Tema: / });
 
@@ -188,88 +188,32 @@ async function expectReloadIn(page: Page, scheme: Scheme): Promise<void> {
   expect(hydration).toEqual([]);
 }
 
-for (const scheme of SCHEMES) {
-  const chosen = opposite(scheme);
-
-  test(`com o sistema ${scheme}, escolher ${LABEL[chosen]} no header muda na hora e persiste`, async ({
-    page,
-    context,
-  }) => {
-    await page.emulateMedia({ colorScheme: scheme });
-    await asRole(page, 'editor');
-    await page.waitForLoadState('networkidle');
-    await expect(themeButton(page)).toHaveAccessibleName('Tema: Sistema');
-
-    await choose(page, LABEL[chosen]);
-    await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${chosen}\\b`));
-    await expect(page.locator('html')).not.toHaveClass(new RegExp(`\\b${scheme}\\b`));
-    expect(await darkUtilityDisplay(page)).toBe(EXPECTED_DISPLAY[chosen]);
-    expect(await themeCookieValue(context)).toBe(chosen);
-
-    // O atual é anunciado como marcado.
-    await themeButton(page).click();
-    await expect(page.getByRole('menuitemradio', { name: LABEL[chosen] })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
-    await expect(page.getByRole('menuitemradio', { name: 'Sistema' })).toHaveAttribute(
-      'aria-checked',
-      'false',
-    );
-    await page.keyboard.press('Escape');
-
-    // Persiste: o HTML do servidor já traz a classe, e a recarga não pisca.
-    const tag = await serverHtmlTag(page);
-    expect(tag).toMatch(new RegExp(`class="[^"]*\\b${chosen}\\b`));
-    await expectReloadIn(page, chosen);
-    await expect(themeButton(page)).toHaveAccessibleName(`Tema: ${LABEL[chosen]}`);
-
-    // Vale nas outras telas.
-    await page.goto('/sites/exemplo-a/conteudos');
-    await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${chosen}\\b`));
-    expect(await darkUtilityDisplay(page)).toBe(EXPECTED_DISPLAY[chosen]);
-  });
-}
-
-test('escolher Sistema no header apaga o cookie e volta à preferência do sistema', async ({
+test('a escolha no header persiste no servidor e na recarga; Sistema apaga o cookie', async ({
   page,
   context,
 }) => {
-  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.emulateMedia({ colorScheme: 'light' });
   await asRole(page, 'editor');
-  await setThemeCookie(context, 'light');
+  await page.waitForLoadState('networkidle');
+  await expect(themeButton(page)).toHaveAccessibleName('Tema: Sistema');
+
+  await choose(page, 'Escuro');
+  expect(await themeCookieValue(context)).toBe('dark');
+  expect(await serverHtmlTag(page)).toMatch(/class="[^"]*\bdark\b/);
+  await expectReloadIn(page, 'dark');
+  await expect(themeButton(page)).toHaveAccessibleName('Tema: Escuro');
+
+  // Vale nas outras telas.
+  await page.goto('/sites/exemplo-a/conteudos');
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+  expect(await darkUtilityDisplay(page)).toBe(EXPECTED_DISPLAY.dark);
+
   await page.goto('/sites');
   await page.waitForLoadState('networkidle');
-  await expect(page.locator('html')).toHaveClass(/\blight\b/);
-  await expect(themeButton(page)).toHaveAccessibleName('Tema: Claro');
-
   await choose(page, 'Sistema');
-  await expect(page.locator('html')).toHaveClass(/\bdark\b/);
-  await expect(page.locator('html')).not.toHaveClass(/\blight\b/);
+  await expect(page.locator('html')).toHaveClass(/\blight\b/);
   expect(await themeCookieValue(context)).toBeUndefined();
-
-  const tag = await serverHtmlTag(page);
-  expect(tag).not.toMatch(/\b(dark|light)\b/);
-  await expectReloadIn(page, 'dark');
+  expect(await serverHtmlTag(page)).not.toMatch(/\b(dark|light)\b/);
+  await expectReloadIn(page, 'light');
   await expect(themeButton(page)).toHaveAccessibleName('Tema: Sistema');
 });
-
-for (const colorScheme of SCHEMES) {
-  test(`o menu de tema aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await asRole(page, 'editor');
-    await page.waitForLoadState('networkidle');
-    await themeButton(page).click();
-    await expect(page.getByRole('menu')).toBeVisible();
-    // Depois da transição de abertura (opacidade), como no menu de perfil (#239).
-    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
-
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-      .include('.header')
-      .include('[role="menu"]')
-      .exclude('[data-floating-ui-focus-guard]')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
-  });
-}
