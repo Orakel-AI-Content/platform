@@ -16,9 +16,10 @@ if (process.env.E2E_DATABASE_URL) process.env.DATABASE_URL = process.env.E2E_DAT
 // Duas camadas (#474). Padrão: `telas`, contra o Next (`next start` no CI, `next dev` fora
 // dele), o Postgres da DATABASE_URL e um access-mock próprio, sem Caddy, S3, worker nem
 // build-runner; o globalSetup migra e semeia o banco. Os testes `@stack` precisam da pilha e
-// ficam de fora. Com E2E_STACK=1 (test:e2e, local:e2e:area e e2e.yml): a suíte inteira no
-// projeto `chromium`, contra o ambiente local (pnpm local:up && pnpm local:seed): Caddy +
-// access-mock + backoffice-web, com o certificado da CA interna do Caddy.
+// ficam de fora. Com E2E_STACK=1 (test:e2e, local:e2e:area e e2e.yml), contra o ambiente local
+// (pnpm local:up && pnpm local:seed): Caddy + access-mock + backoffice-web, com o certificado
+// da CA interna do Caddy. Ali, o projeto `stack` tem só os `@stack` e é o que o E2E completo
+// (e2e.yml) roda (#475); o `chromium`, a suíte inteira, fica para o local:e2e:area.
 // Sessões em paralelo dividem a máquina: 2 workers por padrão (E2E_WORKERS muda). Os testes
 // @perf semeiam 2.000 linhas e medem o tempo no navegador, que fora do CI depende da carga da
 // máquina: ficam no projeto `perf`, registrado só na pilha, com `CI` ou E2E_PERF=1 (#461). A
@@ -40,6 +41,7 @@ const stackLayer: PlaywrightTestConfig = {
   use: { baseURL: process.env.E2E_BASE_URL ?? 'https://admin.orakel.localhost' },
   projects: [
     { name: 'chromium', grepInvert: /@perf/, use: chromium },
+    { name: 'stack', grep: /@stack/, use: chromium },
     ...(runPerf ? [{ name: 'perf', grep: /@perf/, use: chromium }] : []),
   ],
 };

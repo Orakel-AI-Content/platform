@@ -158,7 +158,8 @@ jobs:
 
   # Camada `telas` do E2E do Backoffice (#474): `next start`, o Postgres de serviço e o
   # access-mock como processo (webServer do playwright.config.ts), sem Docker nem imagem. Os
-  # testes `@stack` precisam da pilha e ficam no e2e.yml. Sem S3: o endpoint não responde.
+  # testes `@stack` precisam da pilha e ficam no E2E completo (e2e.yml, fora do PR, #475): na
+  # main, no noturno e no PR com o label `e2e:completo`. Sem S3: o endpoint não responde.
   e2e-telas:
     name: E2E de telas do Backoffice
     needs: changes
