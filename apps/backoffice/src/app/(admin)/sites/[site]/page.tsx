@@ -1,4 +1,5 @@
 import { LifecycleSteps } from '@/components/sites/LifecycleSteps';
+import { RedirectUsageAlert } from '@/components/sites/RedirectUsageAlert';
 import {
   BuildWindowForm,
   LifecycleAction,
@@ -12,6 +13,7 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
+import { redirectUsageFor } from '@/domain/sites/sites.ts';
 import { DetailLayout } from '@/components/shared/DetailLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SECTION_HINT_CLASS } from '@/components/shared/sectionText.ts';
@@ -31,7 +33,8 @@ export const dynamic = 'force-dynamic';
  * Página do site na tela de detalhe do guia (#370): o resumo à esquerda (dados de publicação e
  * "Publicar agora", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1 e
  * Janela de agrupamento (empilham abaixo de `xl`). Lê o site pelo sitePageContext (a mesma
- * busca do layout) e os gatilhos; as ações do ciclo, do G1 e da janela e "Editar configuração"
+ * busca do layout), os gatilhos e o uso de redirects, que vira um aviso acima do resumo quando
+ * o core marca `alert` (#487); as ações do ciclo, do G1 e da janela e "Editar configuração"
  * só aparecem com site.configure, e o domínio confere de novo.
  */
 export default async function SitePage({ params }: { params: Promise<{ site: string }> }) {
@@ -41,6 +44,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const { actor, db, site } = context.value;
   const triggers = await listPolicyTriggers(db, actor, siteId);
   const g1 = triggers.ok ? triggers.value.find((record) => record.trigger === 'G1') : undefined;
+  const redirects = await redirectUsageFor(db, actor, siteId);
   const canConfigure = can(actor, 'site.configure');
   const canPublish = can(actor, 'operations.run') && site.state !== 'pausado';
 
@@ -91,6 +95,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
           ) : undefined
         }
       />
+      {redirects.ok && redirects.value.alert && <RedirectUsageAlert usage={redirects.value} />}
       <DetailLayout>
         <SiteSummaryCard
           site={site}
