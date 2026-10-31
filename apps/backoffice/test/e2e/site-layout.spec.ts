@@ -1,18 +1,17 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { asRole } from './auth.ts';
 
 // Layout do site (#78, workspace#32) contra o ambiente local: título da aba com a área e o
 // site, "não encontrado" de site e de item com o link certo e status 404, o carregamento
-// entre áreas do mesmo site com o cabeçalho visível, a barra lateral de áreas (#171) e o
-// seletor de site no topo dela (#172).
+// entre áreas do mesmo site com o cabeçalho visível, as áreas da barra lateral (#171) pelo
+// papel, os sites do seletor (#172) e a trilha. A área atual, a barra e o seletor pelo teclado,
+// a troca de site, a barra recolhida entre áreas e o Drawer a 375 px ficam em
+// `CollapsibleSide.browser.test.tsx` (#460, #476).
 
 const OPERATOR = 'operacao@orakel.local';
 const SITE = 'exemplo-a';
 const SITE_NAME = 'Exemplo A — Guias';
-
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
 const AREAS = ['Visão geral', 'Conteúdos', 'Revisão', 'Mídia', 'Autores', 'Taxonomias', 'Menus'];
 
@@ -108,59 +107,7 @@ test('com content.write, a barra também tem Textos institucionais', async ({ pa
   ).toHaveText([...AREAS, 'Textos institucionais']);
 });
 
-test('a área atual tem aria-current, também em telas de item, criar e editar', async ({ page }) => {
-  await asRole(page, 'editor');
-  const bar = page.getByRole('navigation', { name: 'Áreas do site' });
-  const current = bar.locator('[aria-current="page"]');
-
-  for (const [path, area] of [
-    ['', 'Visão geral'],
-    ['/autores', 'Autores'],
-    ['/autores/novo', 'Autores'],
-    ['/conteudos/novo', 'Conteúdos'],
-    ['/revisao', 'Revisão'],
-    ['/configuracao', 'Visão geral'],
-  ] as const) {
-    await page.goto(`/sites/${SITE}${path}`);
-    await expect(current).toHaveCount(1);
-    await expect(current).toHaveText(area);
-  }
-});
-
-test('a barra é navegável só com teclado', async ({ page }) => {
-  await asRole(page, 'operacao');
-  await page.goto(`/sites/${SITE}`);
-  const taxonomies = page
-    .getByRole('navigation', { name: 'Áreas do site' })
-    .getByRole('link', { name: 'Taxonomias' });
-
-  for (let step = 0; step < 40; step += 1) {
-    if (await taxonomies.evaluate((element) => element === document.activeElement)) break;
-    await page.keyboard.press('Tab');
-  }
-  await expect(taxonomies).toBeFocused();
-  await page.keyboard.press('Enter');
-
-  await expect(page).toHaveURL(new RegExp(`/sites/${SITE}/taxonomias$`));
-  await expect(taxonomies).toHaveAttribute('aria-current', 'page');
-});
-
 const switcher = (page: Page) => page.getByRole('button', { name: `${SITE_NAME}, trocar de site` });
-const OTHER_SITE = 'Exemplo B — Receitas';
-
-test('o seletor troca de site em 2 cliques, na mesma área; item leva à lista', async ({ page }) => {
-  await asRole(page, 'editor');
-
-  await page.goto(`/sites/${SITE}/midia`);
-  await switcher(page).click();
-  await page.getByRole('menu').getByRole('menuitem', { name: OTHER_SITE }).click();
-  await expect(page).toHaveURL(/\/sites\/exemplo-b\/midia$/);
-
-  await page.goto(`/sites/${SITE}/autores/novo`);
-  await switcher(page).click();
-  await page.getByRole('menu').getByRole('menuitem', { name: OTHER_SITE }).click();
-  await expect(page).toHaveURL(/\/sites\/exemplo-b\/autores$/);
-});
 
 test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page }) => {
   await asRole(page, 'editor');
@@ -189,65 +136,6 @@ test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page
     )
     .toBe(true);
   await expect(menu.locator('[aria-current="true"]')).toHaveText(SITE_NAME);
-});
-
-test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao botão', async ({
-  page,
-}) => {
-  await asRole(page, 'operacao');
-  await page.goto(`/sites/${SITE}/taxonomias`);
-  await page.waitForLoadState('networkidle');
-  const button = switcher(page);
-  const menu = page.getByRole('menu');
-
-  for (let step = 0; step < 40; step += 1) {
-    if (await button.evaluate((element) => element === document.activeElement)) break;
-    await page.keyboard.press('Tab');
-  }
-  await expect(button).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(menu).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(menu).toHaveCount(0);
-  await expect(button).toBeFocused();
-
-  await page.keyboard.press('Enter');
-  await expect(menu).toBeVisible();
-  const other = menu.getByRole('menuitem', { name: OTHER_SITE });
-  // Uma seta por site do menu, no máximo: com outros arquivos do E2E cadastrando sites em
-  // paralelo, a lista pode ter mais de 20, e o Enter só vale com o foco no item certo.
-  const items = await menu.getByRole('menuitem').count();
-  for (let step = 0; step <= items; step += 1) {
-    if (await other.evaluate((element) => element === document.activeElement)) break;
-    await page.keyboard.press('ArrowDown');
-  }
-  await expect(other).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/sites\/exemplo-b\/taxonomias$/);
-});
-
-test(`o seletor aberto sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await asRole(page, 'editor');
-  await page.goto(`/sites/${SITE}/autores`);
-  await page.waitForLoadState('networkidle');
-  // Pelo teclado, como na vitrine do Dropdown: o primeiro item recebe o foco (`tabindex=0`).
-  // Com mais sites do que cabem (outros arquivos do E2E cadastram em paralelo), o <ul> rola,
-  // e o `scrollable-region-focusable` do axe pede um item focável dentro dele.
-  await switcher(page).focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('menu').getByRole('menuitem').first()).toBeFocused();
-  // A transição de abertura (200 ms, no <ul>) mistura a cor do texto com o fundo enquanto a
-  // opacidade sobe; o axe roda depois dela.
-  await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
-
-  const accessibility = await new AxeBuilder({ page })
-    .withTags(WCAG)
-    .include('.side-nav')
-    .include('[role="menu"]')
-    .exclude('[data-floating-ui-focus-guard]')
-    .analyze();
-  expect(accessibility.violations).toEqual([]);
 });
 
 test('trilha nas telas de item: Sites › Site › Área › Item, sem link de volta solto', async ({
@@ -309,77 +197,4 @@ test('trilha nas telas de item: Sites › Site › Área › Item, sem link de v
 
   await page.goto(`${versionsPath}/versoes/1`);
   await expectTrail(['Sites', SITE_NAME, 'Conteúdos', title, 'Versão 1']);
-});
-
-// Recolher a barra (#238): o estado vale entre navegações pelo cliente e volta expandido ao
-// recarregar, o que depende do layout persistente do Next. O toggle, a barra recolhida (ícones,
-// dicas, seletor nas iniciais) e o axe nos dois temas ficam no teste de componente
-// (`CollapsibleSide.browser.test.tsx`, #460).
-
-const sideNavToggle = (page: Page) => page.getByRole('button', { name: 'Navegação lateral' });
-const sideNavWidth = (page: Page) =>
-  page.locator('#barra-lateral').evaluate((element) => element.getBoundingClientRect().width);
-
-test('recolhida, a barra continua assim entre áreas e volta expandida ao recarregar', async ({
-  page,
-}) => {
-  await asRole(page, 'operacao');
-  await page.goto(`/sites/${SITE}`);
-  await page.waitForLoadState('networkidle');
-  await sideNavToggle(page).click();
-  await expect.poll(() => sideNavWidth(page)).toBe(80);
-
-  await page
-    .getByRole('navigation', { name: 'Áreas do site' })
-    .getByRole('link', { name: 'Mídia' })
-    .click();
-  await expect(page).toHaveURL(new RegExp(`/sites/${SITE}/midia$`));
-  await expect(sideNavToggle(page)).toHaveAttribute('aria-expanded', 'false');
-  expect(await sideNavWidth(page)).toBe(80);
-
-  await page.reload();
-  await expect(sideNavToggle(page)).toHaveAttribute('aria-expanded', 'true');
-  expect(await sideNavWidth(page)).toBe(290);
-});
-
-// Navegação do celular (#242): uma área ou a troca de site no Drawer navegam e o fecham, o que
-// depende do roteador do Next. O Drawer em si (conteúdo, foco preso, Esc, axe) e a troca entre a
-// barra fixa e o botão por largura ficam em `CollapsibleSide.browser.test.tsx` (#460).
-
-const mobileToggle = (page: Page) => page.getByRole('button', { name: 'Menu de navegação' });
-const drawer = (page: Page) => page.getByRole('dialog', { name: 'Navegação' });
-
-test.describe('a 375px', () => {
-  test.use({ viewport: { width: 375, height: 812 } });
-
-  test('clicar numa área navega e fecha o Drawer', async ({ page }) => {
-    await asRole(page, 'operacao');
-    await page.goto(`/sites/${SITE}`);
-
-    await mobileToggle(page).click();
-    await drawer(page)
-      .getByRole('navigation', { name: 'Áreas do site' })
-      .getByRole('link', { name: 'Mídia' })
-      .click();
-
-    await expect(page).toHaveURL(new RegExp(`/sites/${SITE}/midia$`));
-    await expect(drawer(page)).toHaveCount(0);
-  });
-
-  test('trocar de site pelo seletor no Drawer leva à mesma área e fecha o Drawer', async ({
-    page,
-  }) => {
-    await asRole(page, 'editor');
-    await page.goto(`/sites/${SITE}/autores`);
-    await page.waitForLoadState('networkidle');
-
-    await mobileToggle(page).click();
-    await drawer(page)
-      .getByRole('button', { name: `${SITE_NAME}, trocar de site` })
-      .click();
-    await page.getByRole('menu').getByRole('menuitem', { name: OTHER_SITE }).click();
-
-    await expect(page).toHaveURL(/\/sites\/exemplo-b\/autores$/);
-    await expect(drawer(page)).toHaveCount(0);
-  });
 });

@@ -24,6 +24,24 @@ export const navigation = {
   search: () => url.split('?')[1] ?? '',
 };
 
+/**
+ * Links internos pelo roteador em memória (#476): sem o app router do Next, o `next/link` não
+ * navega, e o <a> levaria a página de teste embora. O clique num link do app (também o
+ * `click()` que o Enter e o Espaço disparam num item de menu em link) vira `navigation.set`; o
+ * `next/link` vê o `defaultPrevented` e não faz nada. Devolve a função que desliga.
+ */
+export function followLinks(): () => void {
+  const follow = (event: MouseEvent) => {
+    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    const href = link?.getAttribute('href');
+    if (!href?.startsWith('/')) return;
+    event.preventDefault();
+    navigation.set(href);
+  };
+  document.addEventListener('click', follow, true);
+  return () => document.removeEventListener('click', follow, true);
+}
+
 export function usePathname(): string {
   return useSyncExternalStore(subscribe, () => url.split('?')[0]!);
 }

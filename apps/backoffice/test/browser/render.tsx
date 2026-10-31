@@ -6,6 +6,8 @@ import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { ListHeader } from '@/components/shared/PageHeader';
 import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
 import type { SwitcherSite } from '@/components/template/SiteSwitcher';
+import ThemeSwitcher from '@/components/template/ThemeSwitcher';
+import UserProfileDropdown from '@/components/template/UserProfileDropdown';
 import { ModalAppElement } from '@/components/ui/ModalAppElement';
 import { MotionProvider } from '@/components/ui/MotionProvider';
 import { ToastProvider } from '@/components/ui/toast';
@@ -41,13 +43,17 @@ export const FRAME_SITES: readonly SwitcherSite[] = [
   { id: 'exemplo-b', name: 'Exemplo B — Receitas' },
 ];
 
+/** Quem vê a moldura: o e-mail e os papéis do menu de perfil. */
+export const FRAME_EMAIL = 'teste@orakel.local';
+
 type FrameOptions = { sites?: readonly SwitcherSite[]; roles?: readonly Role[] };
 
 /**
- * Render na moldura do admin (`src/app/(admin)/layout.tsx`, #460): a barra lateral do Ecme
- * (290 px), o header e o <main> com os gutters da página, como `renderInApp`. A largura útil é
- * a da tela de verdade, e as medidas de layout (linhas por célula, rolagem) valem para ela. Quem
- * usa precisa do roteador em memória (`vi.mock('next/navigation', …)`).
+ * Render na moldura do admin (`src/app/(admin)/layout.tsx`, #460): o "Pular para o conteúdo",
+ * a barra lateral do Ecme (290 px), o header com a troca de tema e o menu de perfil (#476) e o
+ * <main> com os gutters da página, como `renderInApp`. A largura útil é a da tela de verdade, e
+ * as medidas de layout (linhas por célula, rolagem) valem para ela. Quem usa precisa do
+ * roteador em memória (`vi.mock('next/navigation', …)`).
  */
 export function renderInFrame(
   ui: ReactNode,
@@ -55,10 +61,21 @@ export function renderInFrame(
 ) {
   return renderInApp(
     <div className="min-h-screen">
+      <a
+        href="#conteudo"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-neutral focus:px-3 focus:py-2 focus:text-sm dark:focus:bg-gray-950"
+      >
+        Pular para o conteúdo
+      </a>
       <CollapsibleSide
-        navigationTree={filterNavigation(navigationConfig, { email: 'teste', roles })}
+        navigationTree={filterNavigation(navigationConfig, { email: FRAME_EMAIL, roles })}
         sites={sites}
-        headerEnd={<span className="text-sm">teste@orakel.local</span>}
+        headerEnd={
+          <>
+            <ThemeSwitcher initialMode={undefined} />
+            <UserProfileDropdown email={FRAME_EMAIL} roles={roles} />
+          </>
+        }
       >
         <main
           id="conteudo"
