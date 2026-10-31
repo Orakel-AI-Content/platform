@@ -114,8 +114,8 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
 - **Foco:** uma regra global `:focus-visible` (`@layer base` do `globals.css`) desenha o
   contorno `ring` de 2px, afastado 2px, em todo elemento focável: links, botões, campos e o
   editor de rich text. Componentes não repetem classes de foco (`focus-visible:outline-*`);
-  uma tela só sobrescreve o contorno por motivo explícito. O E2E `focus.spec.ts` confere o
-  contorno navegando com `Tab`.
+  uma tela só sobrescreve o contorno por motivo explícito. O teste de componente
+  `src/app/(admin)/layout.browser.test.tsx` confere o contorno navegando com `Tab`, nos dois temas.
 
 ## Moldura
 

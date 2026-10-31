@@ -66,6 +66,12 @@ na `DATABASE_URL` (ou `E2E_DATABASE_URL`). Precisa só do Chromium do Playwright
   `pnpm local:e2e:area <arquivo sem .spec.ts>` (ou `smoke`), na raiz. Jornada principal de uma
   área nova leva `{ tag: '@smoke' }`. Localmente, nenhum spec semeia lista com mais de 100 itens: o
   que precisa de uma lista com mais de uma página usa um site pequeno (`test/volume.ts`).
+- **Axe e interação no E2E** (#476): cada tela tem um teste de axe, que passa pelos estados
+  abertos (diálogo, menu, seletor) com `expectNoViolations(page)` de `test/e2e/axe.ts`, nos dois
+  temas numa chamada. Teclado, foco, menus, Drawer e o tema escolhido no menu ficam nos testes de
+  componente; para um link navegar no roteador em memória, `followLinks()`
+  (`test/browser/navigation.ts`). No E2E fica o que depende do servidor ou do roteador do Next:
+  rotas, RBAC, gravação, estado na URL, HTML do servidor e a primeira pintura do tema.
 - **Projeto `perf`** (`playwright.config.ts`, #461): o teste que semeia 2.000 linhas e mede
   tempo no navegador leva `{ tag: '@perf' }`, um por bloco ("abre e busca em menos de 2 s"). O
   `telas` e o `chromium` excluem `@perf`; o `perf` só tem `@perf` e só existe na pilha, com `CI`
