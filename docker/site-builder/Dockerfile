@@ -28,8 +28,10 @@ COPY --from=prune /app/out/json/ .
 # (esbuild, workerd, pagefind) vêm dos pacotes opcionais da plataforma.
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=prune /app/out/full/ .
-# Testes do build-site, tokens compilados (dist/) e o servidor da visualização.
-RUN pnpm turbo run lint typecheck test --filter=@orakel/build-site \
+# Testes do build-site, tokens compilados (dist/) e o servidor da visualização. CHECKS=false
+# pula o lint, os tipos e os testes (o E2E do CI, que já os tem no job quality).
+ARG CHECKS=true
+RUN if [ "$CHECKS" = true ]; then pnpm turbo run lint typecheck test --filter=@orakel/build-site; fi \
  && pnpm turbo run build --filter=@orakel/tokens \
  && cd apps/blog && BLOG_OUTPUT=preview node node_modules/astro/bin/astro.mjs build
 

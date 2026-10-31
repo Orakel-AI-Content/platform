@@ -21,7 +21,9 @@ FROM base AS build
 COPY --from=prune /app/out/json/ .
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY --from=prune /app/out/full/ .
-RUN pnpm turbo run lint typecheck test --filter=@orakel/edge-local
+# CHECKS=false pula o lint, os tipos e os testes (o E2E do CI, que já os tem no job quality).
+ARG CHECKS=true
+RUN if [ "$CHECKS" = true ]; then pnpm turbo run lint typecheck test --filter=@orakel/edge-local; fi
 
 FROM base AS runtime
 ENV NODE_ENV=production WRANGLER_SEND_METRICS=false EDGE_LOCAL_DATA=/data
