@@ -9,6 +9,9 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
 | `test:contract` | `vitest.contract.config.ts` | `DATABASE_URL` (Postgres limpo)    |
 | `test:e2e`      | `playwright.config.ts`      | `pnpm local:up && pnpm local:seed` |
 
+E2E de telas (#474): `pnpm exec playwright test --project=telas`, nesta pasta, com um Postgres
+na `DATABASE_URL` (ou `E2E_DATABASE_URL`). Precisa só do Chromium do Playwright.
+
 - **Unitários** ao lado do código; o domínio é testado sem banco quando a regra é pura
   (RBAC, mapeamentos) e pela suíte de contrato quando depende de transação.
 - **Componente em Chromium** (`src/**/*.browser.test.tsx`, ao lado do componente; #457): teclado,
@@ -44,8 +47,18 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
   `Seq Scan` é o plano certo (lê a tabela inteira) e não diria nada: por isso os vizinhos. A
   busca sem acento e o filtro das listas no cliente têm o caso de 2.000 itens no unitário de
   `useListState`.
-- **E2E** (`test/e2e/`): login pelo access-mock, telas de sites e o editor de conteúdo, e axe
-  (WCAG 2.2 AA). Por padrão, rodam contra a imagem `backoffice:local` do compose. Numa sessão,
+- **E2E** (`test/e2e/`): telas de sites, o editor de conteúdo e axe (WCAG 2.2 AA), em duas
+  camadas (#474). O padrão do `playwright.config.ts` é o projeto `telas`: o próprio Playwright
+  sobe o Next (`next start` com `CI`, `next dev` fora dele, porta `E2E_TELAS_PORT`, 3100 por
+  padrão) e um access-mock (`E2E_ACCESS_PORT`, 8790). O `globalSetup` migra o banco e semeia os
+  usuários de teste e `exemplo-a`/`exemplo-b`. Não há Caddy, S3, worker nem build-runner; no CI,
+  é o job `e2e-telas` do `ci.yml`. O teste que só a pilha prova (sessão do Access pelo Caddy,
+  S3 e worker, build, pré-visualização) leva `{ tag: '@stack' }` e fica fora do `telas`. Com
+  `E2E_STACK=1` (o `test:e2e` e o `local:e2e:area` já passam), a suíte inteira roda no projeto
+  `chromium`, contra a pilha: por padrão, a imagem `backoffice:local` do compose. A sessão vem
+  de `asRole(page, papel)` (`test/e2e/auth.ts`): o JWT da rota de token do access-mock, no
+  header `cf-access-jwt-assertion` e no cookie `CF_Authorization`, valendo para as duas
+  camadas. Login pela tela do mock só nos testes da sessão do Access. Numa sessão,
   rode contra o par isolado do worktree (`pnpm local:isolated up <id>`, na raiz): ele imprime
   `E2E_BASE_URL` e `E2E_DATABASE_URL`, e o `playwright.config.ts` usa esse banco no lugar da
   `DATABASE_URL` nos specs e na limpeza. O par não tem worker nem build-runner: o que depende de
@@ -55,10 +68,11 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
   que precisa de uma lista com mais de uma página usa um site pequeno (`test/volume.ts`).
 - **Projeto `perf`** (`playwright.config.ts`, #461): o teste que semeia 2.000 linhas e mede
   tempo no navegador leva `{ tag: '@perf' }`, um por bloco ("abre e busca em menos de 2 s"). O
-  projeto padrão (`chromium`) exclui `@perf`; o `perf` só tem `@perf` e só existe com `CI`
+  `telas` e o `chromium` excluem `@perf`; o `perf` só tem `@perf` e só existe na pilha, com `CI`
   (o `e2e.yml`) ou `E2E_PERF=1`, porque fora do CI o tempo depende da carga da máquina, não do
   código. O `local:e2e:area` passa arquivos ao Playwright e não pega o `perf`. Conferir:
-  `pnpm exec playwright test --list` não lista `@perf`; com `CI=1`, lista os do `[perf]`.
+  `E2E_STACK=1 pnpm exec playwright test --list` não lista `@perf`; com `CI=1`, lista os do
+  `[perf]`.
 - **Sites do E2E**: quem cadastra site (`e2e-<timestamp>`) registra o ID e o remove do banco
   no `afterAll` com `removeSites` (`test/e2e/cleanup.ts`), junto com o build agendado.
 
