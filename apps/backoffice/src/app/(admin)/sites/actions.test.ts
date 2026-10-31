@@ -6,6 +6,7 @@ import {
   createSiteAction,
   registerG1Action,
   setBuildWindowAction,
+  setDailyPublishLimitAction,
   updateSiteConfigAction,
 } from './actions.ts';
 
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   advanceLifecycle: vi.fn(),
   setBuildWindow: vi.fn(),
+  setDailyPublishLimit: vi.fn(),
   registerPolicyTrigger: vi.fn(),
 }));
 
@@ -31,6 +33,7 @@ vi.mock('@/domain/builds/builds.ts', () => ({ requestBuildNow: vi.fn() }));
 vi.mock('@/domain/builds/site-state.ts', () => ({
   advanceLifecycle: mocks.advanceLifecycle,
   setBuildWindow: mocks.setBuildWindow,
+  setDailyPublishLimit: mocks.setDailyPublishLimit,
 }));
 vi.mock('@/domain/sites/policy-triggers.ts', () => ({
   registerPolicyTrigger: mocks.registerPolicyTrigger,
@@ -118,6 +121,10 @@ describe('Server Actions da página do site', () => {
     expect(mocks.advanceLifecycle).not.toHaveBeenCalled();
     expect(mocks.registerPolicyTrigger).not.toHaveBeenCalled();
     expect(mocks.setBuildWindow).not.toHaveBeenCalled();
+    expect(await setDailyPublishLimitAction('exemplo-a', { dailyPublishLimit: 5 })).toMatchObject({
+      ok: false,
+    });
+    expect(mocks.setDailyPublishLimit).not.toHaveBeenCalled();
   });
 
   it('a recusa do domínio vira a mensagem, sem revalidar', async () => {
@@ -145,6 +152,7 @@ describe('Server Actions da página do site', () => {
     mocks.advanceLifecycle.mockResolvedValue(done);
     mocks.registerPolicyTrigger.mockResolvedValue(done);
     mocks.setBuildWindow.mockResolvedValue(done);
+    mocks.setDailyPublishLimit.mockResolvedValue(done);
 
     expect(await advanceLifecycleAction('exemplo-a', 'infra_aplicada')).toEqual({
       ok: true,
@@ -188,6 +196,17 @@ describe('Server Actions da página do site', () => {
     });
     expect(mocks.setBuildWindow).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a', null);
 
+    expect(await setDailyPublishLimitAction('exemplo-a', { dailyPublishLimit: 5 })).toEqual({
+      ok: true,
+      message: 'Limite de 5 por dia salvo.',
+    });
+    expect(mocks.setDailyPublishLimit).toHaveBeenCalledWith({}, operacao, 'exemplo-a', 5);
+    expect(await setDailyPublishLimitAction('exemplo-a', null)).toEqual({
+      ok: true,
+      message: 'Limite padrão restaurado.',
+    });
+    expect(mocks.setDailyPublishLimit).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a', null);
+
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });
@@ -206,6 +225,21 @@ describe('Server Actions da página do site', () => {
       });
     }
     expect(mocks.setBuildWindow).not.toHaveBeenCalled();
+    for (const dailyPublishLimit of [0, -1, 1.5, 'x']) {
+      expect(await setDailyPublishLimitAction('exemplo-a', { dailyPublishLimit } as never)).toEqual(
+        {
+          ok: false,
+          message: 'Não foi possível concluir.',
+          issues: [
+            {
+              path: ['dailyPublishLimit'],
+              message: 'Informe um número inteiro de publicações, 1 ou mais.',
+            },
+          ],
+        },
+      );
+    }
+    expect(mocks.setDailyPublishLimit).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 

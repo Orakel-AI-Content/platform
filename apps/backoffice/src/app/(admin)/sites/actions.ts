@@ -10,8 +10,10 @@ import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteFormResult } from '@/components/sites/siteConfigFormValues.ts';
 import {
   BuildWindowSchema,
+  DailyPublishLimitSchema,
   RegisterG1Schema,
   type BuildWindowValue,
+  type DailyPublishLimitValue,
   type RegisterG1Value,
 } from '@/components/sites/siteOperationForms.ts';
 import { getDb, type Executor } from '@/db/client.ts';
@@ -20,6 +22,7 @@ import { requestBuildNow } from '@/domain/builds/builds.ts';
 import {
   advanceLifecycle,
   setBuildWindow,
+  setDailyPublishLimit,
   type ManualLifecycleStep,
 } from '@/domain/builds/site-state.ts';
 import { registerPolicyTrigger } from '@/domain/sites/policy-triggers.ts';
@@ -182,5 +185,22 @@ export async function setBuildWindowAction(
       window === null
         ? 'Janela padrão restaurada.'
         : `Janela de ${window.buildWindowSeconds} s salva.`,
+  );
+}
+
+/** Limite diário de publicações do site; `null` ("Usar padrão") volta ao padrão (#490). */
+export async function setDailyPublishLimitAction(
+  siteId: string,
+  value: DailyPublishLimitValue | null,
+): Promise<SiteFormResult> {
+  return siteFormOperation(
+    siteId,
+    DailyPublishLimitSchema.nullable(),
+    value,
+    (tx, actor, limit) => setDailyPublishLimit(tx, actor, siteId, limit?.dailyPublishLimit ?? null),
+    (limit) =>
+      limit === null
+        ? 'Limite padrão restaurado.'
+        : `Limite de ${limit.dailyPublishLimit} por dia salvo.`,
   );
 }
