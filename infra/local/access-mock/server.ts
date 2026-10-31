@@ -7,6 +7,8 @@
 //   GET /cdn-cgi/access/logout     apaga o cookie
 //   GET /cdn-cgi/access/authorize  forward_auth do Caddy: 200 + Cf-Access-Jwt-Assertion, ou
 //                                  302 para o login
+//   GET /cdn-cgi/access/token      só para o E2E: o JWT de um usuário de teste (?email=), sem
+//                                  passar pelo login (fixture asRole do backoffice)
 //
 // Só para desenvolvimento: nunca suba em produção.
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -127,6 +129,14 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
         location: safeRedirect(url.searchParams.get('redirect_url')),
         'set-cookie': `${COOKIE}=${issueToken(email)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${TTL_SECONDS}`,
       });
+    }
+
+    case '/cdn-cgi/access/token': {
+      const email = url.searchParams.get('email');
+      if (!USERS.some((user) => user.email === email) || email === null) {
+        return send(res, 400, 'Usuário de teste desconhecido');
+      }
+      return send(res, 200, issueToken(email), { 'content-type': 'text/plain; charset=utf-8' });
     }
 
     case '/cdn-cgi/access/logout':
