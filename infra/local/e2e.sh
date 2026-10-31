@@ -6,6 +6,7 @@
 # os @stack, no E2E completo (e2e.yml).
 set -eu
 cd "$(dirname "$0")/../.."
+. infra/local/lib.sh
 
 usage="uso: pnpm local:e2e:area <área>[,<área>…] | smoke [argumentos do playwright]"
 areas="${1:?$usage}"
@@ -14,52 +15,13 @@ shift
 if [ "$areas" = smoke ]; then
   set -- --grep @smoke "$@"
 else
-  files=""
-  for area in $(printf '%s' "$areas" | tr ',' ' '); do
-    case "$area" in
-      *[!abcdefghijklmnopqrstuvwxyz0123456789-]* | -*) echo "área inválida: $area" >&2; exit 2 ;;
-    esac
-    [ -f "apps/backoffice/test/e2e/$area.spec.ts" ] || {
-      echo "Sem apps/backoffice/test/e2e/$area.spec.ts. Áreas:" >&2
-      ls apps/backoffice/test/e2e | sed -n 's/\.spec\.ts$//p' | sed 's/^/  /' >&2
-      exit 2
-    }
-    files="$files test/e2e/$area.spec.ts"
-  done
-  # shellcheck disable=SC2086 # um caminho por área, sem espaços (validados acima)
+  files="$(e2e_area_files "$areas")"
+  # shellcheck disable=SC2086 # um caminho por área, sem espaços (validados no e2e_area_files)
   set -- $files "$@"
 fi
 
-# Vagas: um diretório por sessão (mkdir é atômico), com o PID de quem o ocupa; vaga de um
-# processo que já morreu é liberada.
-lock_root="${TMPDIR:-/tmp}/orakel-e2e"
-slots="${E2E_SLOTS:-2}"
-mkdir -p "$lock_root"
-slot=""
-waited=0
-while [ -z "$slot" ]; do
-  i=1
-  while [ "$i" -le "$slots" ]; do
-    dir="$lock_root/slot-$i"
-    if mkdir "$dir" 2>/dev/null; then
-      echo $$ >"$dir/pid"
-      slot="$dir"
-      break
-    fi
-    owner="$(cat "$dir/pid" 2>/dev/null || true)"
-    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
-      rm -rf "$dir"
-      continue
-    fi
-    i=$((i + 1))
-  done
-  if [ -z "$slot" ]; then
-    [ "$waited" -gt 0 ] || echo "As $slots vagas do E2E estão ocupadas; esperando…" >&2
-    waited=$((waited + 1))
-    sleep 5
-  fi
-done
-trap 'rm -rf "$slot"' EXIT
+take_e2e_slot
+trap 'rm -rf "$e2e_slot_dir"' EXIT
 trap 'exit 130' INT TERM
 
 # Contra a pilha local (E2E_STACK=1): a camada `telas`, sem Docker, é o padrão do config. Na

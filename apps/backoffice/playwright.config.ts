@@ -9,8 +9,9 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 // @next/env é CommonJS: fora do Next, só o import padrão funciona.
 nextEnv.loadEnvConfig(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'));
 
-// Banco do par isolado (pnpm local:isolated): os specs e a limpeza abrem o banco pela
-// DATABASE_URL do env.ts do app. O config roda no processo principal e em cada worker.
+// Banco da sessão (pnpm local:e2e:telas, ou o par legado do pnpm local:isolated): os specs, a
+// limpeza e o globalSetup abrem o banco pela DATABASE_URL do env.ts do app. O config roda no
+// processo principal e em cada worker.
 if (process.env.E2E_DATABASE_URL) process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
 
 // Duas camadas (#474). Padrão: `telas`, contra o Next (`next start` no CI, `next dev` fora

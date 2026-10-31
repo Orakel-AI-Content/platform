@@ -221,7 +221,7 @@ decisions:
   # Bloco 6 – Qualidade
   quality.tests:
     {
-      value: 'Vitest (config comum em @orakel/vitest-config); Playwright para E2E e axe; E2E em camadas — componente, E2E da área no local, suíte completa no CI a cada PR do Backoffice (ADR 0016); cobertura 90% linhas/branches em content-model, core e events, sem meta nos demais',
+      value: 'Vitest (config comum em @orakel/vitest-config); Playwright para E2E e axe; E2E em três camadas — componente (Vitest Browser Mode), telas (Next + Postgres + access-mock, sem Docker: job e2e-telas em todo PR e local:e2e:telas opcional no local) e pilha completa fora do PR (ADR 0017, que substitui o item 3 do 0016); definição de pronto: lint, typecheck, test, test:browser e, se tocar o domínio, test:contract; cobertura 90% linhas/branches em content-model, core e events, sem meta nos demais',
       source: user,
       input_ref: 'Testes',
     }
@@ -302,7 +302,7 @@ decisions:
     }
   ops.ci:
     {
-      value: 'GitHub Actions sem segredos: ci.yml (filtros de caminho, turbo --affected, fixtures NDJSON para os sites de exemplo), images.yml (bake → GHCR, tag = SHA, mantém 30 versões), release.yml (tag core-v*), e2e.yml (suíte completa em todo PR do Backoffice, 2 shards; ADR 0016)',
+      value: 'GitHub Actions sem segredos: ci.yml (filtros de caminho, turbo --affected, fixtures NDJSON para os sites de exemplo), images.yml (bake → GHCR, tag = SHA, mantém 30 versões), release.yml (tag core-v*), e2e.yml (pilha completa: push na main, noturno, label e2e:completo e manual; ADR 0017)',
       source: input,
       input_ref: 'CI',
     }
@@ -395,6 +395,7 @@ commands:
   local_load: pnpm local:load [<site>]
   local_trust: pnpm local:trust
   local_e2e: pnpm local:e2e
+  local_e2e_telas: pnpm local:e2e:telas <área>
 
 structure:
   tree: |

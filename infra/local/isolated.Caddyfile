@@ -1,3 +1,4 @@
+# Legado (ADR 0017): sai com o pnpm local:isolated.
 # Caddy do par isolado (pnpm local:isolated): só o admin.orakel.localhost, na porta da sessão,
 # para o backoffice da sessão, que roda no host (BACKOFFICE_UPSTREAM em host.docker.internal).
 # Mesmo login de teste do Caddyfile compartilhado (access-mock e
