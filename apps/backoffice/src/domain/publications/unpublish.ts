@@ -1,9 +1,10 @@
-import type { Result } from '@orakel/content-model';
+import type { Issue, Result } from '@orakel/content-model';
 import { and, eq } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { contents, contentVersions } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
+import { declareMassUnpublish } from '../builds/site-state.ts';
 import { liveVersion } from '../content/contents.ts';
 import { createRedirect } from '../content/redirects.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
@@ -84,4 +85,57 @@ export async function unpublishContent(
     value:
       redirectId === undefined ? { version: live.version } : { version: live.version, redirectId },
   };
+}
+
+/** Interrompe o savepoint do lote quando um conteúdo é recusado. */
+class BatchAborted extends Error {
+  readonly issues: Issue[];
+
+  constructor(issues: Issue[]) {
+    super('Despublicação em lote interrompida');
+    this.issues = issues;
+  }
+}
+
+/**
+ * Despublicação em massa (workspace#20, R7): tira do ar os conteúdos escolhidos, sem 301 (os
+ * endereços passam a responder 404), e declara a despublicação em massa no site, para a trava
+ * de segurança do próximo build não abortar a queda de páginas. Tudo num savepoint: se um
+ * conteúdo for recusado, nada fica gravado e as issues voltam com o índice na lista.
+ */
+export async function unpublishContents(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentIds: readonly number[],
+): Promise<Result<{ unpublished: { contentId: number; version: number }[]; declaredAt: Date }>> {
+  const allowed = requireRole(actor, 'content.publish');
+  if (!allowed.ok) return allowed;
+  const ids = [...new Set(contentIds)];
+  if (ids.length === 0) {
+    return refused('publication.empty_batch', 'Escolha ao menos um conteúdo para despublicar');
+  }
+
+  try {
+    return await tx.transaction(async (batch) => {
+      const unpublished: { contentId: number; version: number }[] = [];
+      for (const [index, contentId] of ids.entries()) {
+        const result = await unpublishContent(batch, actor, siteId, contentId);
+        if (!result.ok) {
+          throw new BatchAborted(
+            result.issues.map((issue) => ({
+              ...issue,
+              path: ['contentIds', index, ...issue.path],
+            })),
+          );
+        }
+        unpublished.push({ contentId, version: result.value.version });
+      }
+      const declaredAt = await declareMassUnpublish(batch, siteId, actor.email);
+      return { ok: true as const, value: { unpublished, declaredAt } };
+    });
+  } catch (error) {
+    if (error instanceof BatchAborted) return { ok: false, issues: error.issues };
+    throw error;
+  }
 }
