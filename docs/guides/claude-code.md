@@ -6,10 +6,14 @@ acrescentar regras, skills e agentes.
 ## Onde abrir
 
 Principalmente **na raiz**, com worktrees para trabalho em paralelo (ADR 0003, M.8).
-Para o E2E local de cada worktree, `pnpm local:isolated up <id>` sobe um Backoffice só da
-sessão (`docs/guides/local-setup.md`, "Sessões em paralelo"), e `pnpm local:e2e:area <área>`
-roda só o E2E da área tocada, numa das vagas da máquina; a sessão não roda a suíte inteira,
-que fica com o CI (`e2e.yml`, em todo PR que afeta o Backoffice; ADR 0016).
+A tarefa está pronta com `lint`, `typecheck`, `test`, `test:browser` e, se tocar o domínio,
+`test:contract` (ADR 0017). O E2E local é opcional e só na camada de telas:
+`pnpm local:e2e:telas <área>` roda o spec da área contra o `next dev` do worktree, numa das
+vagas da máquina, com um banco só da sessão e sem build (`docs/guides/local-setup.md`,
+"Sessões em paralelo"). A sessão não roda a suíte inteira: as telas rodam no PR (job
+`e2e-telas`) e a pilha completa, fora dele (`e2e.yml`).
+Legado: `pnpm local:isolated up <id>` (Backoffice com build, banco copiado e Caddy da sessão),
+que sai depois de 2 semanas sem uso.
 Cada unidade também terá `CLAUDE.md`, regras e `settings.json` próprios, para quando
 a sessão for aberta direto nela.
 

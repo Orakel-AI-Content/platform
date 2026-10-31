@@ -64,47 +64,62 @@ o `admin.orakel.localhost` apontar para o `next dev`.
 
 O `backoffice-web` e o Caddy do compose são um só para todas as sessões: recriá-los com a
 imagem de uma branch troca o Backoffice que as outras estão testando, e o `local:images`
-regrava a tag `local`. Para o E2E da própria branch, cada sessão sobe um par só seu, a partir do
-worktree, com o ambiente compartilhado já no ar:
+regrava a tag `local`. Uma tarefa fica pronta sem E2E (`lint`, `typecheck`, `test`,
+`test:browser` e, se tocar o domínio, `test:contract`; ADR 0017). O E2E local é opcional e só
+na camada de telas, a partir do worktree:
 
 ```sh
-pnpm local:isolated up 433     # imprime E2E_BASE_URL e E2E_DATABASE_URL
-E2E_BASE_URL=https://admin.orakel.localhost:<porta> \
-  E2E_DATABASE_URL=postgres://…/orakel_433 pnpm local:e2e:area sites,header
-pnpm local:isolated down 433
+pnpm local:e2e:telas sites,header      # num worktree sem .env.local:
+ORAKEL_ENV_FILE=<raiz>/.env.local pnpm local:e2e:telas sites
 ```
 
-O `<id>` (letras minúsculas, dígitos e hífen; ex.: o número da issue) dá nome ao banco
-`orakel_<id>` e ao container `orakel-<id>-caddy`, então vários pares convivem. O `up` não
-constrói imagem Docker:
+- **Sem build nem Docker a mais:** sobe só o `postgres` do compose (se não estiver no ar) e
+  constrói os pacotes do workspace que o Backoffice importa (cache do turbo). O Playwright sobe
+  o `next dev` do worktree, que compila cada rota na primeira visita, e um access-mock no host.
+  O `.env.local` não é executado: chega ao Playwright pelo `--env-file` do Node.
+- **Vagas:** antes de abrir o navegador, ocupa uma das `E2E_SLOTS` vagas da máquina (padrão
+  2), as mesmas do `local:e2e:area`; com todas ocupadas, espera. A vaga N tem o banco
+  `orakel_e2e_N`, o Next na porta 3100+N e o access-mock na 8790+N. Cada execução usa
+  `E2E_WORKERS` workers (padrão 2). Uma execução por worktree: o `next dev` trava o
+  `.next/dev`, e a segunda sai com "Another next dev server is already running".
+- **Banco da sessão:** cópia por `CREATE DATABASE … TEMPLATE orakel_e2e_template`. O template
+  é um banco próprio (o TEMPLATE exige a origem sem conexões, e o compartilhado sempre tem),
+  semeado pelo `globalSetup` da camada (migrações, usuários de teste, `exemplo-a` e
+  `exemplo-b`) e depois fechado para conexões. A impressão das migrações, das fixtures, de
+  `infra/local/seeds/sites.json` e do `globalSetup` fica no comentário do template; quando
+  muda, a execução seguinte o recria. Na saída (sucesso, falha ou Ctrl+C), o banco da vaga é
+  apagado; o template fica.
+- Só a área tocada, nunca a suíte inteira: as telas rodam no PR (job `e2e-telas`) e a pilha
+  completa, fora dele (`e2e.yml`). Argumentos a mais vão para o Playwright (ex.: `--list`,
+  `-g <título>`).
 
-- **Banco da sessão:** `orakel_<id>`, cópia do banco compartilhado por `pg_dump | psql` (o
-  `CREATE DATABASE … TEMPLATE` exige o banco de origem sem conexões, e o compartilhado sempre
-  tem). O Playwright lê o banco pelo `E2E_DATABASE_URL`, então os dados que um E2E grava não
-  aparecem nas outras sessões.
-- **Backoffice no host:** `pnpm turbo run build --filter=@orakel/backoffice` (o `.next` fica no
-  cache do turbo, que os worktrees dividem: outro worktree no mesmo commit não refaz o build) e
-  `next start` na primeira porta livre a partir de 3100, com as variáveis do `.env.local` e a
-  `DATABASE_URL` da sessão. PID e log ficam em `.e2e/<id>/`.
-- **Caddy avulso** na primeira porta livre a partir de 8400 (ou na informada: `up <id> <porta>`),
-  com o mesmo login de teste. Tem CA própria: o navegador avisa do certificado, e o Playwright o
-  ignora.
+Contra a pilha local (`E2E_STACK=1`, com o ambiente compartilhado no ar):
 
-O `down` encerra o `next start`, remove o Caddy e apaga o banco da sessão. S3 e access-mock
-continuam os compartilhados. Não há worker nem build-runner da sessão: jobs agendados no banco
-dela não rodam, então os E2E que esperam um build terminar (o artigo publicado de
-`midia.spec.ts`) só passam na suíte completa (CI) ou no ambiente compartilhado. Num worktree sem
-`.env.local`, aponte o da raiz: `ORAKEL_ENV_FILE=<raiz>/.env.local pnpm local:isolated up <id>`.
-
-A sessão roda só o E2E da área que tocou, nunca a suíte inteira (essa roda no CI):
-
-- `pnpm local:e2e:area <área>[,<área>…]` roda `apps/backoffice/test/e2e/<área>.spec.ts`;
-  `pnpm local:e2e:area smoke` roda as jornadas marcadas com `@smoke` (uma por área). Argumentos
-  a mais vão para o Playwright (ex.: `--list`, `-g <título>`).
-- Antes de abrir o navegador, o comando ocupa uma das `E2E_SLOTS` vagas da máquina (padrão 2);
-  com todas ocupadas, espera. Cada execução usa `E2E_WORKERS` workers (padrão 2).
+- `pnpm local:e2e:area <área>[,<área>…]` roda `apps/backoffice/test/e2e/<área>.spec.ts` no
+  projeto `chromium`; `pnpm local:e2e:area smoke` roda as jornadas marcadas com `@smoke` (uma
+  por área). Ocupa uma das mesmas vagas.
 - Os testes `@perf` (listas com 2.000 linhas e metas de tempo) ficam no projeto Playwright
   `perf`, que só existe no CI; localmente, com `E2E_PERF=1`.
+
+### Legado: `pnpm local:isolated`
+
+Substituído pelo `local:e2e:telas` (ADR 0017); sai depois de 2 semanas sem uso. Sobe um par
+só da sessão, com o ambiente compartilhado no ar:
+
+```sh
+pnpm local:isolated up 433     # legado; imprime E2E_BASE_URL e E2E_DATABASE_URL
+E2E_BASE_URL=https://admin.orakel.localhost:<porta> \
+  E2E_DATABASE_URL=postgres://…/orakel_433 pnpm local:e2e:area sites,header
+pnpm local:isolated down 433   # legado
+```
+
+O `<id>` (letras minúsculas, dígitos e hífen) dá nome ao banco `orakel_<id>` (cópia do
+compartilhado por `pg_dump | psql`) e ao container `orakel-<id>-caddy`. O `up` roda o
+`next build` pelo turbo e o `next start` na primeira porta livre a partir de 3100 (PID e log em
+`.e2e/<id>/`), e um Caddy avulso na primeira porta livre a partir de 8400, com CA própria. O
+`down` encerra o `next start`, remove o Caddy e apaga o banco. Não há worker nem build-runner da
+sessão. Num worktree sem `.env.local`, aponte o da raiz (legado):
+`ORAKEL_ENV_FILE=<raiz>/.env.local pnpm local:isolated up <id>` (legado).
 
 ## Comandos
 
@@ -123,8 +138,9 @@ A sessão roda só o E2E da área que tocou, nunca a suíte inteira (essa roda n
 | `pnpm local:reset`                                          | Para e **apaga os volumes**                                  |
 | `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit)  |
 | `pnpm local:e2e`                                            | E2E completo com Playwright                                  |
+| `pnpm local:e2e:telas <área>`                               | E2E de telas de uma área, sem build, numa das vagas          |
 | `pnpm local:e2e:area <área>` · `smoke`                      | E2E de uma área ou só os `@smoke`, numa das vagas da máquina |
-| `pnpm local:isolated up <id>` · `down <id>`                 | Backoffice no host, banco e Caddy só da sessão               |
+| `pnpm local:isolated up <id>` · `down <id>` (legado)        | Backoffice no host, banco e Caddy só da sessão               |
 | `infra/local/compose.sh <args>`                             | Qualquer comando do compose com os arquivos certos           |
 
 ## Serviços locais

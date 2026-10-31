@@ -12,9 +12,9 @@ levava ~10 min no caso bom e 20–40 min no ruim.
 
 Localmente, o E2E de uma área custava 10–20 min: `next build` a cada mudança (o cache do turbo
 invalida a cada edição), cópia do banco compartilhado por `pg_dump | psql` e um Caddy avulso
-(`pnpm local:isolated`). A cópia não usava `CREATE DATABASE … TEMPLATE` porque o banco
-compartilhado sempre tem conexões (backoffice-web, worker, build-runner), e o TEMPLATE exige a
-origem sem nenhuma.
+(`pnpm local:isolated`, legado por esta decisão). A cópia não usava
+`CREATE DATABASE … TEMPLATE` porque o banco compartilhado sempre tem conexões (backoffice-web,
+worker, build-runner), e o TEMPLATE exige a origem sem nenhuma.
 
 Dos ~106 testes, só 8 precisam da pilha inteira (Caddy com forward_auth, S3 e worker,
 build-runner, edge-local, pré-visualização). O resto precisa só de Next, Postgres e um JWT
@@ -50,8 +50,8 @@ Três camadas, da mais barata para a mais cara:
 **Definição de pronto de uma tarefa:** `lint`, `typecheck`, `test`, `test:browser` e, se tocar
 o domínio, `test:contract`. O E2E de telas local é opcional; o de pilha não roda na sessão.
 
-O `pnpm local:isolated` (Backoffice com `next build`, banco copiado e Caddy por sessão) vira
-legado e sai depois de 2 semanas sem uso. O `pnpm local:e2e:area` (a suíte contra a pilha
+Legado: o `pnpm local:isolated` (Backoffice com `next build`, banco copiado e Caddy por
+sessão), que sai depois de 2 semanas sem uso. O `pnpm local:e2e:area` (a suíte contra a pilha
 local, `E2E_STACK=1`) continua até a mudança do `e2e.sh`.
 
 ## Alternativas consideradas

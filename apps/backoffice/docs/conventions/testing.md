@@ -10,7 +10,11 @@ Complementa `docs/conventions/testing.md` da raiz só com o que é desta unidade
 | `test:e2e`      | `playwright.config.ts`      | `pnpm local:up && pnpm local:seed` |
 
 E2E de telas (#474): `pnpm exec playwright test --project=telas`, nesta pasta, com um Postgres
-na `DATABASE_URL` (ou `E2E_DATABASE_URL`). Precisa só do Chromium do Playwright.
+na `DATABASE_URL` (ou `E2E_DATABASE_URL`). Precisa só do Chromium do Playwright. Numa sessão,
+`pnpm local:e2e:telas <área>` na raiz (#477) faz o mesmo com um banco só da sessão, sem build.
+
+Pronto, numa tarefa: `lint`, `typecheck`, `test`, `test:browser` e, se tocar o domínio,
+`test:contract` (ADR 0017 da raiz). O E2E local é opcional.
 
 - **Unitários** ao lado do código; o domínio é testado sem banco quando a regra é pura
   (RBAC, mapeamentos) e pela suíte de contrato quando depende de transação.
@@ -59,12 +63,13 @@ na `DATABASE_URL` (ou `E2E_DATABASE_URL`). Precisa só do Chromium do Playwright
   de `asRole(page, papel)` (`test/e2e/auth.ts`): o JWT da rota de token do access-mock, no
   header `cf-access-jwt-assertion` e no cookie `CF_Authorization`, valendo para as duas
   camadas. Login pela tela do mock só nos testes da sessão do Access. Numa sessão,
-  rode contra o par isolado do worktree (`pnpm local:isolated up <id>`, na raiz): ele imprime
-  `E2E_BASE_URL` e `E2E_DATABASE_URL`, e o `playwright.config.ts` usa esse banco no lugar da
-  `DATABASE_URL` nos specs e na limpeza. O par não tem worker nem build-runner: o que depende de
-  build roda no CI ou no ambiente compartilhado. Numa sessão, rode só a área tocada:
-  `pnpm local:e2e:area <arquivo sem .spec.ts>` (ou `smoke`), na raiz. Jornada principal de uma
-  área nova leva `{ tag: '@smoke' }`. Localmente, nenhum spec semeia lista com mais de 100 itens: o
+  o E2E é opcional e só da área tocada: `pnpm local:e2e:telas <arquivo sem .spec.ts>`, na raiz,
+  roda o `telas` com `next dev`, numa das vagas da máquina, num banco copiado por TEMPLATE de
+  `orakel_e2e_template` (ADR 0017 da raiz). O `playwright.config.ts` usa o `E2E_DATABASE_URL` no
+  lugar da `DATABASE_URL` nos specs, na limpeza e no `globalSetup`. Contra a pilha local:
+  `pnpm local:e2e:area <arquivo sem .spec.ts>` (ou `smoke`), na raiz. O par isolado
+  (`pnpm local:isolated up <id>`, legado, com `E2E_BASE_URL` e `E2E_DATABASE_URL`) sai depois de
+  2 semanas sem uso. Jornada principal de uma área nova leva `{ tag: '@smoke' }`. Localmente, nenhum spec semeia lista com mais de 100 itens: o
   que precisa de uma lista com mais de uma página usa um site pequeno (`test/volume.ts`).
 - **Projeto `perf`** (`playwright.config.ts`, #461): o teste que semeia 2.000 linhas e mede
   tempo no navegador leva `{ tag: '@perf' }`, um por bloco ("abre e busca em menos de 2 s"). O
