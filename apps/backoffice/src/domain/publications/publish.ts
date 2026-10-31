@@ -3,7 +3,9 @@ import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { contents, contentVersions, publications, sites } from '../../db/schema/index.ts';
-import { requireRole, type Actor } from '../access/rbac.ts';
+import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
+import { liveSlug, slugInUse } from '../content/contents.ts';
+import { createRedirect } from '../content/redirects.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 
 /** Fuso do dia do limite: sempre o de São Paulo, não o `timeZone` do site (workspace#20). */
@@ -67,7 +69,8 @@ const dayLabel = new Intl.DateTimeFormat('pt-BR', { timeZone: PUBLISH_DAY_TIME_Z
  * mais recente e estar `aprovado`, e o site não pode ter chegado ao limite daquele dia. Trava
  * a linha de `contents`, como a aprovação, e depois a do site (`for no key update`, que não
  * espera as gravações com chave estrangeira para ele), para duas publicações simultâneas no
- * mesmo site não passarem do limite. Usada pela publicação e pelo agendamento.
+ * mesmo site não passarem do limite. O slug é conferido de novo (outro conteúdo pode tê-lo
+ * tomado depois da edição). Usada pela publicação e pelo agendamento.
  */
 export async function reservePublicationSlot(
   tx: Executor,
@@ -82,7 +85,11 @@ export async function reservePublicationSlot(
     .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)))
     .for('update');
   const [latest] = await tx
-    .select({ version: contentVersions.version, status: contentVersions.status })
+    .select({
+      version: contentVersions.version,
+      status: contentVersions.status,
+      slug: sql<string>`${contentVersions.data}->>'slug'`,
+    })
     .from(contentVersions)
     .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))
     .orderBy(desc(contentVersions.version))
@@ -103,6 +110,9 @@ export async function reservePublicationSlot(
     );
   }
 
+  const taken = await slugInUse(tx, siteId, contentId, latest.slug);
+  if (taken !== undefined) return { ok: false, issues: [taken] };
+
   const [site] = await tx
     .select({ limit: sites.dailyPublishLimit })
     .from(sites)
@@ -121,30 +131,50 @@ export async function reservePublicationSlot(
   return { ok: true, value: undefined };
 }
 
-/** Leva a versão a `publicado` e registra a mudança pendente, que agenda o build na janela. */
+/**
+ * Leva a versão a `publicado` e registra a mudança pendente, que agenda o build na janela. Se
+ * o slug difere do que está no ar, o caminho antigo ganha o 301 para o novo, já sem cadeias
+ * (`createRedirect`).
+ */
 async function markPublished(
   tx: Executor,
+  actor: Actor,
   siteId: string,
   contentId: number,
   version: number,
-): Promise<void> {
-  await tx
-    .update(contentVersions)
-    .set({ status: 'publicado' })
-    .where(
-      and(
-        eq(contentVersions.siteId, siteId),
-        eq(contentVersions.contentId, contentId),
-        eq(contentVersions.version, version),
-      ),
+): Promise<Result<void>> {
+  const versionMatch = and(
+    eq(contentVersions.siteId, siteId),
+    eq(contentVersions.contentId, contentId),
+    eq(contentVersions.version, version),
+  );
+  const [row] = await tx
+    .select({ slug: sql<string>`${contentVersions.data}->>'slug'` })
+    .from(contentVersions)
+    .where(versionMatch);
+  if (row === undefined) return { ok: false, issues: [notFound(siteId, contentId)] };
+  const previous = await liveSlug(tx, siteId, contentId);
+  if (previous !== undefined && previous !== row.slug) {
+    const redirect = await createRedirect(
+      tx,
+      actor,
+      siteId,
+      { from: `/${previous}/`, to: `/${row.slug}/`, status: 301, origin: 'slug-change' },
+      { action: 'content.publish' },
     );
+    if (!redirect.ok) return redirect;
+  }
+
+  await tx.update(contentVersions).set({ status: 'publicado' }).where(versionMatch);
   await recordPendingChange(tx, siteId, 'content', String(contentId));
+  return { ok: true, value: undefined };
 }
 
 /**
  * Publica a versão aprovada: confere a vaga do dia de São Paulo de `now`
  * (`reservePublicationSlot`), leva a versão a `publicado`, grava a linha em `publications` e
- * registra a mudança pendente, que agenda o build na janela do site.
+ * registra a mudança pendente, que agenda o build na janela do site. Com troca de slug, o
+ * caminho antigo ganha o 301 (`markPublished`).
  */
 export async function publishVersion(
   tx: Executor,
@@ -164,19 +194,22 @@ export async function publishVersion(
   });
   if (!slot.ok) return slot;
 
+  const published = await markPublished(tx, actor, siteId, contentId, version);
+  if (!published.ok) return published;
   const [publication] = await tx
     .insert(publications)
     .values({ siteId, contentId, version, publishedBy: actor.email, publishedAt: now })
     .returning({ id: publications.id });
   if (publication === undefined) throw new Error('INSERT em publications não devolveu o id');
-  await markPublished(tx, siteId, contentId, version);
   return { ok: true, value: { publicationId: publication.id } };
 }
 
 /**
  * Publica a versão agendada, no job do horário marcado: sem conferir o limite (a vaga já foi
  * reservada no agendamento) e sem outra linha em `publications`. Trava o conteúdo, como o
- * cancelamento; se a versão não está mais `agendado` (cancelada antes), não faz nada.
+ * cancelamento; se a versão não está mais `agendado` (cancelada antes), não faz nada. O 301
+ * da troca de slug é gravado como sistema: não há ator no job, e quem agendou já tinha
+ * `content.publish`.
  */
 export async function publishScheduledVersion(
   tx: Executor,
@@ -200,6 +233,7 @@ export async function publishScheduledVersion(
       ),
     );
   if (row?.status !== 'agendado') return 'not_scheduled';
-  await markPublished(tx, siteId, contentId, version);
+  const published = await markPublished(tx, SYSTEM_ACTOR, siteId, contentId, version);
+  if (!published.ok) throw new Error(JSON.stringify(published.issues));
   return 'published';
 }

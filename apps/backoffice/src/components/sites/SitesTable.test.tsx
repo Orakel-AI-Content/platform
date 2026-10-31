@@ -85,6 +85,8 @@ const site: SiteSummary = {
   lastBuild: null,
   buildWindowSeconds: null,
   effectiveBuildWindowSeconds: 300,
+  dailyPublishLimit: null,
+  effectiveDailyPublishLimit: 3,
   timeZone: 'America/Sao_Paulo',
 };
 

@@ -24,6 +24,8 @@ const site: SiteSummary = {
   lastBuild: { status: 'ok', versionId: 'v7', finishedAt: new Date('2026-10-20T12:00:00.000Z') },
   buildWindowSeconds: null,
   effectiveBuildWindowSeconds: 300,
+  dailyPublishLimit: null,
+  effectiveDailyPublishLimit: 3,
   timeZone: 'America/Sao_Paulo',
 };
 

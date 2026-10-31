@@ -3,7 +3,7 @@ import { Logger, runOnce } from 'graphile-worker';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { contentVersions, publications, sites } from '../../src/db/schema/index.ts';
+import { contentVersions, publications, redirects, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { submitForReview, updateContent } from '../../src/domain/content/contents.ts';
@@ -63,11 +63,17 @@ const statusOf = async (contentId: number, version: number) =>
   (await versions(contentId)).find((row) => row.version === version)?.status;
 
 /** Nova versão enviada para revisão e, se pedido, aprovada. */
-async function prepare(contentId: number, approve = true): Promise<number> {
+async function prepare(contentId: number, approve = true, slug?: string): Promise<number> {
   const last = (await versions(contentId)).at(-1);
   if (last === undefined) throw new Error(`conteúdo ${contentId} sem versão`);
   const saved = await db.transaction((tx) =>
-    updateContent(tx, SYSTEM_ACTOR, SITE, contentId, last.data),
+    updateContent(
+      tx,
+      SYSTEM_ACTOR,
+      SITE,
+      contentId,
+      slug === undefined ? last.data : { ...last.data, slug },
+    ),
   );
   if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
   await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
@@ -152,6 +158,22 @@ describe('agendar', () => {
     expect((await jobs('build')).map((job) => job.key)).toEqual([`build:${SITE}`]);
     expect(await jobs(PUBLISH_SCHEDULED_TASK)).toEqual([]);
     expect(await db.select().from(publications)).toHaveLength(1);
+  });
+
+  it('o job com troca de slug grava o 301 do endereço antigo', async () => {
+    const live = (await versions(1)).findLast((row) => row.status === 'publicado')?.data.slug;
+    expect(live).toBeDefined();
+    const version = await prepare(1, true, 'guia-agendado');
+    expect(await schedule(1, version, `${DAY}T10:00:00-03:00`)).toMatchObject({ ok: true });
+    expect(await db.select().from(redirects).where(eq(redirects.to, '/guia-agendado/'))).toEqual(
+      [],
+    );
+
+    await runDueJobs();
+
+    expect(await statusOf(1, version)).toBe('publicado');
+    const rows = await db.select().from(redirects).where(eq(redirects.to, '/guia-agendado/'));
+    expect(rows.map((row) => [row.from, row.status])).toContainEqual([`/${live}/`, 301]);
   });
 
   it('o job de uma versão que saiu de agendado não muda nada', async () => {

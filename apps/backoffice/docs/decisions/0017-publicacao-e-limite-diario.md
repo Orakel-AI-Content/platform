@@ -46,7 +46,9 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
   `job_key` `publish:<site>:<conteúdo>`. Trava o conteúdo e, se a versão ainda está
   `agendado`, leva a `publicado` e registra a mudança pendente, sem conferir o limite e sem
   outra linha em `publications`. Se não está (cancelada numa corrida com o worker), não faz
-  nada. O autor da publicação é quem agendou.
+  nada. O autor da publicação é quem agendou. Com troca de slug, grava o 301 do endereço
+  antigo como a publicação imediata (#489), com o ator de sistema; o slug em uso já é
+  conferido no agendamento.
 - **Cancelar** (`cancelScheduledPublication`): a versão volta a `aprovado`, a linha da
   reserva é apagada (libera a vaga) e o job sai da fila (`remove_job`), na mesma transação.
 
