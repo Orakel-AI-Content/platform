@@ -57,6 +57,13 @@
       "when": 1793487672274,
       "tag": "0007_publicacoes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793491025182,
+      "tag": "0008_despublicacao_em_massa",
+      "breakpoints": true
     }
   ]
 }
