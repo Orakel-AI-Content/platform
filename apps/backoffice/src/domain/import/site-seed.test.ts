@@ -14,6 +14,7 @@ import {
   processSeedMedia,
   readSiteSeed,
   siteSeedLines,
+  storeMediaPlaceholders,
   type SiteSeed,
 } from './site-seed.ts';
 
@@ -107,5 +108,33 @@ describe('seed de site completo', () => {
 
     const broken = { ...seed, media: [{ ...seed.media[0]!, file: 'texto.jpg' }] };
     await expect(processSeedMedia(memoryStore(), dir, broken)).rejects.toThrow(/texto\.jpg/);
+  });
+
+  it('grava uma imagem lisa por variante das fixtures, na proporção da mídia, só as que faltam', async () => {
+    const store = memoryStore();
+    const lines: SnapshotLine[] = [
+      {
+        type: 'media',
+        data: {
+          id: 1,
+          width: 2000,
+          height: 1000,
+          variants: [
+            { width: 320, format: 'avif', path: 'exemplo-a/c0ffee01-320.avif' },
+            { width: 640, format: 'webp', path: 'exemplo-a/c0ffee01-640.webp' },
+          ],
+        },
+      },
+    ];
+    await store.put('media-exemplo-a', 'exemplo-a/c0ffee01-320.avif', new Uint8Array([1]), 1, 'x');
+
+    expect(await storeMediaPlaceholders(store, 'exemplo-a', lines)).toBe(1);
+
+    expect(store.objects.get('media-exemplo-a/exemplo-a/c0ffee01-320.avif')).toEqual(
+      new Uint8Array([1]),
+    );
+    const webp = store.objects.get('media-exemplo-a/exemplo-a/c0ffee01-640.webp');
+    expect(await sharp(webp).metadata()).toMatchObject({ format: 'webp', width: 640, height: 320 });
+    expect(await storeMediaPlaceholders(store, 'exemplo-a', lines)).toBe(0);
   });
 });

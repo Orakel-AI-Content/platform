@@ -14,6 +14,10 @@ env_or() { value=$(env_value "$1"); echo "${value:-$2}"; }
 
 registry() { env_or IMAGE_REGISTRY ghcr.io/orakel-ai-content; }
 
+# Sites do ambiente local: as chaves de primeiro nível de infra/local/seeds/sites.json, a mesma
+# leitura do s3-init (infra/local/s3/init.sh).
+local_sites() { sed -n 's/^  "\([a-z0-9-]*\)": {.*/\1/p' infra/local/seeds/sites.json; }
+
 clickhouse_query() {
   infra/local/compose.sh exec -T clickhouse clickhouse-client --user "$(env_or CLICKHOUSE_USER orakel)" \
     --password "$(env_or CLICKHOUSE_PASSWORD orakel-local)" -q "$1"

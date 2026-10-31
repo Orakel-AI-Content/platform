@@ -12,11 +12,12 @@ import {
   type SnapshotLine,
   type Taxonomy,
 } from '@orakel/content-model/v1';
+import sharp, { type FormatEnum } from 'sharp';
 
 import { detectImageFormat } from '../media/formats.ts';
 import { normalizeImage, storeOriginal } from '../media/ingest.ts';
 import type { ObjectStore } from '../media/store.ts';
-import { generateVariants } from '../media/variants.ts';
+import { generateVariants, mediaBucket } from '../media/variants.ts';
 import type { MediaOrigin } from './import-snapshot.ts';
 
 // Site completo do ambiente local (`infra/local/seeds/<site>/`): `site.json` com a
@@ -92,6 +93,44 @@ export async function processSeedMedia(
     });
   }
   return { lines, origins };
+}
+
+/** Cor lisa das imagens de mentira das fixtures. */
+const PLACEHOLDER_BACKGROUND = '#9aa5b1';
+
+/**
+ * Mídia das fixtures do content-model: as linhas trazem só os caminhos das variantes, sem
+ * imagem. Grava no bucket do site uma imagem lisa por variante que falta, na largura e na
+ * proporção da mídia, para os sites de exemplo não terem imagem quebrada. Variante que já
+ * existe é mantida; devolve quantas foram gravadas.
+ */
+export async function storeMediaPlaceholders(
+  store: ObjectStore,
+  siteId: string,
+  lines: SnapshotLine[],
+): Promise<number> {
+  const bucket = mediaBucket(siteId);
+  let written = 0;
+  for (const line of lines) {
+    if (line.type !== 'media') continue;
+    const { width, height, variants } = line.data;
+    for (const variant of variants) {
+      if (await store.exists(bucket, variant.path)) continue;
+      const data = await sharp({
+        create: {
+          width: variant.width,
+          height: Math.max(1, Math.round((variant.width * height) / width)),
+          channels: 3,
+          background: PLACEHOLDER_BACKGROUND,
+        },
+      })
+        .toFormat(variant.format as keyof FormatEnum)
+        .toBuffer();
+      await store.put(bucket, variant.path, data, data.byteLength, `image/${variant.format}`);
+      written += 1;
+    }
+  }
+  return written;
 }
 
 /** Snapshot completo do seed, com as linhas de mídia geradas; cada linha passa pelo schema. */

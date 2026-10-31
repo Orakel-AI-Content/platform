@@ -49,8 +49,15 @@ expect "admin.orakel.localhost pede login" "$(status_of https://admin.orakel.loc
 expect "preview.orakel.localhost pede login" "$(status_of https://preview.orakel.localhost/)" '302'
 expect "s3.orakel.localhost pede login" "$(status_of https://s3.orakel.localhost/)" '302'
 expect "exemplo-a.localhost chega ao edge-local" "$(status_of https://exemplo-a.localhost/)" '200|404'
-expect "media.exemplo-a.localhost chega ao filer" "$(status_of https://media.exemplo-a.localhost/nao-existe.webp)" '404'
-expect "media.horta-em-casa.localhost chega ao filer" "$(status_of https://media.horta-em-casa.localhost/nao-existe.webp)" '404'
+# O edge-local também responde 404 a host que não conhece: quem atendeu vem do Server.
+server_of() { curl -sk -o /dev/null -w '%header{server}' --max-time 10 "$1"; }
+for site in $(local_sites); do
+  expect "media.$site.localhost chega ao filer" "$(server_of "https://media.$site.localhost/nao-existe.webp")" 'SeaweedFS.*'
+done
+case "$(server_of https://media.originals.localhost/nao-existe.jpg)" in
+  SeaweedFS*) ko "media.originals.localhost fora do filer" "expõe o media-originals" ;;
+  *) ok "media.originals.localhost fora do filer" ;;
+esac
 
 echo "Certificados (CA interna do Caddy)"
 # Nome exato em cada host: o Chrome recusa o curinga *.localhost, que o OpenSSL e o curl aceitam.
@@ -75,7 +82,7 @@ fi
 
 echo "Armazenamento e analytics"
 buckets=$(compose exec -T s3 sh -c 'echo s3.bucket.list | weed shell -master=localhost:9333 -filer=localhost:8888' 2>/dev/null)
-for bucket in media-originals build-cache backups brasil $(env_or LOCAL_SITES exemplo-a,exemplo-b,horta-em-casa | tr ',' ' ' | sed 's/[^ ][^ ]*/media-&/g'); do
+for bucket in media-originals build-cache backups brasil $(local_sites | sed 's/^/media-/'); do
   printf '%s' "$buckets" | grep -qw "$bucket" && ok "bucket $bucket" || ko "bucket $bucket" "não existe"
 done
 table=$(clickhouse_query 'EXISTS TABLE analytics.events' 2>/dev/null)

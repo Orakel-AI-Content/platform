@@ -1,5 +1,5 @@
 {
-  "$comment": "Só o que é local nos sites (ADR 0015 da raiz): domínios <site>.localhost. O seed do backoffice aplica por cima da configuração das fixtures do content-model e dos sites completos desta pasta (<site>/site.json).",
+  "$comment": "Só o que é local nos sites (ADR 0015 da raiz): domínios <site>.localhost. O seed do backoffice aplica por cima da configuração das fixtures do content-model e dos sites completos desta pasta (<site>/site.json). Cada chave é um site do ambiente local: o s3-init cria o bucket media-<site> a partir delas (ADR 0013).",
   "exemplo-a": {
     "domains": ["exemplo-a.localhost"]
   },

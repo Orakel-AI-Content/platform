@@ -175,7 +175,7 @@ Subdomínios de `.localhost` resolvem sem editar o `/etc/hosts`. As portas só e
 | Perfil `lighthouse`         | `lhci-server`                                                    | PageSpeed Insights            |
 
 Buckets (criados pelo `s3-init` a cada `local:up`): `media-originals`, `build-cache`,
-`backups`, `brasil` e `media-<site>` para cada site de `LOCAL_SITES`.
+`backups`, `brasil` e `media-<site>` para cada site de `infra/local/seeds/sites.json`.
 
 ### Redes
 
@@ -201,7 +201,7 @@ usa em `src/env.ts` (Zod) e falha no boot se faltar alguma.
 | Access           | `ACCESS_TEAM_DOMAIN`, `ACCESS_JWKS_URL`, `ACCESS_AUD`                                                                                               |
 | S3               | `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`                                                                                           |
 | Sites            | `CONTENT_SOURCE` (`api` ou `fixture`), `SITE_ID`, `EXPORT_API_URL`, `BLOG_PREVIEW_UPSTREAM` (opcional)                                              |
-| Ambiente local   | `LOCAL_SITES`, `LOCAL_MEDIA_HOSTS`, `DOCKER_SOCKET_GID`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `BACKOFFICE_UPSTREAM` (opcional)                 |
+| Ambiente local   | `DOCKER_SOCKET_GID`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `BACKOFFICE_UPSTREAM` (opcional)                                                     |
 | Deploy e imagens | `DEPLOY_TARGET` (`local` ou `cloudflare`), `IMAGE_REGISTRY`, `BUILD_WINDOW_SECONDS`, `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` (só produção) |
 | Analytics Engine | `AE_SQL_TRANSPORT`, `AE_SQL_URL`                                                                                                                    |
 | Operação         | `BR_BACKUP_ENDPOINT`, `HEARTBEAT_BASE_URL`, `SENTRY_DSN`, `LIGHTHOUSE_PROVIDER` (`local` ou `psi`)                                                  |
@@ -251,8 +251,9 @@ Com o GlitchTip, crie um projeto e use o DSN com o host interno em `SENTRY_DSN`
 `HEARTBEAT_BASE_URL=http://healthchecks:8000/ping/`. Para ver ou parar, acrescente o
 `--profile` ao `ps`, `logs` ou `down`.
 
-**Site de exemplo novo no local:** acrescente-o a `LOCAL_SITES` e `LOCAL_MEDIA_HOSTS`, e os
-domínios a `infra/local/seeds/sites.json`; depois `pnpm local:up`.
+**Site de exemplo novo no local:** acrescente-o, com os domínios, a
+`infra/local/seeds/sites.json`; depois `pnpm local:up` (cria o bucket `media-<site>`). O Caddy
+atende qualquer `media.<site>.localhost`, sem lista.
 
 ## Unidades
 
@@ -312,8 +313,9 @@ Branches, commits e releases: [`docs/conventions/git.md`](docs/conventions/git.m
 - **`ERR_CERT_AUTHORITY_INVALID` no Chrome:** `pnpm local:trust` e ⌘Q no Chrome. Se o
   `local:check` mostra "CA atual do Caddy no Keychain" com ✗, a raiz instalada é de uma CA
   antiga (depois de um `local:reset`); o mesmo comando troca.
-- **`media.<site>.localhost` não responde:** o site precisa estar em `LOCAL_MEDIA_HOSTS`
-  (recrie o `caddy`) e em `LOCAL_SITES` (rode `local:up`).
+- **Imagem quebrada num site local:** rode `pnpm local:check` (confere se cada
+  `media.<site>.localhost` chega ao filer e se o bucket existe) e `pnpm local:seed`, que grava
+  de novo as imagens que faltam no bucket.
 - **Aviso de plataforma (`linux/amd64`) no `local:up` ou `local:publish`:** imagens de antes do
   build nativo; reconstrua com `pnpm local:images`.
 - **Linux: `build-runner` sem acesso ao Docker:** `DOCKER_SOCKET_GID` = gid do grupo `docker`

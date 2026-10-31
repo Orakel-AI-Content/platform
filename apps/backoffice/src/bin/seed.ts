@@ -13,6 +13,7 @@ import {
   processSeedMedia,
   readSiteSeed,
   siteSeedLines,
+  storeMediaPlaceholders,
 } from '../domain/import/site-seed.ts';
 import { siteExists } from '../domain/sites/sites.ts';
 import { getEnv } from '../env.ts';
@@ -68,39 +69,48 @@ export async function readFixture(site: string): Promise<SnapshotLine[]> {
     });
 }
 
+/** Erro do armazenamento com a pista do bucket que costuma faltar. */
+function bucketHint(site: string) {
+  return (error: unknown): never => {
+    throw new Error(
+      `Imagens de ${site}: confira se o site está em infra/local/seeds/sites.json e rode pnpm local:up`,
+      { cause: error },
+    );
+  };
+}
+
 // Dados do ambiente local: usuários de teste, os dois sites das fixtures (os E2E dependem
 // deles) e os sites completos de infra/local/seeds/<site>/, com imagens de verdade.
-// Idempotente: site que já existe é pulado.
+// Idempotente: site que já existe não é importado de novo, mas as imagens dele são gravadas
+// de novo no bucket quando faltam (o S3 pode ter sido recriado sem o banco).
 if (import.meta.main) {
   await runProcess('backoffice-seed', async (logger) => {
     const { pool, db } = getDb();
     const local = await readLocalSites();
+    const store = s3ObjectStore(createS3Client(getEnv()));
     for (const user of TEST_USERS) await upsertUser(db, user);
     for (const site of FIXTURES) {
+      const lines = withLocalDomains(await readFixture(site), local);
+      // As fixtures não trazem imagem: uma lisa por variante, para o site não ficar sem.
+      const placeholders = await storeMediaPlaceholders(store, site, lines).catch(bucketHint(site));
       if (await siteExists(db, site)) {
-        logger.info({ siteId: site }, 'site já existe; pulado');
+        logger.info({ siteId: site, placeholders }, 'site já existe; pulado');
         continue;
       }
-      const lines = withLocalDomains(await readFixture(site), local);
       const result = await importSnapshot(db, { ...SYSTEM_ACTOR }, lines);
       if (!result.ok) throw new Error(`Seed de ${site}: ${JSON.stringify(result.issues)}`);
-      logger.info({ siteId: site }, 'site importado');
+      logger.info({ siteId: site, placeholders }, 'site importado');
     }
-    const store = s3ObjectStore(createS3Client(getEnv()));
     for (const dir of await listSiteSeeds(LOCAL_SEEDS_DIR)) {
       const seed = await readSiteSeed(dir);
       const site = seed.config.siteId;
+      // O bucket media-<site> é criado pelo s3-init a partir do sites.json (ADR 0013). As
+      // variantes que já existem são mantidas: repetir só grava as que faltam.
+      const media = await processSeedMedia(store, dir, seed).catch(bucketHint(site));
       if (await siteExists(db, site)) {
-        logger.info({ siteId: site }, 'site já existe; pulado');
+        logger.info({ siteId: site, media: media.lines.length }, 'site já existe; pulado');
         continue;
       }
-      // O bucket media-<site> é criado pelo s3-init a partir de LOCAL_SITES (ADR 0013).
-      const media = await processSeedMedia(store, dir, seed).catch((error: unknown) => {
-        throw new Error(
-          `Imagens de ${site}: confira se o site está em LOCAL_SITES e LOCAL_MEDIA_HOSTS e rode pnpm local:up`,
-          { cause: error },
-        );
-      });
       const lines = withLocalDomains(siteSeedLines(seed, media.lines), local);
       const result = await importSnapshot(db, { ...SYSTEM_ACTOR }, lines, {
         mediaOrigins: media.origins,
