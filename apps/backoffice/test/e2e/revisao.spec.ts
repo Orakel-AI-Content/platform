@@ -150,7 +150,7 @@ async function loginPreview(page: Page, email: string): Promise<void> {
 
 test(
   'enviar, achar na fila e aprovar com o checklist; o artigo sai da fila',
-  { tag: '@smoke' },
+  { tag: ['@smoke', '@stack'] },
   async ({ page, browser }) => {
     const slug = `e2e-aprovar-${Date.now()}`;
     const title = `Artigo ${slug}`;
@@ -208,7 +208,7 @@ test(
 
 // Tela de revisão no Ecme (#277): o painel junto da visualização, com checklist e "Aprovar", e
 // o axe sem violação no tema claro (fora o iframe, que é o site).
-test(`tela de revisão sem violação do axe`, async ({ page, browser }) => {
+test(`tela de revisão sem violação do axe`, { tag: '@stack' }, async ({ page, browser }) => {
   const slug = `e2e-tela-light-${Date.now()}`;
   const title = `Artigo ${slug}`;
   await asRole(page, 'editor');

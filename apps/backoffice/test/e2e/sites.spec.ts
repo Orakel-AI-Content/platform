@@ -25,49 +25,57 @@ test.afterAll(async () => {
 // ainda transparente no meio do fade.
 test.use({ reducedMotion: 'reduce' });
 
-test('login pelo Access e registro de instâncias', { tag: '@smoke' }, async ({ page }) => {
-  await page.goto('/sites');
+test(
+  'login pelo Access e registro de instâncias',
+  { tag: ['@smoke', '@stack'] },
+  async ({ page }) => {
+    await page.goto('/sites');
 
-  // Sem sessão, o Access (access-mock) pede login.
-  await expect(page.getByRole('heading', { name: /Login de teste/ })).toBeVisible();
-  await page.getByRole('link', { name: 'operacao@orakel.local' }).click();
+    // Sem sessão, o Access (access-mock) pede login.
+    await expect(page.getByRole('heading', { name: /Login de teste/ })).toBeVisible();
+    await page.getByRole('link', { name: 'operacao@orakel.local' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-  await expect(page.getByText('operacao@orakel.local · operacao')).toBeVisible();
-  const table = page.getByRole('table');
-  // O nome é o link principal; o ID e o domínio ficam sob ele (#100).
-  await expect(table.getByRole('link', { name: 'Exemplo A — Guias' })).toBeVisible();
-  await expect(table.getByText(/^exemplo-a · /)).toBeVisible();
-  await expect(table.getByRole('link', { name: 'Exemplo B — Receitas' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+    await expect(page.getByText('operacao@orakel.local · operacao')).toBeVisible();
+    const table = page.getByRole('table');
+    // O nome é o link principal; o ID e o domínio ficam sob ele (#100).
+    await expect(table.getByRole('link', { name: 'Exemplo A — Guias' })).toBeVisible();
+    await expect(table.getByText(/^exemplo-a · /)).toBeVisible();
+    await expect(table.getByRole('link', { name: 'Exemplo B — Receitas' })).toBeVisible();
 
-  // Operação baixa a lista de sites do OpenTofu (ADR 0011).
-  const download = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Baixar sites.auto.tfvars.json' }).click();
-  expect((await download).suggestedFilename()).toBe('sites.auto.tfvars.json');
+    // Operação baixa a lista de sites do OpenTofu (ADR 0011).
+    const download = page.waitForEvent('download');
+    await page.getByRole('link', { name: 'Baixar sites.auto.tfvars.json' }).click();
+    expect((await download).suggestedFilename()).toBe('sites.auto.tfvars.json');
 
-  // Operação enfileira o build do site sem esperar a janela (12.0, L3). Espera a página
-  // hidratar: um clique antes disso não chega ao onClick (a ação nem é chamada).
-  await page.waitForLoadState('networkidle');
-  // Muda o site publicado: confirma num diálogo (#327).
-  await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
-  await page
-    .getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' })
-    .getByRole('button', { name: 'Publicar' })
-    .click();
-  await expect(page.getByText('Build de exemplo-a enfileirado.')).toBeVisible();
+    // Operação enfileira o build do site sem esperar a janela (12.0, L3). Espera a página
+    // hidratar: um clique antes disso não chega ao onClick (a ação nem é chamada).
+    await page.waitForLoadState('networkidle');
+    // Muda o site publicado: confirma num diálogo (#327).
+    await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+    await page
+      .getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' })
+      .getByRole('button', { name: 'Publicar' })
+      .click();
+    await expect(page.getByText('Build de exemplo-a enfileirado.')).toBeVisible();
 
-  const accessibility = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-    .analyze();
-  expect(accessibility.violations).toEqual([]);
-});
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  },
+);
 
-test('a API de exportação não existe no hostname público', async ({ request }) => {
-  const response = await request.get('/api/export/v1/sites/exemplo-a/snapshot', {
-    headers: { authorization: 'Bearer local-build-token-0000000000000000' },
-  });
-  expect(response.status()).toBe(404);
-});
+test(
+  'a API de exportação não existe no hostname público',
+  { tag: '@stack' },
+  async ({ request }) => {
+    const response = await request.get('/api/export/v1/sites/exemplo-a/snapshot', {
+      headers: { authorization: 'Bearer local-build-token-0000000000000000' },
+    });
+    expect(response.status()).toBe(404);
+  },
+);
 
 test('editor não vê o download do sites.auto.tfvars.json nem o baixa pela rota', async ({
   page,

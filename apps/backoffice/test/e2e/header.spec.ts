@@ -53,29 +53,33 @@ test('a marca "Orakel Backoffice" leva à lista de sites', async ({ page }) => {
 
 const profile = (page: Page) => page.getByRole('button', { name: /^Perfil de / });
 
-test('"Sair", no menu de perfil, encerra a sessão do Access só com o teclado', async ({ page }) => {
-  // A sessão do Access de verdade (cookie pelo login do mock), não a do asRole.
-  await page.goto('/sites');
-  await page.getByRole('link', { name: 'editor@orakel.local' }).click();
-  await page.waitForLoadState('networkidle');
-  await expect(page.getByRole('banner')).toContainText('editor@orakel.local · editor');
-  await expect(page.getByRole('link', { name: 'Sair' })).toHaveCount(0);
+test(
+  '"Sair", no menu de perfil, encerra a sessão do Access só com o teclado',
+  { tag: '@stack' },
+  async ({ page }) => {
+    // A sessão do Access de verdade (cookie pelo login do mock), não a do asRole.
+    await page.goto('/sites');
+    await page.getByRole('link', { name: 'editor@orakel.local' }).click();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('banner')).toContainText('editor@orakel.local · editor');
+    await expect(page.getByRole('link', { name: 'Sair' })).toHaveCount(0);
 
-  await tabTo(page, profile(page));
-  await page.keyboard.press('Enter');
-  const menu = page.getByRole('menu');
-  await expect(menu).toContainText('editor@orakel.local');
-  const logout = menu.getByRole('menuitem', { name: 'Sair' });
-  await expect(logout).toHaveAttribute('href', '/cdn-cgi/access/logout');
-  await page.keyboard.press('ArrowDown');
-  await expect(logout).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/cdn-cgi\/access\/login/);
+    await tabTo(page, profile(page));
+    await page.keyboard.press('Enter');
+    const menu = page.getByRole('menu');
+    await expect(menu).toContainText('editor@orakel.local');
+    const logout = menu.getByRole('menuitem', { name: 'Sair' });
+    await expect(logout).toHaveAttribute('href', '/cdn-cgi/access/logout');
+    await page.keyboard.press('ArrowDown');
+    await expect(logout).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/cdn-cgi\/access\/login/);
 
-  await page.goto('/sites');
-  await expect(page).toHaveURL(/\/cdn-cgi\/access\/login/);
-  await expect(page.getByRole('link', { name: 'editor@orakel.local' })).toBeVisible();
-});
+    await page.goto('/sites');
+    await expect(page).toHaveURL(/\/cdn-cgi\/access\/login/);
+    await expect(page.getByRole('link', { name: 'editor@orakel.local' })).toBeVisible();
+  },
+);
 
 test('o menu de perfil abre com Espaço e fecha com Esc, devolvendo o foco ao avatar', async ({
   page,
