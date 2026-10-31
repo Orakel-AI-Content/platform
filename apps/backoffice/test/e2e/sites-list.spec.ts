@@ -10,12 +10,12 @@ import { getEnv } from '../../src/env.ts';
 import { asRole } from './auth.ts';
 import { removeSites } from './cleanup.ts';
 
-// Lista de sites (#100, #364) contra o ambiente local: busca, filtro e menu "Mais ações". Os 18
+// Lista de sites (#100, #364) contra o ambiente local: busca e filtro na URL e o axe. Os 18
 // sites além dos do seed são gravados pelo domínio (cadastrar 18 pela tela só tornaria o teste
 // lento) e removidos no fim, com um site pausado por falha permanente e um com último build
 // publicado. A tabela legível de relance a 1280 px (linhas por célula, sem rolagem horizontal) e
 // o seletor de site com 20 sites ficam nos testes de componente (`SitesTable.browser.test.tsx`
-// e `SiteSwitcher.browser.test.tsx`, #460).
+// e `SiteSwitcher.browser.test.tsx`, #460), como o menu "Mais ações" (#476).
 
 const stamp = Date.now();
 const created = Array.from({ length: 18 }, (_, index) => `e2e-lista-${stamp}-${index + 1}`);
@@ -164,70 +164,4 @@ test('busca e filtro por estado ficam na URL e recarregar mantém a mesma visão
   await page.goto('/sites?q=nada-com-isso');
   await expect(table.getByText('Nenhum site encontrado.')).toBeVisible();
   await expect(count).toHaveText('0 resultados');
-});
-
-// "Mais ações" no Dropdown do Ecme (#248): `menu` com `menuitem`, aberto pelo mouse ou pelo
-// teclado; ao abrir, o foco vai ao primeiro item e as setas o levam aos outros.
-test('o menu Mais ações abre e fecha pelo mouse e pelo teclado; Esc devolve o foco', async ({
-  page,
-}) => {
-  await openAsAdmin(page);
-  const button = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
-  const menu = page.getByRole('menu');
-  const first = menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' });
-  const item = menu.getByRole('menuitem', { name: 'Editar configuração exemplo-a' });
-
-  // Mouse: abre no clique e fecha no clique fora.
-  await button.click();
-  await expect(item).toBeVisible();
-  await page.getByRole('heading', { name: 'Sites' }).click();
-  await expect(menu).toHaveCount(0);
-
-  // Teclado: Enter abre com o foco no primeiro item; as setas percorrem; Esc fecha e devolve o
-  // foco ao botão.
-  await button.focus();
-  await page.keyboard.press('Enter');
-  await expect(first).toBeFocused();
-  await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('menuitem', { name: 'Mídia exemplo-a' })).toBeFocused();
-  await page.keyboard.press('ArrowDown');
-  await expect(item).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(menu).toHaveCount(0);
-  await expect(button).toBeFocused();
-
-  // Espaço e seta para baixo no botão também abrem.
-  for (const key of ['Space', 'ArrowDown']) {
-    await page.keyboard.press(key);
-    await expect(first).toBeFocused();
-    await page.keyboard.press('Escape');
-    await expect(menu).toHaveCount(0);
-    await expect(button).toBeFocused();
-  }
-});
-
-test('acionar um item do menu Mais ações fecha a lista e navega, pelo teclado e pelo mouse', async ({
-  page,
-}) => {
-  await openAsAdmin(page);
-  const button = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
-  const menu = page.getByRole('menu');
-
-  // Teclado: Enter no item focado. O foco entra no menu depois que ele abre.
-  await button.focus();
-  await page.keyboard.press('Enter');
-  await expect(menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' })).toBeFocused();
-  await page.keyboard.press('ArrowDown');
-  await expect(menu.getByRole('menuitem', { name: 'Mídia exemplo-a' })).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/sites\/exemplo-a\/midia$/);
-  await expect(menu).toHaveCount(0);
-
-  // Mouse.
-  await page.goBack();
-  await page.waitForLoadState('networkidle');
-  await button.click();
-  await menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' }).click();
-  await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos$/);
-  await expect(menu).toHaveCount(0);
 });
