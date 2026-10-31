@@ -1,25 +1,14 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { asRole } from './auth.ts';
+import { expectNoViolations } from './axe.ts';
 
 // Vitrine dos componentes do Ecme (#205; workspace#45), no E2E só com o que depende do servidor
 // (#459): a página renderizada no servidor sem aviso de hidratação, a Pagination com links lida
-// da URL no servidor (`?pagina-link=`) e o axe da página inteira no tema claro, com foco de 2px
-// e alvos de 24 px. Teclado, foco, axe nos dois temas e movimento de cada componente ficam nos
+// da URL no servidor (`?pagina-link=`) e o axe da página inteira nos dois temas (#476), com foco
+// de 2px e alvos de 24 px no claro. Teclado, foco, axe e movimento de cada componente ficam nos
 // testes de componente em Chromium (`src/**/*.browser.test.tsx`, #457 a #459).
 
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
-
-/**
- * Auditoria do axe na página. Os "focus guards" do floating-ui (#210: Dropdown; também o
- * Tooltip e o DataTable) ficam de fora: são <span tabindex="0" aria-hidden="true"> invisíveis que
- * o FloatingPortal e o FloatingFocusManager criam para manter a ordem do Tab com o menu no fim do
- * <body>, e que repassam o foco na hora. O axe os acusa (`aria-hidden-focus`); desligá-los faria
- * o Tab sair da página a partir do menu (decisão no escalonamento da #210).
- */
-const audit = (page: Page) =>
-  new AxeBuilder({ page }).withTags(WCAG).exclude('[data-floating-ui-focus-guard]').analyze();
 const SHOWCASE = '/teste-de-componentes';
 
 /** Erros e avisos de hidratação (em produção, os erros minificados #418, #423 e #425). */
@@ -43,16 +32,19 @@ async function tabTo(page: Page, target: Locator): Promise<void> {
 
 const section = (page: Page, name: string) => page.getByRole('region', { name });
 
-test('vitrine sem violações do axe, com foco de 2px e alvos de 24 px (light)', async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light' });
+test('vitrine sem violações do axe, com foco de 2px e alvos de 24 px', async ({ page }) => {
   await asRole(page, 'editor');
   const hydration = hydrationMessages(page);
   await page.goto(SHOWCASE);
   await expect(page.getByRole('heading', { name: 'Teste de componentes' })).toBeVisible();
   await page.waitForLoadState('networkidle');
 
-  const accessibility = await audit(page);
-  expect(accessibility.violations).toEqual([]);
+  // Os "focus guards" do floating-ui (#210: Dropdown; também o Tooltip e o DataTable) ficam de
+  // fora: são <span tabindex="0" aria-hidden="true"> invisíveis que o FloatingPortal e o
+  // FloatingFocusManager criam para manter a ordem do Tab com o menu no fim do <body>, e que
+  // repassam o foco na hora. O axe os acusa (`aria-hidden-focus`); desligá-los faria o Tab sair
+  // da página a partir do menu (decisão no escalonamento da #210).
+  await expectNoViolations(page, { exclude: ['[data-floating-ui-focus-guard]'] });
 
   const buttons = section(page, 'Button').getByRole('button');
   expect(await buttons.count()).toBeGreaterThanOrEqual(8);

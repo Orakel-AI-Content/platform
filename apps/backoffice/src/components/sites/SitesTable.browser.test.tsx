@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
 import { cellsOverLines, pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
-import { navigation } from '../../../test/browser/navigation.ts';
+import { followLinks, navigation } from '../../../test/browser/navigation.ts';
 import { ListScreen, renderInFrame } from '../../../test/browser/render.tsx';
 import { SitesTable } from './SitesTable.tsx';
 
@@ -15,7 +15,9 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // #153, #248): com 20 sites numa janela de 1280 px, na moldura do admin (barra de 290 px), nem a
 // página nem a tabela rolam na horizontal e nenhuma célula passa de duas linhas de texto. O pior
 // caso de largura fica nos dados: nome e domínio longos, um site pausado com motivo longo e um
-// com último build e versão longa. As ações são as da operação (publicar e configurar).
+// com último build e versão longa. As ações são as da operação (publicar e configurar). O menu
+// "Mais ações" (#248; antes no E2E, #476) abre pelo mouse e pelo teclado, com o foco no primeiro
+// item e as setas nos outros, e acionar um item fecha o menu e navega.
 
 const STAMP = '1761000000000';
 const LONG_NAME = 'Guia completo de receitas regionais brasileiras para o dia a dia';
@@ -63,14 +65,22 @@ const row = (id: string) =>
     .getByRole('row')
     .filter({ hasText: `${id} · ` });
 
+let unfollow: () => void;
+
 beforeEach(() => {
   // Todos numa página só (o padrão é 25, mas a pessoa pode ter escolhido menos).
   navigation.set('/sites?por-pagina=100');
+  unfollow = followLinks();
 });
 
 afterEach(() => {
+  unfollow();
   navigation.set('/');
 });
+
+const moreActions = () => page.getByRole('button', { name: `Mais ações: ${ids[0]}` });
+const menu = () => page.getByRole('menu');
+const menuItem = (name: string) => menu().getByRole('menuitem', { name: `${name} ${ids[0]}` });
 
 describe('SitesTable no navegador', () => {
   it('com 20 sites a 1280 px, sem rolagem horizontal e com até duas linhas por célula', async () => {
@@ -116,4 +126,55 @@ describe('SitesTable no navegador', () => {
       await expect.element(publish).toHaveFocus();
     },
   );
+
+  it('o menu Mais ações abre e fecha pelo mouse e pelo teclado; Esc devolve o foco', async () => {
+    await renderInFrame(<Sites />, { roles: ['admin'] });
+
+    // Mouse: abre no clique e fecha no clique fora.
+    await moreActions().click();
+    await expect.element(menuItem('Editar configuração')).toBeVisible();
+    await page.getByRole('heading', { name: 'Sites' }).click();
+    await expect.element(menu()).not.toBeInTheDocument();
+
+    // Teclado: Enter abre com o foco no primeiro item; as setas percorrem; Esc fecha e devolve o
+    // foco ao botão.
+    (moreActions().element() as HTMLElement).focus();
+    await userEvent.keyboard('{Enter}');
+    await expect.element(menuItem('Conteúdos')).toHaveFocus();
+    await userEvent.keyboard('{ArrowDown}');
+    await expect.element(menuItem('Mídia')).toHaveFocus();
+    await userEvent.keyboard('{ArrowDown}');
+    await expect.element(menuItem('Editar configuração')).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    await expect.element(menu()).not.toBeInTheDocument();
+    await expect.element(moreActions()).toHaveFocus();
+
+    // Espaço e seta para baixo no botão também abrem.
+    for (const key of [' ', '{ArrowDown}']) {
+      await userEvent.keyboard(key);
+      await expect.element(menuItem('Conteúdos')).toHaveFocus();
+      await userEvent.keyboard('{Escape}');
+      await expect.element(menu()).not.toBeInTheDocument();
+      await expect.element(moreActions()).toHaveFocus();
+    }
+  });
+
+  it('acionar um item do menu Mais ações fecha o menu e navega, pelo teclado e pelo mouse', async () => {
+    await renderInFrame(<Sites />, { roles: ['admin'] });
+
+    (moreActions().element() as HTMLElement).focus();
+    await userEvent.keyboard('{Enter}');
+    await expect.element(menuItem('Conteúdos')).toHaveFocus();
+    await userEvent.keyboard('{ArrowDown}');
+    await expect.element(menuItem('Mídia')).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    expect(navigation.get()).toBe(`/sites/${ids[0]}/midia`);
+    await expect.element(menu()).not.toBeInTheDocument();
+
+    navigation.set('/sites?por-pagina=100');
+    await moreActions().click();
+    await menuItem('Conteúdos').click();
+    expect(navigation.get()).toBe(`/sites/${ids[0]}/conteudos`);
+    await expect.element(menu()).not.toBeInTheDocument();
+  });
 });

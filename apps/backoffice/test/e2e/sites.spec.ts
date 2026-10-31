@@ -1,4 +1,3 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { readFixture } from '../../src/bin/seed.ts';
@@ -8,6 +7,7 @@ import { pauseSite } from '../../src/domain/builds/site-state.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getDatabaseUrl } from '../../src/env.ts';
 import { asRole } from './auth.ts';
+import { expectNoViolations } from './axe.ts';
 import { removeSites } from './cleanup.ts';
 import { fieldLabel } from './fieldLabel.ts';
 
@@ -59,10 +59,7 @@ test(
       .click();
     await expect(page.getByText('Build de exemplo-a enfileirado.')).toBeVisible();
 
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
+    await expectNoViolations(page);
   },
 );
 
@@ -87,13 +84,6 @@ test('editor não vê o download do sites.auto.tfvars.json nem o baixa pela rota
 
 // Cadastro e edição da configuração (#29): formulário só com teclado, erros anunciados e axe.
 
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
-
-async function expectNoViolations(page: Page): Promise<void> {
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(accessibility.violations).toEqual([]);
-}
-
 /** Leva o foco até o controle só com Tab (no máximo 80 passos). */
 async function tabTo(page: Page, target: Locator): Promise<void> {
   for (let step = 0; step < 80; step += 1) {
@@ -116,7 +106,7 @@ test('operação cadastra e edita um site só com o teclado', { tag: '@smoke' },
   // A ação fica no cabeçalho e, com a lista vazia, também no estado vazio (#87).
   await page.getByRole('link', { name: 'Criar site' }).first().click();
   await expect(page.getByRole('heading', { name: 'Criar site' })).toBeVisible();
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await expectNoViolations(page);
 
   await typeInto(page, page.getByLabel(fieldLabel('ID')), siteId);
   await typeInto(page, page.getByLabel(fieldLabel('Nome')), 'Site do E2E');
@@ -205,7 +195,7 @@ test('operação cadastra e edita um site só com o teclado', { tag: '@smoke' },
 // Formulário no visual do Ecme (#245): cadastro e configuração sem violação do axe nos dois
 // temas, com as seções em Card e os campos do FormItem.
 test(`cadastro e configuração sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'operacao');
 
   for (const [path, heading] of [
@@ -214,7 +204,7 @@ test(`cadastro e configuração sem violação do axe`, async ({ page }) => {
   ] as const) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();
-    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations, path).toEqual([]);
+    await expectNoViolations(page);
   }
 
   // Remover recurso confirma num diálogo (#327), sem violação com ele aberto; Cancelar não
@@ -235,7 +225,7 @@ test(`cadastro e configuração sem violação do axe`, async ({ page }) => {
   const dialog = page.getByRole('alertdialog', { name: `Remover recurso ${count + 1}?` });
   await remove.click();
   await expect(dialog).toBeVisible();
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await expectNoViolations(page);
   await dialog.getByRole('button', { name: 'Cancelar' }).click();
   await expect(dialog).toHaveCount(0);
   await expect(remove).toBeFocused();
@@ -336,7 +326,7 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   await newSite(page, siteId);
   await page.getByRole('link', { name: `Site ${siteId}`, exact: true }).click();
   await expect(page.getByRole('heading', { name: new RegExp(siteId) })).toBeVisible();
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await expectNoViolations(page);
 
   // Ciclo de vida: quatro etapas em ordem; só o próximo passo manual, no item que ele conclui.
   // A aba aberta ao entrar é a do ciclo de vida.
@@ -404,7 +394,7 @@ test('operação marca as etapas, registra o G1 e define a janela do site', asyn
   await page.getByRole('button', { name: 'Usar padrão' }).click();
   await expect(status(page, 'Janela padrão restaurada.')).toBeVisible();
   await expect(page.getByText(/Janela efetiva: \d+ s( \(.+\))?, padrão/)).toBeVisible();
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await expectNoViolations(page);
 
   await page.goto('/sites');
   await expect(
@@ -460,7 +450,7 @@ test(
       page.getByRole('status').filter({ hasText: 'Build de exemplo-a enfileirado.' }),
     ).toBeVisible();
     await expect(publish.locator('xpath=..').getByRole('alert')).toBeEmpty();
-    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+    await expectNoViolations(page);
   },
 );
 
@@ -503,7 +493,7 @@ test('operação vê o site pausado com o motivo e sem Publicar agora', async ({
   await expect(publication.getByText(reason, { exact: true })).toBeVisible();
   await page.waitForLoadState('networkidle');
   await expect(page.getByRole('button', { name: /^Publicar agora/ })).toHaveCount(0);
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await expectNoViolations(page);
 });
 
 test('editor vê a página do site sem as ações', async ({ page }) => {
@@ -533,9 +523,9 @@ test('editor vê a página do site sem as ações', async ({ page }) => {
 });
 
 // Visão geral do site em Card e nos campos do Ecme (#246), com as ações da operação, em cada
-// aba (#370), no tema claro.
+// aba (#370), nos dois temas.
 test(`página do site sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'operacao');
   await page.goto('/sites/exemplo-a');
   await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
@@ -581,13 +571,13 @@ test(`página do site sem violação do axe`, async ({ page }) => {
 });
 
 // Mudanças pendentes no DataTable do template (#249, #365): o cadastro registra a configuração
-// v1, e o site novo já tem uma pendência; o axe não acha violação no tema claro. A 1280 px sem
-// rolagem horizontal, as linhas por célula e o tema escuro ficam em
+// v1, e o site novo já tem uma pendência; o axe não acha violação nos dois temas. A 1280 px sem
+// rolagem horizontal e as linhas por célula ficam em
 // `PendingChangesTable.browser.test.tsx` (#460).
 test('mudanças pendentes do site novo, sem violação do axe', async ({ page }) => {
   const siteId = `e2e-pendencias-${Date.now()}`;
   created.push(siteId);
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'operacao');
   await newSite(page, siteId);
   await page.goto(`/sites/${siteId}/pendencias`);
