@@ -18,6 +18,7 @@ import { lastBuilds, type LastBuild } from '../builds/builds.ts';
 import { effectiveBuildWindowMs } from '../builds/schedule.ts';
 import { toRedirect } from '../export/mappers.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
+import { effectiveDailyPublishLimit } from '../publications/publish.ts';
 import { hasPolicyTrigger } from './policy-triggers.ts';
 
 /** Textos das páginas institucionais (o content-model só exporta o schema). */
@@ -41,6 +42,10 @@ export type SiteSummary = {
   buildWindowSeconds: number | null;
   /** Janela que o agendamento usa para o site, em segundos. */
   effectiveBuildWindowSeconds: number;
+  /** Limite diário de publicações próprio do site; nulo usa o padrão (#490). */
+  dailyPublishLimit: number | null;
+  /** Limite diário que a publicação aplica ao site. */
+  effectiveDailyPublishLimit: number;
   /** Fuso IANA da configuração corrente: as telas mostram as datas do site nele. */
   timeZone: string;
 };
@@ -327,6 +332,8 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
         lastBuild: buildsBySite.get(site.id) ?? null,
         buildWindowSeconds: site.buildWindowSeconds,
         effectiveBuildWindowSeconds: effectiveBuildWindowMs(site.buildWindowSeconds) / 1000,
+        dailyPublishLimit: site.dailyPublishLimit,
+        effectiveDailyPublishLimit: effectiveDailyPublishLimit(site.dailyPublishLimit),
         timeZone: config?.timeZone ?? DEFAULT_TIME_ZONE,
       };
     }),

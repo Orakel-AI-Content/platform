@@ -2,6 +2,7 @@ import { LifecycleSteps } from '@/components/sites/LifecycleSteps';
 import { RedirectUsageAlert } from '@/components/sites/RedirectUsageAlert';
 import {
   BuildWindowForm,
+  DailyPublishLimitForm,
   LifecycleAction,
   LifecycleActionScope,
   RegisterG1Form,
@@ -24,6 +25,7 @@ import {
   publishNow,
   registerG1Action,
   setBuildWindowAction,
+  setDailyPublishLimitAction,
 } from '../actions.ts';
 import { sitePageContext } from './editorial-page.tsx';
 
@@ -31,11 +33,11 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Página do site na tela de detalhe do guia (#370): o resumo à esquerda (dados de publicação e
- * "Publicar agora", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1 e
- * Janela de agrupamento (empilham abaixo de `xl`). Lê o site pelo sitePageContext (a mesma
+ * "Publicar agora", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1,
+ * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo sitePageContext (a mesma
  * busca do layout), os gatilhos e o uso de redirects, que vira um aviso acima do resumo quando
- * o core marca `alert` (#487); as ações do ciclo, do G1 e da janela e "Editar configuração"
- * só aparecem com site.configure, e o domínio confere de novo.
+ * o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do limite e "Editar
+ * configuração" só aparecem com site.configure, e o domínio confere de novo.
  */
 export default async function SitePage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
@@ -48,7 +50,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const canConfigure = can(actor, 'site.configure');
   const canPublish = can(actor, 'operations.run') && site.state !== 'pausado';
 
-  // Dica e estado das abas de G1 e janela (o nome da aba é o título): com permissão, o corpo do
+  // Dica e estado das abas de G1, janela e limite (o nome da aba é o título): com permissão, o corpo do
   // cartão do formulário (gerado do schema, botões no rodapé, #333); sem, um cartão só de leitura.
   const g1Intro = (
     <>
@@ -76,6 +78,22 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         <strong>
           {formatDuration(site.effectiveBuildWindowSeconds)},{' '}
           {site.buildWindowSeconds === null ? 'padrão' : 'própria'}
+        </strong>
+      </p>
+    </>
+  );
+
+  const limitIntro = (
+    <>
+      <p className={SECTION_HINT_CLASS}>
+        Quantas publicações o site aceita por dia, contadas no dia de São Paulo: a que passaria do
+        limite é recusada.
+      </p>
+      <p className="text-sm">
+        Limite efetivo:{' '}
+        <strong>
+          {site.effectiveDailyPublishLimit} por dia,{' '}
+          {site.dailyPublishLimit === null ? 'padrão' : 'próprio'}
         </strong>
       </p>
     </>
@@ -136,6 +154,17 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
               />
             ) : (
               <Card bodyClass="space-y-3">{windowIntro}</Card>
+            )
+          }
+          dailyLimit={
+            canConfigure ? (
+              <DailyPublishLimitForm
+                intro={limitIntro}
+                own={site.dailyPublishLimit}
+                action={setDailyPublishLimitAction.bind(null, site.id)}
+              />
+            ) : (
+              <Card bodyClass="space-y-3">{limitIntro}</Card>
             )
           }
         />

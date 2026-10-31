@@ -11,15 +11,17 @@ import type { SiteSummary } from '@/domain/sites/sites.ts';
 import type { SiteFormResult } from './siteConfigFormValues.ts';
 import {
   BuildWindowSchema,
+  DailyPublishLimitSchema,
   RegisterG1Schema,
   type BuildWindowValue,
+  type DailyPublishLimitValue,
   type RegisterG1Value,
 } from './siteOperationForms.ts';
 
 // Ações da página do site, no padrão do "Publicar agora": a Server Action delega ao domínio,
 // o sucesso vai para o toast e o erro para o Alert junto da ação. G1 e janela são formulários
-// gerados do schema, em cartão com os botões no rodapé (#333). A página só as mostra com
-// site.configure.
+// gerados do schema, em cartão com os botões no rodapé (#333), como o limite diário (#490). A
+// página só as mostra com site.configure.
 
 const NEXT_STEP = {
   cadastrado: {
@@ -136,6 +138,41 @@ export function BuildWindowForm({
           label: 'Usar padrão',
           pendingLabel: 'Usando padrão…',
           resetTo: { buildWindowSeconds: '' },
+          run: async () => outcome(await action(null)),
+        },
+      }}
+      submitLabel="Salvar"
+      pendingLabel="Salvando…"
+      onSubmit={async (value) => outcome(await action(value))}
+    />
+  );
+}
+
+/**
+ * Limite diário próprio de publicações (#490), no molde da janela: gerado do schema, e
+ * "Usar padrão" volta a PUBLISH_DAILY_LIMIT sem passar pelo schema.
+ */
+export function DailyPublishLimitForm({
+  intro,
+  own,
+  action,
+}: {
+  intro: ReactNode;
+  own: number | null;
+  action: (value: DailyPublishLimitValue | null) => Promise<SiteFormResult>;
+}) {
+  return (
+    <SchemaForm
+      schema={DailyPublishLimitSchema}
+      defaultValues={{ dailyPublishLimit: own ?? '' }}
+      labels={{ dailyPublishLimit: 'Limite próprio (publicações por dia)' }}
+      card={{
+        intro,
+        size: 'sm',
+        extra: {
+          label: 'Usar padrão',
+          pendingLabel: 'Usando padrão…',
+          resetTo: { dailyPublishLimit: '' },
           run: async () => outcome(await action(null)),
         },
       }}

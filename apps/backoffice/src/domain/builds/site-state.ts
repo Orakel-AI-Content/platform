@@ -1,7 +1,7 @@
-// Colunas operacionais do site (estado, motivo da pausa, ciclo de vida, janela dos builds),
-// gravadas pelo build e pela operação. Não vão para o snapshot: gravar aqui não gera
-// mudança pendente — senão cada build agendaria outro. Único módulo fora de pending-changes
-// liberado no teste de varredura.
+// Colunas operacionais do site (estado, motivo da pausa, ciclo de vida, janela dos builds,
+// limite diário de publicações), gravadas pelo build e pela operação. Não vão para o
+// snapshot: gravar aqui não gera mudança pendente — senão cada build agendaria outro. Único
+// módulo fora de pending-changes liberado no teste de varredura.
 import type { Result } from '@orakel/content-model';
 import { and, eq, ne } from 'drizzle-orm';
 
@@ -105,6 +105,46 @@ export async function setBuildWindow(
   const updated = await tx
     .update(sites)
     .set({ buildWindowSeconds: seconds })
+    .where(eq(sites.id, siteId))
+    .returning({ id: sites.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  return { ok: true, value: undefined };
+}
+
+/**
+ * Define o limite diário de publicações do site (#490); `null` volta ao padrão
+ * (PUBLISH_DAILY_LIMIT). A tela aceita só inteiro 1 ou mais: o `0` que o banco aceita
+ * (bloqueia as publicações, ADR 0017) fica fora dela. Vale para a próxima publicação.
+ */
+export async function setDailyPublishLimit(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  limit: number | null,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+  if (limit !== null && !(Number.isInteger(limit) && limit >= 1)) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'site.daily_publish_limit_invalid',
+          message: `O limite é um número inteiro de publicações, 1 ou mais; recebido ${limit}`,
+          path: ['dailyPublishLimit'],
+        },
+      ],
+    };
+  }
+
+  const updated = await tx
+    .update(sites)
+    .set({ dailyPublishLimit: limit })
     .where(eq(sites.id, siteId))
     .returning({ id: sites.id });
   if (updated.length === 0) {
