@@ -60,6 +60,7 @@ const TABLES = [
   'builds',
   'pending_changes',
   'reviews',
+  'publications',
   'content_versions',
   'contents',
   'redirects',

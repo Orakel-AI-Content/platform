@@ -23,9 +23,17 @@ export const sites = pgTable(
      * Operacional: fora da SiteConfig e do snapshot.
      */
     buildWindowSeconds: integer(),
+    /**
+     * Limite diário de publicações do site (dia de America/Sao_Paulo); nulo usa
+     * PUBLISH_DAILY_LIMIT. Operacional: fora da SiteConfig e do snapshot.
+     */
+    dailyPublishLimit: integer(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [check('sites_build_window_seconds_check', sql`${t.buildWindowSeconds} >= 0`)],
+  (t) => [
+    check('sites_build_window_seconds_check', sql`${t.buildWindowSeconds} >= 0`),
+    check('sites_daily_publish_limit_check', sql`${t.dailyPublishLimit} >= 0`),
+  ],
 );
 
 /** Configuração versionada: a corrente é a de maior versão. */

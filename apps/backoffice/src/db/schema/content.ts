@@ -178,3 +178,23 @@ export const reviews = pgTable('reviews', {
   checklist: jsonb().$type<string[]>().notNull(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Publicações (workspace#20): uma linha por ação de publicar, com quem e quando. Operacional,
+ * fora do snapshot; é a base da contagem do limite diário do site (dia de America/Sao_Paulo).
+ */
+export const publications = pgTable(
+  'publications',
+  {
+    id: serial().primaryKey(),
+    siteId: siteId(),
+    contentId: integer().notNull(),
+    version: integer().notNull(),
+    /** E-mail de quem publicou. */
+    publishedBy: text().notNull(),
+    publishedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Horário marcado, quando a publicação veio de um agendamento (Task do agendamento). */
+    scheduledFor: timestamp({ withTimezone: true }),
+  },
+  (t) => [index('publications_site_published_at_idx').on(t.siteId, t.publishedAt)],
+);
