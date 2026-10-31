@@ -1,4 +1,3 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { readFixture } from '../../src/bin/seed.ts';
@@ -8,6 +7,7 @@ import { recordBuild } from '../../src/domain/builds/builds.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { asRole } from './auth.ts';
+import { expectNoViolations } from './axe.ts';
 import { removeSites } from './cleanup.ts';
 
 // Lista de sites (#100, #364) contra o ambiente local: busca e filtro na URL e o axe. Os 18
@@ -109,16 +109,13 @@ async function openAsAdmin(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
 }
 
-// Cabeçalho (título e ações) no visual do Ecme (#247); o tema escuro fica no teste de componente.
+// Cabeçalho (título e ações) no visual do Ecme (#247), nos dois temas.
 test(`a lista de sites sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await openAsAdmin(page);
   await expect(page.getByRole('link', { name: 'Criar site' })).toBeVisible();
 
-  const accessibility = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-    .analyze();
-  expect(accessibility.violations).toEqual([]);
+  await expectNoViolations(page);
 
   // "Publicar agora" da linha confirma num diálogo (#327), sem violação com ele aberto;
   // Cancelar não publica e devolve o foco ao botão da linha.
@@ -126,10 +123,7 @@ test(`a lista de sites sem violação do axe`, async ({ page }) => {
   await publish.click();
   const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
   await expect(dialog).toBeVisible();
-  const withDialog = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-    .analyze();
-  expect(withDialog.violations).toEqual([]);
+  await expectNoViolations(page);
   await dialog.getByRole('button', { name: 'Cancelar' }).click();
   await expect(dialog).toHaveCount(0);
   await expect(publish).toBeFocused();

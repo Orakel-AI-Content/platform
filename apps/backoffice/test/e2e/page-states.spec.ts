@@ -1,20 +1,13 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { asRole } from './auth.ts';
+import { expectNoViolations } from './axe.ts';
 
 // Telas de estado do Backoffice (#77, workspace#32) contra o ambiente local: "não encontrado"
 // e erro dentro do layout, com o cabeçalho, e o carregamento na navegação. A tela de erro usa
 // a página /teste-de-erro, ligada só no local (E2E_ERROR_ROUTE no compose).
 
 const OPERATOR = 'operacao@orakel.local';
-
-async function expectNoAxeViolations(page: Page): Promise<void> {
-  const accessibility = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-    .analyze();
-  expect(accessibility.violations).toEqual([]);
-}
 
 test(
   'endereço inexistente mostra "não encontrado" com o cabeçalho e status 404',
@@ -34,25 +27,19 @@ test(
   },
 );
 
-// Telas de estado no visual do Ecme (#283), no tema claro (o escuro, nos testes de componente).
-test(`"não encontrado" sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+// Telas de estado no visual do Ecme (#283), nos dois temas: "não encontrado" e erro.
+test(`"não encontrado" e erro sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'operacao');
   for (const path of ['/qualquer', '/sites/exemplo-a/nada/aqui']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { name: 'Página não encontrada' })).toBeVisible();
-    await expect(page.locator('html')).toHaveClass(new RegExp(`\\blight\\b`));
-    await expectNoAxeViolations(page);
+    await expectNoViolations(page);
   }
-});
 
-test(`tela de erro sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await asRole(page, 'operacao');
   await page.goto('/teste-de-erro');
   await expect(page.getByRole('heading', { name: 'Algo deu errado' })).toBeVisible();
-  await expect(page.locator('html')).toHaveClass(new RegExp(`\\blight\\b`));
-  await expectNoAxeViolations(page);
+  await expectNoViolations(page);
 });
 
 test('exceção numa página mostra a tela de erro, e "Tentar de novo" busca de novo', async ({

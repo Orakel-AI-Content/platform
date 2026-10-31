@@ -1,7 +1,7 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { asRole } from './auth.ts';
+import { expectNoViolations as expectAxe } from './axe.ts';
 import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
 
@@ -10,14 +10,11 @@ import { chooseOption } from './select.ts';
 // busca e paginação (#108, #363): o item novo, no fim da ordem por ID, é achado pela busca (o
 // banco local acumula itens entre rodadas).
 
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
-
 async function expectNoViolations(page: Page): Promise<void> {
   // Depois de uma navegação no cliente, o <title> chega em streaming; no `next dev` da camada
   // `telas`, depois do axe.
   await expect(page).toHaveTitle(/\S/);
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(accessibility.violations).toEqual([]);
+  await expectAxe(page);
 }
 
 test(
@@ -98,37 +95,10 @@ test(
   },
 );
 
-// Cabeçalho da tela de site (trilha, título e ação) no visual do Ecme (#247), no tema claro.
-test(`tela de site sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await asRole(page, 'editor');
-  await page.goto('/sites/exemplo-a/autores');
-  await expect(page.getByRole('heading', { level: 1, name: 'Autores' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Criar autor' }).first()).toBeVisible();
-  await page.waitForLoadState('networkidle');
-
-  await expectNoViolations(page);
-});
-
-// Resumo de validação do SchemaForm no Alert do Ecme (#325), no tema claro.
-test(`resumo de validação no Alert, sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await asRole(page, 'editor');
-  await page.goto('/sites/exemplo-a/autores/novo');
-  await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
-  await page.getByRole('button', { name: 'Criar' }).click();
-
-  const summary = page.getByRole('alert').filter({ hasText: 'Corrija os campos destacados:' });
-  await expect(summary.locator('.alert')).toBeVisible();
-  await summary.getByRole('button', { name: /^Nome:/ }).click();
-  await expect(page.getByLabel(fieldLabel('Nome'))).toBeFocused();
-  await expectNoViolations(page);
-});
-
-// Remover item de lista do SchemaForm confirma num diálogo (#327), no tema claro: Esc não
+// Remover item de lista do SchemaForm confirma num diálogo (#327), nos dois temas: Esc não
 // remove e devolve o foco; "Remover" tira o item. Nada é salvo.
 test(`remover item do menu confirma, sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/menus');
   await page.getByRole('link', { name: 'Editar principal' }).click();
@@ -153,11 +123,12 @@ test(`remover item do menu confirma, sem violação do axe`, async ({ page }) =>
   await expect(labels).toHaveCount(count);
 });
 
-// Formulário do template (#328), no tema claro: campos em Card, Nome e Slug lado a lado a
-// partir de md, a barra fixa na largura do main com Descartar (criar) ou Voltar (editar).
+// Formulário do template (#328), nos dois temas: campos em Card, Nome e Slug lado a lado a
+// partir de md, a barra fixa na largura do main com Descartar (criar) ou Voltar (editar), e o
+// resumo de validação do SchemaForm no Alert do Ecme (#325).
 test(`formulário de autor no template, sem violação do axe`, async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/autores/novo');
   await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
@@ -183,6 +154,14 @@ test(`formulário de autor no template, sem violação do axe`, async ({ page })
   // Uma coluna: cada campo na sua linha (o schema põe o Slug antes do Nome).
   expect((await name.boundingBox())!.y).toBeGreaterThan((await slug.boundingBox())!.y);
   await page.setViewportSize({ width: 1280, height: 800 });
+
+  // Resumo de validação: o link do campo leva o foco a ele.
+  await page.getByRole('button', { name: 'Criar' }).click();
+  const summary = page.getByRole('alert').filter({ hasText: 'Corrija os campos destacados:' });
+  await expect(summary.locator('.alert')).toBeVisible();
+  await summary.getByRole('button', { name: /^Nome:/ }).click();
+  await expect(name).toBeFocused();
+  await expectNoViolations(page);
 
   // Descartar confirma: Cancelar fica com o que foi digitado; Descartar volta à lista sem criar.
   await name.fill('Rascunho descartado');
@@ -264,10 +243,10 @@ test('menus: busca pela chave na URL, sem resultado na tabela e itens cortados',
   await expect(table.getByRole('row', { name: /principal/ })).toBeVisible();
 });
 
-// Padrão do template (#363): trilha acima do cartão; título, ação, toolbar e tabela nele, nas
-// três listas, no tema claro.
+// Padrão do template (#363) e cabeçalho da tela de site no visual do Ecme (#247): trilha acima
+// do cartão; título, ação, toolbar e tabela nele, nas três listas, nos dois temas.
 test(`listas editoriais no cartão do template, sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'editor');
   for (const [segment, title] of [
     ['autores', 'Autores'],

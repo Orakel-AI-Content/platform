@@ -1,7 +1,7 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { asRole } from './auth.ts';
+import { expectNoViolations } from './axe.ts';
 
 // Cabeçalho da área autenticada (#170): "Sair", no menu de perfil (#239), encerra a sessão do
 // Access só com o teclado. O "Pular para o conteúdo", a marca e o menu de perfil (teclado e axe)
@@ -51,8 +51,6 @@ test(
 // áreas do site já no HTML do servidor; e sem violação do axe. O item atual pelo endereço fica
 // em `CollapsibleSide.browser.test.tsx` (#476).
 
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
-
 test('a moldura aparece em /sites, numa tela de site e no 404, com e-mail e papéis no banner', async ({
   page,
 }) => {
@@ -79,16 +77,11 @@ test('o HTML do servidor já traz as áreas do site, com a atual marcada', async
 });
 
 test(`a moldura sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'editor');
   for (const path of ['/sites', '/sites/exemplo-a/autores']) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .include('.side-nav')
-      .include('.header')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
+    await expectNoViolations(page, { include: ['.side-nav', '.header'] });
   }
 });

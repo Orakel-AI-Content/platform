@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 
-import AxeBuilder from '@axe-core/playwright';
 import { contentPath, mediaUrl } from '@orakel/core/v1';
 import { expect, test, type Page } from '@playwright/test';
 import { and, eq } from 'drizzle-orm';
@@ -19,6 +18,7 @@ import { currentConfig } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { createS3Client, s3ObjectStore } from '../../src/lib/s3.ts';
 import { asRole } from './auth.ts';
+import { expectNoViolations } from './axe.ts';
 import { removeSites } from './cleanup.ts';
 import { createVolumeSite, seedMedia } from '../volume.ts';
 
@@ -28,7 +28,6 @@ import { createVolumeSite, seedMedia } from '../volume.ts';
 // Precisa do .env.local (banco e S3, pelo playwright.config.ts) e de exemplo-a semeado.
 
 const SITE = 'exemplo-a';
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 const FIXTURE = new URL('fixtures/foto-gps.jpg', import.meta.url);
 
 test.setTimeout(240_000);
@@ -275,16 +274,26 @@ test.describe('biblioteca de mídia (#186)', () => {
     await expect(page.getByText('foto-24.jpg ·', { exact: false })).toHaveCount(0);
   });
 
-  // "Copiar identificador" no retorno padrão (#326): o toast fica fora da app que o diálogo
-  // deixa inerte e é anunciado com ele aberto; no tema claro. O cabeçalho é o nativo do Dialog
-  // (#374): o nome num `h4` e um X "Fechar" só, que fecha e devolve o foco à imagem.
-  test(`copiar o identificador com o diálogo aberto confirma no toast`, async ({
-    page,
-    context,
-  }) => {
+  // Busca, contagem e paginação nos controles do Ecme (#269) e "Copiar identificador" no retorno
+  // padrão (#326), nos dois temas: o toast fica fora da app que o diálogo deixa inerte e é
+  // anunciado com ele aberto. O cabeçalho é o nativo do Dialog (#374): o nome num `h4` e um X
+  // "Fechar" só, que fecha e devolve o foco à imagem.
+  test(`lista e diálogo com o toast de copiar sem violação do axe`, async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await asRole(page, 'editor');
+    await page.goto(`/sites/${LIBRARY_SITE}/midia?pagina=2`);
+    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+      '30 resultados',
+    );
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Paginação' })
+        .getByRole('button', { name: 'Página 2', exact: true }),
+    ).toHaveAttribute('aria-current', 'page');
+    await page.waitForLoadState('networkidle');
+    await expectNoViolations(page);
+
     await page.goto(`/sites/${LIBRARY_SITE}/midia`);
     const image = page.getByRole('button', { name: /^foto-1\.jpg ·/ });
     await image.click();
@@ -303,31 +312,11 @@ test.describe('biblioteca de mídia (#186)', () => {
     await expect(details.locator('dd.tabular-nums')).toHaveText(copied);
 
     await page.mouse.move(0, 0);
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
+    await expectNoViolations(page);
 
     await details.getByRole('button', { name: 'Fechar' }).click();
     await expect(details).toBeHidden();
     await expect(image).toBeFocused();
-  });
-
-  // Busca, contagem e paginação nos controles do Ecme (#269), no tema claro.
-  test(`lista sem violação do axe`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await asRole(page, 'editor');
-    await page.goto(`/sites/${LIBRARY_SITE}/midia?pagina=2`);
-    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-      '30 resultados',
-    );
-    await expect(
-      page
-        .getByRole('navigation', { name: 'Paginação' })
-        .getByRole('button', { name: 'Página 2', exact: true }),
-    ).toHaveAttribute('aria-current', 'page');
-    await page.waitForLoadState('networkidle');
-
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
   });
 });
 
@@ -377,10 +366,10 @@ test(
   },
 );
 
-// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, no tema claro, com
+// Fila de envio nos tokens do Ecme (#281): um envio pronto e um recusado, nos dois temas, com
 // um único `role="status"` para a fila (#375), e o diálogo de envio aberto (#376).
 test(`fila de envio preenchida sem violação do axe`, { tag: '@stack' }, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const small = await sharp({
     create: { width: 320, height: 240, channels: 3, background: '#e76f51' },
   })
@@ -392,8 +381,7 @@ test(`fila de envio preenchida sem violação do axe`, { tag: '@stack' }, async 
   await page.getByRole('button', { name: 'Enviar imagens' }).first().click();
   const upload = uploadDialog(page);
   await expect(upload.dialog).toBeVisible();
-  const dialogAccessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(dialogAccessibility.violations).toEqual([]);
+  await expectNoViolations(page);
 
   await upload.input.setInputFiles([
     { name: `axe-light.jpg`, mimeType: 'image/jpeg', buffer: small },
@@ -411,6 +399,5 @@ test(`fila de envio preenchida sem violação do axe`, { tag: '@stack' }, async 
   );
   await expect(page.getByRole('list', { name: 'Envios' }).getByRole('status')).toHaveCount(0);
 
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(accessibility.violations).toEqual([]);
+  await expectNoViolations(page);
 });

@@ -1,13 +1,11 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { asRole } from './auth.ts';
+import { expectNoViolations } from './axe.ts';
 import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
 
 // Fila de revisão (#74) contra o ambiente local semeado: o editor cria um artigo, envia pela
 // página do conteúdo e o encontra na fila; o revisor vê a fila mas não o botão de enviar.
-
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
 /**
  * Fila filtrada pela busca (#365): a fila é paginada e vem da mais antiga para a mais recente,
@@ -106,8 +104,10 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
     new RegExp(`/sites/exemplo-a/revisao/\\d+$`),
   );
 
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(accessibility.violations).toEqual([]);
+  // A fila no DataTable do template (#276, #365), sem violação do axe nos dois temas. A 1280 px
+  // sem rolagem horizontal e as linhas por célula ficam em `ReviewQueueTable.browser.test.tsx`
+  // (#460).
+  await expectNoViolations(page);
 
   // O revisor também alcança a fila pela navegação.
   await reviewer.goto('/sites/exemplo-a');
@@ -118,26 +118,6 @@ test('editor envia pela página do conteúdo e o artigo aparece na fila do site'
   await expect(reviewer).toHaveURL(/\/sites\/exemplo-a\/revisao$/);
   await reviewer.getByLabel('Buscar por título').fill(slug);
   await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toBeVisible();
-});
-
-// Fila no DataTable do template (#276, #365): o artigo enviado aparece, e o axe não acha violação
-// no tema claro. A 1280 px sem rolagem horizontal, as linhas por célula e o tema escuro ficam em
-// `ReviewQueueTable.browser.test.tsx` (#460).
-test('fila com o artigo enviado, sem violação do axe', async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  const slug = `e2e-fila-${Date.now()}`;
-  const title = `Artigo ${slug}`;
-  await asRole(page, 'editor');
-  await createDraft(page, title, slug);
-  await page.getByRole('button', { name: 'Enviar para revisão' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
-
-  await page.goto(queueFor(slug));
-  const table = page.getByRole('table', { name: 'Revisão', exact: true });
-  await expect(table.getByRole('row', { name: new RegExp(title) })).toBeVisible();
-
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(accessibility.violations).toEqual([]);
 });
 
 // Tela de revisão (#75): a visualização fica em preview.*, com sessão própria no Access.
@@ -207,7 +187,7 @@ test(
 );
 
 // Tela de revisão no Ecme (#277): o painel junto da visualização, com checklist e "Aprovar", e
-// o axe sem violação no tema claro (fora o iframe, que é o site).
+// o axe sem violação nos dois temas (fora o iframe, que é o site).
 test(`tela de revisão sem violação do axe`, { tag: '@stack' }, async ({ page, browser }) => {
   const slug = `e2e-tela-light-${Date.now()}`;
   const title = `Artigo ${slug}`;
@@ -243,10 +223,6 @@ test(`tela de revisão sem violação do axe`, { tag: '@stack' }, async ({ page,
   const frame = reviewer.locator('iframe');
   expect(await frame.evaluate((element) => element.closest('.card') !== null)).toBe(true);
 
-  const accessibility = await new AxeBuilder({ page: reviewer })
-    .withTags(WCAG)
-    .exclude('iframe')
-    .analyze();
-  expect(accessibility.violations).toEqual([]);
+  await expectNoViolations(reviewer, { exclude: ['iframe'] });
   await context.close();
 });

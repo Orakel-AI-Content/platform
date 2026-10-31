@@ -1,4 +1,3 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
 import { readFixture } from '../../src/bin/seed.ts';
@@ -7,6 +6,7 @@ import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
 import { getEnv } from '../../src/env.ts';
 import { asRole } from './auth.ts';
+import { expectNoViolations } from './axe.ts';
 import { removeSites } from './cleanup.ts';
 import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
@@ -16,7 +16,6 @@ import { createVolumeSite, seedContents, seedMedia } from '../volume.ts';
 // texto, imagem e FAQ e o acha na lista; o revisor não grava nada. Listas (#107): num site
 // próprio, gravado direto no banco e removido no fim.
 
-const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 /** Região dos toasts (#212): o retorno das ações vai para ela, fora do main (#326). */
 const toastRegion = (page: Page) => page.locator('[data-toast-placement="top-end"]');
 
@@ -178,8 +177,7 @@ test(
     await expect(page.locator('.form-explain')).toHaveCSS('opacity', '1');
     // O ponteiro ficou sobre "Criar conteúdo" desde o clique; o axe audita o rodapé em repouso.
     await page.mouse.move(0, 0);
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
+    await expectNoViolations(page);
 
     await alt.fill('Mesa organizada');
     await page.getByRole('button', { name: 'Criar', exact: true }).click();
@@ -195,76 +193,6 @@ test(
     await expect(row).toContainText('Rascunho');
   },
 );
-
-// Campos de imagem, de entidades e de data no Ecme (#272, #331): com os seletores abertos (#280) e com a
-// capa escolhida (miniatura, "Trocar" e "Remover" na tela), sem violação do axe no tema claro.
-test(`campos de imagem, entidades e data sem violação do axe`, async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await asRole(page, 'editor');
-  await page.goto('/sites/exemplo-a/conteudos/novo');
-  await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
-
-  const cover = page.getByRole('group', { name: 'Capa', exact: true });
-  await cover.getByRole('button', { name: 'Escolher imagem' }).click();
-  const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
-  // O seletor aberto (Dialog do Ecme, #280), com a grade e a paginação.
-  await expect(grid.getByRole('status')).toHaveText(/^Página 1 de \d+ · \d+ image(m|ns)$/);
-  await expect(grid.getByRole('navigation', { name: 'Paginação' })).toBeVisible();
-  await page.mouse.move(0, 0);
-  const picker = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(picker.violations).toEqual([]);
-  await grid
-    .getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ })
-    .first()
-    .click();
-  await expect(grid).toBeHidden();
-  await expect(cover.getByRole('button', { name: 'Remover' })).toBeVisible();
-  const authors = page.getByRole('combobox', { name: fieldLabel('Autores') });
-  await expect(authors).toBeVisible();
-  await expect(page.getByRole('combobox', { name: fieldLabel('Taxonomias') })).toBeVisible();
-  const date = page.getByRole('combobox', { name: 'Data de publicação' });
-  await expect(date).toBeVisible();
-
-  await page.mouse.move(0, 0);
-  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(accessibility.violations).toEqual([]);
-  // Select múltiplo dos autores (#330) aberto pelo teclado, sem violação com a lista aberta.
-  await authors.focus();
-  await page.keyboard.press('ArrowDown');
-  await expect(page.getByRole('listbox')).toBeVisible();
-  const withMenu = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(withMenu.violations).toEqual([]);
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-
-  // A data é o DateTimepicker do Ecme (#331): o painel aberto, sem violação; Esc fecha e
-  // devolve o foco ao campo.
-  await date.focus();
-  await page.keyboard.press('Enter');
-  const datePanel = page.getByRole('dialog', { name: 'Escolher data e hora' });
-  await expect(datePanel).toBeVisible();
-  await page.mouse.move(0, 0);
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
-  await page.keyboard.press('Escape');
-  await expect(datePanel).toBeHidden();
-  await expect(date).toBeFocused();
-
-  // "Remover" da capa confirma num diálogo (#327), sem violação com ele aberto: Cancelar
-  // mantém a imagem; "Remover" esvazia o campo e leva o foco a "Escolher imagem".
-  const remove = cover.getByRole('button', { name: 'Remover' });
-  const dialog = page.getByRole('alertdialog', { name: 'Remover a imagem de Capa?' });
-  await remove.click();
-  await expect(dialog).toBeVisible();
-  const withDialog = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(withDialog.violations).toEqual([]);
-  await dialog.getByRole('button', { name: 'Cancelar' }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(remove).toBeFocused();
-  await remove.click();
-  await dialog.getByRole('button', { name: 'Remover' }).click();
-  await expect(cover.getByText('Nenhuma imagem')).toBeVisible();
-  await expect(cover.getByRole('button', { name: 'Escolher imagem' })).toBeFocused();
-});
 
 test(
   'revisor não tem editor nem link para criar ou editar',
@@ -290,11 +218,10 @@ test(
 
 // Histórico de versões e leitura de uma versão no Ecme (#271, #366, #371, #372): a tela do
 // conteúdo com o cartão "Versões" (trilha e título fora do cartão; o h2, a toolbar e a tabela
-// nele) e a de uma versão, com "Voltar às versões" e "Editar" do mesmo tamanho; o axe no tema
-// claro. A 1280 px sem rolar a página, as linhas por célula, o filtro na URL e o tema escuro
-// ficam em `ContentVersionsTable.browser.test.tsx` (#460).
+// nele) e a de uma versão, com "Voltar às versões" e "Editar" do mesmo tamanho; o axe nos dois
+// temas. A 1280 px sem rolar a página, as linhas por célula e o filtro na URL ficam em `ContentVersionsTable.browser.test.tsx` (#460).
 test('versões e uma versão no cartão, sem violação do axe', async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/conteudos');
   await page
@@ -329,7 +256,7 @@ test('versões e uma versão no cartão, sem violação do axe', async ({ page }
     /^\d+ resultados?$/,
   );
   await page.waitForLoadState('networkidle');
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await expectNoViolations(page);
 
   await table.getByRole('link', { name: 'Versão 1', exact: true }).click();
   const back = page.getByRole('link', { name: 'Voltar às versões' });
@@ -339,7 +266,7 @@ test('versões e uma versão no cartão, sem violação do axe', async ({ page }
   const [backBox, editBox] = [(await back.boundingBox())!, (await edit.boundingBox())!];
   expect(backBox.height).toBe(editBox.height);
   await page.waitForLoadState('networkidle');
-  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await expectNoViolations(page);
 });
 
 // Uma versão em cartões (#372): sem content.write, o cabeçalho só traz o voltar. A 375 px, a URL
@@ -511,6 +438,10 @@ test.describe('lista de conteúdos (#107)', () => {
     await page.goto(`/sites/${LIST_SITE}/conteudos`);
     await expect(count).toHaveText('60 resultados');
     await expect(page.getByRole('row')).toHaveCount(26);
+    // Lista cheia na Table do Ecme (#273): a página de 25 linhas sem violação do axe. A 1280 px
+    // sem rolagem horizontal e as linhas por célula ficam em `ContentsTable.browser.test.tsx`
+    // (#460).
+    await expectNoViolations(page);
     await expect(page.getByRole('columnheader', { name: /Última alteração/ })).toHaveAttribute(
       'aria-sort',
       'descending',
@@ -561,21 +492,7 @@ test.describe('lista de conteúdos (#107)', () => {
     );
     await expect(other.getByRole('row').nth(1)).toHaveText(firstRow ?? '');
 
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
-  });
-
-  // Lista cheia na Table do Ecme (#273): a página de 25 linhas sem violação do axe. A 1280 px
-  // sem rolagem horizontal, as linhas por célula e o tema escuro ficam em
-  // `ContentsTable.browser.test.tsx` (#460).
-  test('lista cheia sem violação do axe', async ({ page }) => {
-    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await asRole(page, 'editor');
-    await page.goto(`/sites/${LIST_SITE}/conteudos`);
-    await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(25);
-
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
+    await expectNoViolations(page);
   });
 
   // Regra única do estado vazio (#361, #362): a tabela fica, com "0 resultados", e a ação de
@@ -694,7 +611,7 @@ test.describe('barra de ações do editor (#109)', () => {
 
   // Remover bloco se desfaz pelo toast (#112, #326): sem região nem botão no rodapé.
   test(`remover bloco mostra o toast com Desfazer, que o devolve`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await asRole(page, 'editor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
     const blocks = page.getByRole('group', { name: /^Bloco \d+:/ });
@@ -706,8 +623,7 @@ test.describe('barra de ações do editor (#109)', () => {
     await expect(blocks).toHaveCount(19);
     await expect(page.getByRole('main').getByRole('button', { name: 'Desfazer' })).toHaveCount(0);
     await page.mouse.move(0, 0);
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
+    await expectNoViolations(page);
 
     await undo.click();
     await expect(blocks).toHaveCount(20);
@@ -845,11 +761,75 @@ test.describe('barra de ações do editor (#109)', () => {
     page.removeAllListeners('dialog');
   });
 
-  // Editor no Ecme (#274): com um bloco recolhido, o menu de inserir aberto e o rodapé fixo,
-  // sem violação do axe no tema claro.
-  test(`editar sem violação do axe`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  // O editor no Ecme, no criar e no editar, nos dois temas. Campos de imagem, de entidades e de
+  // data (#272, #331): com os seletores abertos (#280) e com a capa escolhida (miniatura,
+  // "Trocar" e "Remover" na tela). Blocos (#274): com um bloco recolhido, o menu de inserir
+  // aberto e o rodapé fixo. Texto rico (#275): barra, conteúdo e o popover de link aberto com o
+  // erro do campo. Nada é salvo.
+  test(`editor sem violação do axe`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await asRole(page, 'editor');
+    await page.goto('/sites/exemplo-a/conteudos/novo');
+    await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
+
+    const cover = page.getByRole('group', { name: 'Capa', exact: true });
+    await cover.getByRole('button', { name: 'Escolher imagem' }).click();
+    const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
+    // O seletor aberto (Dialog do Ecme, #280), com a grade e a paginação.
+    await expect(grid.getByRole('status')).toHaveText(/^Página 1 de \d+ · \d+ image(m|ns)$/);
+    await expect(grid.getByRole('navigation', { name: 'Paginação' })).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expectNoViolations(page);
+    await grid
+      .getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ })
+      .first()
+      .click();
+    await expect(grid).toBeHidden();
+    await expect(cover.getByRole('button', { name: 'Remover' })).toBeVisible();
+    const authors = page.getByRole('combobox', { name: fieldLabel('Autores') });
+    await expect(authors).toBeVisible();
+    await expect(page.getByRole('combobox', { name: fieldLabel('Taxonomias') })).toBeVisible();
+    const date = page.getByRole('combobox', { name: 'Data de publicação' });
+    await expect(date).toBeVisible();
+
+    await page.mouse.move(0, 0);
+    await expectNoViolations(page);
+    // Select múltiplo dos autores (#330) aberto pelo teclado, sem violação com a lista aberta.
+    await authors.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('listbox')).toBeVisible();
+    await expectNoViolations(page);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+
+    // A data é o DateTimepicker do Ecme (#331): o painel aberto, sem violação; Esc fecha e
+    // devolve o foco ao campo.
+    await date.focus();
+    await page.keyboard.press('Enter');
+    const datePanel = page.getByRole('dialog', { name: 'Escolher data e hora' });
+    await expect(datePanel).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expectNoViolations(page);
+    await page.keyboard.press('Escape');
+    await expect(datePanel).toBeHidden();
+    await expect(date).toBeFocused();
+
+    // "Remover" da capa confirma num diálogo (#327), sem violação com ele aberto: Cancelar
+    // mantém a imagem; "Remover" esvazia o campo e leva o foco a "Escolher imagem".
+    const remove = cover.getByRole('button', { name: 'Remover' });
+    const dialog = page.getByRole('alertdialog', { name: 'Remover a imagem de Capa?' });
+    await remove.click();
+    await expect(dialog).toBeVisible();
+    await expectNoViolations(page);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(remove).toBeFocused();
+    await remove.click();
+    await dialog.getByRole('button', { name: 'Remover' }).click();
+    await expect(cover.getByText('Nenhuma imagem')).toBeVisible();
+    await expect(cover.getByRole('button', { name: 'Escolher imagem' })).toBeFocused();
+
+    // Editar, com um bloco recolhido e o menu de inserir aberto.
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
     await page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Salvar', exact: true })).toBeInViewport();
@@ -862,18 +842,9 @@ test.describe('barra de ações do editor (#109)', () => {
     await page.mouse.move(0, 0);
     // As guardas de foco do floating-ui (`aria-hidden` e `tabindex=0`, repassam o foco na
     // hora) ficam de fora, como em vitrine.spec.ts.
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(WCAG)
-      .exclude('[data-floating-ui-focus-guard]')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
-  });
+    await expectNoViolations(page, { exclude: ['[data-floating-ui-focus-guard]'] });
 
-  // Texto rico no Ecme (#275): barra, conteúdo e o popover de link aberto com o erro do campo,
-  // sem violação do axe no tema claro. Não salva: o conteúdo da seção fica como está.
-  test(`texto rico com o popover de link sem violação do axe`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await asRole(page, 'editor');
+    // Texto rico com o popover de link aberto.
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
     // Os 20 blocos daqui são sumários: um bloco de texto novo traz o editor.
     await addBlock(page, 'Texto');
@@ -890,8 +861,7 @@ test.describe('barra de ações do editor (#109)', () => {
     await expect(href).toHaveAttribute('aria-invalid', 'true');
 
     await page.mouse.move(0, 0);
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
+    await expectNoViolations(page);
   });
 });
 
