@@ -12,6 +12,7 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
+import { DetailLayout } from '@/components/shared/DetailLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SECTION_HINT_CLASS } from '@/components/shared/sectionText.ts';
 import { siteTrail } from '@/components/shared/trail.ts';
@@ -90,7 +91,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
           ) : undefined
         }
       />
-      <div className="flex flex-col gap-4 xl:flex-row">
+      <DetailLayout>
         <SiteSummaryCard
           site={site}
           g1Registered={g1 !== undefined}
@@ -133,7 +134,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
             )
           }
         />
-      </div>
+      </DetailLayout>
     </section>
   );
 }

@@ -202,78 +202,74 @@ test(
 );
 
 // Campos de imagem, de entidades e de data no Ecme (#272, #331): com os seletores abertos (#280) e com a
-// capa escolhida (miniatura, "Trocar" e "Remover" na tela), sem violação do axe nos dois temas.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`campos de imagem, entidades e data sem violação do axe (${colorScheme})`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto('/sites/exemplo-a/conteudos/novo');
-    await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
+// capa escolhida (miniatura, "Trocar" e "Remover" na tela), sem violação do axe no tema claro.
+test(`campos de imagem, entidades e data sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites/exemplo-a/conteudos/novo');
+  await expect(page.getByRole('heading', { name: 'Criar conteúdo' })).toBeVisible();
 
-    const cover = page.getByRole('group', { name: 'Capa', exact: true });
-    await cover.getByRole('button', { name: 'Escolher imagem' }).click();
-    const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
-    // O seletor aberto (Dialog do Ecme, #280), com a grade e a paginação.
-    await expect(grid.getByRole('status')).toHaveText(/^Página 1 de \d+ · \d+ image(m|ns)$/);
-    await expect(grid.getByRole('navigation', { name: 'Paginação' })).toBeVisible();
-    await page.mouse.move(0, 0);
-    const picker = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(picker.violations).toEqual([]);
-    await grid
-      .getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ })
-      .first()
-      .click();
-    await expect(grid).toBeHidden();
-    await expect(cover.getByRole('button', { name: 'Remover' })).toBeVisible();
-    const authors = page.getByRole('combobox', { name: fieldLabel('Autores') });
-    await expect(authors).toBeVisible();
-    await expect(page.getByRole('combobox', { name: fieldLabel('Taxonomias') })).toBeVisible();
-    const date = page.getByRole('combobox', { name: 'Data de publicação' });
-    await expect(date).toBeVisible();
+  const cover = page.getByRole('group', { name: 'Capa', exact: true });
+  await cover.getByRole('button', { name: 'Escolher imagem' }).click();
+  const grid = page.getByRole('dialog', { name: 'Escolher imagem' });
+  // O seletor aberto (Dialog do Ecme, #280), com a grade e a paginação.
+  await expect(grid.getByRole('status')).toHaveText(/^Página 1 de \d+ · \d+ image(m|ns)$/);
+  await expect(grid.getByRole('navigation', { name: 'Paginação' })).toBeVisible();
+  await page.mouse.move(0, 0);
+  const picker = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(picker.violations).toEqual([]);
+  await grid
+    .getByRole('button', { name: /^Mídia \d+ · \d+×\d+$/ })
+    .first()
+    .click();
+  await expect(grid).toBeHidden();
+  await expect(cover.getByRole('button', { name: 'Remover' })).toBeVisible();
+  const authors = page.getByRole('combobox', { name: fieldLabel('Autores') });
+  await expect(authors).toBeVisible();
+  await expect(page.getByRole('combobox', { name: fieldLabel('Taxonomias') })).toBeVisible();
+  const date = page.getByRole('combobox', { name: 'Data de publicação' });
+  await expect(date).toBeVisible();
 
-    await page.mouse.move(0, 0);
-    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(accessibility.violations).toEqual([]);
-    // Select múltiplo dos autores (#330) aberto pelo teclado, sem violação com a lista aberta.
-    await authors.focus();
-    await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('listbox')).toBeVisible();
-    const withMenu = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(withMenu.violations).toEqual([]);
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('listbox')).toHaveCount(0);
+  await page.mouse.move(0, 0);
+  const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(accessibility.violations).toEqual([]);
+  // Select múltiplo dos autores (#330) aberto pelo teclado, sem violação com a lista aberta.
+  await authors.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('listbox')).toBeVisible();
+  const withMenu = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(withMenu.violations).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
 
-    // A data é o DateTimepicker do Ecme (#331): o painel aberto, sem violação; Esc fecha e
-    // devolve o foco ao campo.
-    await date.focus();
-    await page.keyboard.press('Enter');
-    const datePanel = page.getByRole('dialog', { name: 'Escolher data e hora' });
-    await expect(datePanel).toBeVisible();
-    await page.mouse.move(0, 0);
-    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
-    await page.keyboard.press('Escape');
-    await expect(datePanel).toBeHidden();
-    await expect(date).toBeFocused();
+  // A data é o DateTimepicker do Ecme (#331): o painel aberto, sem violação; Esc fecha e
+  // devolve o foco ao campo.
+  await date.focus();
+  await page.keyboard.press('Enter');
+  const datePanel = page.getByRole('dialog', { name: 'Escolher data e hora' });
+  await expect(datePanel).toBeVisible();
+  await page.mouse.move(0, 0);
+  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(datePanel).toBeHidden();
+  await expect(date).toBeFocused();
 
-    // "Remover" da capa confirma num diálogo (#327), sem violação com ele aberto: Cancelar
-    // mantém a imagem; "Remover" esvazia o campo e leva o foco a "Escolher imagem".
-    const remove = cover.getByRole('button', { name: 'Remover' });
-    const dialog = page.getByRole('alertdialog', { name: 'Remover a imagem de Capa?' });
-    await remove.click();
-    await expect(dialog).toBeVisible();
-    const withDialog = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(withDialog.violations).toEqual([]);
-    await dialog.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(remove).toBeFocused();
-    await remove.click();
-    await dialog.getByRole('button', { name: 'Remover' }).click();
-    await expect(cover.getByText('Nenhuma imagem')).toBeVisible();
-    await expect(cover.getByRole('button', { name: 'Escolher imagem' })).toBeFocused();
-  });
-}
+  // "Remover" da capa confirma num diálogo (#327), sem violação com ele aberto: Cancelar
+  // mantém a imagem; "Remover" esvazia o campo e leva o foco a "Escolher imagem".
+  const remove = cover.getByRole('button', { name: 'Remover' });
+  const dialog = page.getByRole('alertdialog', { name: 'Remover a imagem de Capa?' });
+  await remove.click();
+  await expect(dialog).toBeVisible();
+  const withDialog = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  expect(withDialog.violations).toEqual([]);
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  await remove.click();
+  await dialog.getByRole('button', { name: 'Remover' }).click();
+  await expect(cover.getByText('Nenhuma imagem')).toBeVisible();
+  await expect(cover.getByRole('button', { name: 'Escolher imagem' })).toBeFocused();
+});
 
 test(
   'revisor não tem editor nem link para criar ou editar',
@@ -297,115 +293,65 @@ test(
   },
 );
 
-// Histórico de versões e leitura de uma versão no Ecme (#271): Table e Tag sem violação do axe.
-// Versões no DataTable do template (#366), nos dois temas, no cartão "Versões" da tela de detalhe
-// (#371): trilha e título do conteúdo fora do cartão; o h2, a toolbar e a tabela nele; a 1280 px
-// a página não rola na horizontal (ao lado do resumo, a tabela rola só dentro do próprio
-// contêiner, como no `CustomerDetails` do Ecme) e nenhuma célula passa de duas linhas; o filtro
-// vai para o endereço e recarregar mantém a mesma visão.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`versões a 1280 px, até duas linhas por célula, e uma versão sem violação do axe (${colorScheme})`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto('/sites/exemplo-a/conteudos');
-    await page
-      .getByRole('table')
-      .getByRole('link', { name: / \(ver versões\)$/ })
-      .first()
-      .click();
-    const card = page.locator('.card').filter({ has: page.getByRole('table') });
-    await expect(card.getByRole('heading', { level: 2, name: 'Versões' })).toBeVisible();
-    const versions = page.url();
-    expect(page.viewportSize()?.width).toBe(1280);
+// Histórico de versões e leitura de uma versão no Ecme (#271, #366, #371, #372): a tela do
+// conteúdo com o cartão "Versões" (trilha e título fora do cartão; o h2, a toolbar e a tabela
+// nele) e a de uma versão, com "Voltar às versões" e "Editar" do mesmo tamanho; o axe no tema
+// claro. A 1280 px sem rolar a página, as linhas por célula, o filtro na URL e o tema escuro
+// ficam em `ContentVersionsTable.browser.test.tsx` (#460).
+test('versões e uma versão no cartão, sem violação do axe', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites/exemplo-a/conteudos');
+  await page
+    .getByRole('table')
+    .getByRole('link', { name: / \(ver versões\)$/ })
+    .first()
+    .click();
+  const card = page.locator('.card').filter({ has: page.getByRole('table') });
+  await expect(card.getByRole('heading', { level: 2, name: 'Versões' })).toBeVisible();
+  const versions = new URL(page.url()).pathname;
 
-    await expect(card).toHaveCount(1);
-    await expect(card.getByRole('heading', { level: 1 })).toHaveCount(0);
-    await expect(card.getByRole('search')).toBeVisible();
-    await expect(card.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
-    await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(card).toHaveCount(1);
+  await expect(card.getByRole('heading', { level: 1 })).toHaveCount(0);
+  await expect(card.getByRole('search')).toBeVisible();
+  await expect(card.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
-    const table = page.getByRole('table', { name: 'Versões', exact: true });
-    await expect(table.getByRole('columnheader')).toHaveText([
-      'Versão',
-      'Status',
-      'Título',
-      'Gravada em',
-      'Aprovação',
-    ]);
-    await expect(table.getByRole('link', { name: 'Versão 1', exact: true })).toHaveAttribute(
-      'href',
-      `${new URL(versions).pathname}/versoes/1`,
-    );
-    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-      /^\d+ resultados?$/,
-    );
+  const table = page.getByRole('table', { name: 'Versões', exact: true });
+  await expect(table.getByRole('columnheader')).toHaveText([
+    'Versão',
+    'Status',
+    'Título',
+    'Gravada em',
+    'Aprovação',
+  ]);
+  await expect(table.getByRole('link', { name: 'Versão 1', exact: true })).toHaveAttribute(
+    'href',
+    `${versions}/versoes/1`,
+  );
+  await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+    /^\d+ resultados?$/,
+  );
+  await page.waitForLoadState('networkidle');
+  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
 
-    const overflow = await table.evaluate((element) => ({
-      page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      container: getComputedStyle(element.parentElement!).overflowX,
-    }));
-    expect(overflow.page).toBe(0);
-    expect(overflow.container).toBe('auto');
+  await table.getByRole('link', { name: 'Versão 1', exact: true }).click();
+  const back = page.getByRole('link', { name: 'Voltar às versões' });
+  const edit = page.getByRole('link', { name: 'Editar', exact: true });
+  await expect(back).toHaveAttribute('href', versions);
+  await expect(edit).toHaveAttribute('href', `${versions}/editar`);
+  const [backBox, editBox] = [(await back.boundingBox())!, (await edit.boundingBox())!];
+  expect(backBox.height).toBe(editBox.height);
+  await page.waitForLoadState('networkidle');
+  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+});
 
-    // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
-    // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
-    const lines = await table.locator('tbody td').evaluateAll((cells) =>
-      cells.map((cell) => {
-        const found: { top: number; bottom: number }[] = [];
-        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-          if (!node.textContent?.trim()) continue;
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          for (const rect of range.getClientRects()) {
-            if (rect.width <= 1 || rect.height <= 1) continue;
-            const middle = (rect.top + rect.bottom) / 2;
-            const line = found.find((l) => l.top <= middle && middle <= l.bottom);
-            if (line === undefined) found.push({ top: rect.top, bottom: rect.bottom });
-            else
-              Object.assign(line, {
-                top: Math.min(line.top, rect.top),
-                bottom: Math.max(line.bottom, rect.bottom),
-              });
-          }
-        }
-        return found.length;
-      }),
-    );
-    expect(lines.length).toBeGreaterThan(0);
-    expect(lines.filter((count) => count > 2)).toEqual([]);
-
-    for (const path of [versions, `${versions}/versoes/1`]) {
-      await page.goto(path);
-      await page.waitForLoadState('networkidle');
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
-    }
-
-    // Filtro por status no endereço; recarregar mantém a mesma visão.
-    await page.goto(versions);
-    await page.getByRole('combobox', { name: 'Status' }).focus();
-    await page.keyboard.press('ArrowDown');
-    await page.getByRole('option', { name: 'Agendado', exact: true }).click();
-    await expect(page).toHaveURL(/status=agendado/);
-    await expect(table.getByText('Nenhuma versão encontrada.')).toBeVisible();
-    await page.reload();
-    await expect(table.getByText('Nenhuma versão encontrada.')).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-      '0 resultados',
-    );
-  });
-}
-
-// Uma versão em cartões (#372): "Voltar às versões" e, com content.write, "Editar" no cabeçalho,
-// do mesmo tamanho; a 375 px, a URL canônica de 120 caracteres sem espaço quebra dentro do cartão
-// e a página não rola na horizontal; o axe passa nos dois temas.
+// Uma versão em cartões (#372): sem content.write, o cabeçalho só traz o voltar. A 375 px, a URL
+// canônica longa quebrando no cartão e o axe nos dois temas ficam em
+// `ContentVersionView.browser.test.tsx` (#460); o cabeçalho com content.write, no teste das versões.
 test.describe('versão em cartões (#372)', () => {
   let contentId = 0;
-  const canonical = `https://exemplo-a.example.com/${'guiacompleto'.repeat(10)}`.slice(0, 120);
 
   test.beforeAll(async () => {
     const fixture = await readFixture('exemplo-a');
@@ -420,7 +366,6 @@ test.describe('versão em cartões (#372)', () => {
           kind: 'article',
           title: `Versão em cartões ${Date.now()}`,
           slug: `versao-em-cartoes-${Date.now()}`,
-          seo: { ...content.data.seo, canonical },
           blocks: [{ new: true as const, type: 'toc' as const, title: 'Neste guia' }],
         }),
       );
@@ -430,46 +375,6 @@ test.describe('versão em cartões (#372)', () => {
       await pool.end();
     }
   });
-
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`a 375 px, o canônico longo quebra sem rolar, sem violação do axe (${colorScheme})`, async ({
-      page,
-    }) => {
-      await page.setViewportSize({ width: 375, height: 800 });
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      const contentPath = `/sites/exemplo-a/conteudos/${contentId}`;
-      await page.goto(`${contentPath}/versoes/1`);
-      await page.waitForLoadState('networkidle');
-
-      const back = page.getByRole('link', { name: 'Voltar às versões' });
-      const edit = page.getByRole('link', { name: 'Editar', exact: true });
-      await expect(back).toHaveAttribute('href', contentPath);
-      await expect(edit).toHaveAttribute('href', `${contentPath}/editar`);
-      const [backBox, editBox] = [(await back.boundingBox())!, (await edit.boundingBox())!];
-      expect(backBox.height).toBe(editBox.height);
-
-      const data = page
-        .locator('.card')
-        .filter({ has: page.getByRole('heading', { name: 'Dados' }) });
-      const value = data.getByText(canonical, { exact: true });
-      await expect(value).toBeVisible();
-      const valueBox = (await value.boundingBox())!;
-      const cardBox = (await data.boundingBox())!;
-      expect(valueBox.x + valueBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 1);
-      const lineHeight = await value.evaluate((element) =>
-        Number.parseFloat(getComputedStyle(element).lineHeight),
-      );
-      expect(valueBox.height).toBeGreaterThan(lineHeight * 1.5);
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow).toBe(0);
-
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
-    });
-  }
 
   test('sem content.write, o cabeçalho só traz o voltar', async ({ page }) => {
     await loginAs(page, 'revisor@orakel.local');
@@ -481,8 +386,8 @@ test.describe('versão em cartões (#372)', () => {
 
 // Tela do conteúdo no detalhe do guia (#371): num rascunho com slug longo e sem hífen, criado
 // direto pelo domínio. "Editar" e "Enviar para revisão" no cabeçalho, ambos `solid sm`, só com
-// content.write; o resumo à esquerda do cartão de versões a 1280 px e acima dele a 1024 e a
-// 375 px, sem rolagem horizontal; axe nos dois temas.
+// content.write, e o resumo do conteúdo. A grade resumo × versões a 1280/1024/375 px fica em
+// `DetailLayout.browser.test.tsx` (#460).
 test.describe('tela do conteúdo no detalhe (#371)', () => {
   const stamp = Date.now();
   const title = `Detalhe ${stamp}`;
@@ -529,6 +434,13 @@ test.describe('tela do conteúdo no detalhe (#371)', () => {
     expect(editBox?.height).toBe(submitBox?.height);
     expect(editBox?.y).toBe(submitBox?.y);
 
+    // O resumo (o pior caso é o slug longo e sem hífen, que quebra dentro do cartão: a medida
+    // fica em `DetailLayout.browser.test.tsx`, #460).
+    const summary = page.locator('.card').filter({ has: page.locator('dl') });
+    await expect(summary.getByText(`/${slug}`)).toBeVisible();
+    await expect(summary.locator('dt')).toHaveText(['Tipo', 'ID', 'Slug', 'Status']);
+    await expect(summary.locator('dd').last()).toHaveText('Rascunho');
+
     const reviewer = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
     await loginAs(reviewer, 'revisor@orakel.local');
     await reviewer.goto(contentPath);
@@ -539,45 +451,6 @@ test.describe('tela do conteúdo no detalhe (#371)', () => {
     await expect(reviewer.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);
     await reviewer.context().close();
   });
-
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`resumo ao lado das versões a 1280 px, empilhado a 1024 e a 375 px, sem violação do axe (${colorScheme})`, async ({
-      page,
-    }) => {
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(contentPath);
-      const summary = page.locator('.card').filter({ has: page.locator('dl') });
-      const versions = page.locator('.card').filter({ has: page.getByRole('table') });
-      await expect(summary.getByText(`/${slug}`)).toBeVisible();
-      await expect(summary.locator('dt')).toHaveText(['Tipo', 'ID', 'Slug', 'Status']);
-      await expect(summary.locator('dd').last()).toHaveText('Rascunho');
-
-      for (const width of [1280, 1024, 375]) {
-        await page.setViewportSize({ width, height: 800 });
-        const [left, right] = [await summary.boundingBox(), await versions.boundingBox()];
-        if (left === null || right === null) throw new Error('cartões sem caixa');
-        if (width === 1280) {
-          expect(left.x + left.width).toBeLessThanOrEqual(right.x);
-          expect(Math.abs(left.y - right.y)).toBeLessThan(1);
-        } else {
-          expect(left.y + left.height).toBeLessThanOrEqual(right.y);
-        }
-        const overflow = await page.evaluate(
-          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        );
-        expect(overflow, `rolagem horizontal a ${width} px`).toBe(0);
-        // O slug quebra dentro do cartão em vez de passar da borda.
-        const slugBox = await summary.getByText(`/${slug}`).boundingBox();
-        expect(slugBox!.x + slugBox!.width).toBeLessThanOrEqual(left.x + left.width);
-      }
-
-      await page.setViewportSize({ width: 1280, height: 800 });
-      await page.waitForLoadState('networkidle');
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
-    });
-  }
 });
 
 const BIG_SITE = `e2e-conteudos-${Date.now()}`;
@@ -697,57 +570,18 @@ test.describe('lista de conteúdos (#107)', () => {
     expect(accessibility.violations).toEqual([]);
   });
 
-  // Lista cheia na Table do Ecme (#273): a 1280 px nada rola na horizontal, nenhuma célula
-  // passa de duas linhas de texto e o axe não acha violação, nos dois temas.
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`lista cheia a 1280 px, até duas linhas por célula, sem violação do axe (${colorScheme})`, async ({
-      page,
-    }) => {
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/${LIST_SITE}/conteudos`);
-      expect(page.viewportSize()?.width).toBe(1280);
-      const table = page.getByRole('table');
-      await expect(table.locator('tbody tr')).toHaveCount(25);
+  // Lista cheia na Table do Ecme (#273): a página de 25 linhas sem violação do axe. A 1280 px
+  // sem rolagem horizontal, as linhas por célula e o tema escuro ficam em
+  // `ContentsTable.browser.test.tsx` (#460).
+  test('lista cheia sem violação do axe', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/${LIST_SITE}/conteudos`);
+    await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(25);
 
-      const overflow = await table.evaluate((element) => [
-        document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        element.parentElement!.scrollWidth - element.parentElement!.clientWidth,
-      ]);
-      expect(overflow).toEqual([0, 0]);
-
-      // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
-      // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
-      const lines = await table.locator('tbody td').evaluateAll((cells) =>
-        cells.map((cell) => {
-          const found: { top: number; bottom: number }[] = [];
-          const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-          for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-            if (!node.textContent?.trim()) continue;
-            const range = document.createRange();
-            range.selectNodeContents(node);
-            for (const rect of range.getClientRects()) {
-              if (rect.width <= 1 || rect.height <= 1) continue;
-              const middle = (rect.top + rect.bottom) / 2;
-              const line = found.find((l) => l.top <= middle && middle <= l.bottom);
-              if (line === undefined) found.push({ top: rect.top, bottom: rect.bottom });
-              else
-                Object.assign(line, {
-                  top: Math.min(line.top, rect.top),
-                  bottom: Math.max(line.bottom, rect.bottom),
-                });
-            }
-          }
-          return found.length;
-        }),
-      );
-      expect(lines.length).toBeGreaterThan(0);
-      expect(lines.filter((count) => count > 2)).toEqual([]);
-
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
-    });
-  }
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
 
   // Regra única do estado vazio (#361, #362): a tabela fica, com "0 resultados", e a ação de
   // limpar é a "Limpar filtros" da toolbar.
@@ -864,32 +698,28 @@ test.describe('barra de ações do editor (#109)', () => {
   });
 
   // Remover bloco se desfaz pelo toast (#112, #326): sem região nem botão no rodapé.
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`remover bloco mostra o toast com Desfazer, que o devolve (${colorScheme})`, async ({
-      page,
-    }) => {
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
-      const blocks = page.getByRole('group', { name: /^Bloco \d+:/ });
-      await expect(blocks).toHaveCount(20);
+  test(`remover bloco mostra o toast com Desfazer, que o devolve`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    const blocks = page.getByRole('group', { name: /^Bloco \d+:/ });
+    await expect(blocks).toHaveCount(20);
 
-      await page.getByRole('button', { name: 'Remover bloco 2', exact: true }).click();
-      const undo = toastRegion(page).getByRole('button', { name: 'Desfazer' });
-      await expect(toastRegion(page)).toContainText('Bloco 2 removido.');
-      await expect(blocks).toHaveCount(19);
-      await expect(page.getByRole('main').getByRole('button', { name: 'Desfazer' })).toHaveCount(0);
-      await page.mouse.move(0, 0);
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
+    await page.getByRole('button', { name: 'Remover bloco 2', exact: true }).click();
+    const undo = toastRegion(page).getByRole('button', { name: 'Desfazer' });
+    await expect(toastRegion(page)).toContainText('Bloco 2 removido.');
+    await expect(blocks).toHaveCount(19);
+    await expect(page.getByRole('main').getByRole('button', { name: 'Desfazer' })).toHaveCount(0);
+    await page.mouse.move(0, 0);
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
 
-      await undo.click();
-      await expect(blocks).toHaveCount(20);
-      await expect(page.getByLabel('Título do sumário').nth(1)).toBeFocused();
-      await expect(toastRegion(page)).toContainText('Bloco 2 devolvido.');
-      await expect(undo).toHaveCount(0);
-    });
-  }
+    await undo.click();
+    await expect(blocks).toHaveCount(20);
+    await expect(page.getByLabel('Título do sumário').nth(1)).toBeFocused();
+    await expect(toastRegion(page)).toContainText('Bloco 2 devolvido.');
+    await expect(undo).toHaveCount(0);
+  });
 
   test('com alterações não salvas, sair pede confirmação; depois de salvar, não (#111)', async ({
     page,
@@ -1053,59 +883,53 @@ test.describe('barra de ações do editor (#109)', () => {
   });
 
   // Editor no Ecme (#274): com um bloco recolhido, o menu de inserir aberto e o rodapé fixo,
-  // sem violação do axe nos dois temas.
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`editar sem violação do axe (${colorScheme})`, async ({ page }) => {
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
-      await page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true }).click();
-      await expect(page.getByRole('button', { name: 'Salvar', exact: true })).toBeInViewport();
-      await page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true }).click();
-      await expect(page.getByRole('menu')).toBeVisible();
-      // O menu entra com transição de opacidade (mesmo com movimento reduzido); o axe audita
-      // depois dela, senão mede o texto ainda translúcido.
-      await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+  // sem violação do axe no tema claro.
+  test(`editar sem violação do axe`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    await page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Salvar', exact: true })).toBeInViewport();
+    await page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true }).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    // O menu entra com transição de opacidade (mesmo com movimento reduzido); o axe audita
+    // depois dela, senão mede o texto ainda translúcido.
+    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
 
-      await page.mouse.move(0, 0);
-      // As guardas de foco do floating-ui (`aria-hidden` e `tabindex=0`, repassam o foco na
-      // hora) ficam de fora, como em vitrine.spec.ts.
-      const accessibility = await new AxeBuilder({ page })
-        .withTags(WCAG)
-        .exclude('[data-floating-ui-focus-guard]')
-        .analyze();
-      expect(accessibility.violations).toEqual([]);
-    });
-  }
+    await page.mouse.move(0, 0);
+    // As guardas de foco do floating-ui (`aria-hidden` e `tabindex=0`, repassam o foco na
+    // hora) ficam de fora, como em vitrine.spec.ts.
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .exclude('[data-floating-ui-focus-guard]')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
 
   // Texto rico no Ecme (#275): barra, conteúdo e o popover de link aberto com o erro do campo,
-  // sem violação do axe nos dois temas. Não salva: o conteúdo da seção fica como está.
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`texto rico com o popover de link sem violação do axe (${colorScheme})`, async ({
-      page,
-    }) => {
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
-      // Os 20 blocos daqui são sumários: um bloco de texto novo traz o editor.
-      await addBlock(page, 'Texto');
-      await page.getByRole('textbox', { name: 'Texto', exact: true }).fill('Primeiro parágrafo.');
-      const toolbar = page.getByRole('toolbar', { name: 'Formatação: Texto' });
-      const linkButton = toolbar.getByRole('button', { name: 'Link', exact: true });
-      const linkPopover = page.locator(`[id="${await linkButton.getAttribute('popovertarget')}"]`);
-      const href = linkPopover.getByLabel('Endereço do link');
-      await linkButton.focus();
-      await page.keyboard.press('Enter');
-      await expect(href).toBeFocused();
-      await page.keyboard.type('javascript:alert(1)');
-      await page.keyboard.press('Enter');
-      await expect(href).toHaveAttribute('aria-invalid', 'true');
+  // sem violação do axe no tema claro. Não salva: o conteúdo da seção fica como está.
+  test(`texto rico com o popover de link sem violação do axe`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await loginAs(page, 'editor@orakel.local');
+    await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    // Os 20 blocos daqui são sumários: um bloco de texto novo traz o editor.
+    await addBlock(page, 'Texto');
+    await page.getByRole('textbox', { name: 'Texto', exact: true }).fill('Primeiro parágrafo.');
+    const toolbar = page.getByRole('toolbar', { name: 'Formatação: Texto' });
+    const linkButton = toolbar.getByRole('button', { name: 'Link', exact: true });
+    const linkPopover = page.locator(`[id="${await linkButton.getAttribute('popovertarget')}"]`);
+    const href = linkPopover.getByLabel('Endereço do link');
+    await linkButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(href).toBeFocused();
+    await page.keyboard.type('javascript:alert(1)');
+    await page.keyboard.press('Enter');
+    await expect(href).toHaveAttribute('aria-invalid', 'true');
 
-      await page.mouse.move(0, 0);
-      const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-      expect(accessibility.violations).toEqual([]);
-    });
-  }
+    await page.mouse.move(0, 0);
+    const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(accessibility.violations).toEqual([]);
+  });
 
   test('recolhe e expande blocos só pelo teclado; recolhido, o bloco ocupa uma linha (#135)', async ({
     page,

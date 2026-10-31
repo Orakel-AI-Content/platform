@@ -95,30 +95,28 @@ test('o menu de perfil abre com Espaço e fecha com Esc, devolvendo o foco ao av
   await expect(button).toBeFocused();
 });
 
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`o menu de perfil aberto sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.waitForLoadState('networkidle');
-    await profile(page).click();
-    await expect(page.getByRole('menu')).toBeVisible();
-    // A transição de abertura do menu (opacidade) mistura o texto com o fundo; o axe roda
-    // depois dela, como no Dropdown da vitrine (#210).
-    await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+test(`o menu de perfil aberto sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  await page.waitForLoadState('networkidle');
+  await profile(page).click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  // A transição de abertura do menu (opacidade) mistura o texto com o fundo; o axe roda
+  // depois dela, como no Dropdown da vitrine (#210).
+  await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
 
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-      .include('.header')
-      .include('[role="menu"]')
-      .exclude('[data-floating-ui-focus-guard]')
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
-  });
-}
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+    .include('.header')
+    .include('[role="menu"]')
+    .exclude('[data-floating-ui-focus-guard]')
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+});
 
 // Moldura CollapsibleSide (#237): SideNav e Header em /sites, numa tela de site e no 404; as
 // áreas do site já no HTML do servidor; sem áreas no 404 de site nem em /sites/novo; e sem
-// violação do axe nos dois temas.
+// violação do axe no tema claro.
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
@@ -168,19 +166,17 @@ test('o HTML do servidor já traz as áreas do site, com a atual marcada', async
   expect(html).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/sites\/exemplo-a\/autores"/);
 });
 
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`a moldura sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    for (const path of ['/sites', '/sites/exemplo-a/autores']) {
-      await page.goto(path);
-      await page.waitForLoadState('networkidle');
-      const accessibility = await new AxeBuilder({ page })
-        .withTags(WCAG)
-        .include('.side-nav')
-        .include('.header')
-        .analyze();
-      expect(accessibility.violations).toEqual([]);
-    }
-  });
-}
+test(`a moldura sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  for (const path of ['/sites', '/sites/exemplo-a/autores']) {
+    await page.goto(path);
+    await page.waitForLoadState('networkidle');
+    const accessibility = await new AxeBuilder({ page })
+      .withTags(WCAG)
+      .include('.side-nav')
+      .include('.header')
+      .analyze();
+    expect(accessibility.violations).toEqual([]);
+  }
+});

@@ -15,6 +15,7 @@ import {
   DETAIL_SUMMARY_LIST_CLASS,
 } from '@/components/shared/detailSummary.ts';
 import { InfoField, InfoList } from '@/components/shared/InfoList';
+import { DetailLayout } from '@/components/shared/DetailLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import { siteTrail } from '@/components/shared/trail.ts';
@@ -91,7 +92,7 @@ export default async function ContentVersionsPage({ params }: Params) {
   return (
     <section aria-labelledby="content-title" className="list-width space-y-4">
       {canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header}
-      <div className="flex flex-col gap-4 xl:flex-row">
+      <DetailLayout>
         <Card className={DETAIL_SUMMARY_CLASS}>
           <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
             <InfoField label="Tipo">{CONTENT_KIND_LABEL[latest.data.kind]}</InfoField>
@@ -124,7 +125,7 @@ export default async function ContentVersionsPage({ params }: Params) {
             }))}
           />
         </Card>
-      </div>
+      </DetailLayout>
     </section>
   );
 }

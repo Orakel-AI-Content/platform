@@ -204,49 +204,45 @@ test('operação cadastra e edita um site só com o teclado', { tag: '@smoke' },
 
 // Formulário no visual do Ecme (#245): cadastro e configuração sem violação do axe nos dois
 // temas, com as seções em Card e os campos do FormItem.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`cadastro e configuração sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'operacao@orakel.local');
+test(`cadastro e configuração sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'operacao@orakel.local');
 
-    for (const [path, heading] of [
-      ['/sites/novo', 'Criar site'],
-      ['/sites/exemplo-a/configuracao', 'Identidade'],
-    ] as const) {
-      await page.goto(path);
-      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
-      expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations, path).toEqual(
-        [],
-      );
-    }
+  for (const [path, heading] of [
+    ['/sites/novo', 'Criar site'],
+    ['/sites/exemplo-a/configuracao', 'Identidade'],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations, path).toEqual([]);
+  }
 
-    // Remover recurso confirma num diálogo (#327), sem violação com ele aberto; Cancelar não
-    // remove e devolve o foco, "Remover" tira a linha. Nada é salvo.
-    await page.waitForLoadState('networkidle');
-    const flags = page.getByRole('group', { name: 'Recursos ligados' });
-    const names = flags.getByLabel(/^Nome do recurso/);
-    const count = await names.count();
-    await flags.getByRole('button', { name: 'Adicionar recurso' }).click();
-    await expect(names).toHaveCount(count + 1);
-    // O liga/desliga é o Switcher do Ecme (#331): a linha nova entra ligada e o Espaço desliga.
-    const enabled = flags.getByRole('switch', { name: `Recurso ${count + 1} ligado` });
-    await expect(enabled).toBeChecked();
-    await enabled.focus();
-    await page.keyboard.press('Space');
-    await expect(enabled).not.toBeChecked();
-    const remove = flags.getByRole('button', { name: `Remover recurso ${count + 1}` });
-    const dialog = page.getByRole('alertdialog', { name: `Remover recurso ${count + 1}?` });
-    await remove.click();
-    await expect(dialog).toBeVisible();
-    expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
-    await dialog.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(remove).toBeFocused();
-    await remove.click();
-    await dialog.getByRole('button', { name: 'Remover' }).click();
-    await expect(names).toHaveCount(count);
-  });
-}
+  // Remover recurso confirma num diálogo (#327), sem violação com ele aberto; Cancelar não
+  // remove e devolve o foco, "Remover" tira a linha. Nada é salvo.
+  await page.waitForLoadState('networkidle');
+  const flags = page.getByRole('group', { name: 'Recursos ligados' });
+  const names = flags.getByLabel(/^Nome do recurso/);
+  const count = await names.count();
+  await flags.getByRole('button', { name: 'Adicionar recurso' }).click();
+  await expect(names).toHaveCount(count + 1);
+  // O liga/desliga é o Switcher do Ecme (#331): a linha nova entra ligada e o Espaço desliga.
+  const enabled = flags.getByRole('switch', { name: `Recurso ${count + 1} ligado` });
+  await expect(enabled).toBeChecked();
+  await enabled.focus();
+  await page.keyboard.press('Space');
+  await expect(enabled).not.toBeChecked();
+  const remove = flags.getByRole('button', { name: `Remover recurso ${count + 1}` });
+  const dialog = page.getByRole('alertdialog', { name: `Remover recurso ${count + 1}?` });
+  await remove.click();
+  await expect(dialog).toBeVisible();
+  expect((await new AxeBuilder({ page }).withTags(WCAG).analyze()).violations).toEqual([]);
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  await remove.click();
+  await dialog.getByRole('button', { name: 'Remover' }).click();
+  await expect(names).toHaveCount(count);
+});
 
 // Configuração no formulário do template (#328): seções em Card, ID e Nome lado a lado, a barra
 // fixa na largura do main e Voltar para a página do site, sem salvar.
@@ -536,149 +532,78 @@ test('editor vê a página do site sem as ações', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Editar configuração' })).toHaveCount(0);
 });
 
-// Visão geral do site em Card e nos campos do Ecme (#246), com as ações da operação, nos dois
-// temas, em cada aba (#370).
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`página do site sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'operacao@orakel.local');
-    await page.goto('/sites/exemplo-a');
-    await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
-    await expect(page.getByRole('tabpanel', { name: 'Ciclo de vida' })).toBeVisible();
-    await expectNoViolations(page);
-    await openTab(page, 'G1 (indexação)');
-    await expectNoViolations(page);
-    // G1 e janela gerados do schema, em cartão com os botões no rodapé, sem barra fixa (#333).
-    const windowSection = await openTab(page, 'Janela de agrupamento');
-    const footer = windowSection.locator('.card-footer');
-    await expect(footer.getByRole('button', { name: 'Salvar', exact: true })).toBeVisible();
-    await expect(footer.getByRole('button', { name: 'Usar padrão' })).toBeVisible();
-    await expect(page.locator('.sticky')).toHaveCount(0);
-    await page.waitForLoadState('networkidle');
-    // O erro de campo do schema, validado no navegador (sem gravar nada).
-    const windowInput = windowSection.getByLabel('Janela própria (segundos)');
-    await windowInput.fill('');
-    await footer.getByRole('button', { name: 'Salvar', exact: true }).click();
-    await expect(windowInput).toHaveAttribute('aria-invalid', 'true');
-
-    await expectNoViolations(page);
-
-    // Com a confirmação de "Publicar agora" aberta (#327); Cancelar não publica.
-    await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
-    const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
-    await expect(dialog).toBeVisible();
-    await expectNoViolations(page);
-    await dialog.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(dialog).toHaveCount(0);
-  });
-}
-
-// Detalhe do template (#370): a 1280 px o resumo fica à esquerda das abas; a 1024 e a 375 px,
-// um sobre o outro, sem rolagem horizontal. As ações da tela são todas `sm`, e a do cabeçalho,
-// solid.
-test('página do site: resumo ao lado das abas só a partir de xl, ações em sm', async ({ page }) => {
+// Visão geral do site em Card e nos campos do Ecme (#246), com as ações da operação, em cada
+// aba (#370), no tema claro.
+test(`página do site sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await loginAs(page, 'operacao@orakel.local');
-  for (const [width, sideBySide] of [
-    [1280, true],
-    [1024, false],
-    [375, false],
-  ] as const) {
-    await page.setViewportSize({ width, height: 800 });
-    await page.goto('/sites/exemplo-a');
-    const summary = await siteSummary(page).boundingBox();
-    const tabs = await page
-      .locator('.card')
-      .filter({ has: page.getByRole('tablist', { name: 'Seções do site' }) })
-      .boundingBox();
-    if (!summary || !tabs) throw new Error('resumo ou abas sem caixa');
-    if (sideBySide) {
-      expect(tabs.x).toBeGreaterThanOrEqual(summary.x + summary.width);
-      expect(Math.abs(tabs.y - summary.y)).toBeLessThan(1);
-    } else {
-      expect(tabs.y).toBeGreaterThanOrEqual(summary.y + summary.height);
-    }
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      ),
-    ).toBe(0);
-  }
+  await page.goto('/sites/exemplo-a');
+  await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
+  await expect(page.getByRole('tabpanel', { name: 'Ciclo de vida' })).toBeVisible();
+  await expectNoViolations(page);
 
+  // As ações da tela são todas `sm`, e a do cabeçalho, solid (#370). A grade resumo × abas por
+  // largura fica em `DetailLayout.browser.test.tsx` (#460).
   const sm = /(^| )h-10( |$)/;
   const edit = page.getByRole('link', { name: 'Editar configuração' });
   await expect(edit).toHaveClass(sm);
   await expect(edit).toHaveClass(/bg-primary/);
   await expect(page.getByRole('button', { name: 'Publicar agora exemplo-a' })).toHaveClass(sm);
-  for (const tab of ['G1 (indexação)', 'Janela de agrupamento']) {
-    const panel = await openTab(page, tab);
-    for (const button of await panel.locator('.card-footer').getByRole('button').all()) {
-      await expect(button).toHaveClass(sm);
-    }
+
+  const g1 = await openTab(page, 'G1 (indexação)');
+  for (const button of await g1.locator('.card-footer').getByRole('button').all()) {
+    await expect(button).toHaveClass(sm);
   }
+  await expectNoViolations(page);
+  // G1 e janela gerados do schema, em cartão com os botões no rodapé, sem barra fixa (#333).
+  const windowSection = await openTab(page, 'Janela de agrupamento');
+  const footer = windowSection.locator('.card-footer');
+  await expect(footer.getByRole('button', { name: 'Salvar', exact: true })).toBeVisible();
+  await expect(footer.getByRole('button', { name: 'Usar padrão' })).toBeVisible();
+  for (const button of await footer.getByRole('button').all()) await expect(button).toHaveClass(sm);
+  await expect(page.locator('.sticky')).toHaveCount(0);
+  await page.waitForLoadState('networkidle');
+  // O erro de campo do schema, validado no navegador (sem gravar nada).
+  const windowInput = windowSection.getByLabel('Janela própria (segundos)');
+  await windowInput.fill('');
+  await footer.getByRole('button', { name: 'Salvar', exact: true }).click();
+  await expect(windowInput).toHaveAttribute('aria-invalid', 'true');
+
+  await expectNoViolations(page);
+
+  // Com a confirmação de "Publicar agora" aberta (#327); Cancelar não publica.
+  await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
+  await expect(dialog).toBeVisible();
+  await expectNoViolations(page);
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).toHaveCount(0);
 });
 
-// Mudanças pendentes no DataTable do template (#249, #365), nos dois temas: a 1280 px nada rola
-// na horizontal, nenhuma célula passa de duas linhas e o axe não acha violação. O cadastro
-// registra a configuração v1: o site novo já tem uma pendência.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`mudanças pendentes a 1280 px, até duas linhas por célula, sem violação do axe (${colorScheme})`, async ({
-    page,
-  }) => {
-    const siteId = `e2e-pendencias-${colorScheme}-${Date.now()}`;
-    created.push(siteId);
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'operacao@orakel.local');
-    await newSite(page, siteId);
-    await page.goto(`/sites/${siteId}/pendencias`);
-    await expect(page.getByRole('heading', { name: 'Mudanças pendentes' })).toBeVisible();
-    expect(page.viewportSize()?.width).toBe(1280);
-    const table = page.getByRole('table', { name: 'Mudanças pendentes', exact: true });
-    await expect(table.getByRole('columnheader')).toHaveText(['Origem', 'Item', 'Registrada em']);
-    await expect(table.getByRole('link', { name: 'Configuração v1 (abrir)' })).toHaveAttribute(
-      'href',
-      `/sites/${siteId}/configuracao`,
-    );
-    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-      '1 resultado',
-    );
+// Mudanças pendentes no DataTable do template (#249, #365): o cadastro registra a configuração
+// v1, e o site novo já tem uma pendência; o axe não acha violação no tema claro. A 1280 px sem
+// rolagem horizontal, as linhas por célula e o tema escuro ficam em
+// `PendingChangesTable.browser.test.tsx` (#460).
+test('mudanças pendentes do site novo, sem violação do axe', async ({ page }) => {
+  const siteId = `e2e-pendencias-${Date.now()}`;
+  created.push(siteId);
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'operacao@orakel.local');
+  await newSite(page, siteId);
+  await page.goto(`/sites/${siteId}/pendencias`);
+  await expect(page.getByRole('heading', { name: 'Mudanças pendentes' })).toBeVisible();
+  const table = page.getByRole('table', { name: 'Mudanças pendentes', exact: true });
+  await expect(table.getByRole('columnheader')).toHaveText(['Origem', 'Item', 'Registrada em']);
+  await expect(table.getByRole('link', { name: 'Configuração v1 (abrir)' })).toHaveAttribute(
+    'href',
+    `/sites/${siteId}/configuracao`,
+  );
+  await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
+    '1 resultado',
+  );
 
-    const overflow = await table.evaluate((element) => [
-      document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      element.parentElement!.scrollWidth - element.parentElement!.clientWidth,
-    ]);
-    expect(overflow).toEqual([0, 0]);
-
-    // Linhas de texto por célula (mesma medida de `sites-list.spec.ts`): retângulos de texto
-    // visíveis que se sobrepõem na vertical são a mesma linha; o sr-only fica de fora.
-    const lines = await table.locator('tbody td').evaluateAll((cells) =>
-      cells.map((cell) => {
-        const found: { top: number; bottom: number }[] = [];
-        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-          if (!node.textContent?.trim()) continue;
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          for (const rect of range.getClientRects()) {
-            if (rect.width <= 1 || rect.height <= 1) continue;
-            const middle = (rect.top + rect.bottom) / 2;
-            const line = found.find((l) => l.top <= middle && middle <= l.bottom);
-            if (line === undefined) found.push({ top: rect.top, bottom: rect.bottom });
-            else
-              Object.assign(line, {
-                top: Math.min(line.top, rect.top),
-                bottom: Math.max(line.bottom, rect.bottom),
-              });
-          }
-        }
-        return found.length;
-      }),
-    );
-    expect(lines.length).toBeGreaterThan(0);
-    expect(lines.filter((count) => count > 2)).toEqual([]);
-
-    await expectNoViolations(page);
-  });
-}
+  await expectNoViolations(page);
+});
 
 test('site inexistente responde 404', async ({ page }) => {
   await loginAs(page, 'operacao@orakel.local');

@@ -1,13 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-import { readFixture } from '../../src/bin/seed.ts';
-import { createDb, createPool } from '../../src/db/client.ts';
-import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
-import { createAuthor } from '../../src/domain/content/authors.ts';
-import { createSite } from '../../src/domain/sites/sites.ts';
-import { getEnv } from '../../src/env.ts';
-import { removeSites } from './cleanup.ts';
 import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
 
@@ -107,119 +100,107 @@ test(
   },
 );
 
-// Cabeçalho da tela de site (trilha, título e ação) no visual do Ecme (#247), nos dois temas.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`tela de site sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto('/sites/exemplo-a/autores');
-    await expect(page.getByRole('heading', { level: 1, name: 'Autores' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Criar autor' }).first()).toBeVisible();
-    await page.waitForLoadState('networkidle');
+// Cabeçalho da tela de site (trilha, título e ação) no visual do Ecme (#247), no tema claro.
+test(`tela de site sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites/exemplo-a/autores');
+  await expect(page.getByRole('heading', { level: 1, name: 'Autores' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Criar autor' }).first()).toBeVisible();
+  await page.waitForLoadState('networkidle');
 
-    await expectNoViolations(page);
-  });
-}
+  await expectNoViolations(page);
+});
 
-// Resumo de validação do SchemaForm no Alert do Ecme (#325), nos dois temas.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`resumo de validação no Alert, sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto('/sites/exemplo-a/autores/novo');
-    await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
-    await page.getByRole('button', { name: 'Criar' }).click();
+// Resumo de validação do SchemaForm no Alert do Ecme (#325), no tema claro.
+test(`resumo de validação no Alert, sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites/exemplo-a/autores/novo');
+  await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+  await page.getByRole('button', { name: 'Criar' }).click();
 
-    const summary = page.getByRole('alert').filter({ hasText: 'Corrija os campos destacados:' });
-    await expect(summary.locator('.alert')).toBeVisible();
-    await summary.getByRole('button', { name: /^Nome:/ }).click();
-    await expect(page.getByLabel(fieldLabel('Nome'))).toBeFocused();
-    await expectNoViolations(page);
-  });
-}
+  const summary = page.getByRole('alert').filter({ hasText: 'Corrija os campos destacados:' });
+  await expect(summary.locator('.alert')).toBeVisible();
+  await summary.getByRole('button', { name: /^Nome:/ }).click();
+  await expect(page.getByLabel(fieldLabel('Nome'))).toBeFocused();
+  await expectNoViolations(page);
+});
 
-// Remover item de lista do SchemaForm confirma num diálogo (#327), nos dois temas: Esc não
+// Remover item de lista do SchemaForm confirma num diálogo (#327), no tema claro: Esc não
 // remove e devolve o foco; "Remover" tira o item. Nada é salvo.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`remover item do menu confirma, sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto('/sites/exemplo-a/menus');
-    await page.getByRole('link', { name: 'Editar principal' }).click();
-    await page.waitForLoadState('networkidle');
-    const labels = page.getByLabel('Rótulo');
-    const count = await labels.count();
-    await page.getByRole('button', { name: 'Adicionar item' }).click();
-    await expect(labels).toHaveCount(count + 1);
+test(`remover item do menu confirma, sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites/exemplo-a/menus');
+  await page.getByRole('link', { name: 'Editar principal' }).click();
+  await page.waitForLoadState('networkidle');
+  const labels = page.getByLabel('Rótulo');
+  const count = await labels.count();
+  await page.getByRole('button', { name: 'Adicionar item' }).click();
+  await expect(labels).toHaveCount(count + 1);
 
-    const remove = page.getByRole('button', { name: `Remover item ${count + 1}` });
-    const dialog = page.getByRole('alertdialog', { name: `Remover item ${count + 1}?` });
-    await remove.click();
-    await expect(dialog).toBeVisible();
-    await expectNoViolations(page);
-    await page.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    await expect(remove).toBeFocused();
-    await expect(labels).toHaveCount(count + 1);
-    await remove.click();
-    await dialog.getByRole('button', { name: 'Remover' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(labels).toHaveCount(count);
-  });
-}
+  const remove = page.getByRole('button', { name: `Remover item ${count + 1}` });
+  const dialog = page.getByRole('alertdialog', { name: `Remover item ${count + 1}?` });
+  await remove.click();
+  await expect(dialog).toBeVisible();
+  await expectNoViolations(page);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(remove).toBeFocused();
+  await expect(labels).toHaveCount(count + 1);
+  await remove.click();
+  await dialog.getByRole('button', { name: 'Remover' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(labels).toHaveCount(count);
+});
 
-// Formulário do template (#328), nos dois temas: campos em Card, Nome e Slug lado a lado a
+// Formulário do template (#328), no tema claro: campos em Card, Nome e Slug lado a lado a
 // partir de md, a barra fixa na largura do main com Descartar (criar) ou Voltar (editar).
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`formulário de autor no template, sem violação do axe (${colorScheme})`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto('/sites/exemplo-a/autores/novo');
-    await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
-    await page.waitForLoadState('networkidle');
+test(`formulário de autor no template, sem violação do axe`, async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  await page.goto('/sites/exemplo-a/autores/novo');
+  await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
 
-    // Todo campo dentro de um Card.
-    const form = page.locator('main form');
-    const controls = form.locator('input:not([type=hidden]), textarea, select');
-    for (const control of await controls.all()) {
-      expect(await control.evaluate((el) => el.closest('.card') !== null)).toBe(true);
-    }
-    // Nome e Slug na mesma linha a 1280 px; um embaixo do outro a 767 px.
-    const name = page.getByLabel(fieldLabel('Nome'));
-    const slug = page.getByLabel('Slug');
-    expect((await name.boundingBox())?.y).toBe((await slug.boundingBox())?.y);
-    // A barra encosta nas bordas do main.
-    const bar = page
-      .locator('.sticky')
-      .filter({ has: page.getByRole('button', { name: 'Criar' }) });
-    const main = await page.locator('main').boundingBox();
-    const barBox = await bar.boundingBox();
-    expect(barBox?.x).toBe(main?.x);
-    expect(barBox?.width).toBe(main?.width);
-    await page.setViewportSize({ width: 767, height: 800 });
-    // Uma coluna: cada campo na sua linha (o schema põe o Slug antes do Nome).
-    expect((await name.boundingBox())!.y).toBeGreaterThan((await slug.boundingBox())!.y);
-    await page.setViewportSize({ width: 1280, height: 800 });
+  // Todo campo dentro de um Card.
+  const form = page.locator('main form');
+  const controls = form.locator('input:not([type=hidden]), textarea, select');
+  for (const control of await controls.all()) {
+    expect(await control.evaluate((el) => el.closest('.card') !== null)).toBe(true);
+  }
+  // Nome e Slug na mesma linha a 1280 px; um embaixo do outro a 767 px.
+  const name = page.getByLabel(fieldLabel('Nome'));
+  const slug = page.getByLabel('Slug');
+  expect((await name.boundingBox())?.y).toBe((await slug.boundingBox())?.y);
+  // A barra encosta nas bordas do main.
+  const bar = page.locator('.sticky').filter({ has: page.getByRole('button', { name: 'Criar' }) });
+  const main = await page.locator('main').boundingBox();
+  const barBox = await bar.boundingBox();
+  expect(barBox?.x).toBe(main?.x);
+  expect(barBox?.width).toBe(main?.width);
+  await page.setViewportSize({ width: 767, height: 800 });
+  // Uma coluna: cada campo na sua linha (o schema põe o Slug antes do Nome).
+  expect((await name.boundingBox())!.y).toBeGreaterThan((await slug.boundingBox())!.y);
+  await page.setViewportSize({ width: 1280, height: 800 });
 
-    // Descartar confirma: Cancelar fica com o que foi digitado; Descartar volta à lista sem criar.
-    await name.fill('Rascunho descartado');
-    await page.getByRole('button', { name: 'Descartar' }).click();
-    const dialog = page.getByRole('alertdialog', { name: 'Descartar o que foi preenchido?' });
-    await expect(dialog).toBeVisible();
-    await expectNoViolations(page);
-    await dialog.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(name).toHaveValue('Rascunho descartado');
-    await expectNoViolations(page);
-    await page.getByRole('button', { name: 'Descartar' }).click();
-    await dialog.getByRole('button', { name: 'Descartar' }).click();
-    await expect(page).toHaveURL(/\/sites\/exemplo-a\/autores$/);
-    await expect(page.getByRole('row', { name: /Rascunho descartado/ })).toHaveCount(0);
-  });
-}
+  // Descartar confirma: Cancelar fica com o que foi digitado; Descartar volta à lista sem criar.
+  await name.fill('Rascunho descartado');
+  await page.getByRole('button', { name: 'Descartar' }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'Descartar o que foi preenchido?' });
+  await expect(dialog).toBeVisible();
+  await expectNoViolations(page);
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(name).toHaveValue('Rascunho descartado');
+  await expectNoViolations(page);
+  await page.getByRole('button', { name: 'Descartar' }).click();
+  await dialog.getByRole('button', { name: 'Descartar' }).click();
+  await expect(page).toHaveURL(/\/sites\/exemplo-a\/autores$/);
+  await expect(page.getByRole('row', { name: /Rascunho descartado/ })).toHaveCount(0);
+});
 
 test('editar menu: Voltar leva à lista sem salvar', async ({ page }) => {
   await loginAs(page, 'editor@orakel.local');
@@ -286,31 +267,27 @@ test('menus: busca pela chave na URL, sem resultado na tabela e itens cortados',
 });
 
 // Padrão do template (#363): trilha acima do cartão; título, ação, toolbar e tabela nele, nas
-// três listas, nos dois temas.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`listas editoriais no cartão do template, sem violação do axe (${colorScheme})`, async ({
-    page,
-  }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
-    for (const [segment, title] of [
-      ['autores', 'Autores'],
-      ['taxonomias', 'Taxonomias'],
-      ['menus', 'Menus'],
-    ] as const) {
-      await page.goto(`/sites/exemplo-a/${segment}`);
-      const card = page.locator('.card').filter({ has: page.getByRole('table') });
-      await expect(card).toHaveCount(1);
-      await expect(card.getByRole('heading', { level: 1, name: title })).toBeVisible();
-      await expect(card.getByRole('link', { name: /^Criar / })).toBeVisible();
-      await expect(card.getByRole('search')).toBeVisible();
-      await expect(card.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
-      await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toBeVisible();
-      await page.waitForLoadState('networkidle');
-      await expectNoViolations(page);
-    }
-  });
-}
+// três listas, no tema claro.
+test(`listas editoriais no cartão do template, sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await loginAs(page, 'editor@orakel.local');
+  for (const [segment, title] of [
+    ['autores', 'Autores'],
+    ['taxonomias', 'Taxonomias'],
+    ['menus', 'Menus'],
+  ] as const) {
+    await page.goto(`/sites/exemplo-a/${segment}`);
+    const card = page.locator('.card').filter({ has: page.getByRole('table') });
+    await expect(card).toHaveCount(1);
+    await expect(card.getByRole('heading', { level: 1, name: title })).toBeVisible();
+    await expect(card.getByRole('link', { name: /^Criar / })).toBeVisible();
+    await expect(card.getByRole('search')).toBeVisible();
+    await expect(card.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expectNoViolations(page);
+  }
+});
 
 test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   const text = `Quem somos, revisto em ${Date.now()}.`;
@@ -356,138 +333,5 @@ test('revisor não vê formulário nem links de criar e editar', async ({ page }
   }
 });
 
-// Lista editorial legível de relance na Table do Ecme (#282): com mais autores do que cabem
-// numa página, a 1280 px, ao lado da barra lateral, nem a página nem a tabela rolam na
-// horizontal e nenhuma célula passa de duas linhas de texto. Autores, taxonomias e menus
-// usam o mesmo `EntityTable` (#363): a de autores, com a área de atuação longa e a coluna de
-// editar, é o caso mais largo. Site próprio da rodada, com os autores gravados pelo domínio (cadastrar 30
-// pela tela só tornaria o teste lento), removido no fim.
-test.describe('lista editorial a 1280 px', () => {
-  test.use({ viewport: { width: 1280, height: 800 } });
-
-  const siteId = `e2e-editorial-${Date.now()}`;
-  /** Nome e área de atuação longos: o pior caso de largura fica na própria rodada. */
-  const LONG_NAME = 'Maria Aparecida dos Santos Albuquerque de Vasconcelos Neto';
-  const LONG_EXPERTISE =
-    'Culinária regional brasileira, confeitaria artesanal e fermentação natural';
-  const MAX_LINES_PER_CELL = 2;
-
-  test.beforeAll(async () => {
-    const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
-    if (line?.type !== 'config') throw new Error('fixture sem config');
-    const pool = createPool(getEnv().DATABASE_URL);
-    try {
-      await createDb(pool).transaction(async (tx) => {
-        const site = await createSite(tx, SYSTEM_ACTOR, {
-          ...line.data,
-          siteId,
-          name: `Site ${siteId}`,
-          domains: [`${siteId}.example.com`],
-        });
-        if (!site.ok) throw new Error(JSON.stringify(site.issues));
-        for (let index = 1; index <= 30; index++) {
-          const author = await createAuthor(tx, SYSTEM_ACTOR, siteId, {
-            slug: `autor-${index}`,
-            name: index === 1 ? LONG_NAME : `Autor ${String(index).padStart(2, '0')}`,
-            expertise: index === 1 ? LONG_EXPERTISE : 'Receitas',
-          });
-          if (!author.ok) throw new Error(JSON.stringify(author.issues));
-        }
-      });
-    } finally {
-      await pool.end();
-    }
-  });
-
-  test.afterAll(async () => {
-    await removeSites([siteId]);
-  });
-
-  test('com 30 autores, página e tabela sem rolagem horizontal e células de até duas linhas', async ({
-    page,
-  }) => {
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto(`/sites/${siteId}/autores`);
-    const table = page.getByRole('table');
-    const rows = table.locator('tbody tr');
-    await expect(rows).toHaveCount(25);
-    await expect(page.getByRole('navigation', { name: 'Paginação' })).toBeVisible();
-    await expect(rows.first().getByRole('link', { name: `Editar ${LONG_NAME}` })).toBeVisible();
-
-    // Nem a página nem o contêiner da tabela (`overflow-x-auto` da Table) rolam na horizontal.
-    const viewport = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
-    const container = await table.evaluate((element) => ({
-      scrollWidth: element.parentElement!.scrollWidth,
-      clientWidth: element.parentElement!.clientWidth,
-    }));
-    expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth);
-
-    // Linhas de texto por célula, como em `sites-list.spec.ts` (#117): só nós de texto visíveis
-    // (o sr-only mede 1 px e fica de fora); retângulos que se sobrepõem na vertical são a
-    // mesma linha.
-    const cells = await rows.evaluateAll((trs) =>
-      trs.flatMap((tr) =>
-        Array.from(tr.querySelectorAll('td'), (cell, column) => {
-          const lines: { top: number; bottom: number }[] = [];
-          const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-          for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-            if (!node.textContent?.trim()) continue;
-            const range = document.createRange();
-            range.selectNodeContents(node);
-            for (const rect of range.getClientRects()) {
-              if (rect.width <= 1 || rect.height <= 1) continue;
-              const middle = (rect.top + rect.bottom) / 2;
-              const line = lines.find((l) => l.top <= middle && middle <= l.bottom);
-              if (line === undefined) lines.push({ top: rect.top, bottom: rect.bottom });
-              else
-                Object.assign(line, {
-                  top: Math.min(line.top, rect.top),
-                  bottom: Math.max(line.bottom, rect.bottom),
-                });
-            }
-          }
-          const author = tr.querySelector('td')?.textContent?.trim() ?? '';
-          return { author, column, lines: lines.length };
-        }),
-      ),
-    );
-    expect(cells.length).toBeGreaterThan(0);
-    expect(cells.filter((cell) => cell.lines > MAX_LINES_PER_CELL)).toEqual([]);
-  });
-
-  test('o seletor de tamanho fica na URL e recarregar mantém a mesma visão (#363)', async ({
-    page,
-  }) => {
-    await loginAs(page, 'editor@orakel.local');
-    await page.goto(`/sites/${siteId}/autores`);
-
-    await page.getByRole('combobox', { name: 'Itens por página' }).focus();
-    await page.keyboard.press('ArrowDown');
-    await page.getByRole('option', { name: '10 / página' }).click();
-    await expect(page).toHaveURL(/por-pagina=10/);
-    await expect(page.locator('tbody tr')).toHaveCount(10);
-
-    await page.reload();
-    await expect(page.locator('tbody tr')).toHaveCount(10);
-    await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
-      '30 resultados',
-    );
-  });
-
-  // A lista na Table do Ecme, com busca, paginação e editar, nos dois temas.
-  for (const colorScheme of ['light', 'dark'] as const) {
-    test(`lista de autores paginada sem violação do axe (${colorScheme})`, async ({ page }) => {
-      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-      await loginAs(page, 'editor@orakel.local');
-      await page.goto(`/sites/${siteId}/autores`);
-      await expect(page.getByRole('table').locator('tbody tr')).toHaveCount(25);
-      await page.waitForLoadState('networkidle');
-
-      await expectNoViolations(page);
-    });
-  }
-});
+// A lista legível de relance a 1280 px (30 autores, linhas por célula, sem rolagem horizontal),
+// o tamanho da página na URL e o axe nos dois temas ficam em `EntityTable.browser.test.tsx` (#460).

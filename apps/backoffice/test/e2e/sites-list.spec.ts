@@ -9,13 +9,12 @@ import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { removeSites } from './cleanup.ts';
 
-// Lista de sites legível de relance (#100): com 20 sites numa janela de 1280 px, ao lado da
-// barra lateral do Ecme (290 px, #237), nem a página nem a tabela rolam na horizontal e nenhuma
-// célula passa de duas linhas de texto (Table do Ecme, #248). Os 18 sites além dos
-// do seed são gravados pelo domínio (cadastrar 18 pela tela só tornaria o teste lento) e
-// removidos no fim. O pior caso de largura fica na própria rodada, sem depender do banco
-// (#153): um site pausado por falha permanente, com motivo longo, e um com último build
-// publicado e versão longa.
+// Lista de sites (#100, #364) contra o ambiente local: busca, filtro e menu "Mais ações". Os 18
+// sites além dos do seed são gravados pelo domínio (cadastrar 18 pela tela só tornaria o teste
+// lento) e removidos no fim, com um site pausado por falha permanente e um com último build
+// publicado. A tabela legível de relance a 1280 px (linhas por célula, sem rolagem horizontal) e
+// o seletor de site com 20 sites ficam nos testes de componente (`SitesTable.browser.test.tsx`
+// e `SiteSwitcher.browser.test.tsx`, #460).
 
 const stamp = Date.now();
 const created = Array.from({ length: 18 }, (_, index) => `e2e-lista-${stamp}-${index + 1}`);
@@ -25,9 +24,6 @@ const LONG_NAME = 'Guia completo de receitas regionais brasileiras para o dia a 
 /** Motivo da pausa longo, no formato `<etapa>: <mensagem>` de uma falha permanente. */
 const LONG_FAILURE = 'Tema "padrao-editorial-receitas" não existe nesta release do site-builder';
 const LONG_VERSION = '3f9c2a7e-5b1d-4c8e-9a6f-0d2e4b7c1a95';
-
-/** Nome e `SITE_ID · domínio` na célula do site; as outras células têm uma linha só. */
-const MAX_LINES_PER_CELL = 2;
 
 test.beforeAll(async () => {
   const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
@@ -114,115 +110,31 @@ async function loginAsAdmin(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
 }
 
-test('com 20 sites em 1280 px, página e tabela sem rolagem horizontal e linhas de até duas linhas', async ({
-  page,
-}) => {
+// Cabeçalho (título e ações) no visual do Ecme (#247); o tema escuro fica no teste de componente.
+test(`a lista de sites sem violação do axe`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await loginAsAdmin(page);
-  // Todos os sites numa página só (o padrão é 25, e o banco local pode ter outros sites).
-  await page.goto('/sites?por-pagina=100');
-  await page.waitForLoadState('networkidle');
-  const table = page.getByRole('table', { name: 'Sites', exact: true });
-  const rows = table.locator('tbody tr');
-  expect(await rows.count()).toBeGreaterThanOrEqual(20);
-
-  // Nem a página nem o contêiner da tabela (`overflow-x-auto` da Table) rolam na horizontal.
-  const viewport = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth);
-  const container = await table.evaluate((element) => ({
-    scrollWidth: element.parentElement!.scrollWidth,
-    clientWidth: element.parentElement!.clientWidth,
-  }));
-  expect(container.scrollWidth).toBeLessThanOrEqual(container.clientWidth);
-
-  // Linhas de texto por célula, não altura em px (#117): um badge ou botão 1 px maior não
-  // muda a contagem. Só nós de texto visíveis (a Range da célula inteira traria as caixas dos
-  // badges, alguns px acima do texto); o texto sr-only mede 1 px e fica de fora. Retângulos
-  // que se sobrepõem na vertical são a mesma linha: badge e texto ao lado não têm o mesmo top.
-  const cells = await rows.evaluateAll((trs) =>
-    trs.flatMap((tr) =>
-      Array.from(tr.querySelectorAll('td'), (cell, column) => {
-        const lines: { top: number; bottom: number }[] = [];
-        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-          if (!node.textContent?.trim()) continue;
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          for (const rect of range.getClientRects()) {
-            if (rect.width <= 1 || rect.height <= 1) continue;
-            const middle = (rect.top + rect.bottom) / 2;
-            const line = lines.find((l) => l.top <= middle && middle <= l.bottom);
-            if (line === undefined) lines.push({ top: rect.top, bottom: rect.bottom });
-            else
-              Object.assign(line, {
-                top: Math.min(line.top, rect.top),
-                bottom: Math.max(line.bottom, rect.bottom),
-              });
-          }
-        }
-        const site = tr.querySelector('td')?.textContent?.trim().slice(0, 60) ?? '';
-        return { site, column, lines: lines.length };
-      }),
-    ),
-  );
-  expect(cells.length).toBeGreaterThan(0);
-  expect(cells.filter((cell) => cell.lines > MAX_LINES_PER_CELL)).toEqual([]);
-
-  // Todas as informações continuam na linha; o nome longo fica cortado, inteiro no `title`.
-  // `-1` também casaria com `-10`…`-18`: a linha é a do ID seguido do separador.
-  const row = rows.filter({ hasText: `${created[0]} · ` });
-  await expect(row.getByRole('link', { name: LONG_NAME })).toHaveAttribute('title', LONG_NAME);
-  for (const text of ['Cadastrado', 'Sem release', 'Ativo', 'Não']) {
-    await expect(row.getByText(text, { exact: true })).toBeVisible();
-  }
-  await expect(page.getByRole('columnheader', { name: 'SITE_ID' })).toHaveCount(0);
-
-  // O pior caso está na lista, cortado, com o texto inteiro em `title` (#153).
-  const paused = rows.filter({ hasText: `${created[1]} · ` });
-  await expect(paused.getByText('Pausado', { exact: true })).toBeVisible();
-  await expect(paused.getByTitle(`render: ${LONG_FAILURE}`)).toBeVisible();
-  const built = rows.filter({ hasText: `${created[2]} · ` });
-  await expect(built.getByTitle(new RegExp(` · ${LONG_VERSION}$`))).toBeVisible();
-
-  // O cadastro registrou a configuração v1: a pendência se destaca e leva à tela dela.
-  const pending = row.getByRole('link', { name: `1 mudança pendente em ${created[0]}` });
-  await expect(pending).toHaveAttribute('href', `/sites/${created[0]}/pendencias`);
+  await expect(page.getByRole('link', { name: 'Criar site' })).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
     .analyze();
   expect(accessibility.violations).toEqual([]);
+
+  // "Publicar agora" da linha confirma num diálogo (#327), sem violação com ele aberto;
+  // Cancelar não publica e devolve o foco ao botão da linha.
+  const publish = page.getByRole('button', { name: 'Publicar agora exemplo-a' });
+  await publish.click();
+  const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
+  await expect(dialog).toBeVisible();
+  const withDialog = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
+    .analyze();
+  expect(withDialog.violations).toEqual([]);
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(publish).toBeFocused();
 });
-
-// Cabeçalho (título e ações) no visual do Ecme (#247), nos dois temas.
-for (const colorScheme of ['light', 'dark'] as const) {
-  test(`a lista de sites sem violação do axe (${colorScheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    await loginAsAdmin(page);
-    await expect(page.getByRole('link', { name: 'Criar site' })).toBeVisible();
-
-    const accessibility = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-      .analyze();
-    expect(accessibility.violations).toEqual([]);
-
-    // "Publicar agora" da linha confirma num diálogo (#327), sem violação com ele aberto;
-    // Cancelar não publica e devolve o foco ao botão da linha.
-    const publish = page.getByRole('button', { name: 'Publicar agora exemplo-a' });
-    await publish.click();
-    const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
-    await expect(dialog).toBeVisible();
-    const withDialog = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
-      .analyze();
-    expect(withDialog.violations).toEqual([]);
-    await dialog.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(publish).toBeFocused();
-  });
-}
 
 // Lista no cartão do template (#364): busca, filtro por estado, ordem e tamanho na URL;
 // recarregar mantém a mesma visão.
@@ -319,50 +231,4 @@ test('acionar um item do menu Mais ações fecha a lista e navega, pelo teclado 
   await menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' }).click();
   await expect(page).toHaveURL(/\/sites\/exemplo-a\/conteudos$/);
   await expect(menu).toHaveCount(0);
-});
-
-test('com 20 sites, a lista do seletor de site cabe na janela, rola e alcança o último site', async ({
-  page,
-}) => {
-  // Seletor de site (#221, #241): sem altura máxima, a lista passava da borda inferior e os
-  // últimos sites ficavam fora de alcance, sem rolagem. O menu do Dropdown rola por dentro
-  // (o <ul>), e as setas levam o foco até o último.
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await loginAsAdmin(page);
-  await page.goto('/sites/exemplo-a');
-  await page.waitForLoadState('networkidle');
-  const button = page.getByRole('button', { name: 'Exemplo A — Guias, trocar de site' });
-  const menu = page.getByRole('menu');
-
-  await button.focus();
-  await page.keyboard.press('Enter');
-  await expect(menu).toBeVisible();
-  const box = await button.evaluate((anchor) => {
-    const list = document.querySelector('[role="menu"] ul')!;
-    const rect = list.getBoundingClientRect();
-    return {
-      items: list.querySelectorAll('[role="menuitem"]').length,
-      height: rect.height,
-      bottom: rect.bottom,
-      below: window.innerHeight - anchor.getBoundingClientRect().bottom,
-      scrollHeight: list.scrollHeight,
-      clientHeight: list.clientHeight,
-    };
-  });
-  expect(box.items).toBeGreaterThanOrEqual(20);
-  expect(box.bottom).toBeLessThanOrEqual(720);
-  expect(box.height).toBeLessThanOrEqual(box.below);
-  expect(box.scrollHeight).toBeGreaterThan(box.clientHeight);
-
-  // O último site: as setas chegam a ele (e o rolam para a vista), e o Enter leva à mesma
-  // área do outro site.
-  const last = menu.getByRole('menuitem').last();
-  await expect(menu.getByRole('menuitem').first()).toBeFocused();
-  for (let step = 1; step < box.items; step += 1) await page.keyboard.press('ArrowDown');
-  await expect(last).toBeFocused();
-  await expect(last).toBeInViewport();
-  const href = await last.getAttribute('href');
-  expect(href).toMatch(/^\/sites\/[\w-]+$/);
-  await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(new RegExp(`${href}$`));
 });
