@@ -20,8 +20,19 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
 - **Publicar** (`publishVersion`, em `domain/publications/publish.ts`): exige
   `content.publish`, só a versão mais recente e só em `aprovado`. Na mesma transação, leva
   a versão a `publicado`, grava a linha em `publications` e chama `recordPendingChange`, que
-  agenda o build na janela do site. As versões publicadas antes continuam `publicado`, e a
-  seleção `published` já pega a mais recente.
+  agenda o build na janela do site. As versões publicadas antes continuam `publicado`.
+- **Versão no ar:** a mais recente entre `publicado` e `despublicado`, e só se for
+  `publicado` (`LIVE_STATUSES` e `liveVersion`, em `domain/content/contents.ts`). É a regra
+  da seleção `published` do snapshot, do caminho no ar da troca de endereço e da checagem de
+  slug em uso. Olhar só `publicado` traria de volta, depois da despublicação, uma versão
+  publicada anterior a ela (#491).
+- **Despublicar** (`unpublishContent`, em `domain/publications/unpublish.ts`): exige
+  `content.publish` e trava a linha de `contents`. Na mesma transação, leva a versão no ar a
+  `despublicado` e chama `recordPendingChange`. Com destino (outro conteúdo no ar do site),
+  grava o 301 do caminho do despublicado para o do destino por `createRedirect`, com origem
+  `manual`, e os redirects que chegavam no caminho antigo passam a apontar para o destino.
+  Sem destino, o endereço passa a responder 404. Não grava em `publications`, então não
+  conta no limite diário.
 - **Contagem do dia:** são as linhas do site com `published_at` na faixa
   `[início do dia de São Paulo, +1 dia)` do instante `now`, calculada no Postgres
   (`date_trunc` com `at time zone`). O `now` é injetável, para os testes. A publicação que
@@ -45,6 +56,11 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
   o dia num fuso só.
 - **Calcular o dia em JS com `Intl`:** criaria um segundo relógio para a mesma regra. No
   SQL, a faixa usa o índice.
+- **Despublicar todas as versões `publicado`:** reescreveria o histórico das versões, e a
+  regra da versão no ar continuaria espalhada.
+- **Origem `unpublish` no `Redirect.origin`:** mudaria o contrato do `content-model` sem
+  consumidor que precise distinguir. O destino é escolhido por uma pessoa, como o redirect
+  manual.
 - **Só a trava de `contents`:** duas publicações simultâneas no mesmo site passariam do
   limite.
 - **Limite na `SiteConfig`:** iria para o snapshot, e cada ajuste geraria um build sem nada a

@@ -147,8 +147,9 @@ export const CONTENT_STATUSES = [
 export type ContentData = Omit<Content, 'id'>;
 
 /**
- * Versões com dados imutáveis; só o `status` muda (ADR 0015). A publicada mais recente é a
- * que vai para o site.
+ * Versões com dados imutáveis; só o `status` muda (ADR 0015). A mais recente entre
+ * `publicado` e `despublicado` é a que vai para o site, se for `publicado` (`LIVE_STATUSES`,
+ * ADR 0017).
  */
 export const contentVersions = pgTable(
   'content_versions',
