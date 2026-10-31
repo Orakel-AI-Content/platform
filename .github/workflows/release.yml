@@ -1,6 +1,7 @@
 # Release do core (ADR 0005): a tag manual core-vX.Y.Z publica a imagem site-builder
 # com a tag X.Y.Z. Merge na main não cria release. A imagem é testada em todo PR pelo
-# job "Imagem site-builder" do ci.yml.
+# job "Imagem site-builder" do ci.yml. O release só sai com o último E2E completo da main
+# verde (#475).
 name: Release
 
 on:
@@ -13,8 +14,37 @@ permissions:
   packages: write
 
 jobs:
+  e2e-main:
+    name: E2E completo verde na main
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      # O último run concluído de push ou noturno; cancelado não conta. Não é o run do commit da
+      # tag: um push que não toca os caminhos do e2e.yml não gera run.
+      - name: Último run da main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          run="$(gh run list --workflow e2e.yml --branch main --status completed --limit 50 \
+            --json conclusion,event,url \
+            --jq '[.[] | select((.event == "push" or .event == "schedule") and .conclusion != "cancelled")][0] // empty | "\(.conclusion) \(.url)"')"
+          if [ -z "$run" ]; then
+            echo "::error::Nenhum run concluído do E2E completo na main."
+            exit 1
+          fi
+          conclusion="${run%% *}"
+          url="${run#* }"
+          if [ "$conclusion" != success ]; then
+            echo "::error::O último E2E completo da main terminou em $conclusion: $url"
+            exit 1
+          fi
+          echo "Último E2E completo da main verde: $url"
+
   site-builder:
     name: Imagem site-builder
+    needs: e2e-main
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
