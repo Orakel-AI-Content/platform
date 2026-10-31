@@ -14,6 +14,7 @@ import { getDatabaseUrl } from '../../src/env.ts';
 export const SITE_TABLES = [
   'builds',
   'reviews',
+  'publications',
   'pending_changes',
   'content_versions',
   'contents',
