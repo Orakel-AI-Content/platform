@@ -3,9 +3,10 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { contentVersions, publications, sites } from '../../src/db/schema/index.ts';
+import { contentVersions, publications } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
+import { setDailyPublishLimit } from '../../src/domain/builds/site-state.ts';
 import { submitForReview, updateContent } from '../../src/domain/content/contents.ts';
 import { openSnapshot } from '../../src/domain/export/snapshot.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
@@ -104,8 +105,11 @@ async function publishedTitles(): Promise<Map<number, string>> {
   return titles;
 }
 
-const setSiteLimit = (limit: number | null) =>
-  db.update(sites).set({ dailyPublishLimit: limit }).where(eq(sites.id, SITE));
+/** Pelo setter da aba "Limite diário" (#490): o que ele grava é o que a publicação conta. */
+async function setSiteLimit(limit: number | null) {
+  const set = await db.transaction((tx) => setDailyPublishLimit(tx, SYSTEM_ACTOR, SITE, limit));
+  if (!set.ok) throw new Error(JSON.stringify(set.issues));
+}
 
 describe('publicar a versão aprovada', () => {
   it('leva a versão a publicado, grava em publications e agenda o build na janela', async () => {

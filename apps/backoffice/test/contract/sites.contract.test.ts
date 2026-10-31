@@ -7,8 +7,9 @@ import { siteConfigs, sitePolicyTriggers, sites } from '../../src/db/schema/inde
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
-import { setBuildWindow } from '../../src/domain/builds/site-state.ts';
+import { setBuildWindow, setDailyPublishLimit } from '../../src/domain/builds/site-state.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
+import { configureDailyPublishLimit } from '../../src/domain/publications/publish.ts';
 import {
   listPolicyTriggers,
   registerPolicyTrigger,
@@ -60,6 +61,75 @@ describe('registro de instâncias', () => {
     } finally {
       configureBuildWindow(15 * 60_000);
     }
+  });
+});
+
+describe('limite diário do site (#490)', () => {
+  const limitOf = async (siteId: string) => {
+    const [row] = await db
+      .select({ dailyPublishLimit: sites.dailyPublishLimit })
+      .from(sites)
+      .where(eq(sites.id, siteId));
+    return row?.dailyPublishLimit;
+  };
+
+  it('grava o próprio, volta ao padrão com null e lista o próprio e o efetivo', async () => {
+    configureDailyPublishLimit(3);
+    expect(
+      await db.transaction((tx) => setDailyPublishLimit(tx, SYSTEM_ACTOR, 'exemplo-a', 5)),
+    ).toEqual({ ok: true, value: undefined });
+
+    const listed = await listSites(db, SYSTEM_ACTOR);
+    if (!listed.ok) throw new Error(JSON.stringify(listed.issues));
+    expect(
+      listed.value.map(({ id, dailyPublishLimit, effectiveDailyPublishLimit }) => ({
+        id,
+        dailyPublishLimit,
+        effectiveDailyPublishLimit,
+      })),
+    ).toEqual([
+      { id: 'exemplo-a', dailyPublishLimit: 5, effectiveDailyPublishLimit: 5 },
+      { id: 'exemplo-b', dailyPublishLimit: null, effectiveDailyPublishLimit: 3 },
+    ]);
+
+    await db.transaction((tx) => setDailyPublishLimit(tx, SYSTEM_ACTOR, 'exemplo-a', null));
+    const reset = await listSites(db, SYSTEM_ACTOR);
+    if (!reset.ok) throw new Error(JSON.stringify(reset.issues));
+    expect(reset.value[0]).toMatchObject({
+      dailyPublishLimit: null,
+      effectiveDailyPublishLimit: 3,
+    });
+  });
+
+  it('não cria mudança pendente', async () => {
+    const before = await unresolvedPendingChangeIds(db, 'exemplo-a');
+    await db.transaction((tx) => setDailyPublishLimit(tx, SYSTEM_ACTOR, 'exemplo-a', 5));
+
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(before);
+  });
+
+  it.each([0, -1, 1.5])('recusa %s com issue no campo, sem gravar', async (limit) => {
+    expect(
+      await db.transaction((tx) => setDailyPublishLimit(tx, SYSTEM_ACTOR, 'exemplo-a', limit)),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.daily_publish_limit_invalid', path: ['dailyPublishLimit'] }],
+    });
+    expect(await limitOf('exemplo-a')).toBeNull();
+  });
+
+  it('recusa site inexistente', async () => {
+    expect(
+      await db.transaction((tx) => setDailyPublishLimit(tx, SYSTEM_ACTOR, 'outro', 5)),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+  });
+
+  it.each(['editor', 'revisor'] as const)('%s não define o limite', async (role) => {
+    const actor = { email: `${role}@orakel.local`, roles: [role] };
+    expect(
+      await db.transaction((tx) => setDailyPublishLimit(tx, actor, 'exemplo-a', 5)),
+    ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await limitOf('exemplo-a')).toBeNull();
   });
 });
 
