@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+# Legado (ADR 0017): o E2E local de uma área é o `pnpm local:e2e:telas <área>`, sem build nem
+# cópia do banco. Este comando sai depois de 2 semanas sem uso.
+#
 # pnpm local:isolated up <id> [porta] | down <id>: um Backoffice só da sessão, para o E2E de
 # sessões em paralelo (worktrees). Sobe o `next start` do worktree no host (build pelo turbo,
 # com cache), num banco só da sessão (orakel_<id>, cópia do compartilhado), e um Caddy avulso,
@@ -9,7 +12,7 @@ set -eu
 cd "$(dirname "$0")/../.."
 . infra/local/lib.sh
 
-usage="uso: pnpm local:isolated up <id> [porta] | down <id>"
+usage="uso (legado; prefira pnpm local:e2e:telas <área>): pnpm local:isolated up <id> [porta] | down <id>"
 verb="${1:?$usage}"
 id="${2:?$usage}"
 case "$id" in
