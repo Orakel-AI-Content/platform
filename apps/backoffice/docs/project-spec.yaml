@@ -173,6 +173,13 @@ decisions:
       source: input,
       provisional: true,
     }
+  extra.daily-publish-limit:
+    {
+      value: '3 publicações por site no dia de America/Sao_Paulo (proposta); por site em sites.daily_publish_limit, nula usa PUBLISH_DAILY_LIMIT; contagem em publications',
+      rationale: 'ADR 0017',
+      source: decided,
+      provisional: true,
+    }
 
 commands:
   dev: pnpm dev
