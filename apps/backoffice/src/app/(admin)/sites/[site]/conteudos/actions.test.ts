@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
-import { createContentAction, submitForReviewAction, updateContentAction } from './actions.ts';
+import {
+  createContentAction,
+  submitForReviewAction,
+  unpublishContentAction,
+  updateContentAction,
+} from './actions.ts';
 
 // As actions só traduzem: sessão → recusa, Result do domínio → issues com path, sucesso →
 // revalida a lista. Regras e permissão estão nos testes de contrato do domínio.
@@ -15,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   listContentVersions: vi.fn(),
   submitForReview: vi.fn(),
   resourcesFor: vi.fn(),
+  unpublishContent: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -28,6 +34,9 @@ vi.mock('@/domain/content/contents.ts', () => ({
   updateContent: mocks.updateContent,
   listContentVersions: mocks.listContentVersions,
   submitForReview: mocks.submitForReview,
+}));
+vi.mock('@/domain/publications/unpublish.ts', () => ({
+  unpublishContent: mocks.unpublishContent,
 }));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
 
@@ -182,5 +191,61 @@ describe('enviar para revisão', () => {
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(1, '/sites/exemplo-a/conteudos');
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(2, '/sites/exemplo-a/conteudos/7');
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(3, '/sites/exemplo-a/revisao');
+  });
+});
+
+describe('despublicar (#494)', () => {
+  it('sem sessão não chama o domínio nem revalida', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await unpublishContentAction('exemplo-a', 1)).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.unpublishContent).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('recusa do domínio volta com a mensagem e não revalida', async () => {
+    mocks.unpublishContent.mockResolvedValue({
+      ok: false,
+      issues: [
+        {
+          code: 'publication.invalid_target',
+          message: 'O destino do 301 precisa ser outro conteúdo no ar do site exemplo-a: 9 não é',
+          path: [],
+        },
+      ],
+    });
+
+    expect(await unpublishContentAction('exemplo-a', 1, 9)).toEqual({
+      ok: false,
+      message: 'O destino do 301 precisa ser outro conteúdo no ar do site exemplo-a: 9 não é',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('sem destino delega sem `to`; com destino, passa o `to`; e revalida o site e o conteúdo', async () => {
+    mocks.unpublishContent.mockResolvedValue({ ok: true, value: { version: 2 } });
+
+    expect(await unpublishContentAction('exemplo-a', 1)).toEqual({
+      ok: true,
+      message: 'Conteúdo despublicado.',
+    });
+    expect(mocks.unpublishContent).toHaveBeenLastCalledWith({}, editor, 'exemplo-a', 1, {});
+
+    mocks.unpublishContent.mockResolvedValue({ ok: true, value: { version: 2, redirectId: 5 } });
+    expect(await unpublishContentAction('exemplo-a', 1, 2)).toEqual({
+      ok: true,
+      message: 'Conteúdo despublicado, com o 301.',
+    });
+    expect(mocks.unpublishContent).toHaveBeenLastCalledWith({}, editor, 'exemplo-a', 1, { to: 2 });
+    expect(mocks.revalidatePath.mock.calls.map(([path]) => path as string)).toEqual(
+      expect.arrayContaining([
+        '/sites/exemplo-a',
+        '/sites/exemplo-a/conteudos',
+        '/sites/exemplo-a/conteudos/1',
+      ]),
+    );
   });
 });
