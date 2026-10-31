@@ -7,7 +7,7 @@ import {
   type Content,
   type Resources,
 } from '@orakel/content-model/v1';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ne, or, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import {
@@ -15,6 +15,7 @@ import {
   contents,
   contentVersions,
   media,
+  redirects,
   reviews,
   taxonomies,
   type CONTENT_STATUSES,
@@ -67,18 +68,95 @@ function withN(block: NewBlock, n: number): Block {
   return { ...fresh, n } as Block;
 }
 
+/** Slug da versão no ar (a última `publicado`, a seleção `published` do snapshot). */
+export async function liveSlug(
+  tx: Executor,
+  siteId: string,
+  contentId: number,
+): Promise<string | undefined> {
+  const [row] = await tx
+    .select({ slug: sql<string>`${contentVersions.data}->>'slug'` })
+    .from(contentVersions)
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        eq(contentVersions.contentId, contentId),
+        eq(contentVersions.status, 'publicado'),
+      ),
+    )
+    .orderBy(desc(contentVersions.version))
+    .limit(1);
+  return row?.slug;
+}
+
+/** Maior versão do conteúdo da linha externa de `content_versions` (só as publicadas, se pedido). */
+const maxVersion = (published: boolean) => sql`(
+  select max(v.version) from ${contentVersions} v
+  where v.site_id = ${contentVersions.siteId} and v.content_id = ${contentVersions.contentId}
+  ${published ? sql`and v.status = 'publicado'` : sql``}
+)`;
+
 /**
- * Schema e validação semântica (referências do site, recursos); devolve os dados sem ID. A
- * revisão valida a versão com a mesma regra da edição.
+ * Slug em uso no site, a regra de `checkUniqueSlugs` sobre o banco: o de outro conteúdo
+ * (artigos e páginas dividem `/<slug>/`), na versão mais recente ou na que está no ar, para
+ * nem o snapshot `latest` nem o `published` colidirem; ou a origem de um redirect que não
+ * aponta para o caminho no ar do próprio conteúdo. `contentId` nulo: conteúdo novo.
+ */
+export async function slugInUse(
+  tx: Executor,
+  siteId: string,
+  contentId: number | null,
+  slug: string,
+): Promise<Issue | undefined> {
+  const path = `/${slug}/`;
+  const inUse = (message: string): Issue => ({
+    code: 'content.slug_in_use',
+    message,
+    path: ['slug'],
+  });
+
+  const [other] = await tx
+    .select({ id: contentVersions.contentId })
+    .from(contentVersions)
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        contentId === null ? undefined : ne(contentVersions.contentId, contentId),
+        sql`${contentVersions.data}->>'slug' = ${slug}`,
+        or(
+          eq(contentVersions.version, maxVersion(false)),
+          eq(contentVersions.version, maxVersion(true)),
+        ),
+      ),
+    )
+    .limit(1);
+  if (other !== undefined) return inUse(`O endereço ${path} já é do conteúdo ${other.id}`);
+
+  const [redirect] = await tx
+    .select({ to: redirects.to })
+    .from(redirects)
+    .where(and(eq(redirects.siteId, siteId), eq(redirects.from, path)))
+    .limit(1);
+  if (redirect === undefined) return undefined;
+  const live = contentId === null ? undefined : await liveSlug(tx, siteId, contentId);
+  if (live !== undefined && redirect.to === `/${live}/`) return undefined;
+  return inUse(`O endereço ${path} é a origem de um redirect para ${redirect.to}`);
+}
+
+/**
+ * Schema, validação semântica (referências do site, recursos) e slug livre no site; devolve
+ * os dados sem ID. A revisão valida a versão com a mesma regra da edição. `contentId` nulo:
+ * conteúdo novo, validado com um ID provisório (o definitivo só é alocado depois, para não
+ * gastar a sequência).
  */
 export async function validateContentData(
   tx: Executor,
   siteId: string,
-  contentId: number,
+  contentId: number | null,
   input: Omit<Content, 'id'>,
   resources: Resources = RESOURCES,
 ): Promise<Result<ContentData>> {
-  const parsed = ContentSchema.safeParse({ ...input, id: contentId });
+  const parsed = ContentSchema.safeParse({ ...input, id: contentId ?? 1 });
   if (!parsed.success) {
     return {
       ok: false,
@@ -91,6 +169,8 @@ export async function validateContentData(
   }
   const semantic = validateContent(parsed.data, await referenceContext(tx, siteId), resources);
   if (!semantic.ok) return semantic;
+  const taken = await slugInUse(tx, siteId, contentId, parsed.data.slug);
+  if (taken !== undefined) return { ok: false, issues: [taken] };
   const data: Partial<Content> = { ...semantic.value };
   delete data.id;
   return { ok: true, value: data as ContentData };
@@ -121,11 +201,10 @@ export async function createContent(
   let nextBlockN =
     Math.max(0, ...input.blocks.flatMap((block) => (isNew(block) ? [] : [block.n]))) + 1;
   const blocks = input.blocks.map((block) => (isNew(block) ? withN(block, nextBlockN++) : block));
-  // ID provisório na validação: o definitivo só é alocado depois, para não gastar a sequência.
   const data = await validateContentData(
     tx,
     siteId,
-    options.id ?? 1,
+    options.id ?? null,
     { ...input, blocks },
     options.resources,
   );

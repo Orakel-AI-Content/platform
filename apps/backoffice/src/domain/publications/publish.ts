@@ -4,6 +4,8 @@ import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { Executor } from '../../db/client.ts';
 import { contents, contentVersions, publications, sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
+import { liveSlug, slugInUse } from '../content/contents.ts';
+import { createRedirect } from '../content/redirects.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 
 /** Fuso do dia do limite: sempre o de São Paulo, não o `timeZone` do site (workspace#20). */
@@ -62,7 +64,9 @@ async function publishedOnDay(tx: Executor, siteId: string, now: Date): Promise<
  * `publications` e registra a mudança pendente, que agenda o build na janela do site. Trava a
  * linha de `contents`, como a aprovação, e depois a do site (`for no key update`, que não
  * espera as gravações com chave estrangeira para ele), para duas publicações simultâneas no
- * mesmo site não passarem do limite.
+ * mesmo site não passarem do limite. O slug é conferido de novo (outro conteúdo pode tê-lo
+ * tomado depois da edição) e, se difere do que está no ar, o caminho antigo ganha o 301 para
+ * o novo, já sem cadeias (`createRedirect`).
  */
 export async function publishVersion(
   tx: Executor,
@@ -82,7 +86,11 @@ export async function publishVersion(
     .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)))
     .for('update');
   const [latest] = await tx
-    .select({ version: contentVersions.version, status: contentVersions.status })
+    .select({
+      version: contentVersions.version,
+      status: contentVersions.status,
+      slug: sql<string>`${contentVersions.data}->>'slug'`,
+    })
     .from(contentVersions)
     .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))
     .orderBy(desc(contentVersions.version))
@@ -103,6 +111,9 @@ export async function publishVersion(
     );
   }
 
+  const taken = await slugInUse(tx, siteId, contentId, latest.slug);
+  if (taken !== undefined) return { ok: false, issues: [taken] };
+
   const [site] = await tx
     .select({ limit: sites.dailyPublishLimit })
     .from(sites)
@@ -116,6 +127,18 @@ export async function publishVersion(
       'publication.daily_limit',
       `O site ${siteId} já tem ${published} publicação(ões) hoje (dia de São Paulo), e o limite é ${limit}`,
     );
+  }
+
+  const previous = await liveSlug(tx, siteId, contentId);
+  if (previous !== undefined && previous !== latest.slug) {
+    const redirect = await createRedirect(
+      tx,
+      actor,
+      siteId,
+      { from: `/${previous}/`, to: `/${latest.slug}/`, status: 301, origin: 'slug-change' },
+      { action: 'content.publish' },
+    );
+    if (!redirect.ok) return redirect;
   }
 
   await tx
