@@ -722,6 +722,8 @@ test.describe('barra de ações do editor (#109)', () => {
     await asRole(page, 'editor');
     const editPath = `/sites/exemplo-a/conteudos/${contentId}/editar`;
     await page.goto(editPath);
+    // Digitar antes da hidratação perde o estado do formulário (no `next dev`, ela demora).
+    await page.waitForLoadState('networkidle');
     const titleField = page.getByLabel(fieldLabel('Título'));
     // O conteúdo na trilha (#174) leva às versões; pelo destino, porque o título muda ao salvar.
     const versions = page
@@ -752,6 +754,7 @@ test.describe('barra de ações do editor (#109)', () => {
 
     // Confirmar navega; fechar a aba com alteração dispara o beforeunload.
     await page.goto(editPath);
+    await page.waitForLoadState('networkidle');
     await titleField.fill(`${title} (de novo)`);
     page.once('dialog', (dialog) => {
       dialogs.push(dialog.type());
@@ -847,6 +850,8 @@ test.describe('barra de ações do editor (#109)', () => {
   }) => {
     await asRole(page, 'editor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    // Teclado só depois da hidratação (no `next dev` da camada `telas`, ela demora).
+    await page.waitForLoadState('networkidle');
     const trigger = page.getByRole('button', { name: 'Inserir bloco na posição 2', exact: true });
     const menu = page.getByRole('menu');
 
@@ -931,6 +936,7 @@ test.describe('barra de ações do editor (#109)', () => {
   }) => {
     await asRole(page, 'editor');
     await page.goto(`/sites/exemplo-a/conteudos/${contentId}/editar`);
+    await page.waitForLoadState('networkidle');
     const toggle = page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true });
     const group = page.getByRole('group', { name: 'Bloco 1: Sumário', exact: true });
 

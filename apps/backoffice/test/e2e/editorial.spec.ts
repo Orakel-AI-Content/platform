@@ -13,6 +13,9 @@ import { chooseOption } from './select.ts';
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
 async function expectNoViolations(page: Page): Promise<void> {
+  // Depois de uma navegação no cliente, o <title> chega em streaming; no `next dev` da camada
+  // `telas`, depois do axe.
+  await expect(page).toHaveTitle(/\S/);
   const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   expect(accessibility.violations).toEqual([]);
 }
