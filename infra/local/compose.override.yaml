@@ -39,10 +39,9 @@ services:
     image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
     restart: 'no'
     entrypoint: ['sh', '/init.sh']
-    environment:
-      LOCAL_SITES: ${LOCAL_SITES:-exemplo-a,exemplo-b,horta-em-casa}
     volumes:
       - ../local/s3/init.sh:/init.sh:ro
+      - ../local/seeds/sites.json:/sites.json:ro
     networks: [internal]
     depends_on:
       s3:
@@ -86,7 +85,6 @@ services:
     environment:
       BACKOFFICE_UPSTREAM: ${BACKOFFICE_UPSTREAM:-backoffice-web:3000}
       BLOG_PREVIEW_UPSTREAM: ${BLOG_PREVIEW_UPSTREAM:-blog-preview:4321}
-      LOCAL_MEDIA_HOSTS: ${LOCAL_MEDIA_HOSTS:-media.exemplo-a.localhost, media.exemplo-b.localhost, media.horta-em-casa.localhost}
     volumes:
       - ../local/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

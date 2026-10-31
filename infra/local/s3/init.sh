@@ -2,13 +2,15 @@
 # Buckets do armazenamento local (ADR 0013 da raiz), os mesmos do R2 de produção. Rodado pelo
 # serviço s3-init a cada local:up; bucket que já existe é mantido.
 #   media-originals   originais das imagens (privado)
-#   media-<site>      variantes de cada site (lidas pelo Caddy em media.<site>.localhost)
+#   media-<site>      variantes de cada site de infra/local/seeds/sites.json (lidas pelo Caddy
+#                     em media.<site>.localhost)
 #   build-cache       saída compactada de cada publish
 #   backups, brasil   backups do Postgres e a cópia fora da nuvem
 set -eu
 
 buckets="media-originals build-cache backups brasil"
-for site in $(echo "${LOCAL_SITES:-}" | tr ',' ' '); do
+# Os sites são as chaves de primeiro nível do sites.json (formatado pelo Prettier).
+for site in $(sed -n 's/^  "\([a-z0-9-]*\)": {.*/\1/p' /sites.json); do
   buckets="$buckets media-$site"
 done
 

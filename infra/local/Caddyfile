@@ -69,20 +69,6 @@ lhci.orakel.localhost {
 	import protected lhci-server:9001
 }
 
-# Mídia dos sites (ADR 0013 da raiz): media.<site>.localhost → bucket media-<site>, pelo filer
-# do SeaweedFS (sem leitura anônima no S3). Só leitura, com o cache do R2 de produção.
-# LOCAL_MEDIA_HOSTS lista os hosts, porque o curinga do Caddy só cobre um nível.
-{$LOCAL_MEDIA_HOSTS} {
-	@read method GET HEAD
-	handle @read {
-		rewrite * /buckets/media-{labels.1}{uri}
-		reverse_proxy s3:8888 {
-			header_down Cache-Control "public, max-age=31536000, immutable"
-		}
-	}
-	respond 405
-}
-
 # Sites publicados no edge-local (substituto da Cloudflare): <site>.localhost, público como
 # em produção. Bloco genérico (qualquer host que os de cima não atendem), com certificado por
 # site emitido no primeiro acesso: com o endereço *.localhost, o Caddy emitiria um curinga, e o
@@ -91,5 +77,24 @@ https:// {
 	tls internal {
 		on_demand
 	}
-	reverse_proxy edge-local:8080
+
+	# Mídia dos sites (ADR 0013 da raiz): media.<site>.localhost → bucket media-<site>, pelo
+	# filer do SeaweedFS (sem leitura anônima no S3). Só leitura, com o cache do R2 de produção.
+	# Pelo formato do nome, sem lista de hosts: site novo não precisa de configuração aqui.
+	# media-originals é privado, não é mídia de site.
+	@media expression `{host}.matches('^media\\.[a-z0-9-]+\\.localhost$') && {labels.1} != 'originals'`
+	handle @media {
+		@read method GET HEAD
+		handle @read {
+			rewrite * /buckets/media-{labels.1}{uri}
+			reverse_proxy s3:8888 {
+				header_down Cache-Control "public, max-age=31536000, immutable"
+			}
+		}
+		respond 405
+	}
+
+	handle {
+		reverse_proxy edge-local:8080
+	}
 }
