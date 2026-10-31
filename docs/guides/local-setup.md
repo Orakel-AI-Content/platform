@@ -29,8 +29,10 @@ fixtures do `content-model`; os E2E dependem deles) e cada site completo de
 `infra/local/seeds/<site>/` — hoje o **Horta em Casa** (`horta-em-casa`), com 10 artigos,
 autores, taxonomias, menus e ilustrações de verdade em `imagens/`. As imagens passam pela
 mesma normalização e pelas mesmas variantes de um envio e vão para `media-<site>`; por isso o
-site precisa estar em `LOCAL_SITES` e `LOCAL_MEDIA_HOSTS`. Site que já existe é pulado: para
-recriar, remova-o do banco (ou `pnpm local:reset`) e rode o seed de novo.
+site precisa estar em `infra/local/seeds/sites.json` (de onde o `s3-init` tira os buckets). As
+fixtures não trazem imagem: o seed grava uma imagem lisa em cada variante delas. Site que já
+existe não é importado de novo, mas as imagens que faltam no bucket são gravadas outra vez;
+para recriar o site, remova-o do banco (ou `pnpm local:reset`) e rode o seed de novo.
 
 Já tinha um `.env.local`? Compare com o `.env.example` e acrescente as variáveis novas
 (backoffice, Access local e o bloco "Ambiente local"); o compose avisa qual falta. Apague ou
@@ -159,7 +161,8 @@ sessão. Num worktree sem `.env.local`, aponte o da raiz (legado):
 | Caddy (Tunnel)       | portas 80 e 443                                     | CA interna (veja "Primeira vez")                     |
 
 As portas só escutam em `127.0.0.1`. Buckets (criados pelo `s3-init` a cada `local:up`):
-`media-originals`, `build-cache`, `backups`, `brasil` e `media-<site>` de `LOCAL_SITES`.
+`media-originals`, `build-cache`, `backups`, `brasil` e `media-<site>` de cada site de
+`infra/local/seeds/sites.json`.
 
 ## Builds
 
@@ -201,8 +204,11 @@ Para ver ou desligar: acrescente o `--profile` ao `ps`, `logs` ou `down`.
 - **Porta ocupada**: pare o serviço local que usa 5432, 8123 ou 8333.
 - **`local:check` falha em "Serviços"**: `infra/local/compose.sh logs <serviço>`. Um serviço
   parado só é aceito se for one-shot (`backoffice-migrate`, `s3-init`, `glitchtip-db`).
-- **`media.<site>.localhost` não responde**: o site precisa estar em `LOCAL_MEDIA_HOSTS`
-  (recrie o `caddy`: `infra/local/compose.sh up -d caddy`) e em `LOCAL_SITES` (rode `local:up` para criar o bucket).
+- **Imagem quebrada num site local**: `pnpm local:check` confere se cada `media.<site>.localhost`
+  chega ao filer (`Server: SeaweedFS`; o edge-local também responde 404) e se o bucket existe.
+  Sem o bucket, ponha o site em `infra/local/seeds/sites.json` e rode `local:up`; sem as
+  imagens, `pnpm local:seed` grava de novo as que faltam. Um `.env.local` antigo ainda pode ter
+  `LOCAL_SITES` e `LOCAL_MEDIA_HOSTS`: não são mais lidas, apague-as.
 - **Aviso de plataforma (`linux/amd64`) no `local:up` ou `local:publish`**: imagens de antes
   do build nativo; reconstrua com `pnpm local:images` (usa a arquitetura da máquina; o CI
   constrói amd64, a da VPS). Para testar amd64 no local: `PLATFORM=linux/amd64 pnpm local:images`.
