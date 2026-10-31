@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { asRole } from './auth.ts';
 import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
 
@@ -10,12 +11,6 @@ import { chooseOption } from './select.ts';
 // banco local acumula itens entre rodadas).
 
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
-
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 async function expectNoViolations(page: Page): Promise<void> {
   const accessibility = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -29,7 +24,7 @@ test(
     const stamp = Date.now();
     const author = `Autora ${stamp}`;
     const category = `Categoria ${stamp}`;
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto('/sites/exemplo-a');
     const nav = page.getByRole('navigation', { name: 'Áreas do site' });
 
@@ -103,7 +98,7 @@ test(
 // Cabeçalho da tela de site (trilha, título e ação) no visual do Ecme (#247), no tema claro.
 test(`tela de site sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/autores');
   await expect(page.getByRole('heading', { level: 1, name: 'Autores' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Criar autor' }).first()).toBeVisible();
@@ -115,7 +110,7 @@ test(`tela de site sem violação do axe`, async ({ page }) => {
 // Resumo de validação do SchemaForm no Alert do Ecme (#325), no tema claro.
 test(`resumo de validação no Alert, sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/autores/novo');
   await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
   await page.getByRole('button', { name: 'Criar' }).click();
@@ -131,7 +126,7 @@ test(`resumo de validação no Alert, sem violação do axe`, async ({ page }) =
 // remove e devolve o foco; "Remover" tira o item. Nada é salvo.
 test(`remover item do menu confirma, sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/menus');
   await page.getByRole('link', { name: 'Editar principal' }).click();
   await page.waitForLoadState('networkidle');
@@ -160,7 +155,7 @@ test(`remover item do menu confirma, sem violação do axe`, async ({ page }) =>
 test(`formulário de autor no template, sem violação do axe`, async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/autores/novo');
   await expect(page.getByRole('heading', { name: 'Criar autor' })).toBeVisible();
   await page.waitForLoadState('networkidle');
@@ -203,7 +198,7 @@ test(`formulário de autor no template, sem violação do axe`, async ({ page })
 });
 
 test('editar menu: Voltar leva à lista sem salvar', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/menus');
   await page.getByRole('link', { name: 'Editar principal' }).click();
   await page.waitForLoadState('networkidle');
@@ -220,7 +215,7 @@ test('editar menu: Voltar leva à lista sem salvar', async ({ page }) => {
 
 test('editor edita um item do menu e o vê na lista', async ({ page }) => {
   const label = `Guias ${Date.now()}`;
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/menus');
   await page.getByRole('link', { name: 'Editar principal' }).click();
 
@@ -240,7 +235,7 @@ test('editor edita um item do menu e o vê na lista', async ({ page }) => {
 test('menus: busca pela chave na URL, sem resultado na tabela e itens cortados', async ({
   page,
 }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/menus');
   const table = page.getByRole('table', { name: 'Menus', exact: true });
   await expect(page.getByRole('navigation', { name: 'Paginação' })).toBeVisible();
@@ -270,7 +265,7 @@ test('menus: busca pela chave na URL, sem resultado na tabela e itens cortados',
 // três listas, no tema claro.
 test(`listas editoriais no cartão do template, sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   for (const [segment, title] of [
     ['autores', 'Autores'],
     ['taxonomias', 'Taxonomias'],
@@ -293,7 +288,7 @@ test('editor altera o texto "sobre" com rich text', async ({ page }) => {
   const text = `Quem somos, revisto em ${Date.now()}.`;
   // Sem a animação do toast, o axe audita a confirmação já em repouso.
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a');
   await page
     .getByRole('navigation', { name: 'Áreas do site' })
@@ -314,7 +309,7 @@ test('editor altera o texto "sobre" com rich text', async ({ page }) => {
 });
 
 test('revisor não vê formulário nem links de criar e editar', async ({ page }) => {
-  await loginAs(page, 'revisor@orakel.local');
+  await asRole(page, 'revisor');
   await page.goto('/sites/exemplo-a');
   const nav = page.getByRole('navigation', { name: 'Áreas do site' });
   await expect(nav.getByRole('link', { name: 'Autores' })).toBeVisible();

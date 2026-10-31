@@ -18,6 +18,7 @@ import { profileVariants } from '../../src/domain/media/variants.ts';
 import { currentConfig } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
 import { createS3Client, s3ObjectStore } from '../../src/lib/s3.ts';
+import { asRole } from './auth.ts';
 import { removeSites } from './cleanup.ts';
 import { createVolumeSite, seedMedia } from '../volume.ts';
 
@@ -37,12 +38,6 @@ test.afterAll(async () => {
 
 // Com a biblioteca vazia, "Enviar imagens" aparece no cabeçalho e no `EmptyState` (#377): o E2E
 // usa o primeiro, o do cabeçalho.
-
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 /** O EXIF (após "Exif\0\0") aponta para o bloco de GPS: tag 0x8825 na ordem de bytes do TIFF. */
 /** Diálogo "Enviar imagens" (#376) e o campo de arquivo da área de soltar, nomeado pelo texto. */
@@ -75,7 +70,7 @@ test('foto com GPS vira variantes sem localização e o artigo publicado a carre
 
   // Envio pela tela da biblioteca (#52), como editor, até a mídia aparecer.
   const before = await maxMediaId();
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto(`/sites/${SITE}/midia`);
   // Soltar na área do diálogo (#376): o arrasto destaca a área, e o arquivo solto cai no campo
   // que a cobre (o Playwright não solta arquivos do sistema; `setInputFiles` faz a parte dele).
@@ -219,7 +214,7 @@ test.describe('biblioteca com 2.000 imagens (#186)', { tag: '@perf' }, () => {
   });
 
   test('abre e busca em menos de 2 s', async ({ page }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
     let started = Date.now();
@@ -245,7 +240,7 @@ test.describe('biblioteca de mídia (#186)', () => {
   });
 
   test('busca por nome e pagina só com teclado, com a busca na URL', async ({ page }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     // A contagem fica ao lado do nav "Paginação" do Ecme, não dentro dele (#269).
     const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
@@ -286,7 +281,7 @@ test.describe('biblioteca de mídia (#186)', () => {
   }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${LIBRARY_SITE}/midia`);
     const image = page.getByRole('button', { name: /^foto-1\.jpg ·/ });
     await image.click();
@@ -316,7 +311,7 @@ test.describe('biblioteca de mídia (#186)', () => {
   // Busca, contagem e paginação nos controles do Ecme (#269), no tema claro.
   test(`lista sem violação do axe`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${LIBRARY_SITE}/midia?pagina=2`);
     await expect(page.getByRole('status').filter({ hasText: /resultados?$/ })).toHaveText(
       '30 resultados',
@@ -342,7 +337,7 @@ test(
     })
       .jpeg()
       .toBuffer();
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${SITE}/midia`);
 
     // Só com teclado (#376): Enter no botão abre o diálogo; Tab passa pelo X "Fechar" e chega ao
@@ -388,7 +383,7 @@ test(`fila de envio preenchida sem violação do axe`, async ({ page }) => {
   })
     .jpeg()
     .toBuffer();
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto(`/sites/${SITE}/midia`);
 
   await page.getByRole('button', { name: 'Enviar imagens' }).first().click();

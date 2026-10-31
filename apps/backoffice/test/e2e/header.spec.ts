@@ -1,15 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import { asRole } from './auth.ts';
+
 // Cabeçalho da área autenticada (#170): "Pular para o conteúdo" como primeira parada do Tab,
 // a marca levando a /sites e "Sair", no menu de perfil (#239), encerrando a sessão do Access,
 // tudo só com o teclado.
-
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 /** Leva o foco até o controle só com Tab (no máximo 80 passos). */
 async function tabTo(page: Page, target: Locator): Promise<void> {
@@ -24,7 +20,7 @@ test(
   'a primeira parada do Tab é "Pular para o conteúdo", que leva o foco ao <main>',
   { tag: '@smoke' },
   async ({ page }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
 
     for (const path of ['/sites', '/sites/exemplo-a/conteudos']) {
       await page.goto(path);
@@ -45,7 +41,7 @@ test(
 );
 
 test('a marca "Orakel Backoffice" leva à lista de sites', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto('/sites/exemplo-a/conteudos');
 
   await tabTo(page, page.getByRole('link', { name: 'Orakel Backoffice' }));
@@ -58,7 +54,9 @@ test('a marca "Orakel Backoffice" leva à lista de sites', async ({ page }) => {
 const profile = (page: Page) => page.getByRole('button', { name: /^Perfil de / });
 
 test('"Sair", no menu de perfil, encerra a sessão do Access só com o teclado', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  // A sessão do Access de verdade (cookie pelo login do mock), não a do asRole.
+  await page.goto('/sites');
+  await page.getByRole('link', { name: 'editor@orakel.local' }).click();
   await page.waitForLoadState('networkidle');
   await expect(page.getByRole('banner')).toContainText('editor@orakel.local · editor');
   await expect(page.getByRole('link', { name: 'Sair' })).toHaveCount(0);
@@ -82,7 +80,7 @@ test('"Sair", no menu de perfil, encerra a sessão do Access só com o teclado',
 test('o menu de perfil abre com Espaço e fecha com Esc, devolvendo o foco ao avatar', async ({
   page,
 }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.waitForLoadState('networkidle');
   const button = profile(page);
 
@@ -97,7 +95,7 @@ test('o menu de perfil abre com Espaço e fecha com Esc, devolvendo o foco ao av
 
 test(`o menu de perfil aberto sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.waitForLoadState('networkidle');
   await profile(page).click();
   await expect(page.getByRole('menu')).toBeVisible();
@@ -123,7 +121,7 @@ const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 test('a moldura aparece em /sites, numa tela de site e no 404, com e-mail e papéis no banner', async ({
   page,
 }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   for (const path of ['/sites', '/sites/exemplo-a/conteudos', '/sites/inexistente']) {
     await page.goto(path);
     await expect(page.getByRole('banner')).toContainText('editor@orakel.local · editor');
@@ -138,7 +136,7 @@ test('a moldura aparece em /sites, numa tela de site e no 404, com e-mail e pap�
 test('"Sites" é o item atual de "Principal" em /sites e /sites/novo, sem as áreas do site', async ({
   page,
 }) => {
-  await loginAs(page, 'admin@orakel.local');
+  await asRole(page, 'admin');
   const principal = page.getByRole('navigation', { name: 'Principal' });
   for (const path of ['/sites', '/sites/novo', '/sites/inexistente']) {
     await page.goto(path);
@@ -157,7 +155,7 @@ test('"Sites" é o item atual de "Principal" em /sites e /sites/novo, sem as ár
 });
 
 test('o HTML do servidor já traz as áreas do site, com a atual marcada', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   const html = await (await page.request.get('/sites/exemplo-a/autores/novo')).text();
   expect(html).toContain('aria-label="Áreas do site"');
   for (const area of ['Visão geral', 'Conteúdos', 'Mídia', 'Textos institucionais']) {
@@ -168,7 +166,7 @@ test('o HTML do servidor já traz as áreas do site, com a atual marcada', async
 
 test(`a moldura sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   for (const path of ['/sites', '/sites/exemplo-a/autores']) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');

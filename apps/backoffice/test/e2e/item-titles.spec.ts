@@ -1,17 +1,12 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
+
+import { asRole } from './auth.ts';
 
 // Título do item na aba (#79, workspace#32) contra o ambiente local semeado: editor, versões,
 // uma versão e as edições de autor, taxonomia e menu; item inexistente fica só com a área.
 
-const EDITOR = 'editor@orakel.local';
 const SITE = 'exemplo-a';
 const SUFFIX = 'Exemplo A — Guias · Orakel Backoffice';
-
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 /**
  * Nome acessível de um link, sem o prefixo ou sufixo que só serve ao leitor de tela: o
@@ -23,7 +18,7 @@ async function linkName(link: Locator, strip: RegExp): Promise<string> {
 }
 
 test('editor, versões e uma versão mostram o título do conteúdo', async ({ page }) => {
-  await loginAs(page, EDITOR);
+  await asRole(page, 'editor');
   await page.goto(`/sites/${SITE}/conteudos`);
   const first = page
     .getByRole('table')
@@ -46,7 +41,7 @@ test('editor, versões e uma versão mostram o título do conteúdo', async ({ p
 });
 
 test('a edição de autor, taxonomia e menu mostra o nome (ou a chave) do item', async ({ page }) => {
-  await loginAs(page, EDITOR);
+  await asRole(page, 'editor');
   for (const [area, label] of [
     ['autores', 'Editar autor'],
     ['taxonomias', 'Editar taxonomia'],
@@ -64,7 +59,7 @@ test('a edição de autor, taxonomia e menu mostra o nome (ou a chave) do item',
 });
 
 test('item inexistente responde 404 e a aba fica só com a área', async ({ page }) => {
-  await loginAs(page, EDITOR);
+  await asRole(page, 'editor');
 
   const content = await page.goto(`/sites/${SITE}/conteudos/999999/editar`);
   expect(content?.status()).toBe(404);

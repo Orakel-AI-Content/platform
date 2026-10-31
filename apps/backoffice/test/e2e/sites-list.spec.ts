@@ -7,6 +7,7 @@ import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { recordBuild } from '../../src/domain/builds/builds.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { getEnv } from '../../src/env.ts';
+import { asRole } from './auth.ts';
 import { removeSites } from './cleanup.ts';
 
 // Lista de sites (#100, #364) contra o ambiente local: busca, filtro e menu "Mais ações". Os 18
@@ -102,10 +103,8 @@ test.afterAll(async () => {
 
 test.use({ viewport: { width: 1280, height: 800 } });
 
-async function loginAsAdmin(page: Page): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: 'admin@orakel.local' }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+async function openAsAdmin(page: Page): Promise<void> {
+  await asRole(page, 'admin');
   // O menu e "Publicar agora" só respondem depois da hidratação.
   await page.waitForLoadState('networkidle');
 }
@@ -113,7 +112,7 @@ async function loginAsAdmin(page: Page): Promise<void> {
 // Cabeçalho (título e ações) no visual do Ecme (#247); o tema escuro fica no teste de componente.
 test(`a lista de sites sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAsAdmin(page);
+  await openAsAdmin(page);
   await expect(page.getByRole('link', { name: 'Criar site' })).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page })
@@ -141,7 +140,7 @@ test(`a lista de sites sem violação do axe`, async ({ page }) => {
 test('busca e filtro por estado ficam na URL e recarregar mantém a mesma visão', async ({
   page,
 }) => {
-  await loginAsAdmin(page);
+  await openAsAdmin(page);
   const table = page.getByRole('table', { name: 'Sites', exact: true });
   const count = page.getByRole('status').filter({ hasText: /resultados?$/ });
 
@@ -172,7 +171,7 @@ test('busca e filtro por estado ficam na URL e recarregar mantém a mesma visão
 test('o menu Mais ações abre e fecha pelo mouse e pelo teclado; Esc devolve o foco', async ({
   page,
 }) => {
-  await loginAsAdmin(page);
+  await openAsAdmin(page);
   const button = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
   const menu = page.getByRole('menu');
   const first = menu.getByRole('menuitem', { name: 'Conteúdos exemplo-a' });
@@ -210,7 +209,7 @@ test('o menu Mais ações abre e fecha pelo mouse e pelo teclado; Esc devolve o 
 test('acionar um item do menu Mais ações fecha a lista e navega, pelo teclado e pelo mouse', async ({
   page,
 }) => {
-  await loginAsAdmin(page);
+  await openAsAdmin(page);
   const button = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
   const menu = page.getByRole('menu');
 

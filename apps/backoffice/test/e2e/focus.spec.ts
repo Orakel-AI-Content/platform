@@ -1,15 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { asRole } from './auth.ts';
 import { fieldLabel } from './fieldLabel.ts';
 
 // Foco visível (#85): navegando só com Tab, link, campo e botão mostram o contorno --ring
 // de 2px, vindo da regra global de globals.css, nos dois temas. O "Pular para o conteúdo"
 // (#170), primeira parada do Tab, também.
-
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
 
 /** Leva o foco até o controle só com Tab (no máximo 80 passos). */
 async function tabTo(page: Page, target: Locator): Promise<void> {
@@ -44,7 +39,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     page,
   }) => {
     await page.emulateMedia({ colorScheme });
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto('/sites/exemplo-a/autores/novo');
     const main = page.getByRole('main');
     const ring = await ringColor(page);

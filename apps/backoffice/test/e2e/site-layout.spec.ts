@@ -1,6 +1,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { asRole } from './auth.ts';
+
 // Layout do site (#78, workspace#32) contra o ambiente local: título da aba com a área e o
 // site, "não encontrado" de site e de item com o link certo e status 404, o carregamento
 // entre áreas do mesmo site com o cabeçalho visível, a barra lateral de áreas (#171) e o
@@ -14,14 +16,8 @@ const WCAG = ['wcag2a', 'wcag2aa', 'wcag22aa'];
 
 const AREAS = ['Visão geral', 'Conteúdos', 'Revisão', 'Mídia', 'Autores', 'Taxonomias', 'Menus'];
 
-async function loginAs(page: Page, email: string): Promise<void> {
-  await page.goto('/sites');
-  await page.getByRole('link', { name: email }).click();
-  await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
-}
-
 test('a aba mostra a área e, dentro de um site, o nome dele', async ({ page }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   await expect(page).toHaveTitle('Sites · Orakel Backoffice');
 
   await page.goto('/sites/novo');
@@ -46,7 +42,7 @@ test('a aba mostra a área e, dentro de um site, o nome dele', async ({ page }) 
 test('site inexistente leva a Sites; item inexistente leva ao site; os dois com 404', async ({
   page,
 }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
 
   const missingSite = await page.goto('/sites/inexistente/midia');
   expect(missingSite?.status()).toBe(404);
@@ -67,7 +63,7 @@ test('site inexistente leva a Sites; item inexistente leva ao site; os dois com 
 test('entre áreas do mesmo site, o carregamento aparece com o cabeçalho visível', async ({
   page,
 }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   await page.goto(`/sites/${SITE}`);
   await page.waitForLoadState('networkidle');
 
@@ -95,7 +91,7 @@ test('entre áreas do mesmo site, o carregamento aparece com o cabeçalho visív
 test('a barra lateral lista as áreas, sem Textos institucionais para quem não edita', async ({
   page,
 }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   await page.goto(`/sites/${SITE}`);
   const bar = page.getByRole('navigation', { name: 'Áreas do site' });
   await expect(bar.getByRole('link')).toHaveText(AREAS);
@@ -105,7 +101,7 @@ test('a barra lateral lista as áreas, sem Textos institucionais para quem não 
 });
 
 test('com content.write, a barra também tem Textos institucionais', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto(`/sites/${SITE}/midia`);
   await expect(
     page.getByRole('navigation', { name: 'Áreas do site' }).getByRole('link'),
@@ -113,7 +109,7 @@ test('com content.write, a barra também tem Textos institucionais', async ({ pa
 });
 
 test('a área atual tem aria-current, também em telas de item, criar e editar', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   const bar = page.getByRole('navigation', { name: 'Áreas do site' });
   const current = bar.locator('[aria-current="page"]');
 
@@ -132,7 +128,7 @@ test('a área atual tem aria-current, também em telas de item, criar e editar',
 });
 
 test('a barra é navegável só com teclado', async ({ page }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   await page.goto(`/sites/${SITE}`);
   const taxonomies = page
     .getByRole('navigation', { name: 'Áreas do site' })
@@ -153,7 +149,7 @@ const switcher = (page: Page) => page.getByRole('button', { name: `${SITE_NAME},
 const OTHER_SITE = 'Exemplo B — Receitas';
 
 test('o seletor troca de site em 2 cliques, na mesma área; item leva à lista', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
 
   await page.goto(`/sites/${SITE}/midia`);
   await switcher(page).click();
@@ -167,7 +163,7 @@ test('o seletor troca de site em 2 cliques, na mesma área; item leva à lista',
 });
 
 test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   const menu = page.getByRole('menu');
 
   // Outros arquivos do E2E rodam em paralelo e cadastram e removem sites (o sites-list.spec
@@ -198,7 +194,7 @@ test('o seletor lista os sites de quem pede, com o atual marcado', async ({ page
 test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao botão', async ({
   page,
 }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   await page.goto(`/sites/${SITE}/taxonomias`);
   await page.waitForLoadState('networkidle');
   const button = switcher(page);
@@ -232,7 +228,7 @@ test('o seletor abre, escolhe e fecha só com teclado; Esc devolve o foco ao bot
 
 test(`o seletor aberto sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   await page.goto(`/sites/${SITE}/autores`);
   await page.waitForLoadState('networkidle');
   // Pelo teclado, como na vitrine do Dropdown: o primeiro item recebe o foco (`tabindex=0`).
@@ -257,7 +253,7 @@ test(`o seletor aberto sem violação do axe`, async ({ page }) => {
 test('trilha nas telas de item: Sites › Site › Área › Item, sem link de volta solto', async ({
   page,
 }) => {
-  await loginAs(page, 'editor@orakel.local');
+  await asRole(page, 'editor');
   const trail = page.getByRole('navigation', { name: 'Trilha de navegação' });
   const main = page.getByRole('main');
   const expectTrail = async (items: readonly string[]) => {
@@ -327,7 +323,7 @@ const sideNavWidth = (page: Page) =>
 test('recolhida, a barra continua assim entre áreas e volta expandida ao recarregar', async ({
   page,
 }) => {
-  await loginAs(page, OPERATOR);
+  await asRole(page, 'operacao');
   await page.goto(`/sites/${SITE}`);
   await page.waitForLoadState('networkidle');
   await sideNavToggle(page).click();
@@ -357,7 +353,7 @@ test.describe('a 375px', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   test('clicar numa área navega e fecha o Drawer', async ({ page }) => {
-    await loginAs(page, OPERATOR);
+    await asRole(page, 'operacao');
     await page.goto(`/sites/${SITE}`);
 
     await mobileToggle(page).click();
@@ -373,7 +369,7 @@ test.describe('a 375px', () => {
   test('trocar de site pelo seletor no Drawer leva à mesma área e fecha o Drawer', async ({
     page,
   }) => {
-    await loginAs(page, 'editor@orakel.local');
+    await asRole(page, 'editor');
     await page.goto(`/sites/${SITE}/autores`);
     await page.waitForLoadState('networkidle');
 
