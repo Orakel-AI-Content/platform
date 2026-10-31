@@ -7,14 +7,16 @@ import {
   type SiteConfig,
 } from '@orakel/content-model/v1';
 import type { Result } from '@orakel/content-model';
+import { redirectUsage, type RedirectUsage } from '@orakel/core/v1';
 import { isThemeId } from '@orakel/tokens';
 import { and, count, desc, eq, isNull } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { pendingChanges, siteConfigs, sites } from '../../db/schema/index.ts';
+import { pendingChanges, redirects, siteConfigs, sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { lastBuilds, type LastBuild } from '../builds/builds.ts';
 import { effectiveBuildWindowMs } from '../builds/schedule.ts';
+import { toRedirect } from '../export/mappers.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 import { hasPolicyTrigger } from './policy-triggers.ts';
 
@@ -250,6 +252,22 @@ export async function getInstitutionalTexts(
     };
   }
   return { ok: true, value: config.institutionalTexts ?? {} };
+}
+
+/**
+ * Uso do `_redirects` do site (workspace#20, R6): os redirects do banco pelo `redirectUsage`
+ * do core, o mesmo cálculo do build. O limiar do alerta (75%) e a separação entre estáticos e
+ * dinâmicos ficam só no core.
+ */
+export async function redirectUsageFor(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<RedirectUsage>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+  const rows = await db.select().from(redirects).where(eq(redirects.siteId, siteId));
+  return { ok: true, value: redirectUsage(rows.map(toRedirect)) };
 }
 
 export async function siteExists(db: Executor, siteId: string): Promise<boolean> {
