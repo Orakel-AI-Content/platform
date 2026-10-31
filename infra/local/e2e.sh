@@ -61,4 +61,5 @@ done
 trap 'rm -rf "$slot"' EXIT
 trap 'exit 130' INT TERM
 
-pnpm --filter @orakel/backoffice exec playwright test "$@"
+# Contra a pilha local (E2E_STACK=1): a camada `telas`, sem Docker, é o padrão do config.
+E2E_STACK=1 pnpm --filter @orakel/backoffice exec playwright test "$@"
