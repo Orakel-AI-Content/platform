@@ -8,10 +8,10 @@ import { toast, ToastProvider } from '@/components/ui/toast';
 import { CONTROL_SIZES } from '@/components/ui/utils/constants';
 
 import type { SiteFormResult } from './siteConfigFormValues.ts';
-import { BuildWindowForm, RegisterG1Form } from './SiteActions.tsx';
+import { BuildWindowForm, DailyPublishLimitForm, RegisterG1Form } from './SiteActions.tsx';
 import { fieldLabel } from '@/test/fieldLabel.ts';
 
-// G1 e janela gerados do schema (#333): validação no campo, "Usar padrão" sem schema, recusa
+// G1, janela (#333) e limite diário (#490) gerados do schema: validação no campo, "Usar padrão" sem schema, recusa
 // do domínio no campo e os botões no rodapé do cartão.
 
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
@@ -37,6 +37,10 @@ const saved = (message: string): Promise<SiteFormResult> => Promise.resolve({ ok
 
 const windowInput = () =>
   screen.getByLabelText<HTMLInputElement>(fieldLabel('Janela própria (segundos)'));
+
+const LIMIT_MESSAGE = 'Informe um número inteiro de publicações, 1 ou mais.';
+const limitInput = () =>
+  screen.getByLabelText<HTMLInputElement>(fieldLabel('Limite próprio (publicações por dia)'));
 
 describe('RegisterG1Form', () => {
   it('envia a observação pelo schema e mostra a confirmação no toast', async () => {
@@ -147,5 +151,74 @@ describe('BuildWindowForm', () => {
     expect(size(reset)).toEqual(size(save));
     expect(save.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
     expect(save.className).toContain('bg-primary');
+  });
+});
+
+describe('DailyPublishLimitForm', () => {
+  it.each([
+    ['vazio', ''],
+    ['zero', '0'],
+    ['negativo', '-1'],
+    ['não inteiro', '1.5'],
+  ])('valor %s mostra o erro no campo, sem chamar a ação', async (_, typed) => {
+    const user = userEvent.setup();
+    const action = vi.fn(() => saved('ok'));
+    render(<DailyPublishLimitForm intro={null} own={null} action={action} />);
+
+    if (typed !== '') await user.type(limitInput(), typed);
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(limitInput().getAttribute('aria-invalid')).toBe('true'));
+    expect(screen.getAllByText(LIMIT_MESSAGE).length).toBeGreaterThan(0);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it('salva o limite próprio', async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(() => saved('Limite de 5 por dia salvo.'));
+    render(<DailyPublishLimitForm intro={null} own={null} action={action} />);
+    render(<ToastProvider />);
+
+    await user.type(limitInput(), '5');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    expect(action).toHaveBeenCalledWith({ dailyPublishLimit: 5 });
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Limite de 5 por dia salvo.'),
+    );
+  });
+
+  it('"Usar padrão" envia null e limpa o campo', async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(() => saved('Limite padrão restaurado.'));
+    render(<DailyPublishLimitForm intro={null} own={5} action={action} />);
+    render(<ToastProvider />);
+    expect(limitInput().value).toBe('5');
+
+    await user.click(screen.getByRole('button', { name: 'Usar padrão' }));
+
+    expect(action).toHaveBeenCalledWith(null);
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Limite padrão restaurado.'),
+    );
+    expect(limitInput().value).toBe('');
+  });
+
+  it('a recusa do domínio com path aparece no campo', async () => {
+    const user = userEvent.setup();
+    const action = vi.fn((): Promise<SiteFormResult> =>
+      Promise.resolve({
+        ok: false,
+        message: 'Não foi possível concluir.',
+        issues: [{ path: ['dailyPublishLimit'], message: 'Limite recusado pelo domínio.' }],
+      }),
+    );
+    render(<DailyPublishLimitForm intro={null} own={null} action={action} />);
+
+    await user.type(limitInput(), '5');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(limitInput().getAttribute('aria-invalid')).toBe('true'));
+    expect(screen.getAllByText('Limite recusado pelo domínio.').length).toBeGreaterThan(0);
   });
 });
