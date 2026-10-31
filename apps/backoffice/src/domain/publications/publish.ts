@@ -3,7 +3,7 @@ import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { contents, contentVersions, publications, sites } from '../../db/schema/index.ts';
-import { requireRole, type Actor } from '../access/rbac.ts';
+import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { liveSlug, slugInUse } from '../content/contents.ts';
 import { createRedirect } from '../content/redirects.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
@@ -41,10 +41,14 @@ const notFound = (siteId: string, contentId: number): Issue => ({
   path: [],
 });
 
-/** Publicações do site no dia de São Paulo que contém `now` (faixa do índice por site e data). */
-async function publishedOnDay(tx: Executor, siteId: string, now: Date): Promise<number> {
-  const at = sql`${now.toISOString()}::timestamptz`;
-  const dayStart = sql`(date_trunc('day', ${at} at time zone ${PUBLISH_DAY_TIME_ZONE}) at time zone ${PUBLISH_DAY_TIME_ZONE})`;
+/**
+ * Publicações do site no dia de São Paulo que contém `at` (faixa do índice por site e data).
+ * Conta as feitas e as agendadas: a reserva do agendamento grava `published_at` no horário
+ * marcado (schedule.ts).
+ */
+async function publishedOnDay(tx: Executor, siteId: string, at: Date): Promise<number> {
+  const instant = sql`${at.toISOString()}::timestamptz`;
+  const dayStart = sql`(date_trunc('day', ${instant} at time zone ${PUBLISH_DAY_TIME_ZONE}) at time zone ${PUBLISH_DAY_TIME_ZONE})`;
   const [row] = await tx
     .select({ total: count() })
     .from(publications)
@@ -58,28 +62,23 @@ async function publishedOnDay(tx: Executor, siteId: string, now: Date): Promise<
   return row?.total ?? 0;
 }
 
+const dayLabel = new Intl.DateTimeFormat('pt-BR', { timeZone: PUBLISH_DAY_TIME_ZONE });
+
 /**
- * Publica a versão aprovada: precisa ser a mais recente e estar `aprovado`, e o site não pode
- * ter chegado ao limite do dia de São Paulo. Leva a versão a `publicado`, grava a linha em
- * `publications` e registra a mudança pendente, que agenda o build na janela do site. Trava a
- * linha de `contents`, como a aprovação, e depois a do site (`for no key update`, que não
+ * Confere se a versão pode ocupar uma vaga no dia de São Paulo que contém `day`: precisa ser a
+ * mais recente e estar `aprovado`, e o site não pode ter chegado ao limite daquele dia. Trava
+ * a linha de `contents`, como a aprovação, e depois a do site (`for no key update`, que não
  * espera as gravações com chave estrangeira para ele), para duas publicações simultâneas no
  * mesmo site não passarem do limite. O slug é conferido de novo (outro conteúdo pode tê-lo
- * tomado depois da edição) e, se difere do que está no ar, o caminho antigo ganha o 301 para
- * o novo, já sem cadeias (`createRedirect`).
+ * tomado depois da edição). Usada pela publicação e pelo agendamento.
  */
-export async function publishVersion(
+export async function reservePublicationSlot(
   tx: Executor,
-  actor: Actor,
   siteId: string,
   contentId: number,
   version: number,
-  options: { now?: Date } = {},
-): Promise<Result<{ publicationId: number }>> {
-  const allowed = requireRole(actor, 'content.publish');
-  if (!allowed.ok) return allowed;
-  const now = options.now ?? new Date();
-
+  day: { at: Date; today: boolean },
+): Promise<Result<void>> {
   const [content] = await tx
     .select({ id: contents.id })
     .from(contents)
@@ -121,29 +120,111 @@ export async function publishVersion(
     .for('no key update');
   if (site === undefined) return { ok: false, issues: [notFound(siteId, contentId)] };
   const limit = effectiveDailyPublishLimit(site.limit);
-  const published = await publishedOnDay(tx, siteId, now);
+  const published = await publishedOnDay(tx, siteId, day.at);
   if (published >= limit) {
+    const when = day.today ? 'hoje' : `em ${dayLabel.format(day.at)}`;
     return refused(
       'publication.daily_limit',
-      `O site ${siteId} já tem ${published} publicação(ões) hoje (dia de São Paulo), e o limite é ${limit}`,
+      `O site ${siteId} já tem ${published} publicação(ões) ${when} (dia de São Paulo), e o limite é ${limit}`,
     );
   }
+  return { ok: true, value: undefined };
+}
 
+/**
+ * Leva a versão a `publicado` e registra a mudança pendente, que agenda o build na janela. Se
+ * o slug difere do que está no ar, o caminho antigo ganha o 301 para o novo, já sem cadeias
+ * (`createRedirect`).
+ */
+async function markPublished(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<Result<void>> {
+  const versionMatch = and(
+    eq(contentVersions.siteId, siteId),
+    eq(contentVersions.contentId, contentId),
+    eq(contentVersions.version, version),
+  );
+  const [row] = await tx
+    .select({ slug: sql<string>`${contentVersions.data}->>'slug'` })
+    .from(contentVersions)
+    .where(versionMatch);
+  if (row === undefined) return { ok: false, issues: [notFound(siteId, contentId)] };
   const previous = await liveSlug(tx, siteId, contentId);
-  if (previous !== undefined && previous !== latest.slug) {
+  if (previous !== undefined && previous !== row.slug) {
     const redirect = await createRedirect(
       tx,
       actor,
       siteId,
-      { from: `/${previous}/`, to: `/${latest.slug}/`, status: 301, origin: 'slug-change' },
+      { from: `/${previous}/`, to: `/${row.slug}/`, status: 301, origin: 'slug-change' },
       { action: 'content.publish' },
     );
     if (!redirect.ok) return redirect;
   }
 
+  await tx.update(contentVersions).set({ status: 'publicado' }).where(versionMatch);
+  await recordPendingChange(tx, siteId, 'content', String(contentId));
+  return { ok: true, value: undefined };
+}
+
+/**
+ * Publica a versão aprovada: confere a vaga do dia de São Paulo de `now`
+ * (`reservePublicationSlot`), leva a versão a `publicado`, grava a linha em `publications` e
+ * registra a mudança pendente, que agenda o build na janela do site. Com troca de slug, o
+ * caminho antigo ganha o 301 (`markPublished`).
+ */
+export async function publishVersion(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  options: { now?: Date } = {},
+): Promise<Result<{ publicationId: number }>> {
+  const allowed = requireRole(actor, 'content.publish');
+  if (!allowed.ok) return allowed;
+  const now = options.now ?? new Date();
+
+  const slot = await reservePublicationSlot(tx, siteId, contentId, version, {
+    at: now,
+    today: true,
+  });
+  if (!slot.ok) return slot;
+
+  const published = await markPublished(tx, actor, siteId, contentId, version);
+  if (!published.ok) return published;
+  const [publication] = await tx
+    .insert(publications)
+    .values({ siteId, contentId, version, publishedBy: actor.email, publishedAt: now })
+    .returning({ id: publications.id });
+  if (publication === undefined) throw new Error('INSERT em publications não devolveu o id');
+  return { ok: true, value: { publicationId: publication.id } };
+}
+
+/**
+ * Publica a versão agendada, no job do horário marcado: sem conferir o limite (a vaga já foi
+ * reservada no agendamento) e sem outra linha em `publications`. Trava o conteúdo, como o
+ * cancelamento; se a versão não está mais `agendado` (cancelada antes), não faz nada. O 301
+ * da troca de slug é gravado como sistema: não há ator no job, e quem agendou já tinha
+ * `content.publish`.
+ */
+export async function publishScheduledVersion(
+  tx: Executor,
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<'published' | 'not_scheduled'> {
   await tx
-    .update(contentVersions)
-    .set({ status: 'publicado' })
+    .select({ id: contents.id })
+    .from(contents)
+    .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)))
+    .for('update');
+  const [row] = await tx
+    .select({ status: contentVersions.status })
+    .from(contentVersions)
     .where(
       and(
         eq(contentVersions.siteId, siteId),
@@ -151,11 +232,8 @@ export async function publishVersion(
         eq(contentVersions.version, version),
       ),
     );
-  const [publication] = await tx
-    .insert(publications)
-    .values({ siteId, contentId, version, publishedBy: actor.email, publishedAt: now })
-    .returning({ id: publications.id });
-  if (publication === undefined) throw new Error('INSERT em publications não devolveu o id');
-  await recordPendingChange(tx, siteId, 'content', String(contentId));
-  return { ok: true, value: { publicationId: publication.id } };
+  if (row?.status !== 'agendado') return 'not_scheduled';
+  const published = await markPublished(tx, SYSTEM_ACTOR, siteId, contentId, version);
+  if (!published.ok) throw new Error(JSON.stringify(published.issues));
+  return 'published';
 }

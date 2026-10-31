@@ -175,7 +175,7 @@ decisions:
     }
   extra.daily-publish-limit:
     {
-      value: '3 publicações por site no dia de America/Sao_Paulo (proposta); por site em sites.daily_publish_limit, nula usa PUBLISH_DAILY_LIMIT; contagem em publications',
+      value: '3 publicações por site no dia de America/Sao_Paulo (proposta); por site em sites.daily_publish_limit, nula usa PUBLISH_DAILY_LIMIT; contagem em publications, agendamento reserva a vaga do dia marcado',
       rationale: 'ADR 0017',
       source: decided,
       provisional: true,
