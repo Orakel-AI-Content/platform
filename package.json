@@ -29,6 +29,7 @@
     "local:images": "docker/bake.sh",
     "local:e2e": "turbo run test:e2e",
     "local:e2e:area": "infra/local/e2e.sh",
+    "local:e2e:telas": "infra/local/e2e-telas.sh",
     "local:check": "infra/local/check.sh",
     "local:publish": "infra/local/publish.sh",
     "local:load": "infra/local/load.sh",
