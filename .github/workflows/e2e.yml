@@ -1,10 +1,13 @@
-# E2E completo (ADR 0016): em todo PR que afeta o Backoffice, e manual. Sobe o ambiente
-# local em containers, como no `pnpm local:up`, e divide a suíte em 2 shards. As imagens
-# são construídas uma vez no job `images`; os shards as recarregam do cache do buildx.
-name: E2E
+# E2E completo (#475): os testes `@stack` e `@perf` contra o ambiente local em containers,
+# como no `pnpm local:up`. Fica fora do caminho do PR: roda em todo push na main que afeta o
+# Backoffice, toda noite, em PR com o label `e2e:completo` e manual. O resto da suíte é o job
+# `e2e-telas` do ci.yml, sem Docker. Falha na main ou no noturno abre (ou comenta) a issue
+# com o label `e2e-completo-quebrado`; o release.yml exige o último run da main verde.
+name: E2E completo
 
 on:
-  pull_request:
+  push:
+    branches: [main]
     paths:
       - 'apps/backoffice/**'
       - 'packages/**'
@@ -12,14 +15,25 @@ on:
       - 'docker/**'
       - 'pnpm-lock.yaml'
       - '.github/workflows/e2e.yml'
+  schedule:
+    # 03:00 em Brasília.
+    - cron: '0 6 * * *'
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Só o PR cancela o run anterior, e só um run que vai rodar (um `labeled` com outro label
+# cairia no mesmo grupo e cancelaria o E2E em curso). Na main, cada run tem o próprio grupo:
+# a trava do release lê o último run concluído.
 concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+  group: >-
+    e2e-${{ github.event_name == 'pull_request'
+    && (github.event.action != 'labeled' || github.event.label.name == 'e2e:completo')
+    && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   TURBO_TELEMETRY_DISABLED: '1'
@@ -35,38 +49,26 @@ env:
     --set backoffice.cache-from=type=gha,scope=e2e-backoffice
     --set edge-local.cache-from=type=gha,scope=e2e-edge-local
     --set site-builder.cache-from=type=gha,scope=e2e-site-builder
+    --set backoffice.cache-to=type=gha,mode=max,scope=e2e-backoffice
+    --set edge-local.cache-to=type=gha,mode=max,scope=e2e-edge-local
+    --set site-builder.cache-to=type=gha,mode=max,scope=e2e-site-builder
     --set edge-local.args.CHECKS=false
     --set site-builder.args.CHECKS=false
 
 jobs:
-  images:
-    name: Imagens (cache do buildx)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
-      - name: Bake do grupo default para o cache
-        run: >-
-          docker/bake.sh default $BAKE_ARGS
-          --set '*.output=type=cacheonly'
-          --set backoffice.cache-to=type=gha,mode=max,scope=e2e-backoffice
-          --set edge-local.cache-to=type=gha,mode=max,scope=e2e-edge-local
-          --set site-builder.cache-to=type=gha,mode=max,scope=e2e-site-builder
-
   e2e:
-    name: E2E ponta a ponta (shard ${{ matrix.shard }}/2)
-    needs: images
+    name: E2E completo (stack e perf)
+    # No PR, só com o label; um `labeled` com outro label não roda.
+    if: >-
+      github.event_name != 'pull_request'
+      || (contains(github.event.pull_request.labels.*.name, 'e2e:completo')
+      && (github.event.action != 'labeled' || github.event.label.name == 'e2e:completo'))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
-      - name: Imagens do cache
+      - name: Imagens (cache do buildx)
         run: docker/bake.sh default $BAKE_ARGS --load
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
@@ -85,16 +87,16 @@ jobs:
         uses: ./.github/actions/playwright-chromium
         with:
           filter: '@orakel/backoffice'
-      - name: Testes do shard
-        run: pnpm turbo run test:e2e -- --list --shard=${{ matrix.shard }}/2
-      - run: pnpm turbo run test:e2e -- --shard=${{ matrix.shard }}/2
+      - name: Testes da pilha
+        run: pnpm turbo run test:e2e -- --list --project=stack --project=perf
+      - run: pnpm turbo run test:e2e -- --project=stack --project=perf
       - name: Logs do compose
         if: failure()
         run: infra/local/compose.sh logs --no-color --timestamps > compose.log 2>&1 || true
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: playwright-report-shard-${{ matrix.shard }}
+          name: playwright-report
           path: |
             apps/backoffice/playwright-report/
             apps/backoffice/test-results/
@@ -102,3 +104,28 @@ jobs:
           if-no-files-found: ignore
       - if: always()
         run: pnpm local:down
+
+  aviso:
+    name: Aviso de falha na main
+    needs: e2e
+    if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      # Uma issue só, comentada a cada falha, enquanto estiver aberta.
+      - name: Abre ou comenta a issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          body="O E2E completo falhou (\`$EVENT\`) em $SHA: $RUN_URL. O relatório do Playwright e os logs do compose estão no artefato \`playwright-report\` do run."
+          issue="$(gh issue list --label e2e-completo-quebrado --state open --limit 1 --json number --jq '.[0].number // empty')"
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "$body"
+          else
+            gh issue create --title 'E2E completo quebrado na main' --label e2e-completo-quebrado --body "$body"
+          fi
