@@ -65,6 +65,7 @@ function SiteDetail() {
           lifecycle={<p>Etapas do ciclo de vida.</p>}
           g1={<p>Registro no G1.</p>}
           buildWindow={<p>Janela de agrupamento.</p>}
+          dailyLimit={<p>Limite diário.</p>}
         />
       </DetailLayout>
     </section>
