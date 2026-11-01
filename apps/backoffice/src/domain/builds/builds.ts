@@ -10,7 +10,7 @@ import { requireRole, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome } from './run-build.ts';
 import { buildNow } from './schedule.ts';
-import { markPublished, pauseSite } from './site-state.ts';
+import { clearMassUnpublish, markPublished, pauseSite } from './site-state.ts';
 
 export type BuildTarget = {
   siteId: string;
@@ -22,6 +22,8 @@ export type BuildTarget = {
   domain: string;
   /** Páginas da versão ativa (último build com sucesso): referência da trava. */
   activePages: number | undefined;
+  /** Despublicação em massa declarada e não consumida: libera a trava neste build. */
+  massUnpublishDeclaredAt: Date | null;
 };
 
 export async function loadBuildTarget(
@@ -44,6 +46,7 @@ export async function loadBuildTarget(
     release: site.release,
     domain: config?.domains[0] ?? '',
     activePages: active?.pages ?? undefined,
+    massUnpublishDeclaredAt: site.massUnpublishDeclaredAt,
   };
 }
 
@@ -53,6 +56,8 @@ export type BuildRun = {
   jobId: string | undefined;
   attempt: number;
   startedAt: Date;
+  /** Declaração de despublicação em massa que o plano usou; o sucesso a consome. */
+  massUnpublishDeclaredAt?: Date | null;
 };
 
 /** Registra a tentativa e aplica o efeito no site e nas mudanças pendentes. */
@@ -97,6 +102,8 @@ export async function recordBuild(
         );
     }
     await markPublished(tx, run.siteId);
+    const declaredAt = run.massUnpublishDeclaredAt ?? null;
+    if (declaredAt !== null) await clearMassUnpublish(tx, run.siteId, declaredAt);
     return row?.id ?? 0;
   }
 

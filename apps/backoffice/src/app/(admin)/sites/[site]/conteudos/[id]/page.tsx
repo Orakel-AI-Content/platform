@@ -118,6 +118,9 @@ export default async function ContentVersionsPage({ params }: Params) {
       }
     />
   );
+  // Um escopo por grupo de ações, cada um com o seu Alert abaixo da linha do título.
+  const withSubmit = canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header;
+  const scoped = canPublish ? <PublishActionsScope>{withSubmit}</PublishActionsScope> : withSubmit;
 
   return (
     <section aria-labelledby="content-title" className="list-width space-y-4">

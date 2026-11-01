@@ -28,6 +28,13 @@ export const sites = pgTable(
      * PUBLISH_DAILY_LIMIT. Operacional: fora da SiteConfig e do snapshot.
      */
     dailyPublishLimit: integer(),
+    /**
+     * Despublicação em massa declarada (e-mail de quem declarou e quando), à espera do build
+     * que a consome: com ela, a trava de segurança não aborta a queda de páginas. Uso único:
+     * o primeiro build com sucesso que a viu limpa as duas. Operacional: fora do snapshot.
+     */
+    massUnpublishDeclaredBy: text(),
+    massUnpublishDeclaredAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
