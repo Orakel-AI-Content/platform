@@ -17,6 +17,7 @@ import {
   PUBLISH_SCHEDULED_TASK,
   publishJobKey,
   schedulePublication,
+  scheduledPublicationAt,
 } from '../../src/domain/publications/schedule.ts';
 import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
@@ -257,6 +258,41 @@ describe('cancelar', () => {
     expect(await cancel(1, version)).toMatchObject({
       ok: false,
       issues: [{ code: 'publication.not_scheduled' }],
+    });
+  });
+});
+
+describe('horário marcado', () => {
+  const at = (contentId: number, version: number, actor = role('editor')) =>
+    scheduledPublicationAt(db, actor, SITE, contentId, version);
+
+  it('devolve o horário da versão agendada e null depois do cancelamento', async () => {
+    const version = await prepare(1);
+    expect(await at(1, version)).toEqual({ ok: true, value: null });
+
+    expect(await schedule(1, version, `${DAY}T10:00:00-03:00`)).toMatchObject({ ok: true });
+    expect(await at(1, version)).toEqual({
+      ok: true,
+      value: new Date(`${DAY}T10:00:00-03:00`),
+    });
+
+    expect(await cancel(1, version)).toMatchObject({ ok: true });
+    expect(await at(1, version)).toEqual({ ok: true, value: null });
+  });
+
+  it('a versão publicada pelo job não tem mais horário a mostrar', async () => {
+    const version = await prepare(1);
+    expect(await schedule(1, version, `${DAY}T10:00:00-03:00`)).toMatchObject({ ok: true });
+
+    await runDueJobs();
+
+    expect(await at(1, version)).toEqual({ ok: true, value: null });
+  });
+
+  it('sem site.read, recusa', async () => {
+    expect(await at(1, 1, { email: 'x@orakel.local', roles: [] })).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
     });
   });
 });

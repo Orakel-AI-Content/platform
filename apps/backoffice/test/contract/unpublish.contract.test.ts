@@ -8,6 +8,7 @@ import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import {
   createContent,
+  listLiveContents,
   liveSlug,
   submitForReview,
   updateContent,
@@ -178,6 +179,60 @@ describe('despublicar', () => {
 
     expect(await redirectMap()).toEqual(before);
     expect(await publishedIds()).toContain(1);
+  });
+});
+
+describe('destinos do 301 (listLiveContents, #494)', () => {
+  const live = async () => {
+    const result = await listLiveContents(db, role('editor'), SITE);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value;
+  };
+
+  it('um rascunho sobre a versão no ar não tira o conteúdo da lista; despublicar tira', async () => {
+    const [last] = await db
+      .select({ data: contentVersions.data })
+      .from(contentVersions)
+      .where(and(eq(contentVersions.siteId, SITE), eq(contentVersions.contentId, 1)))
+      .orderBy(sql`${contentVersions.version} desc`)
+      .limit(1);
+    const draft = await db.transaction((tx) =>
+      updateContent(tx, SYSTEM_ACTOR, SITE, 1, { ...last!.data, slug: 'guia-rascunho' }),
+    );
+    expect(draft).toMatchObject({ ok: true });
+
+    const before = await live();
+    expect(before).toContainEqual(expect.objectContaining({ id: 1, slug: 'guia-completo' }));
+    expect(before).toContainEqual(expect.objectContaining({ id: 2, slug: 'rotina-da-manha' }));
+    const titles = before.map((item) => item.title);
+    expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b, 'pt-BR')));
+
+    expect(await unpublish(1)).toMatchObject({ ok: true });
+
+    const after = await live();
+    expect(after.map((item) => item.id)).not.toContain(1);
+    expect(after.map((item) => item.id)).toContain(2);
+  });
+
+  it('não lista conteúdo só em rascunho nem de outro site, e exige site.read', async () => {
+    const created = await db.transaction(async (tx) => {
+      const [last] = await tx
+        .select({ data: contentVersions.data })
+        .from(contentVersions)
+        .where(and(eq(contentVersions.siteId, SITE), eq(contentVersions.contentId, 2)))
+        .limit(1);
+      return createContent(tx, SYSTEM_ACTOR, SITE, { ...last!.data, slug: 'so-rascunho' });
+    });
+    if (!created.ok) throw new Error(JSON.stringify(created.issues));
+
+    expect((await live()).map((item) => item.id)).not.toContain(created.value.id);
+    expect(
+      await listLiveContents(db, { email: 'ninguem@orakel.local', roles: [] }, SITE),
+    ).toMatchObject({ ok: false });
+    expect(await listLiveContents(db, role('editor'), 'outro-site')).toEqual({
+      ok: true,
+      value: [],
+    });
   });
 });
 

@@ -1,7 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { readFixture } from '../../src/bin/seed.ts';
+import { and, eq } from 'drizzle-orm';
+
 import { createDb, createPool } from '../../src/db/client.ts';
+import { redirects } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
 import { getEnv } from '../../src/env.ts';
@@ -372,6 +375,83 @@ test.describe('tela do conteúdo no detalhe (#371)', () => {
     await expect(reviewer.getByRole('link', { name: 'Editar', exact: true })).toHaveCount(0);
     await expect(reviewer.getByRole('button', { name: 'Enviar para revisão' })).toHaveCount(0);
     await reviewer.context().close();
+  });
+});
+
+// Despublicar no cabeçalho (#494): dois conteúdos no ar, gravados direto pelo domínio. Só com
+// content.publish e o conteúdo no ar; confirmar com destino tira do ar e grava o 301. O foco e
+// o seletor ficam em `UnpublishDialog.browser.test.tsx`.
+test.describe('despublicar no cabeçalho do conteúdo (#494)', () => {
+  const stamp = Date.now();
+  const live = { title: `No ar ${stamp}`, slug: `no-ar-${stamp}`, path: '' };
+  const target = { title: `Destino ${stamp}`, slug: `destino-${stamp}`, path: '' };
+
+  test.beforeAll(async () => {
+    const fixture = await readFixture('exemplo-a');
+    const content = fixture.find((line) => line.type === 'content');
+    if (content?.type !== 'content') throw new Error('fixture sem conteúdo');
+    const pool = createPool(getEnv().DATABASE_URL);
+    try {
+      for (const item of [live, target]) {
+        const created = await createDb(pool).transaction((tx) =>
+          createContent(
+            tx,
+            SYSTEM_ACTOR,
+            'exemplo-a',
+            {
+              ...content.data,
+              kind: 'article',
+              title: item.title,
+              slug: item.slug,
+              blocks: [{ new: true as const, type: 'toc' as const, title: 'Seção' }],
+            },
+            { status: 'publicado' },
+          ),
+        );
+        if (!created.ok) throw new Error(JSON.stringify(created.issues));
+        item.path = `/sites/exemplo-a/conteudos/${created.value.id}`;
+      }
+    } finally {
+      await pool.end();
+    }
+  });
+
+  test('só com content.publish e o conteúdo no ar; com destino, tira do ar e grava o 301', async ({
+    page,
+    browser,
+  }) => {
+    const editor = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
+    await asRole(editor, 'editor');
+    await editor.goto(live.path);
+    await expect(editor.getByRole('heading', { level: 1, name: live.title })).toBeVisible();
+    await expect(editor.getByRole('button', { name: 'Despublicar' })).toHaveCount(0);
+    await editor.context().close();
+
+    await asRole(page, 'revisor');
+    await page.goto(live.path);
+    await page.getByRole('button', { name: 'Despublicar' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Despublicar este conteúdo?' });
+    await expect(dialog).toContainText(`/${live.slug}/ passa a responder 404`);
+    await expectNoViolations(page);
+    await chooseOption(
+      dialog.getByRole('combobox', { name: 'Redirecionar para (opcional)' }),
+      `${target.title} (/${target.slug}/)`,
+    );
+    await expect(dialog).toContainText(`passa a redirecionar (301) para /${target.slug}/`);
+    await dialog.getByRole('button', { name: 'Despublicar' }).click();
+
+    await expect(toastRegion(page)).toContainText('Conteúdo despublicado, com o 301.');
+    await expect(page.getByRole('button', { name: 'Despublicar' })).toHaveCount(0);
+    const pool = createPool(getEnv().DATABASE_URL);
+    try {
+      const rows = await createDb(pool)
+        .select({ to: redirects.to, status: redirects.status })
+        .from(redirects)
+        .where(and(eq(redirects.siteId, 'exemplo-a'), eq(redirects.from, `/${live.slug}/`)));
+      expect(rows).toEqual([{ to: `/${target.slug}/`, status: 301 }]);
+    } finally {
+      await pool.end();
+    }
   });
 });
 

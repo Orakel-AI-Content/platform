@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   submitForReview: vi.fn(),
   unpublishContents: vi.fn(),
   resourcesFor: vi.fn(),
+  unpublishContent: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -39,6 +40,11 @@ vi.mock('@/domain/publications/unpublish.ts', () => ({
   unpublishContents: mocks.unpublishContents,
 }));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
+vi.mock('@/domain/publications/publish.ts', () => ({ publishVersion: mocks.publishVersion }));
+vi.mock('@/domain/publications/schedule.ts', () => ({
+  schedulePublication: mocks.schedulePublication,
+  cancelScheduledPublication: mocks.cancelScheduledPublication,
+}));
 
 const editor = { email: 'editor@orakel.local', roles: ['editor'] };
 const input = { kind: 'article', title: 'Guia', blocks: [] } as unknown as ContentEdit;
