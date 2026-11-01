@@ -33,6 +33,17 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
   `manual`, e os redirects que chegavam no caminho antigo passam a apontar para o destino.
   Sem destino, o endereço passa a responder 404. Não grava em `publications`, então não
   conta no limite diário.
+- **Despublicação em massa** (`unpublishContents`, no mesmo módulo; R7, #493): exige
+  `content.publish`. Num savepoint, despublica cada conteúdo escolhido com `unpublishContent`,
+  sem 301, e declara a despublicação em massa nas colunas operacionais
+  `sites.mass_unpublish_declared_by` e `sites.mass_unpublish_declared_at`, gravadas por
+  `declareMassUnpublish` em `builds/site-state.ts`. Se algum conteúdo for recusado, o
+  savepoint desfaz tudo, como o `importSnapshot`. O `loadBuildTarget` expõe a declaração, o
+  `planBuild` passa `ALLOW_MASS_UNPUBLISH=true` e a trava de segurança do render deixa a
+  queda de páginas passar. A declaração é de uso único: o build com sucesso limpa só a que
+  usou (`clearMassUnpublish` compara o `declared_at`). Uma declaração feita durante o build
+  fica para o próximo. Falha não limpa. A data vem do processo, em milissegundos, para a
+  comparação não perder precisão.
 - **Contagem do dia:** são as linhas do site com `published_at` na faixa
   `[início do dia de São Paulo, +1 dia)` do instante `now`, calculada no Postgres
   (`date_trunc` com `at time zone`). O `now` é injetável, para os testes. A publicação que
@@ -61,6 +72,11 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
 - **Origem `unpublish` no `Redirect.origin`:** mudaria o contrato do `content-model` sem
   consumidor que precise distinguir. O destino é escolhido por uma pessoa, como o redirect
   manual.
+- **Declaração de massa com prazo, ou consumida por qualquer build com sucesso:** o
+  refinamento escolheu o lote explícito. Limpar sem comparar a data consumiria uma
+  declaração que o build não viu.
+- **Validar o lote inteiro antes de gravar:** duplicaria as regras de `unpublishContent`. O
+  savepoint reaproveita essas regras e garante o tudo ou nada.
 - **Só a trava de `contents`:** duas publicações simultâneas no mesmo site passariam do
   limite.
 - **Limite na `SiteConfig`:** iria para o snapshot, e cada ajuste geraria um build sem nada a
