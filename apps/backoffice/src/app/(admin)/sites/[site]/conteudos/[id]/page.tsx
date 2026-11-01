@@ -8,8 +8,11 @@ import {
   CONTENT_STATUS_TAG,
 } from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
+import { PublishActions, PublishActionsScope } from '@/components/contents/PublishActions';
 import { SubmitForReview, SubmitForReviewScope } from '@/components/contents/SubmitForReview';
+import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
+import { scheduledPublicationAt } from '@/domain/publications/schedule.ts';
 import {
   DETAIL_SUMMARY_CLASS,
   DETAIL_SUMMARY_LIST_CLASS,
@@ -24,7 +27,12 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 
 import { itemTitle } from '../../item-title.ts';
-import { submitForReviewAction } from '../actions.ts';
+import {
+  cancelScheduledPublicationAction,
+  publishVersionAction,
+  schedulePublicationAction,
+  submitForReviewAction,
+} from '../actions.ts';
 import { readContentVersions } from '../content-versions.ts';
 import { positiveInt } from '../params.ts';
 
@@ -45,8 +53,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * Um conteúdo na tela de detalhe do guia (#371): o título no PageHeader com as ações de quem tem
  * content.write ("Editar" e, com a versão mais recente em rascunho, "Enviar para revisão"; o
  * domínio confere de novo); abaixo, o resumo à esquerda e as versões, da primeira à mais
- * recente, à direita (empilham abaixo de `xl`). A recusa do envio vai ao Alert do escopo, logo
- * abaixo da linha do título.
+ * recente, à direita (empilham abaixo de `xl`). Com content.publish (#492), "Publicar" e
+ * "Agendar" para a versão aprovada, ou o horário marcado e "Cancelar agendamento" para a agendada;
+ * o revisor tem content.publish sem content.write. A recusa vai ao Alert do escopo, logo abaixo
+ * da linha do título.
  */
 export default async function ContentVersionsPage({ params }: Params) {
   const { site: siteId, id } = await params;
@@ -61,6 +71,12 @@ export default async function ContentVersionsPage({ params }: Params) {
   }
   const latest = versions.value.at(-1)!;
   const canWrite = can(actor, 'content.write');
+  const canPublish = can(actor, 'content.publish');
+  const scheduled =
+    canPublish && latest.status === 'agendado'
+      ? await scheduledPublicationAt(getDb().db, actor, siteId, contentId, latest.version)
+      : undefined;
+  const version = latest.version;
 
   const header = (
     <PageHeader
@@ -70,28 +86,44 @@ export default async function ContentVersionsPage({ params }: Params) {
       ])}
       title={latest.data.title}
       action={
-        canWrite ? (
+        canWrite || canPublish ? (
           <>
-            <ButtonLink
-              href={`/sites/${siteId}/conteudos/${contentId}/editar`}
-              variant="solid"
-              size="sm"
-            >
-              Editar
-            </ButtonLink>
-            <SubmitForReview
-              available={latest.status === 'rascunho'}
-              action={submitForReviewAction.bind(null, siteId, contentId)}
-            />
+            {canPublish && (
+              <PublishActions
+                status={latest.status}
+                scheduledAt={scheduled?.ok ? scheduled.value : null}
+                publish={publishVersionAction.bind(null, siteId, contentId, version)}
+                schedule={schedulePublicationAction.bind(null, siteId, contentId, version)}
+                cancel={cancelScheduledPublicationAction.bind(null, siteId, contentId, version)}
+              />
+            )}
+            {canWrite && (
+              <>
+                <ButtonLink
+                  href={`/sites/${siteId}/conteudos/${contentId}/editar`}
+                  variant="solid"
+                  size="sm"
+                >
+                  Editar
+                </ButtonLink>
+                <SubmitForReview
+                  available={latest.status === 'rascunho'}
+                  action={submitForReviewAction.bind(null, siteId, contentId)}
+                />
+              </>
+            )}
           </>
         ) : undefined
       }
     />
   );
+  // Um escopo por grupo de ações, cada um com o seu Alert abaixo da linha do título.
+  const withSubmit = canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header;
+  const scoped = canPublish ? <PublishActionsScope>{withSubmit}</PublishActionsScope> : withSubmit;
 
   return (
     <section aria-labelledby="content-title" className="list-width space-y-4">
-      {canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header}
+      {scoped}
       <DetailLayout>
         <Card className={DETAIL_SUMMARY_CLASS}>
           <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>

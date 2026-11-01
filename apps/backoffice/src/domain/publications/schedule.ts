@@ -149,3 +149,39 @@ export async function cancelScheduledPublication(
   await tx.execute(sql`select graphile_worker.remove_job(${publishJobKey(siteId, contentId)})`);
   return { ok: true, value: undefined };
 }
+
+/**
+ * Horário marcado da versão agendada (a reserva em `publications`), para a tela do conteúdo
+ * mostrá-lo junto de "Cancelar agendamento" (#492). `null` quando a versão não está `agendado`.
+ */
+export async function scheduledPublicationAt(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<Result<Date | null>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+  const [row] = await db
+    .select({ scheduledFor: publications.scheduledFor })
+    .from(publications)
+    .innerJoin(
+      contentVersions,
+      and(
+        eq(contentVersions.siteId, publications.siteId),
+        eq(contentVersions.contentId, publications.contentId),
+        eq(contentVersions.version, publications.version),
+      ),
+    )
+    .where(
+      and(
+        eq(publications.siteId, siteId),
+        eq(publications.contentId, contentId),
+        eq(publications.version, version),
+        eq(contentVersions.status, 'agendado'),
+        isNotNull(publications.scheduledFor),
+      ),
+    );
+  return { ok: true, value: row?.scheduledFor ?? null };
+}

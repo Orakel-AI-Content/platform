@@ -14,6 +14,8 @@ import {
   updateContent,
   type ContentEdit,
 } from '@/domain/content/contents.ts';
+import { publishVersion } from '@/domain/publications/publish.ts';
+import { cancelScheduledPublication, schedulePublication } from '@/domain/publications/schedule.ts';
 import { resourcesFor } from '@/domain/sites/sites.ts';
 
 // Ações do editor de conteúdo: permissão, validação e o `n` dos blocos ficam no domínio; a
@@ -87,11 +89,70 @@ export async function submitForReviewAction(
   const result = await getDb().db.transaction((tx) =>
     submitForReview(tx, actor.value, siteId, contentId),
   );
+  return translated(siteId, contentId, result, 'Enviado para revisão.');
+}
+
+/**
+ * O `Result` do domínio no retorno padrão das ações: a recusa junta as mensagens, para o Alert;
+ * o sucesso revalida o conteúdo, a lista e a revisão, onde o status aparece.
+ */
+function translated(
+  siteId: string,
+  contentId: number,
+  result: { ok: true } | { ok: false; issues: readonly Issue[] },
+  message: string,
+): ActionResult {
   if (!result.ok) {
     return { ok: false, message: result.issues.map((issue) => issue.message).join(' ') };
   }
   revalidatePath(`/sites/${siteId}/conteudos`);
   revalidatePath(`/sites/${siteId}/conteudos/${contentId}`);
   revalidatePath(`/sites/${siteId}/revisao`);
-  return { ok: true, message: 'Enviado para revisão.' };
+  return { ok: true, message };
+}
+
+/** Publica a versão aprovada agora; o limite diário e a permissão são do domínio (#492). */
+export async function publishVersionAction(
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<ActionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: noSession.message };
+  const result = await getDb().db.transaction((tx) =>
+    publishVersion(tx, actor.value, siteId, contentId, version),
+  );
+  return translated(siteId, contentId, result, 'Publicado.');
+}
+
+/**
+ * Agenda a versão aprovada para o instante `at` (ISO, escolhido em `America/Sao_Paulo` na
+ * tela); o domínio recusa o horário que não está no futuro.
+ */
+export async function schedulePublicationAction(
+  siteId: string,
+  contentId: number,
+  version: number,
+  at: string,
+): Promise<ActionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: noSession.message };
+  const result = await getDb().db.transaction((tx) =>
+    schedulePublication(tx, actor.value, siteId, contentId, version, new Date(at)),
+  );
+  return translated(siteId, contentId, result, 'Publicação agendada.');
+}
+
+/** Cancela o agendamento: a versão volta a aprovado e a vaga do dia é liberada. */
+export async function cancelScheduledPublicationAction(
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<ActionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: noSession.message };
+  const result = await getDb().db.transaction((tx) =>
+    cancelScheduledPublication(tx, actor.value, siteId, contentId, version),
+  );
+  return translated(siteId, contentId, result, 'Agendamento cancelado.');
 }
