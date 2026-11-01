@@ -8,7 +8,8 @@ import {
   CONTENT_STATUS_TAG,
 } from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { SubmitForReview, SubmitForReviewScope } from '@/components/contents/SubmitForReview';
+import { ContentActionScope } from '@/components/contents/ContentActionScope';
+import { SubmitForReview } from '@/components/contents/SubmitForReview';
 import { can } from '@/domain/access/rbac.ts';
 import {
   DETAIL_SUMMARY_CLASS,
@@ -91,7 +92,7 @@ export default async function ContentVersionsPage({ params }: Params) {
 
   return (
     <section aria-labelledby="content-title" className="list-width space-y-4">
-      {canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header}
+      {canWrite ? <ContentActionScope>{header}</ContentActionScope> : header}
       <DetailLayout>
         <Card className={DETAIL_SUMMARY_CLASS}>
           <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
