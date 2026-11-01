@@ -135,7 +135,7 @@ test(
     const slug = `e2e-aprovar-${Date.now()}`;
     const title = `Artigo ${slug}`;
     await asRole(page, 'editor');
-    await createDraft(page, title, slug);
+    const contentPath = await createDraft(page, title, slug);
     await page.getByRole('button', { name: 'Enviar para revisão' }).click();
     await expect(
       page.getByRole('status').filter({ hasText: 'Enviado para revisão.' }),
@@ -182,6 +182,13 @@ test(
     await reviewer.goto(queueFor(slug));
     await expect(reviewer.getByRole('heading', { level: 1, name: /Revisão/ })).toBeVisible();
     await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toHaveCount(0);
+
+    // Na página do conteúdo aprovado, o revisor (content.publish sem content.write) vê
+    // "Publicar" e "Agendar" (#492), e não "Editar".
+    await reviewer.goto(contentPath);
+    await expect(reviewer.getByRole('button', { name: 'Publicar', exact: true })).toBeVisible();
+    await expect(reviewer.getByRole('button', { name: 'Agendar', exact: true })).toBeVisible();
+    await expect(reviewer.getByRole('link', { name: 'Editar', exact: true })).toHaveCount(0);
     await context.close();
   },
 );
