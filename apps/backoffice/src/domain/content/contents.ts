@@ -386,7 +386,21 @@ export type ContentListItem = {
   status: Status;
   version: number;
   updatedAt: Date;
+  /**
+   * Se o conteúdo está no ar, pela regra de `liveVersion` (a mais recente entre
+   * `LIVE_STATUSES`, e só se for `publicado`): um rascunho sobre a versão publicada não o tira
+   * do ar, e o `status` acima, o da mais recente, não diz isso.
+   */
+  live: boolean;
 };
+
+/** `live` da linha externa de `content_versions`, sem ler os blocos (`liveVersion`). */
+const isLive = sql<boolean>`coalesce((
+  select v.status = 'publicado' from ${contentVersions} v
+  where v.site_id = ${contentVersions.siteId} and v.content_id = ${contentVersions.contentId}
+    and v.status in ('publicado', 'despublicado')
+  order by v.version desc limit 1
+), false)`;
 
 /**
  * Conteúdos do site com a versão mais recente de cada um, em ordem de ID. Lê só o título e o
@@ -409,6 +423,7 @@ export async function listContents(
       status: contentVersions.status,
       version: contentVersions.version,
       updatedAt: contentVersions.createdAt,
+      live: isLive,
     })
     .from(contentVersions)
     .innerJoin(
@@ -420,7 +435,7 @@ export async function listContents(
   return { ok: true, value: rows };
 }
 
-export type ReviewQueueItem = Omit<ContentListItem, 'slug' | 'status'>;
+export type ReviewQueueItem = Omit<ContentListItem, 'slug' | 'status' | 'live'>;
 
 /**
  * Fila de revisão do site: conteúdos cuja versão mais recente está `em_revisao`, da versão
