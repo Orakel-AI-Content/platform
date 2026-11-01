@@ -28,6 +28,7 @@ const ROWS: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
   status: STATUSES[index % STATUSES.length] as ContentListItem['status'],
   version: index + 1,
   updatedAt: new Date('2026-10-20T12:00Z'),
+  live: index % 3 !== 0,
 }));
 
 function Contents() {

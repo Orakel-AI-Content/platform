@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
 import Link from 'next/link';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import Modal from 'react-modal';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ActionResult } from '@/components/shared/actionResult.ts';
+import { toast, ToastProvider } from '@/components/ui/toast';
+import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 import { ContentsTable } from './ContentsTable.tsx';
@@ -59,6 +63,7 @@ const rows: ContentListItem[] = [
     status: 'em_revisao',
     version: 3,
     updatedAt: new Date('2026-10-01T12:00:00Z'),
+    live: false,
   },
   {
     id: 2,
@@ -68,6 +73,7 @@ const rows: ContentListItem[] = [
     status: 'publicado',
     version: 1,
     updatedAt: new Date('2026-09-20T09:30:00Z'),
+    live: true,
   },
 ];
 
@@ -190,6 +196,7 @@ const many: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
   version: 1,
   // Mais recente quanto maior o índice.
   updatedAt: new Date(Date.UTC(2026, 8, 1 + index)),
+  live: index % 2 === 0,
 }));
 
 function renderMany() {
@@ -338,5 +345,187 @@ describe('busca, filtros, ordem e paginação (#107)', () => {
     const text = within(link).getByText(title);
     expect(text.getAttribute('title')).toBe(title);
     expect(text.className).toContain('truncate');
+  });
+});
+
+describe('despublicar em massa (#495)', () => {
+  // A confirmação é um diálogo, que esconde o contêiner da app.
+  let app: HTMLElement;
+  beforeEach(() => {
+    app = document.createElement('div');
+    app.id = APP_ELEMENT_ID;
+    document.body.append(app);
+    Modal.setAppElement(app);
+  });
+  afterEach(async () => {
+    act(() => toast.removeAll());
+    await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
+    app.remove();
+  });
+
+  const item = (id: number, title: string, status: ContentListItem['status'], live: boolean) => ({
+    id,
+    kind: 'article' as const,
+    title,
+    slug: `c-${id}`,
+    status,
+    version: 2,
+    updatedAt: new Date(Date.UTC(2026, 9, id)),
+    live,
+  });
+  const mixed: ContentListItem[] = [
+    item(1, 'Publicado', 'publicado', true),
+    item(2, 'Rascunho sobre o publicado', 'rascunho', true),
+    item(3, 'Nunca publicado', 'rascunho', false),
+    item(4, 'Despublicado', 'despublicado', false),
+  ];
+
+  const ok = (): Promise<ActionResult> =>
+    Promise.resolve({
+      ok: true,
+      message: '2 conteúdos despublicados; a trava fica liberada no próximo build.',
+    });
+
+  function renderBulk(action = vi.fn(ok), canPublish = true) {
+    render(
+      <>
+        <ContentsTable
+          siteId="exemplo-a"
+          timeZone="UTC"
+          rows={mixed}
+          canPublish={canPublish}
+          unpublishAction={action}
+        />
+        <ToastProvider />
+      </>,
+    );
+    return action;
+  }
+
+  it('sem content.publish a lista fica sem caixas nem barra', () => {
+    renderBulk(vi.fn(ok), false);
+
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Despublicar em massa' })).toBeNull();
+  });
+
+  it('com content.publish só os conteúdos no ar têm caixa, inclusive com rascunho por cima', () => {
+    renderBulk();
+
+    expect(screen.getAllByRole('checkbox').map((box) => box.getAttribute('aria-label'))).toEqual([
+      'Selecionar todas as linhas',
+      // Mais recente primeiro: 4, 3, 2, 1; o 4 e o 3 não estão no ar.
+      'Selecionar Rascunho sobre o publicado',
+      'Selecionar Publicado',
+    ]);
+    // A barra só aparece com seleção.
+    expect(screen.queryByRole('button', { name: 'Despublicar em massa' })).toBeNull();
+  });
+
+  it('"Selecionar todas" marca só os no ar; a barra diz quantos', async () => {
+    const user = userEvent.setup();
+    renderBulk();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar todas as linhas' }));
+
+    expect(screen.getByText('2 conteúdos selecionados')).toBeTruthy();
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar Publicado' }));
+    expect(screen.getByText('1 conteúdo selecionado')).toBeTruthy();
+    expect(
+      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Selecionar todas as linhas' })
+        .indeterminate,
+    ).toBe(true);
+  });
+
+  it('a confirmação diz quantos saem, o 404 e a trava; confirmar despublica e zera a seleção', async () => {
+    const user = userEvent.setup();
+    const action = renderBulk();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar todas as linhas' }));
+    await user.click(screen.getByRole('button', { name: 'Despublicar em massa' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Despublicar 2 conteúdos?' });
+    expect(dialog.textContent).toContain('Os 2 conteúdos saem do ar');
+    expect(dialog.textContent).toContain('404');
+    expect(dialog.textContent).toContain('trava de queda de páginas fica liberada');
+    await user.click(within(dialog).getByRole('button', { name: 'Despublicar' }));
+
+    expect(action).toHaveBeenCalledWith('exemplo-a', [2, 1]);
+    expect(
+      await screen.findByText('2 conteúdos despublicados; a trava fica liberada no próximo build.'),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Despublicar em massa' })).toBeNull(),
+    );
+    expect(
+      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Selecionar Publicado' }).checked,
+    ).toBe(false);
+  });
+
+  it('a recusa do lote vai para o Alert e a seleção fica', async () => {
+    const user = userEvent.setup();
+    renderBulk(
+      vi.fn((): Promise<ActionResult> =>
+        Promise.resolve({ ok: false, message: 'O conteúdo 2 não está no ar' }),
+      ),
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar Publicado' }));
+    await user.click(screen.getByRole('button', { name: 'Despublicar em massa' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Despublicar 1 conteúdo?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Despublicar' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('O conteúdo 2 não está no ar'),
+    );
+    expect(screen.getByText('1 conteúdo selecionado')).toBeTruthy();
+  });
+
+  it('Cancelar não despublica', async () => {
+    const user = userEvent.setup();
+    const action = renderBulk();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar Publicado' }));
+    await user.click(screen.getByRole('button', { name: 'Despublicar em massa' }));
+    const dialog = await screen.findByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it('o teclado marca a caixa com Espaço e chega ao botão da barra', async () => {
+    const user = userEvent.setup();
+    renderBulk();
+    const box = screen.getByRole('checkbox', { name: 'Selecionar Rascunho sobre o publicado' });
+
+    box.focus();
+    await user.keyboard(' ');
+    expect((box as HTMLInputElement).checked).toBe(true);
+    const button = screen.getByRole('button', { name: 'Despublicar em massa' });
+    // A caixa continua com o foco depois de marcada (as células não remontam).
+    expect(document.activeElement).toBe(box);
+    while (document.activeElement !== button && document.activeElement !== document.body) {
+      await user.tab();
+    }
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('trocar de página zera a seleção', async () => {
+    const user = userEvent.setup();
+    render(
+      <ContentsTable
+        siteId="exemplo-a"
+        timeZone="UTC"
+        rows={many}
+        canPublish
+        unpublishAction={vi.fn(ok)}
+      />,
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar todas as linhas' }));
+    expect(screen.getByText(/conteúdos selecionados/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Próxima página' }));
+
+    expect(screen.queryByText(/selecionados?$/)).toBeNull();
   });
 });
