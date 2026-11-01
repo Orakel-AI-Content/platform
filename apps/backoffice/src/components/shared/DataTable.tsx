@@ -15,6 +15,11 @@
 //   `useListTable`, que filtra, ordena e corta, e ao DataTable, que só desenha (#361);
 // - contagem "N resultados" em `role="status"` no rodapé, junto da paginação e do seletor, e o
 //   rodapé quebra linha em tela estreita (#361).
+// Acrescentado (#495): `rowSelectable` restringe a seleção por linha (o `enableRowSelection` do
+// TanStack) e a linha que não pode ser escolhida fica sem caixa; `checkboxLabel` dá nome a cada
+// caixa. Com a seleção controlada (`checkboxChecked`), o "indeterminado" do cabeçalho sai dela,
+// não do estado interno, e o cabeçalho fica desabilitado quando nenhuma linha da página pode
+// ser escolhida.
 'use client';
 
 import { useImperativeHandle, useMemo, useState } from 'react';
@@ -119,6 +124,10 @@ export type DataTableProps<T extends RowData> = {
   };
   checkboxChecked?: (row: T) => boolean;
   indeterminateCheckboxChecked?: (row: Row<T>[]) => boolean;
+  /** Quais linhas podem ser escolhidas; as outras ficam sem caixa. Sem ela, todas. */
+  rowSelectable?: (row: T) => boolean;
+  /** Nome da caixa de cada linha ("Selecionar <título>"); sem ele, "Selecionar linha". */
+  checkboxLabel?: (row: T) => string;
   ref?: Ref<DataTableResetHandle>;
 } & Omit<TableProps, 'ref'>;
 
@@ -189,6 +198,8 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
     },
     checkboxChecked,
     indeterminateCheckboxChecked,
+    rowSelectable,
+    checkboxLabel,
     instanceId = 'data-table',
     ref,
     ...rest
@@ -228,38 +239,49 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
         {
           id: 'select',
           maxSize: 50,
-          header: ({ table }) => (
-            <IndeterminateCheckbox
-              aria-label="Selecionar todas as linhas"
-              checked={
-                indeterminateCheckboxChecked
-                  ? indeterminateCheckboxChecked(table.getRowModel().rows)
-                  : table.getIsAllRowsSelected()
-              }
-              indeterminate={table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected()}
-              onChange={table.getToggleAllRowsSelectedHandler()}
-              onIndeterminateCheckBoxChange={(e) => {
-                handleIndeterminateCheckBoxChange(e.target.checked, table.getRowModel().rows);
-              }}
-            />
-          ),
-          cell: ({ row }) => (
-            <IndeterminateCheckbox
-              aria-label="Selecionar linha"
-              checked={checkboxChecked ? checkboxChecked(row.original) : row.getIsSelected()}
-              disabled={!row.getCanSelect()}
-              indeterminate={row.getIsSomeSelected()}
-              onChange={row.getToggleSelectedHandler()}
-              onCheckBoxChange={(e) => handleCheckBoxChange(e.target.checked, row.original)}
-            />
-          ),
+          header: ({ table }) => {
+            const rows = table.getRowModel().rows;
+            const selectableRows = rows.filter((row) => row.getCanSelect());
+            const checkedRows = checkboxChecked
+              ? selectableRows.filter((row) => checkboxChecked(row.original)).length
+              : 0;
+            const indeterminate = checkboxChecked
+              ? checkedRows > 0 && checkedRows < selectableRows.length
+              : table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
+            return (
+              <IndeterminateCheckbox
+                aria-label="Selecionar todas as linhas"
+                checked={
+                  indeterminateCheckboxChecked
+                    ? indeterminateCheckboxChecked(rows)
+                    : table.getIsAllRowsSelected()
+                }
+                disabled={selectableRows.length === 0}
+                indeterminate={indeterminate}
+                onChange={table.getToggleAllRowsSelectedHandler()}
+                onIndeterminateCheckBoxChange={(e) => {
+                  handleIndeterminateCheckBoxChange(e.target.checked, rows);
+                }}
+              />
+            );
+          },
+          cell: ({ row }) =>
+            row.getCanSelect() ? (
+              <IndeterminateCheckbox
+                aria-label={checkboxLabel ? checkboxLabel(row.original) : 'Selecionar linha'}
+                checked={checkboxChecked ? checkboxChecked(row.original) : row.getIsSelected()}
+                indeterminate={row.getIsSomeSelected()}
+                onChange={row.getToggleSelectedHandler()}
+                onCheckBoxChange={(e) => handleCheckBoxChange(e.target.checked, row.original)}
+              />
+            ) : null,
         },
         ...columns,
       ];
     }
     return columns;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columnsProp, selectable, loading, checkboxChecked]);
+  }, [columnsProp, selectable, loading, checkboxChecked, checkboxLabel]);
 
   const table = useTable({
     features: dataTableFeatures,
@@ -267,6 +289,7 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
     columns: finalColumns,
     manualPagination: true,
     manualSorting: true,
+    enableRowSelection: rowSelectable ? (row) => rowSelectable(row.original) : true,
     onSortingChange: (updater) => {
       const next = functionalUpdate(updater, sorting);
       if (!sort) setLocalSorting(next);
