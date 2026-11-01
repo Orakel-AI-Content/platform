@@ -57,8 +57,11 @@ export function UnpublishDialog({
         type="button"
         size="sm"
         customColorClass={dangerButtonClass}
-        disabled={scope.pending}
+        // `aria-disabled`, não `disabled`, durante o envio: o diálogo fecha antes da resposta, e
+        // um botão desabilitado não recebe o foco que volta a ele.
+        aria-disabled={scope.pending || undefined}
         onClick={() => {
+          if (scope.pending) return;
           setTo(undefined);
           setOpen(true);
         }}
