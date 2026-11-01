@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createRef } from 'react';
+import { createRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import DataTable, { type ColumnDef, type DataTableResetHandle } from './DataTable.tsx';
@@ -226,5 +226,100 @@ describe('DataTable', () => {
     expect(onCheckBoxChange).toHaveBeenLastCalledWith(true, ARTIGOS[0]);
     expect(ref.current?.resetSelected).toBeTypeOf('function');
     expect(ref.current?.resetSorting).toBeTypeOf('function');
+  });
+
+  it('rowSelectable: só as linhas escolhíveis têm caixa, com o nome de checkboxLabel (#495)', async () => {
+    const user = userEvent.setup();
+    const onIndeterminateCheckBoxChange = vi.fn();
+    render(
+      <DataTable
+        columns={COLUNAS}
+        data={ARTIGOS}
+        pagingData={paging}
+        selectable
+        rowSelectable={(artigo) => artigo.status !== 'Rascunho'}
+        checkboxLabel={(artigo) => `Selecionar ${artigo.titulo}`}
+        onIndeterminateCheckBoxChange={onIndeterminateCheckBoxChange}
+      />,
+    );
+
+    const caixas = screen.getAllByRole('checkbox');
+    expect(caixas.map((caixa) => caixa.getAttribute('aria-label'))).toEqual([
+      'Selecionar todas as linhas',
+      'Selecionar Guia de jardinagem',
+      'Selecionar Receita de pão',
+    ]);
+    const [, rascunho] = screen.getAllByRole('row').slice(1);
+    expect(within(rascunho!).queryByRole('checkbox')).toBeNull();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar todas as linhas' }));
+    expect(
+      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Selecionar Guia de jardinagem' })
+        .checked,
+    ).toBe(true);
+    expect(
+      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Selecionar Receita de pão' }).checked,
+    ).toBe(true);
+    expect(onIndeterminateCheckBoxChange).toHaveBeenLastCalledWith(true, expect.any(Array));
+  });
+
+  it('rowSelectable: cabeçalho desabilitado quando nenhuma linha da página pode ser escolhida', () => {
+    render(
+      <DataTable
+        columns={COLUNAS}
+        data={ARTIGOS}
+        pagingData={paging}
+        selectable
+        rowSelectable={() => false}
+      />,
+    );
+
+    expect(
+      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Selecionar todas as linhas' })
+        .disabled,
+    ).toBe(true);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+  });
+
+  it('seleção controlada: o indeterminado do cabeçalho sai de checkboxChecked', async () => {
+    const user = userEvent.setup();
+    function Controlada() {
+      const [escolhidos, setEscolhidos] = useState<string[]>(['Guia de jardinagem']);
+      return (
+        <>
+          <button type="button" onClick={() => setEscolhidos([])}>
+            Limpar
+          </button>
+          <DataTable
+            columns={COLUNAS}
+            data={ARTIGOS}
+            pagingData={paging}
+            selectable
+            checkboxChecked={(artigo) => escolhidos.includes(artigo.titulo)}
+            onCheckBoxChange={(checked, artigo) =>
+              setEscolhidos((atual) =>
+                checked ? [...atual, artigo.titulo] : atual.filter((t) => t !== artigo.titulo),
+              )
+            }
+          />
+        </>
+      );
+    }
+    render(<Controlada />);
+    const cabecalho = () =>
+      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Selecionar todas as linhas' });
+
+    expect(cabecalho().indeterminate).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Limpar' }));
+    expect(cabecalho().indeterminate).toBe(false);
+
+    // Marcar pelo teclado muda `checkboxChecked`, e a caixa continua com o foco.
+    const [primeira] = screen.getAllByRole<HTMLInputElement>('checkbox', {
+      name: 'Selecionar linha',
+    });
+    primeira!.focus();
+    await user.keyboard(' ');
+    expect(primeira!.checked).toBe(true);
+    expect(document.activeElement).toBe(primeira);
   });
 });

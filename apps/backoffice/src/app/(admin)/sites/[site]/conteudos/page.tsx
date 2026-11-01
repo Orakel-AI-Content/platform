@@ -1,6 +1,7 @@
 import { TbPlus } from 'react-icons/tb';
 
 import { ContentsTable } from '@/components/contents/ContentsTable';
+import { can } from '@/domain/access/rbac.ts';
 import { listContents } from '@/domain/content/contents.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
@@ -9,6 +10,7 @@ import { ListHeader, PageTrail } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 
 import { sitePageContext } from '../editorial-page.tsx';
+import { unpublishContentsAction } from './actions.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +18,8 @@ export const metadata = { title: 'Conteúdos' };
 
 /**
  * Conteúdos do site com a versão mais recente de cada um. Ler exige site.read (o domínio
- * confere); criar e editar só aparecem com content.write. Lista no padrão do template (#362):
+ * confere); criar e editar só aparecem com content.write; a seleção e a despublicação em massa,
+ * com content.publish (#495). Lista no padrão do template (#362):
  * a trilha acima do cartão; título, ação, toolbar e tabela dentro dele.
  */
 export default async function ContentsPage({ params }: { params: Promise<{ site: string }> }) {
@@ -48,6 +51,8 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
             timeZone={site.timeZone}
             rows={contents.value}
             canWrite={canWrite}
+            canPublish={can(actor, 'content.publish')}
+            unpublishAction={unpublishContentsAction}
             emptyAction={create}
             labelledBy="contents-title"
           />

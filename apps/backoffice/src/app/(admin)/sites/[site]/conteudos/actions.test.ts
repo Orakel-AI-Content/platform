@@ -6,7 +6,7 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 import {
   createContentAction,
   submitForReviewAction,
-  unpublishContentAction,
+  unpublishContentsAction,
   updateContentAction,
 } from './actions.ts';
 
@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   updateContent: vi.fn(),
   listContentVersions: vi.fn(),
   submitForReview: vi.fn(),
+  unpublishContents: vi.fn(),
   resourcesFor: vi.fn(),
   unpublishContent: vi.fn(),
   revalidatePath: vi.fn(),
@@ -36,7 +37,7 @@ vi.mock('@/domain/content/contents.ts', () => ({
   submitForReview: mocks.submitForReview,
 }));
 vi.mock('@/domain/publications/unpublish.ts', () => ({
-  unpublishContent: mocks.unpublishContent,
+  unpublishContents: mocks.unpublishContents,
 }));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
 vi.mock('@/domain/publications/publish.ts', () => ({ publishVersion: mocks.publishVersion }));
@@ -199,58 +200,54 @@ describe('enviar para revisão', () => {
   });
 });
 
-describe('despublicar (#494)', () => {
+describe('despublicar em massa (#495)', () => {
   it('sem sessão não chama o domínio nem revalida', async () => {
     mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
 
-    expect(await unpublishContentAction('exemplo-a', 1)).toEqual({
-      ok: false,
-      message: 'Sessão inválida; entre de novo.',
-    });
-    expect(mocks.unpublishContent).not.toHaveBeenCalled();
+    expect(await unpublishContentsAction('exemplo-a', [1, 2])).toMatchObject({ ok: false });
+    expect(mocks.unpublishContents).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('recusa do domínio volta com a mensagem e não revalida', async () => {
-    mocks.unpublishContent.mockResolvedValue({
+  it('recusa do lote volta com a mensagem e não revalida', async () => {
+    mocks.unpublishContents.mockResolvedValue({
       ok: false,
       issues: [
         {
-          code: 'publication.invalid_target',
-          message: 'O destino do 301 precisa ser outro conteúdo no ar do site exemplo-a: 9 não é',
-          path: [],
+          code: 'publication.not_live',
+          message: 'O conteúdo 2 não está no ar',
+          path: ['contentIds', 1],
         },
       ],
     });
 
-    expect(await unpublishContentAction('exemplo-a', 1, 9)).toEqual({
+    expect(await unpublishContentsAction('exemplo-a', [1, 2])).toEqual({
       ok: false,
-      message: 'O destino do 301 precisa ser outro conteúdo no ar do site exemplo-a: 9 não é',
+      message: 'O conteúdo 2 não está no ar',
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('sem destino delega sem `to`; com destino, passa o `to`; e revalida o site e o conteúdo', async () => {
-    mocks.unpublishContent.mockResolvedValue({ ok: true, value: { version: 2 } });
-
-    expect(await unpublishContentAction('exemplo-a', 1)).toEqual({
+  it('sucesso delega com o ator e os ids, revalida o site e a lista e diz quantos saíram', async () => {
+    mocks.unpublishContents.mockResolvedValue({
       ok: true,
-      message: 'Conteúdo despublicado.',
+      value: {
+        unpublished: [
+          { contentId: 1, version: 1 },
+          { contentId: 2, version: 3 },
+        ],
+        declaredAt: new Date(),
+      },
     });
-    expect(mocks.unpublishContent).toHaveBeenLastCalledWith({}, editor, 'exemplo-a', 1, {});
 
-    mocks.unpublishContent.mockResolvedValue({ ok: true, value: { version: 2, redirectId: 5 } });
-    expect(await unpublishContentAction('exemplo-a', 1, 2)).toEqual({
+    expect(await unpublishContentsAction('exemplo-a', [1, 2])).toEqual({
       ok: true,
-      message: 'Conteúdo despublicado, com o 301.',
+      message: '2 conteúdos despublicados; a trava fica liberada no próximo build.',
     });
-    expect(mocks.unpublishContent).toHaveBeenLastCalledWith({}, editor, 'exemplo-a', 1, { to: 2 });
-    expect(mocks.revalidatePath.mock.calls.map(([path]) => path as string)).toEqual(
-      expect.arrayContaining([
-        '/sites/exemplo-a',
-        '/sites/exemplo-a/conteudos',
-        '/sites/exemplo-a/conteudos/1',
-      ]),
-    );
+    expect(mocks.unpublishContents).toHaveBeenCalledWith({}, editor, 'exemplo-a', [1, 2]);
+    expect(mocks.revalidatePath.mock.calls).toEqual([
+      ['/sites/exemplo-a'],
+      ['/sites/exemplo-a/conteudos'],
+    ]);
   });
 });

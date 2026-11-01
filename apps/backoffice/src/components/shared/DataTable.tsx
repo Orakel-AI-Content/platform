@@ -15,9 +15,16 @@
 //   `useListTable`, que filtra, ordena e corta, e ao DataTable, que só desenha (#361);
 // - contagem "N resultados" em `role="status"` no rodapé, junto da paginação e do seletor, e o
 //   rodapé quebra linha em tela estreita (#361).
+// Acrescentado (#495): `rowSelectable` restringe a seleção por linha (o `enableRowSelection` do
+// TanStack) e a linha que não pode ser escolhida fica sem caixa; `checkboxLabel` dá nome a cada
+// caixa. Com a seleção controlada (`checkboxChecked`), o "indeterminado" do cabeçalho sai dela,
+// não do estado interno, e o cabeçalho fica desabilitado quando nenhuma linha da página pode
+// ser escolhida. As caixas leem a seleção por contexto, com as colunas estáveis: no Ecme, o
+// `checkboxChecked` novo a cada clique recriava as colunas, remontava as células e tirava o
+// foco da caixa marcada pelo teclado.
 'use client';
 
-import { useImperativeHandle, useMemo, useState } from 'react';
+import { createContext, use, useImperativeHandle, useMemo, useState } from 'react';
 import Table from '@/components/ui/Table';
 import Pagination from '@/components/ui/Pagination';
 import Select from '@/components/ui/Select';
@@ -50,6 +57,7 @@ import type {
   CellContext as BaseCellContext,
   RowData,
   SortingState,
+  Table as TanstackTable,
 } from '@tanstack/react-table';
 import type { TableProps } from '@/components/ui/Table';
 import type { SkeletonProps } from '@/components/ui/Skeleton';
@@ -119,6 +127,10 @@ export type DataTableProps<T extends RowData> = {
   };
   checkboxChecked?: (row: T) => boolean;
   indeterminateCheckboxChecked?: (row: Row<T>[]) => boolean;
+  /** Quais linhas podem ser escolhidas; as outras ficam sem caixa. Sem ela, todas. */
+  rowSelectable?: (row: T) => boolean;
+  /** Nome da caixa de cada linha ("Selecionar <título>"); sem ele, "Selecionar linha". */
+  checkboxLabel?: (row: T) => string;
   ref?: Ref<DataTableResetHandle>;
 } & Omit<TableProps, 'ref'>;
 
@@ -152,6 +164,67 @@ const IndeterminateCheckbox = (props: IndeterminateCheckboxProps) => {
     />
   );
 };
+
+/** Seleção controlada do DataTable, lida pelas caixas do cabeçalho e de cada linha. */
+type Selection<T extends RowData> = {
+  checkboxChecked?: (row: T) => boolean;
+  indeterminateCheckboxChecked?: (rows: Row<T>[]) => boolean;
+  checkboxLabel?: (row: T) => string;
+  onRowChange: (checked: boolean, row: T) => void;
+  onAllChange: (checked: boolean, rows: Row<T>[]) => void;
+};
+
+const SelectionContext = createContext<Selection<RowData> | null>(null);
+
+function useSelection<T extends RowData>(): Selection<T> {
+  const selection = use(SelectionContext);
+  if (selection === null) throw new Error('Caixa de seleção fora do DataTable');
+  return selection as unknown as Selection<T>;
+}
+
+function SelectAllCheckbox<T extends RowData>({
+  table,
+}: {
+  table: TanstackTable<DataTableFeatures, T>;
+}) {
+  const { checkboxChecked, indeterminateCheckboxChecked, onAllChange } = useSelection<T>();
+  const rows = table.getRowModel().rows;
+  const selectableRows = rows.filter((row) => row.getCanSelect());
+  const checkedRows = checkboxChecked
+    ? selectableRows.filter((row) => checkboxChecked(row.original)).length
+    : 0;
+  const indeterminate = checkboxChecked
+    ? checkedRows > 0 && checkedRows < selectableRows.length
+    : table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected();
+  return (
+    <IndeterminateCheckbox
+      aria-label="Selecionar todas as linhas"
+      checked={
+        indeterminateCheckboxChecked
+          ? indeterminateCheckboxChecked(rows)
+          : table.getIsAllRowsSelected()
+      }
+      disabled={selectableRows.length === 0}
+      indeterminate={indeterminate}
+      onChange={table.getToggleAllRowsSelectedHandler()}
+      onIndeterminateCheckBoxChange={(e) => onAllChange(e.target.checked, rows)}
+    />
+  );
+}
+
+function SelectRowCheckbox<T extends RowData>({ row }: { row: Row<T> }) {
+  const { checkboxChecked, checkboxLabel, onRowChange } = useSelection<T>();
+  if (!row.getCanSelect()) return null;
+  return (
+    <IndeterminateCheckbox
+      aria-label={checkboxLabel ? checkboxLabel(row.original) : 'Selecionar linha'}
+      checked={checkboxChecked ? checkboxChecked(row.original) : row.getIsSelected()}
+      indeterminate={row.getIsSomeSelected()}
+      onChange={row.getToggleSelectedHandler()}
+      onCheckBoxChange={(e) => onRowChange(e.target.checked, row.original)}
+    />
+  );
+}
 
 const count = new Intl.NumberFormat('pt-BR');
 
@@ -189,6 +262,8 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
     },
     checkboxChecked,
     indeterminateCheckboxChecked,
+    rowSelectable,
+    checkboxLabel,
     instanceId = 'data-table',
     ref,
     ...rest
@@ -224,42 +299,28 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
     const columns = columnsProp;
 
     if (selectable) {
+      // As caixas leem a seleção pelo contexto: com ela controlada (`checkboxChecked` muda a
+      // cada clique), colunas recriadas remontariam as células e o foco do teclado se perderia.
       return [
         {
           id: 'select',
           maxSize: 50,
-          header: ({ table }) => (
-            <IndeterminateCheckbox
-              aria-label="Selecionar todas as linhas"
-              checked={
-                indeterminateCheckboxChecked
-                  ? indeterminateCheckboxChecked(table.getRowModel().rows)
-                  : table.getIsAllRowsSelected()
-              }
-              indeterminate={table.getIsSomeRowsSelected() && !table.getIsAllRowsSelected()}
-              onChange={table.getToggleAllRowsSelectedHandler()}
-              onIndeterminateCheckBoxChange={(e) => {
-                handleIndeterminateCheckBoxChange(e.target.checked, table.getRowModel().rows);
-              }}
-            />
-          ),
-          cell: ({ row }) => (
-            <IndeterminateCheckbox
-              aria-label="Selecionar linha"
-              checked={checkboxChecked ? checkboxChecked(row.original) : row.getIsSelected()}
-              disabled={!row.getCanSelect()}
-              indeterminate={row.getIsSomeSelected()}
-              onChange={row.getToggleSelectedHandler()}
-              onCheckBoxChange={(e) => handleCheckBoxChange(e.target.checked, row.original)}
-            />
-          ),
+          header: ({ table }) => <SelectAllCheckbox<T> table={table} />,
+          cell: ({ row }) => <SelectRowCheckbox<T> row={row} />,
         },
         ...columns,
       ];
     }
     return columns;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columnsProp, selectable, loading, checkboxChecked]);
+  }, [columnsProp, selectable]);
+
+  const selection: Selection<T> = {
+    checkboxChecked,
+    indeterminateCheckboxChecked,
+    checkboxLabel,
+    onRowChange: handleCheckBoxChange,
+    onAllChange: handleIndeterminateCheckBoxChange,
+  };
 
   const table = useTable({
     features: dataTableFeatures,
@@ -267,6 +328,7 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
     columns: finalColumns,
     manualPagination: true,
     manualSorting: true,
+    enableRowSelection: rowSelectable ? (row) => rowSelectable(row.original) : true,
     onSortingChange: (updater) => {
       const next = functionalUpdate(updater, sorting);
       if (!sort) setLocalSorting(next);
@@ -305,122 +367,124 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
   };
 
   return (
-    <Loading loading={Boolean(loading && data.length !== 0)} type="cover">
-      <Table aria-busy={loading || undefined} {...rest}>
-        <THead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <Tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => {
-                const canSort = header.column.getCanSort();
-                const sorted = header.column.getIsSorted();
-                const content = header.isPlaceholder
-                  ? null
-                  : flexRender(header.column.columnDef.header, header.getContext());
-                return (
-                  <Th
-                    key={header.id}
-                    colSpan={header.colSpan}
-                    sort={canSort ? sorted || 'none' : undefined}
-                  >
-                    {canSort && !header.isPlaceholder ? (
-                      <button
-                        type="button"
-                        className={classNames(
-                          'inline-flex min-h-6 cursor-pointer select-none items-center gap-1 uppercase',
-                          loading && 'pointer-events-none',
-                        )}
-                        disabled={loading}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {content}
-                        <Sorter sort={sorted || true} />
-                      </button>
-                    ) : (
-                      content
-                    )}
-                  </Th>
-                );
-              })}
-            </Tr>
-          ))}
-        </THead>
-        {loading && data.length === 0 ? (
-          <TableRowSkeleton
-            columns={finalColumns.length}
-            rows={pagingData.pageSize}
-            avatarInColumns={skeletonAvatarColumns}
-            avatarProps={skeletonAvatarProps}
-          />
-        ) : (
-          <TBody>
-            {noData ? (
-              <Tr>
-                <Td className="hover:bg-transparent" colSpan={finalColumns.length}>
-                  <div className="flex flex-col items-center gap-4">
-                    {customNoDataIcon ? (
-                      customNoDataIcon
-                    ) : (
-                      <>
-                        <FileNotFound />
-                        <span className="font-semibold">Nenhum dado encontrado!</span>
-                      </>
-                    )}
-                  </div>
-                </Td>
-              </Tr>
-            ) : (
-              table
-                .getRowModel()
-                .rows.slice(0, pageSize)
-                .map((row) => {
+    <SelectionContext value={selection as unknown as Selection<RowData>}>
+      <Loading loading={Boolean(loading && data.length !== 0)} type="cover">
+        <Table aria-busy={loading || undefined} {...rest}>
+          <THead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <Tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const canSort = header.column.getCanSort();
+                  const sorted = header.column.getIsSorted();
+                  const content = header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext());
                   return (
-                    <Tr key={row.id}>
-                      {row.getVisibleCells().map((cell) => {
-                        return (
-                          <Td
-                            key={cell.id}
-                            style={{
-                              width: cell.column.getSize(),
-                            }}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </Td>
-                        );
-                      })}
-                    </Tr>
+                    <Th
+                      key={header.id}
+                      colSpan={header.colSpan}
+                      sort={canSort ? sorted || 'none' : undefined}
+                    >
+                      {canSort && !header.isPlaceholder ? (
+                        <button
+                          type="button"
+                          className={classNames(
+                            'inline-flex min-h-6 cursor-pointer select-none items-center gap-1 uppercase',
+                            loading && 'pointer-events-none',
+                          )}
+                          disabled={loading}
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {content}
+                          <Sorter sort={sorted || true} />
+                        </button>
+                      ) : (
+                        content
+                      )}
+                    </Th>
                   );
-                })
-            )}
-          </TBody>
-        )}
-      </Table>
-      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-        <Pagination
-          pageSize={pageSize}
-          currentPage={pageIndex}
-          total={total}
-          onChange={handlePaginationChange}
-        />
-        <div className="flex items-center gap-3">
-          {/* Sempre na página, para o leitor de tela anunciar a troca; vazio no esqueleto. */}
-          <p role="status" className="text-sm tabular-nums">
-            {loading && data.length === 0 ? '' : resultCount(total)}
-          </p>
-          <div style={{ minWidth: 130 }}>
-            <Select
-              instanceId={instanceId}
-              aria-label="Itens por página"
-              size="sm"
-              menuPlacement="top"
-              isSearchable={false}
-              value={pageSizeOption.filter((option) => option.value === pageSize)}
-              options={pageSizeOption}
-              onChange={(option) => handleSelectChange(option?.value)}
+                })}
+              </Tr>
+            ))}
+          </THead>
+          {loading && data.length === 0 ? (
+            <TableRowSkeleton
+              columns={finalColumns.length}
+              rows={pagingData.pageSize}
+              avatarInColumns={skeletonAvatarColumns}
+              avatarProps={skeletonAvatarProps}
             />
+          ) : (
+            <TBody>
+              {noData ? (
+                <Tr>
+                  <Td className="hover:bg-transparent" colSpan={finalColumns.length}>
+                    <div className="flex flex-col items-center gap-4">
+                      {customNoDataIcon ? (
+                        customNoDataIcon
+                      ) : (
+                        <>
+                          <FileNotFound />
+                          <span className="font-semibold">Nenhum dado encontrado!</span>
+                        </>
+                      )}
+                    </div>
+                  </Td>
+                </Tr>
+              ) : (
+                table
+                  .getRowModel()
+                  .rows.slice(0, pageSize)
+                  .map((row) => {
+                    return (
+                      <Tr key={row.id}>
+                        {row.getVisibleCells().map((cell) => {
+                          return (
+                            <Td
+                              key={cell.id}
+                              style={{
+                                width: cell.column.getSize(),
+                              }}
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </Td>
+                          );
+                        })}
+                      </Tr>
+                    );
+                  })
+              )}
+            </TBody>
+          )}
+        </Table>
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+          <Pagination
+            pageSize={pageSize}
+            currentPage={pageIndex}
+            total={total}
+            onChange={handlePaginationChange}
+          />
+          <div className="flex items-center gap-3">
+            {/* Sempre na página, para o leitor de tela anunciar a troca; vazio no esqueleto. */}
+            <p role="status" className="text-sm tabular-nums">
+              {loading && data.length === 0 ? '' : resultCount(total)}
+            </p>
+            <div style={{ minWidth: 130 }}>
+              <Select
+                instanceId={instanceId}
+                aria-label="Itens por página"
+                size="sm"
+                menuPlacement="top"
+                isSearchable={false}
+                value={pageSizeOption.filter((option) => option.value === pageSize)}
+                options={pageSizeOption}
+                onChange={(option) => handleSelectChange(option?.value)}
+              />
+            </div>
           </div>
         </div>
-      </div>
-    </Loading>
+      </Loading>
+    </SelectionContext>
   );
 }
 

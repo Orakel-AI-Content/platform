@@ -17,6 +17,7 @@ import {
   type EditBlock,
 } from '../../src/domain/content/contents.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
+import { unpublishContent } from '../../src/domain/publications/unpublish.ts';
 import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { createVolumeSite, seedContents } from '../volume.ts';
@@ -380,6 +381,37 @@ describe('leituras de conteúdo', () => {
     ]);
   });
 
+  it('a lista diz se o conteúdo está no ar pela versão no ar, não pela mais recente (#495)', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    const unpublished = await db.transaction((tx) => unpublishContent(tx, SYSTEM_ACTOR, SITE, 2));
+    if (!unpublished.ok) throw new Error(JSON.stringify(unpublished.issues));
+    await edit(2, await latest(2));
+    const created = await db.transaction((tx) =>
+      createContent(tx, SYSTEM_ACTOR, SITE, {
+        kind: 'page',
+        slug: 'rascunho-novo',
+        title: 'Rascunho novo',
+        authorIds: [],
+        taxonomyIds: [],
+        publishedAt: '2026-10-06T12:00:00-03:00',
+        blocks: [newText('um')],
+      }),
+    );
+    if (!created.ok) throw new Error(JSON.stringify(created.issues));
+
+    const result = await listContents(db, SYSTEM_ACTOR, SITE);
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.map(({ id, status, live }) => ({ id, status, live }))).toEqual([
+      // Rascunho sobre a versão publicada: continua no ar.
+      { id: 1, status: 'rascunho', live: true },
+      // Despublicado, com rascunho por cima: a versão publicada anterior não volta ao ar.
+      { id: 2, status: 'rascunho', live: false },
+      { id: 3, status: 'publicado', live: true },
+      { id: created.value.id, status: 'rascunho', live: false },
+    ]);
+  });
+
   it('com 2.000 conteúdos de duas versões, a lista traz só a mais recente em menos de 500 ms (#105)', async () => {
     const template = await latest(1);
     const ids = Array.from({ length: 2000 }, (_, index) => 1001 + index);
@@ -406,7 +438,7 @@ describe('leituras de conteúdo', () => {
     const bulk = result.value.filter((item) => item.id > 1000);
     expect(bulk).toHaveLength(2000);
     expect(Object.keys(bulk[0] ?? {}).sort()).toEqual(
-      ['id', 'kind', 'slug', 'status', 'title', 'updatedAt', 'version'].sort(),
+      ['id', 'kind', 'live', 'slug', 'status', 'title', 'updatedAt', 'version'].sort(),
     );
     expect(bulk[0]).toMatchObject({
       id: 1001,
@@ -415,6 +447,7 @@ describe('leituras de conteúdo', () => {
       slug: 'conteudo-1001',
       status: 'rascunho',
       version: 2,
+      live: true,
     });
     expect(bulk[0]?.updatedAt).toBeInstanceOf(Date);
     expect(bulk.every((item) => item.version === 2 && item.title.endsWith(' v2'))).toBe(true);

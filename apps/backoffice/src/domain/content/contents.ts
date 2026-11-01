@@ -386,7 +386,21 @@ export type ContentListItem = {
   status: Status;
   version: number;
   updatedAt: Date;
+  /**
+   * Se o conteúdo está no ar, pela regra de `liveVersion` (a mais recente entre
+   * `LIVE_STATUSES`, e só se for `publicado`): um rascunho sobre a versão publicada não o tira
+   * do ar, e o `status` acima, o da mais recente, não diz isso.
+   */
+  live: boolean;
 };
+
+/** `live` da linha externa de `content_versions`, sem ler os blocos (`liveVersion`). */
+const isLive = sql<boolean>`coalesce((
+  select v.status = 'publicado' from ${contentVersions} v
+  where v.site_id = ${contentVersions.siteId} and v.content_id = ${contentVersions.contentId}
+    and v.status in ('publicado', 'despublicado')
+  order by v.version desc limit 1
+), false)`;
 
 /**
  * Conteúdos do site com a versão mais recente de cada um, em ordem de ID. Lê só o título e o
@@ -409,6 +423,7 @@ export async function listContents(
       status: contentVersions.status,
       version: contentVersions.version,
       updatedAt: contentVersions.createdAt,
+      live: isLive,
     })
     .from(contentVersions)
     .innerJoin(
@@ -420,44 +435,7 @@ export async function listContents(
   return { ok: true, value: rows };
 }
 
-export type LiveContentItem = { id: number; title: string; slug: string };
-
-/**
- * Conteúdos no ar do site, com o título e o slug da versão no ar, em ordem de título: os
- * destinos possíveis do 301 da despublicação (#494). Mesma regra de `liveVersion`: a versão
- * mais recente entre `LIVE_STATUSES`, e só se for `publicado` (um rascunho sobre a versão no
- * ar não a tira do ar; o status da versão mais recente, de `listContents`, não diz isso).
- */
-export async function listLiveContents(
-  db: Executor,
-  actor: Actor,
-  siteId: string,
-): Promise<Result<LiveContentItem[]>> {
-  const allowed = requireRole(actor, 'site.read');
-  if (!allowed.ok) return allowed;
-
-  const rows = await db
-    .selectDistinctOn([contentVersions.contentId], {
-      id: contentVersions.contentId,
-      title: sql<string>`${contentVersions.data}->>'title'`,
-      slug: sql<string>`${contentVersions.data}->>'slug'`,
-      status: contentVersions.status,
-    })
-    .from(contentVersions)
-    .where(
-      and(eq(contentVersions.siteId, siteId), inArray(contentVersions.status, [...LIVE_STATUSES])),
-    )
-    .orderBy(asc(contentVersions.contentId), desc(contentVersions.version));
-  return {
-    ok: true,
-    value: rows
-      .filter((row) => row.status === 'publicado')
-      .map(({ id, title, slug }) => ({ id, title, slug }))
-      .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR') || a.id - b.id),
-  };
-}
-
-export type ReviewQueueItem = Omit<ContentListItem, 'slug' | 'status'>;
+export type ReviewQueueItem = Omit<ContentListItem, 'slug' | 'status' | 'live'>;
 
 /**
  * Fila de revisão do site: conteúdos cuja versão mais recente está `em_revisao`, da versão
