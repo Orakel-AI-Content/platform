@@ -3,7 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
-import { createContentAction, submitForReviewAction, updateContentAction } from './actions.ts';
+import {
+  cancelScheduledPublicationAction,
+  createContentAction,
+  publishVersionAction,
+  schedulePublicationAction,
+  submitForReviewAction,
+  updateContentAction,
+} from './actions.ts';
 
 // As actions só traduzem: sessão → recusa, Result do domínio → issues com path, sucesso →
 // revalida a lista. Regras e permissão estão nos testes de contrato do domínio.
@@ -15,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   listContentVersions: vi.fn(),
   submitForReview: vi.fn(),
   resourcesFor: vi.fn(),
+  publishVersion: vi.fn(),
+  schedulePublication: vi.fn(),
+  cancelScheduledPublication: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -30,6 +40,11 @@ vi.mock('@/domain/content/contents.ts', () => ({
   submitForReview: mocks.submitForReview,
 }));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
+vi.mock('@/domain/publications/publish.ts', () => ({ publishVersion: mocks.publishVersion }));
+vi.mock('@/domain/publications/schedule.ts', () => ({
+  schedulePublication: mocks.schedulePublication,
+  cancelScheduledPublication: mocks.cancelScheduledPublication,
+}));
 
 const editor = { email: 'editor@orakel.local', roles: ['editor'] };
 const input = { kind: 'article', title: 'Guia', blocks: [] } as unknown as ContentEdit;
@@ -183,4 +198,82 @@ describe('enviar para revisão', () => {
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(2, '/sites/exemplo-a/conteudos/7');
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(3, '/sites/exemplo-a/revisao');
   });
+});
+
+describe('publicar, agendar e cancelar o agendamento', () => {
+  const AT = '2026-11-05T13:00:00.000Z';
+  const revisor = { email: 'revisor@orakel.local', roles: ['revisor'] };
+  const actions = [
+    {
+      name: 'publicar',
+      run: () => publishVersionAction('exemplo-a', 7, 3),
+      domain: mocks.publishVersion,
+      args: [{}, revisor, 'exemplo-a', 7, 3],
+      success: 'Publicado.',
+    },
+    {
+      name: 'agendar',
+      run: () => schedulePublicationAction('exemplo-a', 7, 3, AT),
+      domain: mocks.schedulePublication,
+      args: [{}, revisor, 'exemplo-a', 7, 3, new Date(AT)],
+      success: 'Publicação agendada.',
+    },
+    {
+      name: 'cancelar o agendamento',
+      run: () => cancelScheduledPublicationAction('exemplo-a', 7, 3),
+      domain: mocks.cancelScheduledPublication,
+      args: [{}, revisor, 'exemplo-a', 7, 3],
+      success: 'Agendamento cancelado.',
+    },
+  ];
+
+  beforeEach(() => {
+    mocks.currentActor.mockResolvedValue({ ok: true, value: revisor });
+  });
+
+  for (const action of actions) {
+    describe(action.name, () => {
+      it('sem sessão não chama o domínio nem revalida', async () => {
+        mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+        expect(await action.run()).toEqual({
+          ok: false,
+          message: 'Sessão inválida; entre de novo.',
+        });
+        expect(action.domain).not.toHaveBeenCalled();
+        expect(mocks.revalidatePath).not.toHaveBeenCalled();
+      });
+
+      it('recusa do domínio volta com a mensagem e não revalida', async () => {
+        action.domain.mockResolvedValue({
+          ok: false,
+          issues: [
+            {
+              code: 'publication.daily_limit',
+              message: 'O site já publicou 3 conteúdos hoje',
+              path: [],
+            },
+          ],
+        });
+
+        expect(await action.run()).toEqual({
+          ok: false,
+          message: 'O site já publicou 3 conteúdos hoje',
+        });
+        expect(mocks.revalidatePath).not.toHaveBeenCalled();
+      });
+
+      it('sucesso delega com o ator e a versão e revalida o conteúdo, a lista e a revisão', async () => {
+        action.domain.mockResolvedValue({ ok: true, value: undefined });
+
+        expect(await action.run()).toEqual({ ok: true, message: action.success });
+        expect(action.domain).toHaveBeenCalledWith(...action.args);
+        expect(mocks.revalidatePath.mock.calls).toEqual([
+          ['/sites/exemplo-a/conteudos'],
+          ['/sites/exemplo-a/conteudos/7'],
+          ['/sites/exemplo-a/revisao'],
+        ]);
+      });
+    });
+  }
 });
