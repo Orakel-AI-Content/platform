@@ -6,16 +6,17 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import { toast, ToastProvider } from '@/components/ui/toast';
 
-import { SubmitForReview, SubmitForReviewScope } from './SubmitForReview.tsx';
+import { ContentActionScope } from './ContentActionScope.tsx';
+import { SubmitForReview } from './SubmitForReview.tsx';
 
 // Botão Enviar para revisão (#74): rótulo, teclado e o retorno padrão (sucesso no toast,
 // recusa no Alert do escopo, abaixo do cabeçalho, #371).
 
 function Submit(props: Parameters<typeof SubmitForReview>[0]) {
   return (
-    <SubmitForReviewScope>
+    <ContentActionScope>
       <SubmitForReview {...props} />
-    </SubmitForReviewScope>
+    </ContentActionScope>
   );
 }
 
@@ -91,7 +92,7 @@ describe('disponibilidade', () => {
   it('fora do escopo, o botão acusa o erro de montagem', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<SubmitForReview available action={vi.fn()} />)).toThrow(
-      'SubmitForReview fora de um SubmitForReviewScope.',
+      'SubmitForReview fora de um ContentActionScope.',
     );
     vi.mocked(console.error).mockRestore();
   });

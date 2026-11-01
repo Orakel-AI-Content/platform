@@ -4,11 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
 import {
-  cancelScheduledPublicationAction,
   createContentAction,
-  publishVersionAction,
-  schedulePublicationAction,
   submitForReviewAction,
+  unpublishContentAction,
   updateContentAction,
 } from './actions.ts';
 
@@ -22,9 +20,7 @@ const mocks = vi.hoisted(() => ({
   listContentVersions: vi.fn(),
   submitForReview: vi.fn(),
   resourcesFor: vi.fn(),
-  publishVersion: vi.fn(),
-  schedulePublication: vi.fn(),
-  cancelScheduledPublication: vi.fn(),
+  unpublishContent: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -38,6 +34,9 @@ vi.mock('@/domain/content/contents.ts', () => ({
   updateContent: mocks.updateContent,
   listContentVersions: mocks.listContentVersions,
   submitForReview: mocks.submitForReview,
+}));
+vi.mock('@/domain/publications/unpublish.ts', () => ({
+  unpublishContent: mocks.unpublishContent,
 }));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
 vi.mock('@/domain/publications/publish.ts', () => ({ publishVersion: mocks.publishVersion }));
@@ -200,80 +199,58 @@ describe('enviar para revisão', () => {
   });
 });
 
-describe('publicar, agendar e cancelar o agendamento', () => {
-  const AT = '2026-11-05T13:00:00.000Z';
-  const revisor = { email: 'revisor@orakel.local', roles: ['revisor'] };
-  const actions = [
-    {
-      name: 'publicar',
-      run: () => publishVersionAction('exemplo-a', 7, 3),
-      domain: mocks.publishVersion,
-      args: [{}, revisor, 'exemplo-a', 7, 3],
-      success: 'Publicado.',
-    },
-    {
-      name: 'agendar',
-      run: () => schedulePublicationAction('exemplo-a', 7, 3, AT),
-      domain: mocks.schedulePublication,
-      args: [{}, revisor, 'exemplo-a', 7, 3, new Date(AT)],
-      success: 'Publicação agendada.',
-    },
-    {
-      name: 'cancelar o agendamento',
-      run: () => cancelScheduledPublicationAction('exemplo-a', 7, 3),
-      domain: mocks.cancelScheduledPublication,
-      args: [{}, revisor, 'exemplo-a', 7, 3],
-      success: 'Agendamento cancelado.',
-    },
-  ];
+describe('despublicar (#494)', () => {
+  it('sem sessão não chama o domínio nem revalida', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
 
-  beforeEach(() => {
-    mocks.currentActor.mockResolvedValue({ ok: true, value: revisor });
+    expect(await unpublishContentAction('exemplo-a', 1)).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.unpublishContent).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
-  for (const action of actions) {
-    describe(action.name, () => {
-      it('sem sessão não chama o domínio nem revalida', async () => {
-        mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
-
-        expect(await action.run()).toEqual({
-          ok: false,
-          message: 'Sessão inválida; entre de novo.',
-        });
-        expect(action.domain).not.toHaveBeenCalled();
-        expect(mocks.revalidatePath).not.toHaveBeenCalled();
-      });
-
-      it('recusa do domínio volta com a mensagem e não revalida', async () => {
-        action.domain.mockResolvedValue({
-          ok: false,
-          issues: [
-            {
-              code: 'publication.daily_limit',
-              message: 'O site já publicou 3 conteúdos hoje',
-              path: [],
-            },
-          ],
-        });
-
-        expect(await action.run()).toEqual({
-          ok: false,
-          message: 'O site já publicou 3 conteúdos hoje',
-        });
-        expect(mocks.revalidatePath).not.toHaveBeenCalled();
-      });
-
-      it('sucesso delega com o ator e a versão e revalida o conteúdo, a lista e a revisão', async () => {
-        action.domain.mockResolvedValue({ ok: true, value: undefined });
-
-        expect(await action.run()).toEqual({ ok: true, message: action.success });
-        expect(action.domain).toHaveBeenCalledWith(...action.args);
-        expect(mocks.revalidatePath.mock.calls).toEqual([
-          ['/sites/exemplo-a/conteudos'],
-          ['/sites/exemplo-a/conteudos/7'],
-          ['/sites/exemplo-a/revisao'],
-        ]);
-      });
+  it('recusa do domínio volta com a mensagem e não revalida', async () => {
+    mocks.unpublishContent.mockResolvedValue({
+      ok: false,
+      issues: [
+        {
+          code: 'publication.invalid_target',
+          message: 'O destino do 301 precisa ser outro conteúdo no ar do site exemplo-a: 9 não é',
+          path: [],
+        },
+      ],
     });
-  }
+
+    expect(await unpublishContentAction('exemplo-a', 1, 9)).toEqual({
+      ok: false,
+      message: 'O destino do 301 precisa ser outro conteúdo no ar do site exemplo-a: 9 não é',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('sem destino delega sem `to`; com destino, passa o `to`; e revalida o site e o conteúdo', async () => {
+    mocks.unpublishContent.mockResolvedValue({ ok: true, value: { version: 2 } });
+
+    expect(await unpublishContentAction('exemplo-a', 1)).toEqual({
+      ok: true,
+      message: 'Conteúdo despublicado.',
+    });
+    expect(mocks.unpublishContent).toHaveBeenLastCalledWith({}, editor, 'exemplo-a', 1, {});
+
+    mocks.unpublishContent.mockResolvedValue({ ok: true, value: { version: 2, redirectId: 5 } });
+    expect(await unpublishContentAction('exemplo-a', 1, 2)).toEqual({
+      ok: true,
+      message: 'Conteúdo despublicado, com o 301.',
+    });
+    expect(mocks.unpublishContent).toHaveBeenLastCalledWith({}, editor, 'exemplo-a', 1, { to: 2 });
+    expect(mocks.revalidatePath.mock.calls.map(([path]) => path as string)).toEqual(
+      expect.arrayContaining([
+        '/sites/exemplo-a',
+        '/sites/exemplo-a/conteudos',
+        '/sites/exemplo-a/conteudos/1',
+      ]),
+    );
+  });
 });

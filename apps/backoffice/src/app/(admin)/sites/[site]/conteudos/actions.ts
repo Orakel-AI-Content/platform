@@ -14,8 +14,7 @@ import {
   updateContent,
   type ContentEdit,
 } from '@/domain/content/contents.ts';
-import { publishVersion } from '@/domain/publications/publish.ts';
-import { cancelScheduledPublication, schedulePublication } from '@/domain/publications/schedule.ts';
+import { unpublishContent } from '@/domain/publications/unpublish.ts';
 import { resourcesFor } from '@/domain/sites/sites.ts';
 
 // Ações do editor de conteúdo: permissão, validação e o `n` dos blocos ficam no domínio; a
@@ -155,4 +154,31 @@ export async function cancelScheduledPublicationAction(
     cancelScheduledPublication(tx, actor.value, siteId, contentId, version),
   );
   return translated(siteId, contentId, result, 'Agendamento cancelado.');
+}
+
+/**
+ * Tira do ar o conteúdo (#494): com `to`, grava o 301 do caminho dele para o do destino; sem,
+ * o endereço passa a responder 404. Permissão, "não está no ar" e destino inválido são do
+ * domínio (`unpublishContent`) e voltam como a recusa do Alert.
+ */
+export async function unpublishContentAction(
+  siteId: string,
+  contentId: number,
+  to?: number,
+): Promise<ActionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: noSession.message };
+  const result = await getDb().db.transaction((tx) =>
+    unpublishContent(tx, actor.value, siteId, contentId, to === undefined ? {} : { to }),
+  );
+  if (!result.ok) {
+    return { ok: false, message: result.issues.map((issue) => issue.message).join(' ') };
+  }
+  revalidatePath(`/sites/${siteId}`);
+  revalidatePath(`/sites/${siteId}/conteudos`);
+  revalidatePath(`/sites/${siteId}/conteudos/${contentId}`);
+  return {
+    ok: true,
+    message: to === undefined ? 'Conteúdo despublicado.' : 'Conteúdo despublicado, com o 301.',
+  };
 }
