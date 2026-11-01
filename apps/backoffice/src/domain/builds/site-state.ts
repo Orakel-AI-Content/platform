@@ -1,5 +1,5 @@
 // Colunas operacionais do site (estado, motivo da pausa, ciclo de vida, janela dos builds,
-// limite diário de publicações), gravadas pelo build e pela operação. Não vão para o
+// limite diário de publicações, despublicação em massa declarada), gravadas pelo build e pela operação. Não vão para o
 // snapshot: gravar aqui não gera mudança pendente — senão cada build agendaria outro. Único
 // módulo fora de pending-changes liberado no teste de varredura.
 import type { Result } from '@orakel/content-model';
@@ -23,6 +23,39 @@ export async function markPublished(tx: Executor, siteId: string): Promise<void>
     .update(sites)
     .set({ lifecycle: 'publicado' })
     .where(and(eq(sites.id, siteId), ne(sites.lifecycle, 'publicado')));
+}
+
+/**
+ * Declara a despublicação em massa do site (quem e quando), para o próximo build passar pela
+ * trava de segurança. Uma declaração ainda não consumida é substituída pela nova. A data vem
+ * do processo, em milissegundos, para voltar idêntica ao `clearMassUnpublish`.
+ */
+export async function declareMassUnpublish(
+  tx: Executor,
+  siteId: string,
+  declaredBy: string,
+  declaredAt: Date = new Date(),
+): Promise<Date> {
+  await tx
+    .update(sites)
+    .set({ massUnpublishDeclaredBy: declaredBy, massUnpublishDeclaredAt: declaredAt })
+    .where(eq(sites.id, siteId));
+  return declaredAt;
+}
+
+/**
+ * Consome a declaração que o build usou (`declaredAt`). Uma mais nova, feita durante o build,
+ * fica para o próximo: o snapshot deste pode não ter visto as despublicações dela.
+ */
+export async function clearMassUnpublish(
+  tx: Executor,
+  siteId: string,
+  declaredAt: Date,
+): Promise<void> {
+  await tx
+    .update(sites)
+    .set({ massUnpublishDeclaredBy: null, massUnpublishDeclaredAt: null })
+    .where(and(eq(sites.id, siteId), eq(sites.massUnpublishDeclaredAt, declaredAt)));
 }
 
 /** Etapas marcadas à mão pela operação, cada uma com a etapa de que parte. */
