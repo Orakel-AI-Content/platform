@@ -312,5 +312,14 @@ describe('DataTable', () => {
     expect(cabecalho().indeterminate).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Limpar' }));
     expect(cabecalho().indeterminate).toBe(false);
+
+    // Marcar pelo teclado muda `checkboxChecked`, e a caixa continua com o foco.
+    const [primeira] = screen.getAllByRole<HTMLInputElement>('checkbox', {
+      name: 'Selecionar linha',
+    });
+    primeira!.focus();
+    await user.keyboard(' ');
+    expect(primeira!.checked).toBe(true);
+    expect(document.activeElement).toBe(primeira);
   });
 });
