@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
@@ -31,7 +31,7 @@ const ROWS: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
   live: index % 3 !== 0,
 }));
 
-function Contents() {
+function Contents({ canPublish = false }: { canPublish?: boolean }) {
   return (
     <ListScreen title="Conteúdos">
       <ContentsTable
@@ -39,6 +39,8 @@ function Contents() {
         timeZone="America/Sao_Paulo"
         rows={ROWS}
         canWrite
+        canPublish={canPublish}
+        unpublishAction={() => Promise.resolve({ ok: true, message: 'Despublicados.' })}
         labelledBy="lista-titulo"
       />
     </ListScreen>
@@ -70,5 +72,49 @@ describe('ContentsTable no navegador', () => {
     await setReducedMotion('reduce');
     await renderInFrame(<Contents />);
     expect(await audit()).toEqual([]);
+  });
+
+  // Seleção da despublicação em massa (#495): caixas só nos conteúdos no ar e a barra dos
+  // selecionados.
+  it('com seleção, a 1280 px, sem rolagem horizontal e com até duas linhas por célula', async () => {
+    await renderInFrame(<Contents canPublish />);
+    await page.getByRole('checkbox', { name: 'Selecionar todas as linhas' }).click();
+    await expect.element(page.getByRole('button', { name: 'Despublicar em massa' })).toBeVisible();
+
+    expect(pageOverflow()).toBe(0);
+    expect(tableOverflow(table())).toBe(0);
+    expect(cellsOverLines(table())).toEqual([]);
+  });
+
+  it.each(COLOR_SCHEMES)('com seleção, sem violação do axe (%s)', async (scheme) => {
+    await setTheme(scheme);
+    await setReducedMotion('reduce');
+    await renderInFrame(<Contents canPublish />);
+    await page.getByRole('checkbox', { name: 'Selecionar Receita 2' }).click();
+    await expect.element(page.getByText('1 conteúdo selecionado')).toBeVisible();
+
+    expect(await audit()).toEqual([]);
+  });
+
+  it('o teclado marca a caixa com Espaço, sem perder o foco, e chega à barra', async () => {
+    await renderInFrame(<Contents canPublish />);
+    const box = page.getByRole('checkbox', { name: 'Selecionar Receita 2' });
+    (box.element() as HTMLInputElement).focus();
+
+    await userEvent.keyboard(' ');
+    await expect.element(box).toBeChecked();
+    expect(document.activeElement).toBe(box.element());
+    // A Receita 1 (índice 0) não está no ar: sem caixa.
+    expect(page.getByRole('checkbox', { name: 'Selecionar Receita 1' }).query()).toBeNull();
+
+    const button = page.getByRole('button', { name: 'Despublicar em massa' });
+    for (let step = 0; step < 80 && document.activeElement !== button.element(); step++) {
+      await userEvent.keyboard('{Tab}');
+    }
+    expect(document.activeElement).toBe(button.element());
+    await userEvent.keyboard('{Enter}');
+    await expect
+      .element(page.getByRole('alertdialog', { name: 'Despublicar 1 conteúdo?' }))
+      .toBeVisible();
   });
 });
