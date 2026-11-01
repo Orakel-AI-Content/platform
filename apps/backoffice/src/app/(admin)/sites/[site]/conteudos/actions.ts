@@ -14,6 +14,7 @@ import {
   updateContent,
   type ContentEdit,
 } from '@/domain/content/contents.ts';
+import { unpublishContents } from '@/domain/publications/unpublish.ts';
 import { resourcesFor } from '@/domain/sites/sites.ts';
 
 // Ações do editor de conteúdo: permissão, validação e o `n` dos blocos ficam no domínio; a
@@ -94,4 +95,35 @@ export async function submitForReviewAction(
   revalidatePath(`/sites/${siteId}/conteudos/${contentId}`);
   revalidatePath(`/sites/${siteId}/revisao`);
   return { ok: true, message: 'Enviado para revisão.' };
+}
+
+const count = new Intl.NumberFormat('pt-BR');
+
+/**
+ * Despublicação em massa (#495): tira do ar os conteúdos escolhidos na lista, sem 301, e
+ * declara a massa no site, para a trava do próximo build não abortar a queda de páginas. Tudo
+ * ou nada no domínio (`unpublishContents`): a recusa de um volta como a mensagem do Alert.
+ */
+export async function unpublishContentsAction(
+  siteId: string,
+  contentIds: number[],
+): Promise<ActionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: noSession.message };
+  const result = await getDb().db.transaction((tx) =>
+    unpublishContents(tx, actor.value, siteId, contentIds),
+  );
+  if (!result.ok) {
+    return { ok: false, message: result.issues.map((issue) => issue.message).join(' ') };
+  }
+  revalidatePath(`/sites/${siteId}`);
+  revalidatePath(`/sites/${siteId}/conteudos`);
+  const total = result.value.unpublished.length;
+  return {
+    ok: true,
+    message:
+      total === 1
+        ? '1 conteúdo despublicado; a trava fica liberada no próximo build.'
+        : `${count.format(total)} conteúdos despublicados; a trava fica liberada no próximo build.`,
+  };
 }
