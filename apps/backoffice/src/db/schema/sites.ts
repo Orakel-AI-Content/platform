@@ -1,3 +1,4 @@
+import { CULPRIT_ORIGINS } from '@orakel/build-contract';
 import type { SiteConfig } from '@orakel/content-model/v1';
 import { sql } from 'drizzle-orm';
 import { check, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
@@ -16,6 +17,17 @@ export const sites = pgTable(
     lifecycle: text({ enum: SITE_LIFECYCLE }).notNull().default('cadastrado'),
     state: text({ enum: SITE_STATES }).notNull().default('ativo'),
     pausedReason: text(),
+    /**
+     * Conteúdo que causou a pausa (origem e referência, como em `pending_changes`), quando a
+     * falha o aponta; as duas nulas ou preenchidas juntas. Operacional: fora do snapshot.
+     */
+    pausedCulpritOrigin: text({ enum: CULPRIT_ORIGINS }),
+    pausedCulpritReference: text(),
+    /**
+     * Versão no ar (`versionId` do deploy): gravada pelo build com sucesso e, depois, pelo
+     * rollback. Nula até a primeira publicação. Operacional: fora do snapshot.
+     */
+    activeVersionId: text(),
     /** Release do core registrada para o site (core-vX.Y.Z); nula até a primeira promoção. */
     release: text(),
     /**
@@ -40,6 +52,10 @@ export const sites = pgTable(
   (t) => [
     check('sites_build_window_seconds_check', sql`${t.buildWindowSeconds} >= 0`),
     check('sites_daily_publish_limit_check', sql`${t.dailyPublishLimit} >= 0`),
+    check(
+      'sites_paused_culprit_check',
+      sql`(${t.pausedCulpritOrigin} is null) = (${t.pausedCulpritReference} is null)`,
+    ),
   ],
 );
 
