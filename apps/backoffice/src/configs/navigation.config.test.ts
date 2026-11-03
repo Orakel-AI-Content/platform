@@ -53,6 +53,17 @@ describe('filterNavigation', () => {
     }
   });
 
+  it('"Releases" aparece só para admin e operacao (release.promote)', () => {
+    const globais = (role: Actor['roles'][number]) =>
+      filterNavigation(navigationConfig, actor(role))
+        .filter((nav) => nav.type === NAV_ITEM_TYPE_ITEM)
+        .map((nav) => nav.title);
+    expect(globais('admin')).toEqual(['Sites', 'Releases']);
+    expect(globais('operacao')).toEqual(['Sites', 'Releases']);
+    expect(globais('editor')).toEqual(['Sites']);
+    expect(globais('revisor')).toEqual(['Sites']);
+  });
+
   it('authority vazia é visível para qualquer actor; basta uma das permissões', () => {
     const tree = [item('livre', []), item('qualquer', ['release.promote', 'content.write'])];
     expect(filterNavigation(tree, { email: 'x', roles: [] }).map((nav) => nav.key)).toEqual([
@@ -108,6 +119,8 @@ describe('activeNavigationKey', () => {
     ['/sites/x/pendencias', 'site.overview'],
     ['/sites', 'sites'],
     ['/sites/novo', 'sites'],
+    ['/releases', 'releases'],
+    ['/releases/nova', 'releases'],
   ])('%s → %s', (pathname, key) => {
     expect(activeNavigationKey(pathname)).toBe(key);
   });

@@ -9,6 +9,7 @@ import {
   PiFileTextDuotone,
   PiImagesDuotone,
   PiListDuotone,
+  PiPackageDuotone,
   PiSquaresFourDuotone,
   PiTagDuotone,
   PiUsersDuotone,
@@ -17,6 +18,7 @@ import type { JSX } from 'react';
 
 const navigationIcon = {
   sites: <PiBrowsersDuotone aria-hidden />,
+  releases: <PiPackageDuotone aria-hidden />,
   siteOverview: <PiSquaresFourDuotone aria-hidden />,
   siteContents: <PiFileTextDuotone aria-hidden />,
   siteReview: <PiCheckCircleDuotone aria-hidden />,
