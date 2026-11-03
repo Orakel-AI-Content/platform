@@ -3,7 +3,12 @@ import type { Loader, LoaderContext } from 'astro/loaders';
 
 import { failureKind } from '../../failures.ts';
 import { writeSnapshotMeta } from '../meta-file.ts';
-import { readSnapshot, type ReadSnapshot, type SnapshotRequest } from '../read-snapshot.ts';
+import {
+  readSnapshot,
+  type ReadSnapshot,
+  type SnapshotCulprit,
+  type SnapshotRequest,
+} from '../read-snapshot.ts';
 
 export type SnapshotLoadersOptions = SnapshotRequest & {
   /** Onde gravar { header, end } para o render (result.json). */
@@ -23,14 +28,19 @@ export const SNAPSHOT_COLLECTIONS = [
 
 export type SnapshotCollection = (typeof SNAPSHOT_COLLECTIONS)[number];
 
-/** Erro de leitura com a classificação, para o render escolher o código de saída. */
+/**
+ * Erro de leitura com a classificação, para o render escolher o código de saída, e o
+ * conteúdo culpado, quando a falha aponta um (`failure.culprit` do result.json).
+ */
 export class SnapshotReadError extends Error {
   readonly kind: 'transient' | 'permanent';
+  readonly culprit: SnapshotCulprit | undefined;
 
-  constructor(message: string, kind: 'transient' | 'permanent') {
+  constructor(message: string, kind: 'transient' | 'permanent', culprit?: SnapshotCulprit) {
     super(message);
     this.name = 'SnapshotReadError';
     this.kind = kind;
+    this.culprit = culprit;
   }
 }
 
@@ -74,6 +84,7 @@ export function snapshotLoaders(
         throw new SnapshotReadError(
           `Snapshot de ${options.site} inválido (${kind}): ${JSON.stringify(result.issues.slice(0, 5))}`,
           kind,
+          result.culprit,
         );
       }
       if (options.metaFile) {

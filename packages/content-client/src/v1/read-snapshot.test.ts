@@ -96,6 +96,72 @@ describe('readSnapshot', () => {
     expect(!result.ok && failureKind(result.issues)).toBe('permanent');
   });
 
+  describe('culpado', () => {
+    /** Altera o `data` do primeiro conteúdo do snapshot e devolve o id dele. */
+    async function withContent(change: (data: Record<string, unknown>) => void) {
+      const lines = (await readFixture('exemplo-b')).trimEnd().split('\n');
+      const index = lines.findIndex((line) => line.includes('"type":"content"'));
+      const line = JSON.parse(lines[index] ?? '') as { data: Record<string, unknown> };
+      change(line.data);
+      lines[index] = JSON.stringify(line);
+      return { body: lines.join('\n'), id: String(line.data.id) };
+    }
+
+    it('conteúdo inválido no parse aponta o conteúdo pelo id', async () => {
+      const { body, id } = await withContent((data) => {
+        data.slug = 'Slug Inválido!';
+      });
+      const baseUrl = await serve(() => ({ body }));
+      const result = await readSnapshot({ baseUrl, site: 'exemplo-b', token: TOKEN });
+      expect(result).toMatchObject({ ok: false, culprit: { origin: 'content', reference: id } });
+    });
+
+    it('referência quebrada na semântica aponta o conteúdo pelo id', async () => {
+      const { body, id } = await withContent((data) => {
+        data.authorIds = [987654];
+      });
+      const baseUrl = await serve(() => ({ body }));
+      const result = await readSnapshot({ baseUrl, site: 'exemplo-b', token: TOKEN });
+      expect(!result.ok && result.issues[0]?.path.slice(0, 1)).toEqual(['contents']);
+      expect(result).toMatchObject({ ok: false, culprit: { origin: 'content', reference: id } });
+    });
+
+    it('configuração inválida aponta a configuração', async () => {
+      const lines = (await readFixture('exemplo-b')).trimEnd().split('\n');
+      const index = lines.findIndex((line) => line.includes('"type":"config"'));
+      lines[index] = '{"type":"config","data":{}}';
+      const baseUrl = await serve(() => ({ body: lines.join('\n') }));
+      const result = await readSnapshot({ baseUrl, site: 'exemplo-b', token: TOKEN });
+      expect(result).toMatchObject({
+        ok: false,
+        culprit: { origin: 'config', reference: 'config' },
+      });
+    });
+
+    it('estrutura, rede, HTTP e linha que não é JSON não têm culpado', async () => {
+      const body = await readFixture('exemplo-a');
+      const lines = body.trimEnd().split('\n');
+      const cases = [
+        { body: lines.slice(0, -1).join('\n') },
+        { body: [lines[0], 'não é json', ...lines.slice(1)].join('\n') },
+        { status: 500 },
+      ];
+      for (const reply of cases) {
+        await close?.();
+        const baseUrl = await serve(() => reply);
+        const result = await readSnapshot({ baseUrl, site: 'exemplo-a', token: TOKEN });
+        expect(result.ok).toBe(false);
+        expect(result).not.toHaveProperty('culprit');
+      }
+      const offline = await readSnapshot({
+        baseUrl: 'http://127.0.0.1:1',
+        site: 'exemplo-a',
+        token: TOKEN,
+      });
+      expect(offline).not.toHaveProperty('culprit');
+    });
+  });
+
   it('falha de rede é transitória', async () => {
     const result = await readSnapshot({
       baseUrl: 'http://127.0.0.1:1',
