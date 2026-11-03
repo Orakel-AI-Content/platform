@@ -55,6 +55,27 @@ export const PublishEnvSchema = z.discriminatedUnion('DEPLOY_TARGET', [
 ]);
 export type PublishEnv = z.infer<typeof PublishEnvSchema>;
 
+/**
+ * rollback (ADR 0009): ativa uma versão já publicada. Não lê render nem build-cache, então
+ * não recebe as credenciais do S3 — só o alvo, a versão e o token do alvo.
+ */
+const RollbackBase = {
+  SITE_ID: Slug,
+  VERSION_ID: z.string().regex(/^[A-Za-z0-9-]+$/, 'Use o ID da versão do publish.json'),
+  BUILD_DIR: z.string().startsWith('/').default('/build'),
+};
+
+export const RollbackEnvSchema = z.discriminatedUnion('DEPLOY_TARGET', [
+  z.object({
+    ...RollbackBase,
+    DEPLOY_TARGET: z.literal('cloudflare'),
+    CLOUDFLARE_API_TOKEN: Token,
+    CLOUDFLARE_ACCOUNT_ID: z.string().regex(/^[0-9a-f]{32}$/),
+  }),
+  z.object({ ...RollbackBase, DEPLOY_TARGET: z.literal('local'), EDGE_LOCAL_URL: z.url() }),
+]);
+export type RollbackEnv = z.infer<typeof RollbackEnvSchema>;
+
 export class EnvError extends Error {
   override readonly name = 'EnvError';
   /** Configuração errada não se resolve tentando de novo. */

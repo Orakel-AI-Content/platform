@@ -32,7 +32,7 @@ decisions:
     }
   architecture.contract:
     {
-      value: 'Volume /build: site/, wrangler.{cloudflare,local}.jsonc, result.json (sempre), publish.json; schemas em ./contract; códigos 0/10/20',
+      value: 'Volume /build: site/, wrangler.{cloudflare,local}.jsonc, result.json (sempre), publish.json, rollback.json; schemas em ./contract; códigos 0/10/20',
       source: user,
     }
   architecture.page_drop:
@@ -74,7 +74,7 @@ decisions:
     { value: 'scripts/measure.ts manual; resultados em docs/measurements.md', source: user }
   security.secrets:
     {
-      value: 'Token do build só no render, token de deploy só no publish, por variável; nunca em log, erro ou volume',
+      value: 'Token do build só no render, token de deploy só no publish e no rollback, por variável; nunca em log, erro ou volume',
       source: input,
     }
 
@@ -94,6 +94,7 @@ structure:
     ├── src/render/{render,astro-build,count,page-drop}.ts
     ├── src/wrangler/{jsonc,targets}.ts
     ├── src/publish/{publish,archive,cloudflare,edge-local,build-cache}.ts
+    ├── src/rollback.ts
     ├── scripts/{snapshot-server,synthetic-snapshot,measure}.ts + smoke.sh
     └── docs/measurements.md
     docker/site-builder/Dockerfile
@@ -102,7 +103,6 @@ structure:
     image: ../../docker/site-builder/
 
 open_questions:
-  - 'Rollback no alvo cloudflare (wrangler rollback) e no local: operação do backoffice (L4) sobre a versionId do publish.json'
   - 'Imagem com ~1,2 GB (workspace inteiro com dependências de desenvolvimento): enxugar depois'
   - 'Cache do build da imagem no CI (hoje sem cache)'
   - 'Medir de novo na VPS (--cpus=3 --memory=6g) no piloto'

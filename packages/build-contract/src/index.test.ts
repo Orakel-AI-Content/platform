@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { EXIT_CODES, PublishResultSchema, ResultSchema, exitCodeOf } from './index.ts';
+import {
+  CONTRACT_VERSION,
+  EXIT_CODES,
+  EdgeLocalRollbackSchema,
+  PATHS,
+  PublishResultSchema,
+  ResultSchema,
+  RollbackResultSchema,
+  exitCodeOf,
+} from './index.ts';
 
 const base = { formatVersion: 1, site: 'exemplo-a', release: 'local', durationMs: 1200 };
 
@@ -44,6 +53,35 @@ describe('publish.json', () => {
       durationMs: 2944,
     });
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe('rollback.json', () => {
+  const ok = {
+    formatVersion: 1,
+    status: 'ok',
+    site: 'exemplo-a',
+    target: 'cloudflare',
+    versionId: 'c0ffee',
+    durationMs: 800,
+  };
+  it('sucesso traz o alvo e a versão ativa; falha traz o tipo', () => {
+    expect(RollbackResultSchema.safeParse(ok).success).toBe(true);
+    expect(RollbackResultSchema.safeParse({ ...ok, versionId: '' }).success).toBe(false);
+    expect(
+      RollbackResultSchema.safeParse({
+        formatVersion: 1,
+        status: 'failed',
+        site: 'exemplo-a',
+        failure: { kind: 'transient', message: 'x' },
+        durationMs: 0,
+      }).success,
+    ).toBe(true);
+  });
+  it('evolução aditiva: mesma versão de formato, arquivo próprio', () => {
+    expect(CONTRACT_VERSION).toBe(1);
+    expect(PATHS.rollback).toBe('rollback.json');
+    expect(EdgeLocalRollbackSchema.parse({ active: 'v1' })).toEqual({ active: 'v1' });
   });
 });
 

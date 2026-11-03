@@ -2,7 +2,8 @@
 
 Entrypoints da imagem `site-builder` (`docker/site-builder/Dockerfile`): `render` (astro build do
 blog → `/build`, trava de segurança, `wrangler.jsonc` por alvo, `result.json`), `publish`
-(`cloudflare` ou `edge-local`, `build-cache`, `publish.json`) e `ssr`. Parte do monorepo —
+(`cloudflare` ou `edge-local`, `build-cache`, `publish.json`), `rollback` (versão já publicada,
+`rollback.json`) e `ssr`. Parte do monorepo —
 regras gerais no `CLAUDE.md` da raiz.
 
 ## Comandos (rodar nesta pasta)
@@ -13,9 +14,9 @@ regras gerais no `CLAUDE.md` da raiz.
 
 ## Regras invioláveis
 
-- `result.json`/`publish.json` sempre escritos, validados pelo `contract.ts`; código de saída concorda (0/10/20).
+- `result.json`/`publish.json`/`rollback.json` sempre escritos, validados pelo `contract.ts`; código de saída concorda (0/10/20).
 - Erro sem `kind` é transitório; configuração e conteúdo inválidos são permanentes.
-- Token do build só no render, token de deploy só no publish; nunca em log, erro ou volume.
+- Token do build só no render, token de deploy só no publish e no rollback; nunca em log, erro ou volume.
 - Mudou o contrato? Aditivo, com o backoffice no mesmo PR; quebra = `formatVersion` novo.
 - O blog não é dependência declarada deste pacote (Turbo `^build`); a imagem o inclui pelo `turbo prune`.
 

@@ -1,18 +1,20 @@
-// Entrypoint da imagem site-builder: node tooling/build-site/src/cli.ts <render|publish|ssr>
+// Entrypoint da imagem site-builder:
+//   node tooling/build-site/src/cli.ts <render|publish|rollback|ssr>
 // O código de saída segue o contrato: 0 sucesso, 10 permanente, 20 transitória.
 import { readFile } from 'node:fs/promises';
 
 import { CONTRACT_VERSION, EXIT_CODES, exitCodeOf } from '@orakel/build-contract';
-import { PublishEnvSchema, RenderEnvSchema, parseEnv } from './env.ts';
+import { PublishEnvSchema, RenderEnvSchema, RollbackEnvSchema, parseEnv } from './env.ts';
 import { classify } from './failures.ts';
 import { WORKER_BASE_CONFIG, WORKER_MAIN } from './paths.ts';
 import { publish } from './publish/publish.ts';
 import { archiveBuild } from './publish/archive.ts';
 import { uploadBuildCache } from './publish/build-cache.ts';
-import { deployCloudflare } from './publish/cloudflare.ts';
-import { uploadEdgeLocal } from './publish/edge-local.ts';
+import { deployCloudflare, rollbackCloudflare } from './publish/cloudflare.ts';
+import { rollbackEdgeLocal, uploadEdgeLocal } from './publish/edge-local.ts';
 import { astroBuild } from './render/astro-build.ts';
 import { render, writeResult } from './render/render.ts';
+import { rollback, rollbackFailure, writeRollbackResult } from './rollback.ts';
 import { ssr } from './ssr.ts';
 
 const log = (message: Record<string, unknown>) => console.log(JSON.stringify(message));
@@ -79,6 +81,34 @@ async function runPublish(): Promise<number> {
   return exitCodeOf(result);
 }
 
+async function runRollback(): Promise<number> {
+  let env;
+  try {
+    env = parseEnv(RollbackEnvSchema, process.env, 'rollback');
+  } catch (error) {
+    // Como no render: sem variáveis válidas, registra o motivo se o volume existir.
+    const failure = classify(error);
+    await writeRollbackResult(
+      process.env.BUILD_DIR ?? '/build',
+      rollbackFailure(process.env.SITE_ID || 'desconhecido', failure),
+    ).catch(() => undefined);
+    log({ msg: 'rollback falhou', ...failure });
+    return EXIT_CODES[failure.kind];
+  }
+  const result = await rollback(env, { rollbackCloudflare, rollbackEdgeLocal, now: Date.now });
+  log(
+    result.status === 'ok'
+      ? {
+          msg: 'rollback ok',
+          site: result.site,
+          target: result.target,
+          versionId: result.versionId,
+        }
+      : { msg: 'rollback falhou', site: result.site, ...result.failure },
+  );
+  return exitCodeOf(result);
+}
+
 const [command] = process.argv.slice(2);
 try {
   switch (command) {
@@ -88,11 +118,14 @@ try {
     case 'publish':
       process.exitCode = await runPublish();
       break;
+    case 'rollback':
+      process.exitCode = await runRollback();
+      break;
     case 'ssr':
       process.exitCode = await ssr();
       break;
     default:
-      console.error('Uso: node tooling/build-site/src/cli.ts <render|publish|ssr>');
+      console.error('Uso: node tooling/build-site/src/cli.ts <render|publish|rollback|ssr>');
       process.exitCode = 2;
   }
 } catch (error) {
