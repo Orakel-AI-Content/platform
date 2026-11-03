@@ -66,12 +66,18 @@ async function versions(contentId: number) {
     .orderBy(asc(contentVersions.version));
 }
 
-/** Nova versão em rascunho (os mesmos dados) e, se pedido, enviada para revisão. */
+/**
+ * Nova versão em rascunho (o título ganha o número dela: sem alteração, nenhuma versão é
+ * criada, #523) e, se pedido, enviada para revisão.
+ */
 async function draft(contentId: number, submit = true): Promise<number> {
   const last = (await versions(contentId)).at(-1);
   if (last === undefined) throw new Error(`conteúdo ${contentId} sem versão`);
   const saved = await db.transaction((tx) =>
-    updateContent(tx, SYSTEM_ACTOR, SITE, contentId, last.data),
+    updateContent(tx, SYSTEM_ACTOR, SITE, contentId, {
+      ...last.data,
+      title: `${last.data.title} (v${String(last.version + 1)})`,
+    }),
   );
   if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
   if (submit) await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));

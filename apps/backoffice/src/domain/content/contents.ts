@@ -8,6 +8,7 @@ import {
   type Resources,
 } from '@orakel/content-model/v1';
 import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import { isDeepStrictEqual } from 'node:util';
 
 import type { Executor } from '../../db/client.ts';
 import {
@@ -247,10 +248,22 @@ export async function createContent(
 }
 
 /**
+ * Igualdade dos dados como o JSONB os guarda: o round-trip JSON descarta `undefined` e a
+ * comparação não depende da ordem das chaves (o Postgres não a preserva).
+ */
+function sameData(a: ContentData, b: ContentData): boolean {
+  return isDeepStrictEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
+}
+
+/**
  * Edita um conteúdo: grava a versão N+1 em `rascunho` (as anteriores ficam intactas). Bloco
  * existente mantém o `n` da versão mais recente; bloco novo recebe `nextBlockN`, em ordem, e
  * o `n` nunca é reutilizado. A linha de `contents` fica travada até o fim da transação: duas
  * edições simultâneas não calculam a mesma versão nem os mesmos `n`.
+ *
+ * Dados iguais aos da versão mais recente não gravam nada (#523): nem versão, nem
+ * `nextBlockN`, nem mudança pendente; devolve a versão atual com `created: false`, e ela
+ * continua com o status que tinha. Bloco novo sempre conta como alteração.
  */
 export async function updateContent(
   tx: Executor,
@@ -259,7 +272,7 @@ export async function updateContent(
   contentId: number,
   input: ContentEdit,
   resources: Resources = RESOURCES,
-): Promise<Result<{ version: number }>> {
+): Promise<Result<{ version: number; created: boolean }>> {
   const allowed = checkWrite(actor);
   if (!allowed.ok) return allowed;
 
@@ -309,6 +322,9 @@ export async function updateContent(
 
   const data = await validateContentData(tx, siteId, contentId, { ...input, blocks }, resources);
   if (!data.ok) return data;
+  if (nextBlockN === content.nextBlockN && sameData(data.value, latest.data)) {
+    return { ok: true, value: { version: latest.version, created: false } };
+  }
 
   const version = latest.version + 1;
   await tx
@@ -319,7 +335,7 @@ export async function updateContent(
     .set({ nextBlockN })
     .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)));
   await recordPendingChange(tx, siteId, 'content', String(contentId));
-  return { ok: true, value: { version } };
+  return { ok: true, value: { version, created: true } };
 }
 
 /**
