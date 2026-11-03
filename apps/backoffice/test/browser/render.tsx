@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { render } from 'vitest-browser-react';
 
 import CollapsibleSide from '@/components/layouts/CollapsibleSide';
+import { PausedSitesAlert, type PausedSite } from '@/components/sites/PausedSitesAlert';
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { ListHeader } from '@/components/shared/PageHeader';
 import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
@@ -46,18 +47,23 @@ export const FRAME_SITES: readonly SwitcherSite[] = [
 /** Quem vê a moldura: o e-mail e os papéis do menu de perfil. */
 export const FRAME_EMAIL = 'teste@orakel.local';
 
-type FrameOptions = { sites?: readonly SwitcherSite[]; roles?: readonly Role[] };
+type FrameOptions = {
+  sites?: readonly SwitcherSite[];
+  roles?: readonly Role[];
+  /** Os sites pausados do aviso no topo do <main> (#511); nenhum por padrão. */
+  pausedSites?: readonly PausedSite[];
+};
 
 /**
  * Render na moldura do admin (`src/app/(admin)/layout.tsx`, #460): o "Pular para o conteúdo",
  * a barra lateral do Ecme (290 px), o header com a troca de tema e o menu de perfil (#476) e o
- * <main> com os gutters da página, como `renderInApp`. A largura útil é a da tela de verdade, e
+ * <main> com os gutters da página e o aviso de site pausado (#511), como `renderInApp`. A largura útil é a da tela de verdade, e
  * as medidas de layout (linhas por célula, rolagem) valem para ela. Quem usa precisa do
  * roteador em memória (`vi.mock('next/navigation', …)`).
  */
 export function renderInFrame(
   ui: ReactNode,
-  { sites = FRAME_SITES, roles = ['editor'] }: FrameOptions = {},
+  { sites = FRAME_SITES, roles = ['editor'], pausedSites = [] }: FrameOptions = {},
 ) {
   return renderInApp(
     <div className="min-h-screen">
@@ -86,6 +92,7 @@ export function renderInFrame(
             PAGE_CONTAINER_GUTTER_Y,
           )}
         >
+          <PausedSitesAlert sites={pausedSites} />
           {ui}
         </main>
       </CollapsibleSide>
