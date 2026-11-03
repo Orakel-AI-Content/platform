@@ -7,6 +7,7 @@ import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { liveSlug, slugInUse } from '../content/contents.ts';
 import { createRedirect } from '../content/redirects.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
+import { processSettings } from '../process-settings.ts';
 
 /** Fuso do dia do limite: sempre o de São Paulo, não o `timeZone` do site (workspace#20). */
 export const PUBLISH_DAY_TIME_ZONE = 'America/Sao_Paulo';
@@ -14,12 +15,11 @@ export const PUBLISH_DAY_TIME_ZONE = 'America/Sao_Paulo';
 /**
  * Limite diário padrão (proposta: 3, calibrado na fase 2). Vem de PUBLISH_DAILY_LIMIT,
  * aplicado na partida de cada processo (runProcess e instrumentation do Next); o domínio não
- * lê o ambiente. Um site pode ter o próprio (`sites.dailyPublishLimit`).
+ * lê o ambiente. Um site pode ter o próprio (`sites.dailyPublishLimit`). Guardado em
+ * `processSettings`, compartilhado pelas cópias do módulo no build do Next.
  */
-let defaultLimit = 3;
-
 export function configureDailyPublishLimit(limit: number): void {
-  defaultLimit = limit;
+  processSettings().dailyPublishLimit = limit;
 }
 
 /**
@@ -27,7 +27,7 @@ export function configureDailyPublishLimit(limit: number): void {
  * mesma da janela de agrupamento (`effectiveBuildWindowMs`).
  */
 export function effectiveDailyPublishLimit(siteLimit: number | null): number {
-  return siteLimit ?? defaultLimit;
+  return siteLimit ?? processSettings().dailyPublishLimit;
 }
 
 const refused = (code: string, message: string): Result<never> => ({
