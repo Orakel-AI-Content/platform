@@ -132,12 +132,13 @@ describe('despublicar', () => {
     expect(await publishedIds()).toContain(2);
   });
 
-  it('com as versões 1 e 2 publicadas, o build não traz de volta a 1', async () => {
+  it('com a versão 1 substituída pela 2, o build não traz de volta a 1', async () => {
     expect(await publish(1, await approved(1, { title: 'Versão nova' }))).toMatchObject({
       ok: true,
     });
     const before = await versions(1);
-    expect(before.filter((v) => v.status === 'publicado').length).toBeGreaterThanOrEqual(2);
+    // Publicar a 2 leva a 1 a substituido (#519): só a 2 fica publicado.
+    expect(before.map((v) => v.status)).toEqual(['substituido', 'publicado']);
 
     expect(await unpublish(1)).toMatchObject({ ok: true });
 
