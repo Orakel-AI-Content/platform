@@ -16,9 +16,14 @@ sequenceDiagram
   P->>P: tar.gz → wrangler deploy | edge-local; build-cache
   P->>V: publish.json (versionId)
   P-->>BR: código 0 / 10 / 20
+  BR->>P: rollback: VERSION_ID + DEPLOY_TARGET + token de deploy
+  P->>P: wrangler rollback | POST edge-local /rollback
+  P->>V: rollback.json (versionId ativo)
+  P-->>BR: código 0 / 10 / 20
 ```
 
 - **render** (ADR 0002, 0003, 0004): a lógica do site é toda do blog; aqui ficam a orquestração, a trava e os alvos do wrangler.
 - **publish** (ADR 0005): só depois de um render `ok`; nunca acessa a API.
+- **rollback** (ADR 0009): ativa uma versão já publicada; não depende de render nem do build-cache.
 - **ssr**: o servidor `preview` do blog, feito na construção da imagem.
 - **Contrato** (`src/contract.ts`, subcaminho `./contract`): o que o backoffice lê do volume.

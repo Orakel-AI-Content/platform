@@ -1,6 +1,6 @@
 # @orakel/build-site
 
-Entrypoints da imagem `site-builder` (a release do core): `render`, `publish` e `ssr`.
+Entrypoints da imagem `site-builder` (a release do core): `render`, `publish`, `rollback` e `ssr`.
 
 ```sh
 # Imagem e fumaça (da raiz)
@@ -13,6 +13,10 @@ SITE_ID=exemplo-a SITE_DOMAIN=exemplo-a.com.br EXPORT_API_URL=http://127.0.0.1:8
   EXPORT_BUILD_TOKEN=smoke-build-token-0000000000000000 BUILD_DIR=/tmp/build \
   node src/cli.ts render     # 0 ok · 10 permanente · 20 transitória; ver /tmp/build/result.json
 ```
+
+Rollback para uma versão já publicada (ADR 0009): `SITE_ID`, `VERSION_ID` (o `versionId` do
+`publish.json`), `DEPLOY_TARGET` e o acesso ao alvo (`EDGE_LOCAL_URL` ou `CLOUDFLARE_*`) →
+`node src/cli.ts rollback`, que escreve `/build/rollback.json`.
 
 Render e publish pelas redes do compose local, como o `build-runner` fará (da raiz):
 `pnpm local:publish <site>` → `https://<site>.localhost`.
