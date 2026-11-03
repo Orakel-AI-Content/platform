@@ -3,16 +3,12 @@
 import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
 
-import {
-  LIFECYCLE_LABEL,
-  SITE_STATE_LABEL,
-  SITE_STATE_VARIANT,
-} from '@/components/shared/siteLabels.ts';
+import { LIFECYCLE_LABEL, SITE_STATE_LABEL } from '@/components/shared/siteLabels.ts';
 import {
   LastBuildSummary,
   PendingCount,
   PublishNowButton,
-  StateTag,
+  SiteStateIndicator,
   type PublishNow,
 } from '@/components/sites/SiteStatus';
 import { ActionAlert, pushSuccess, useActionResult } from '@/components/shared/ActionFeedback.tsx';
@@ -142,19 +138,7 @@ function columnsFor(
       enableGlobalFilter: false,
       filterFn: 'equalsString',
       sortFn: byText((site) => SITE_STATE_LABEL[site.state]),
-      cell: ({ row }) => {
-        const site = row.original;
-        const reason = site.state === 'pausado' ? site.pausedReason : null;
-        return (
-          <TwoLines
-            secondary={reason ? <Truncated text={reason} className="max-w-24" /> : undefined}
-          >
-            <StateTag color={SITE_STATE_VARIANT[site.state]}>
-              {SITE_STATE_LABEL[site.state]}
-            </StateTag>
-          </TwoLines>
-        );
-      },
+      cell: ({ row }) => <SiteStateIndicator site={row.original} compact />,
     },
     {
       header: 'Indexável',

@@ -9,7 +9,12 @@ import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { toast, ToastProvider } from '@/components/ui/toast';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
-import { LastBuildSummary, PendingCount, PublishNowPanel } from './SiteStatus.tsx';
+import {
+  LastBuildSummary,
+  PendingCount,
+  PublishNowPanel,
+  SiteStateIndicator,
+} from './SiteStatus.tsx';
 
 // Estado de publicação compartilhado pela lista de sites e pela página do site (#149).
 
@@ -54,6 +59,68 @@ describe('pendências', () => {
     const link = screen.getByRole('link', { name: '1 mudança pendente em exemplo-a' });
     expect(link.getAttribute('href')).toBe('/sites/exemplo-a/pendencias');
     expect(link.querySelector('.tag-prefix')?.className).toContain('bg-warning');
+  });
+});
+
+describe('estado do site (#511)', () => {
+  const paused = {
+    id: 'exemplo-a',
+    state: 'pausado' as const,
+    pausedReason: 'render: tema inexistente',
+    pausedCulprit: null,
+  };
+
+  it.each([false, true])(
+    'pausado com culpado content leva ao conteúdo (compact: %s)',
+    (compact) => {
+      render(
+        <SiteStateIndicator
+          site={{ ...paused, pausedCulprit: { origin: 'content', reference: '42' } }}
+          compact={compact}
+        />,
+      );
+
+      expect(screen.getByText('Pausado').querySelector('.tag-prefix')).toBeTruthy();
+      expect(screen.getByText('render: tema inexistente')).toBeTruthy();
+      // Na lista, o motivo cortado é o próprio link; o culpado vem no nome acessível.
+      const link = screen.getByRole('link', {
+        name: compact
+          ? 'render: tema inexistente · Conteúdo 42 culpado pela pausa de exemplo-a'
+          : 'Conteúdo 42 culpado pela pausa de exemplo-a',
+      });
+      expect(link.getAttribute('href')).toBe('/sites/exemplo-a/conteudos/42');
+    },
+  );
+
+  it('culpado redirect, sem tela própria, fica sem link', () => {
+    render(
+      <SiteStateIndicator
+        site={{ ...paused, pausedCulprit: { origin: 'redirect', reference: '7' } }}
+      />,
+    );
+
+    expect(screen.getByText(/^Conteúdo culpado:/).textContent).toBe(
+      'Conteúdo culpado: Redirecionamento 7',
+    );
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('sem culpado mostra só a tag e o motivo', () => {
+    const { container } = render(<SiteStateIndicator site={paused} />);
+
+    expect(container.textContent).toBe('Pausadorender: tema inexistente');
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('ativo mostra só a tag, mesmo com motivo antigo gravado', () => {
+    const { container } = render(
+      <SiteStateIndicator
+        site={{ ...paused, state: 'ativo', pausedCulprit: { origin: 'content', reference: '42' } }}
+        compact
+      />,
+    );
+
+    expect(container.textContent).toBe('Ativo');
   });
 });
 

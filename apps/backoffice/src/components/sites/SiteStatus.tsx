@@ -7,6 +7,9 @@ import {
   BUILD_STATUS_LABEL,
   BUILD_STATUS_VARIANT,
   formatDateTime,
+  pendingItem,
+  SITE_STATE_LABEL,
+  SITE_STATE_VARIANT,
   type StateTagColor,
 } from '@/components/shared/siteLabels.ts';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
@@ -15,8 +18,10 @@ import ConfirmDialog, {
   dangerButtonClass,
   dangerConfirmButtonProps,
 } from '@/components/shared/ConfirmDialog.tsx';
+import { TwoLines } from '@/components/shared/TwoLines';
 import { Button } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Tag';
+import classNames from '@/components/ui/utils/classNames';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Estado de publicação de um site, igual na lista de sites e na página do site (#149).
@@ -40,6 +45,86 @@ export function StateTag({
     <Tag prefix prefixClass={color} className={className}>
       {children}
     </Tag>
+  );
+}
+
+type SiteState = Pick<SiteSummary, 'id' | 'state' | 'pausedReason' | 'pausedCulprit'>;
+
+const CULPRIT_LINK_CLASS = 'underline underline-offset-4 hover:text-primary';
+
+/**
+ * Estado do site, igual na lista e na página do site (#511): a tag e, pausado, o motivo e o
+ * conteúdo culpado, com o mesmo texto e o mesmo destino da tela de pendências (`pendingItem`;
+ * sem tela para a origem, como redirect, só o texto). `compact` (lista) cabe numa linha: o
+ * motivo cortado é o próprio link para o culpado, com o culpado no nome acessível e, junto do
+ * motivo inteiro, no `title`. Fora dele, motivo e culpado ficam cada um no seu parágrafo.
+ */
+export function SiteStateIndicator({
+  site,
+  compact = false,
+}: {
+  site: SiteState;
+  compact?: boolean;
+}) {
+  const tag = (
+    <StateTag color={SITE_STATE_VARIANT[site.state]}>{SITE_STATE_LABEL[site.state]}</StateTag>
+  );
+  const paused = site.state === 'pausado';
+  const reason = paused ? site.pausedReason : null;
+  const culprit =
+    paused && site.pausedCulprit !== null
+      ? pendingItem(site.id, site.pausedCulprit.origin, site.pausedCulprit.reference)
+      : null;
+  const culpritLabel = culprit && <span className="sr-only"> culpado pela pausa de {site.id}</span>;
+
+  if (compact) {
+    const shown = reason ?? culprit?.text;
+    if (shown === undefined) return <TwoLines>{tag}</TwoLines>;
+    const title = [reason, culprit && `Conteúdo culpado: ${culprit.text}`]
+      .filter(Boolean)
+      .join(' · ');
+    const text = (
+      <span title={title} className="block max-w-24 truncate">
+        {shown}
+        {reason && culprit && <span className="sr-only"> · {culprit.text}</span>}
+        {culpritLabel}
+      </span>
+    );
+    return (
+      <TwoLines
+        secondary={
+          culprit?.href ? (
+            <Link href={culprit.href} className={classNames('block', CULPRIT_LINK_CLASS)}>
+              {text}
+            </Link>
+          ) : (
+            text
+          )
+        }
+      >
+        {tag}
+      </TwoLines>
+    );
+  }
+
+  return (
+    <>
+      {tag}
+      {reason && <p className="mt-1 font-normal">{reason}</p>}
+      {culprit && (
+        <p className="mt-1 font-normal">
+          Conteúdo culpado:{' '}
+          {culprit.href ? (
+            <Link href={culprit.href} className={CULPRIT_LINK_CLASS}>
+              {culprit.text}
+              {culpritLabel}
+            </Link>
+          ) : (
+            culprit.text
+          )}
+        </p>
+      )}
+    </>
   );
 }
 
