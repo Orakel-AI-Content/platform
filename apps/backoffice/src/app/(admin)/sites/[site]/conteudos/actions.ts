@@ -14,7 +14,9 @@ import {
   updateContent,
   type ContentEdit,
 } from '@/domain/content/contents.ts';
-import { unpublishContents } from '@/domain/publications/unpublish.ts';
+import { publishVersion } from '@/domain/publications/publish.ts';
+import { cancelScheduledPublication, schedulePublication } from '@/domain/publications/schedule.ts';
+import { unpublishContent, unpublishContents } from '@/domain/publications/unpublish.ts';
 import { resourcesFor } from '@/domain/sites/sites.ts';
 
 // Ações do editor de conteúdo: permissão, validação e o `n` dos blocos ficam no domínio; a

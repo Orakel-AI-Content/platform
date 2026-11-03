@@ -44,6 +44,7 @@ export const CONTENT_STATUS_LABEL: Record<ContentListItem['status'], string> = {
   agendado: 'Agendado',
   publicado: 'Publicado',
   despublicado: 'Despublicado',
+  substituido: 'Substituída',
 };
 
 /** Estado operacional de um site (lista de sites). */
@@ -59,11 +60,18 @@ export const SITE_STATE_LABEL: Record<SiteSummary['state'], string> = {
  * chega a 4,5:1 no claro.
  */
 export type StateTagColor =
-  'bg-success' | 'bg-info' | 'bg-warning' | 'bg-error' | 'bg-primary-mild' | 'bg-gray-400';
+  | 'bg-success'
+  | 'bg-info'
+  | 'bg-warning'
+  | 'bg-error'
+  | 'bg-primary-mild'
+  | 'bg-gray-400'
+  | 'bg-gray-600';
 
 /**
  * Cor da tag de cada status de conteúdo: nenhum repete a de outro. Agendado fica no azul claro
- * ao lado do azul de aprovado, como o `info`/`info-solid` do badge antigo.
+ * ao lado do azul de aprovado, como o `info`/`info-solid` do badge antigo; substituída, no cinza
+ * escuro, ao lado do cinza claro de rascunho (só histórico).
  */
 export const CONTENT_STATUS_TAG: Record<ContentListItem['status'], StateTagColor> = {
   rascunho: 'bg-gray-400',
@@ -72,6 +80,7 @@ export const CONTENT_STATUS_TAG: Record<ContentListItem['status'], StateTagColor
   agendado: 'bg-primary-mild',
   publicado: 'bg-success',
   despublicado: 'bg-error',
+  substituido: 'bg-gray-600',
 };
 
 /** Cor da tag de cada estado de site. */

@@ -31,7 +31,10 @@ import { Button } from '@/components/ui/Button';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 const KINDS = Object.keys(CONTENT_KIND_LABEL) as ContentListItem['kind'][];
-const STATUSES = Object.keys(CONTENT_STATUS_LABEL) as ContentListItem['status'][];
+/** A lista mostra a versão mais recente, que nunca é `substituido`: o filtro não o oferece. */
+const STATUSES = (Object.keys(CONTENT_STATUS_LABEL) as ContentListItem['status'][]).filter(
+  (status) => status !== 'substituido',
+);
 
 /** Busca por título, filtros por tipo e status, mais recente primeiro (#107); tamanhos (#362). */
 const LIST: ListConfig = {

@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { parseSnapshotLine } from '@orakel/content-model/v1';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -140,6 +142,20 @@ describe('publicar a versão aprovada', () => {
     expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeGreaterThan(before);
   });
 
+  it('leva a substituido as versões publicadas antes, e só elas (#519)', async () => {
+    const second = await prepare(1, 'Segunda');
+    expect(await publish(1, second)).toMatchObject({ ok: true });
+    const draft = await prepare(1, 'Terceira', false);
+
+    expect((await versions(1)).map((row) => [row.version, row.status])).toEqual([
+      [1, 'substituido'],
+      [second, 'publicado'],
+      [draft, 'em_revisao'],
+    ]);
+    expect((await versions(2)).every((row) => row.status !== 'substituido')).toBe(true);
+    expect((await publishedTitles()).get(1)).toBe('Segunda');
+  });
+
   it('o snapshot published passa a trazer a versão publicada', async () => {
     const original = (await publishedTitles()).get(1);
     const version = await prepare(1, 'Título da versão publicada');
@@ -271,5 +287,31 @@ describe('recusas sem gravar nada', () => {
 
     expect(result).toMatchObject({ ok: false, issues: [{ code: 'publication.not_latest' }] });
     await expectNothingWritten(1, 'em_revisao', pending);
+  });
+});
+
+describe('migração 0009_versoes_substituidas (#519)', () => {
+  it('deixa publicado só a maior versão publicado de cada conteúdo, e é idempotente', async () => {
+    const second = await prepare(1, 'Segunda');
+    const third = await prepare(1, 'Terceira');
+    // O histórico de antes da regra: as versões publicadas não saíam de publicado.
+    await db
+      .update(contentVersions)
+      .set({ status: 'publicado' })
+      .where(and(eq(contentVersions.siteId, SITE), eq(contentVersions.contentId, 1)));
+    const migration = await readFile(
+      new URL('../../drizzle/0009_versoes_substituidas.sql', import.meta.url),
+      'utf8',
+    );
+
+    await db.execute(sql.raw(migration));
+    await db.execute(sql.raw(migration));
+
+    expect((await versions(1)).map((row) => [row.version, row.status])).toEqual([
+      [1, 'substituido'],
+      [second, 'substituido'],
+      [third, 'publicado'],
+    ]);
+    expect((await versions(2)).map((row) => row.status)).toEqual(['publicado']);
   });
 });

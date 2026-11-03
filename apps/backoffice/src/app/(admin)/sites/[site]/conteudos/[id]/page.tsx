@@ -9,11 +9,13 @@ import {
 } from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { ContentActionScope } from '@/components/contents/ContentActionScope';
+import { PublishActions } from '@/components/contents/PublishActions';
 import { SubmitForReview } from '@/components/contents/SubmitForReview';
 import { UnpublishDialog } from '@/components/contents/UnpublishDialog';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { LIVE_STATUSES, listLiveContents } from '@/domain/content/contents.ts';
+import { scheduledPublicationAt } from '@/domain/publications/schedule.ts';
 import {
   DETAIL_SUMMARY_CLASS,
   DETAIL_SUMMARY_LIST_CLASS,
@@ -28,7 +30,13 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 
 import { itemTitle } from '../../item-title.ts';
-import { submitForReviewAction, unpublishContentAction } from '../actions.ts';
+import {
+  cancelScheduledPublicationAction,
+  publishVersionAction,
+  schedulePublicationAction,
+  submitForReviewAction,
+  unpublishContentAction,
+} from '../actions.ts';
 import { readContentVersions } from '../content-versions.ts';
 import { positiveInt } from '../params.ts';
 
@@ -55,9 +63,11 @@ function liveOf<V extends { status: string }>(versions: readonly V[]): V | undef
 
 /**
  * Um conteúdo na tela de detalhe do guia (#371): o título no PageHeader com as ações de quem tem
- * content.write ("Editar" e, com a versão mais recente em rascunho, "Enviar para revisão") e,
- * com content.publish e o conteúdo no ar, "Despublicar" (#494), com o destino do 301 entre os
- * conteúdos no ar do site; o domínio confere de novo. Abaixo, o resumo à esquerda e as versões,
+ * content.write ("Editar" e, com a versão mais recente em rascunho, "Enviar para revisão") e as
+ * de quem tem content.publish: "Publicar" e "Agendar" para a versão aprovada, ou o horário
+ * marcado e "Cancelar agendamento" para a agendada (#492), e, com o conteúdo no ar,
+ * "Despublicar" (#494), com o destino do 301 entre os conteúdos no ar do site; o revisor tem
+ * content.publish sem content.write. O domínio confere de novo. Abaixo, o resumo à esquerda e as versões,
  * da primeira à mais recente, à direita (empilham abaixo de `xl`). A recusa das ações vai ao
  * Alert do escopo, logo abaixo da linha do título.
  */
@@ -74,7 +84,13 @@ export default async function ContentVersionsPage({ params }: Params) {
   }
   const latest = versions.value.at(-1)!;
   const canWrite = can(actor, 'content.write');
-  const live = can(actor, 'content.publish') ? liveOf(versions.value) : undefined;
+  const canPublish = can(actor, 'content.publish');
+  const version = latest.version;
+  const scheduled =
+    canPublish && latest.status === 'agendado'
+      ? await scheduledPublicationAt(getDb().db, actor, siteId, contentId, version)
+      : undefined;
+  const live = canPublish ? liveOf(versions.value) : undefined;
   const targets =
     live === undefined ? undefined : await listLiveContents(getDb().db, actor, siteId);
   const unpublish =
@@ -95,8 +111,17 @@ export default async function ContentVersionsPage({ params }: Params) {
       ])}
       title={latest.data.title}
       action={
-        canWrite || unpublish !== undefined ? (
+        canWrite || canPublish ? (
           <>
+            {canPublish && (
+              <PublishActions
+                status={latest.status}
+                scheduledAt={scheduled?.ok ? scheduled.value : null}
+                publish={publishVersionAction.bind(null, siteId, contentId, version)}
+                schedule={schedulePublicationAction.bind(null, siteId, contentId, version)}
+                cancel={cancelScheduledPublicationAction.bind(null, siteId, contentId, version)}
+              />
+            )}
             {canWrite && (
               <>
                 <ButtonLink
@@ -118,17 +143,10 @@ export default async function ContentVersionsPage({ params }: Params) {
       }
     />
   );
-  // Um escopo por grupo de ações, cada um com o seu Alert abaixo da linha do título.
-  const withSubmit = canWrite ? <SubmitForReviewScope>{header}</SubmitForReviewScope> : header;
-  const scoped = canPublish ? <PublishActionsScope>{withSubmit}</PublishActionsScope> : withSubmit;
 
   return (
     <section aria-labelledby="content-title" className="list-width space-y-4">
-      {canWrite || unpublish !== undefined ? (
-        <ContentActionScope>{header}</ContentActionScope>
-      ) : (
-        header
-      )}
+      {canWrite || canPublish ? <ContentActionScope>{header}</ContentActionScope> : header}
       <DetailLayout>
         <Card className={DETAIL_SUMMARY_CLASS}>
           <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>

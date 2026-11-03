@@ -141,6 +141,7 @@ export const CONTENT_STATUSES = [
   'agendado',
   'publicado',
   'despublicado',
+  'substituido',
 ] as const;
 
 /** Dados de uma versão: o conteúdo do content-model, sem o ID (que é do conteúdo). */
@@ -149,7 +150,8 @@ export type ContentData = Omit<Content, 'id'>;
 /**
  * Versões com dados imutáveis; só o `status` muda (ADR 0015). A mais recente entre
  * `publicado` e `despublicado` é a que vai para o site, se for `publicado` (`LIVE_STATUSES`,
- * ADR 0017).
+ * ADR 0017). Publicar uma versão leva a `substituido` as `publicado` anteriores: no máximo uma
+ * versão do conteúdo fica `publicado`, e as substituídas ficam só como histórico.
  */
 export const contentVersions = pgTable(
   'content_versions',

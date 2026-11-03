@@ -151,9 +151,9 @@ export async function reservePublicationSlot(
 }
 
 /**
- * Leva a versão a `publicado` e registra a mudança pendente, que agenda o build na janela. Se
- * o slug difere do que está no ar, o caminho antigo ganha o 301 para o novo, já sem cadeias
- * (`createRedirect`).
+ * Leva a versão a `publicado`, as `publicado` anteriores a `substituido` (histórico) e registra
+ * a mudança pendente, que agenda o build na janela. Se o slug difere do que está no ar, o
+ * caminho antigo ganha o 301 para o novo, já sem cadeias (`createRedirect`).
  */
 async function markPublished(
   tx: Executor,
@@ -185,6 +185,18 @@ async function markPublished(
   }
 
   await tx.update(contentVersions).set({ status: 'publicado' }).where(versionMatch);
+  // As publicadas antes saem para o histórico: no máximo uma versão fica `publicado` (#519).
+  await tx
+    .update(contentVersions)
+    .set({ status: 'substituido' })
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        eq(contentVersions.contentId, contentId),
+        lt(contentVersions.version, version),
+        eq(contentVersions.status, 'publicado'),
+      ),
+    );
   await recordPendingChange(tx, siteId, 'content', String(contentId));
   return { ok: true, value: undefined };
 }

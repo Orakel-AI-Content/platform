@@ -161,6 +161,17 @@ describe('agendar', () => {
     expect(await db.select().from(publications)).toHaveLength(1);
   });
 
+  it('o job leva a substituido a versão que estava publicada (#519)', async () => {
+    const version = await prepare(1);
+    expect(await schedule(1, version, `${DAY}T10:00:00-03:00`)).toMatchObject({ ok: true });
+    expect(await statusOf(1, 1)).toBe('publicado');
+
+    await runDueJobs();
+
+    expect(await statusOf(1, 1)).toBe('substituido');
+    expect(await statusOf(1, version)).toBe('publicado');
+  });
+
   it('o job com troca de slug grava o 301 do endereço antigo', async () => {
     const live = (await versions(1)).findLast((row) => row.status === 'publicado')?.data.slug;
     expect(live).toBeDefined();
