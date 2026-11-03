@@ -9,6 +9,7 @@ import { and, eq, ne } from 'drizzle-orm';
 import type { Executor } from '../../db/client.ts';
 import { sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
+import { buildNow } from './schedule.ts';
 
 /**
  * Falha permanente: o site para de receber builds até ser retomado (L4). Grava o culpado
@@ -29,6 +30,53 @@ export async function pauseSite(
       pausedCulpritReference: culprit?.reference ?? null,
     })
     .where(eq(sites.id, siteId));
+}
+
+/**
+ * "Retomar" (L4): o site pausado volta a `ativo`, sem motivo nem culpado, e o build entra na
+ * fila já, publicando as mudanças represadas (a falha não as baixou). O update condicional
+ * decide a corrida: de dois "Retomar" simultâneos, só um enfileira.
+ */
+export async function resumeSite(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+
+  const updated = await tx
+    .update(sites)
+    .set({
+      state: 'ativo',
+      pausedReason: null,
+      pausedCulpritOrigin: null,
+      pausedCulpritReference: null,
+    })
+    .where(and(eq(sites.id, siteId), eq(sites.state, 'pausado')))
+    .returning({ id: sites.id });
+  if (updated.length > 0) {
+    await buildNow(tx, siteId);
+    return { ok: true, value: undefined };
+  }
+
+  const [site] = await tx.select({ state: sites.state }).from(sites).where(eq(sites.id, siteId));
+  if (site === undefined) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  return {
+    ok: false,
+    issues: [
+      {
+        code: 'site.not_paused',
+        message: `O site ${siteId} não está pausado; não há o que retomar`,
+        path: [],
+      },
+    ],
+  };
 }
 
 /** Primeira publicação bem-sucedida: o site passa a `publicado`. */

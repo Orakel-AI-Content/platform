@@ -12,23 +12,28 @@ import {
   PublishNowPanel,
   SiteStateIndicator,
   type PublishNow,
+  type ResumeSite,
 } from './SiteStatus.tsx';
 
 /**
  * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: os dados do
- * site no `InfoList` (com o uso do limite diário de hoje) e, ao pé, "Publicar agora". `publish` só vem de quem pode publicar
- * (`operations.run` e site não pausado); sem ele, o botão não aparece. Sem estado próprio: o
- * `PublishNowPanel` é o único Client Component dentro dele.
+ * site no `InfoList` (com o uso do limite diário de hoje) e, ao pé, "Publicar agora" ou, com o
+ * site pausado, "Retomar". `publish` e `resume` só vêm de quem tem `operations.run`; cada botão
+ * aparece só no estado dele (publicar com o site não pausado, retomar com ele pausado). Sem
+ * estado próprio: os painéis são os únicos Client Components dentro dele.
  */
 export function SiteSummaryCard({
   site,
   g1Registered,
   publish,
+  resume,
 }: {
   site: SiteSummary;
   g1Registered: boolean;
   publish?: PublishNow;
+  resume?: ResumeSite;
 }) {
+  const paused = site.state === 'pausado';
   return (
     <Card className={DETAIL_SUMMARY_CLASS} bodyClass="flex flex-col gap-6">
       <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
@@ -52,7 +57,8 @@ export function SiteSummaryCard({
           )}
         </InfoField>
       </InfoList>
-      {publish && <PublishNowPanel siteId={site.id} action={publish} />}
+      {publish && !paused && <PublishNowPanel siteId={site.id} action={publish} />}
+      {resume && paused && <ResumeSitePanel siteId={site.id} action={resume} />}
     </Card>
   );
 }

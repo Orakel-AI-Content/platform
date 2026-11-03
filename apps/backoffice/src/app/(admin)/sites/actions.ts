@@ -21,6 +21,7 @@ import type { Actor } from '@/domain/access/rbac.ts';
 import { requestBuildNow } from '@/domain/builds/builds.ts';
 import {
   advanceLifecycle,
+  resumeSite,
   setBuildWindow,
   setDailyPublishLimit,
   type ManualLifecycleStep,
@@ -116,6 +117,15 @@ export async function advanceLifecycleAction(
     siteId,
     (tx, actor) => advanceLifecycle(tx, actor, siteId, step),
     `${STEP_LABEL[step]} marcada.`,
+  );
+}
+
+/** "Retomar" o site pausado: volta a ativo e enfileira o build já (a regra é do domínio). */
+export async function resumeSiteAction(siteId: string): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => resumeSite(tx, actor, siteId),
+    `${siteId} retomado; build enfileirado.`,
   );
 }
 
