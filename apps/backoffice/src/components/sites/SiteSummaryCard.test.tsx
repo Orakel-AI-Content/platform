@@ -7,7 +7,8 @@ import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { SiteSummaryCard } from './SiteSummaryCard.tsx';
 
-// Resumo da página do site (#370): os campos no InfoList e "Publicar agora" só com a ação.
+// Resumo da página do site (#370): os campos no InfoList e "Publicar agora" ou "Retomar" só
+// com a ação.
 
 afterEach(cleanup);
 
@@ -104,5 +105,31 @@ describe('SiteSummaryCard', () => {
     const publish = screen.getByRole('button', { name: 'Publicar agora exemplo-a' });
     expect(document.querySelector('.card')?.contains(publish)).toBe(true);
     expect(publish.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
+  });
+
+  it('pausado, "Retomar" no lugar de "Publicar agora"; ativo, o contrário', () => {
+    const action = vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' }));
+    const paused = {
+      ...site,
+      state: 'pausado' as const,
+      pausedReason: 'render: Snapshot inválido',
+    };
+    const { rerender } = render(
+      <SiteSummaryCard site={paused} g1Registered publish={action} resume={action} />,
+    );
+    const resume = screen.getByRole('button', { name: 'Retomar exemplo-a' });
+    expect(document.querySelector('.card')?.contains(resume)).toBe(true);
+    expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
+
+    rerender(<SiteSummaryCard site={site} g1Registered publish={action} resume={action} />);
+    expect(screen.getByRole('button', { name: 'Publicar agora exemplo-a' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Retomar/ })).toBeNull();
+  });
+
+  it('sem a ação (editor, revisor), o site pausado não mostra "Retomar"', () => {
+    render(
+      <SiteSummaryCard site={{ ...site, state: 'pausado', pausedReason: 'x' }} g1Registered />,
+    );
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });

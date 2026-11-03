@@ -24,6 +24,7 @@ import {
   advanceLifecycleAction,
   publishNow,
   registerG1Action,
+  resumeSiteAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
 } from '../actions.ts';
@@ -33,7 +34,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Página do site na tela de detalhe do guia (#370): o resumo à esquerda (dados de publicação e
- * "Publicar agora", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1,
+ * "Publicar agora" ou, pausado, "Retomar", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1,
  * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo sitePageContext (a mesma
  * busca do layout), os gatilhos e o uso de redirects, que vira um aviso acima do resumo quando
  * o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do limite e "Editar
@@ -48,7 +49,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const g1 = triggers.ok ? triggers.value.find((record) => record.trigger === 'G1') : undefined;
   const redirects = await redirectUsageFor(db, actor, siteId);
   const canConfigure = can(actor, 'site.configure');
-  const canPublish = can(actor, 'operations.run') && site.state !== 'pausado';
+  const canOperate = can(actor, 'operations.run');
 
   // Dica e estado das abas de G1, janela e limite (o nome da aba é o título): com permissão, o corpo do
   // cartão do formulário (gerado do schema, botões no rodapé, #333); sem, um cartão só de leitura.
@@ -127,7 +128,8 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         <SiteSummaryCard
           site={site}
           g1Registered={g1 !== undefined}
-          publish={canPublish ? publishNow : undefined}
+          publish={canOperate ? publishNow : undefined}
+          resume={canOperate ? resumeSiteAction : undefined}
         />
         <SiteTabs
           lifecycle={
