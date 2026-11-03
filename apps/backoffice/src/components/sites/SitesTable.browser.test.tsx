@@ -33,6 +33,8 @@ const SITES: SiteSummary[] = ids.map((id, index) => ({
   lifecycle: 'cadastrado',
   state: index === 1 ? 'pausado' : 'ativo',
   pausedReason: index === 1 ? `render: ${LONG_FAILURE}` : null,
+  pausedCulprit: null,
+  activeVersionId: null,
   release: null,
   indexavel: false,
   pendingChanges: 1,

@@ -64,6 +64,38 @@ describe('registro de instâncias', () => {
   });
 });
 
+describe('versão ativa e culpado da pausa (#510)', () => {
+  it('listSites expõe a versão no ar e o culpado da pausa', async () => {
+    await db
+      .update(sites)
+      .set({
+        activeVersionId: 'v-1',
+        state: 'pausado',
+        pausedReason: 'render: snapshot inválido',
+        pausedCulpritOrigin: 'content',
+        pausedCulpritReference: '42',
+      })
+      .where(eq(sites.id, 'exemplo-a'));
+
+    const result = await listSites(db, SYSTEM_ACTOR);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(
+      result.value.map(({ id, activeVersionId, pausedCulprit }) => ({
+        id,
+        activeVersionId,
+        pausedCulprit,
+      })),
+    ).toEqual([
+      {
+        id: 'exemplo-a',
+        activeVersionId: 'v-1',
+        pausedCulprit: { origin: 'content', reference: '42' },
+      },
+      { id: 'exemplo-b', activeVersionId: null, pausedCulprit: null },
+    ]);
+  });
+});
+
 describe('limite diário do site (#490)', () => {
   const limitOf = async (siteId: string) => {
     const [row] = await db

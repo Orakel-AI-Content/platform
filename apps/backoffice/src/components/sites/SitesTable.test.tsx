@@ -79,6 +79,8 @@ const site: SiteSummary = {
   lifecycle: 'publicado',
   state: 'ativo',
   pausedReason: null,
+  pausedCulprit: null,
+  activeVersionId: null,
   release: null,
   indexavel: false,
   pendingChanges: 0,
