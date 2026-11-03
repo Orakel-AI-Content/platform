@@ -129,12 +129,12 @@ Argumentos extras vão para o Playwright.
 
 ### Imagens Docker
 
-| Quero…                                               | Comando                                            |
-| ---------------------------------------------------- | -------------------------------------------------- |
-| Construir um grupo de imagens                        | `docker/bake.sh [images\|release\|local\|default]` |
-| Construir uma imagem só                              | `docker buildx bake <alvo> --load`                 |
-| Lint, tipos e testes de um pacote em container limpo | `docker buildx bake <pacote>-test`                 |
-| Fumaça da imagem `site-builder`                      | `tooling/build-site/scripts/smoke.sh`              |
+| Quero…                                               | Comando                                                          |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| Construir um grupo de imagens                        | `docker/bake.sh [images\|release\|local\|default]`               |
+| Construir uma imagem só                              | `docker buildx bake --file docker/docker-bake.hcl <alvo>`        |
+| Lint, tipos e testes de um pacote em container limpo | `docker buildx bake --file docker/docker-bake.hcl <pacote>-test` |
+| Fumaça da imagem `site-builder`                      | `tooling/build-site/scripts/smoke.sh`                            |
 
 `PLATFORM=linux/amd64` força a arquitetura da VPS (o padrão local é a da máquina).
 
