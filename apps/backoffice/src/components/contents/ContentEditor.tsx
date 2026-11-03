@@ -66,6 +66,8 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 // vai para o toast e o resumo de erros para o Alert da barra. Esqueleto do formulário de tela
 // (#332), como o `SchemaForm`: metadados e cada bloco num `Card` e a barra fixa
 // (`FormActionBar`) com "Descartar" (criação) ou "Voltar" (edição), "Ver prévia" e o envio.
+// Na edição sem alteração (#525), "Salvar" fica indisponível (`aria-disabled`, focável) e a
+// nota ligada a ele diz por quê; o formulário não envia, nem pelo Enter num campo.
 
 const META_LABELS: Record<string, string> = {
   kind: 'Tipo',
@@ -330,13 +332,19 @@ export function ContentEditor({
     : form.formState.isDirty
       ? 'As alterações não salvas não aparecem na prévia.'
       : '';
+  // Edição sem alteração (#525): nada a enviar; o domínio também não grava (#523).
+  const unchanged = mode === 'edit' && !form.formState.isDirty;
   return (
     <FormProvider {...form}>
       <form
         id={`${id}-form`}
         noValidate
         className="flex flex-col"
-        onSubmit={(event) =>
+        onSubmit={(event) => {
+          if (unchanged) {
+            event.preventDefault();
+            return;
+          }
           void form.handleSubmit(onValid, (errors) => {
             setSummary(['Corrija os campos destacados.']);
             const blockErrors: unknown = errors.blocks;
@@ -345,8 +353,8 @@ export function ContentEditor({
                 ? blockErrors.flatMap((error, index) => (error ? [index] : []))
                 : [],
             );
-          })(event)
-        }
+          })(event);
+        }}
       >
         <div className={classNames('flex flex-col gap-4', contentClassName)}>
           <section aria-labelledby={`${id}-meta`}>
@@ -511,7 +519,15 @@ export function ContentEditor({
           contentClassName={contentClassName}
           pending={busy}
           submit={
-            <Button type="submit" variant="solid" disabled={busy}>
+            <Button
+              type="submit"
+              variant="solid"
+              disabled={busy}
+              // aria-disabled (não disabled): fica no Tab e a nota chega com o foco (#525).
+              aria-disabled={unchanged || undefined}
+              aria-describedby={unchanged ? `${id}-save-note` : undefined}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            >
               {SUBMIT_LABEL[mode][busy ? 'pending' : 'idle']}
             </Button>
           }
@@ -537,6 +553,12 @@ export function ContentEditor({
           <p id={`${id}-preview-note`} aria-live="polite" className="mt-2 text-sm empty:hidden">
             {previewNote}
           </p>
+          {/* Sem aria-live: mudaria a cada tecla; é a descrição do "Salvar", lida no foco. */}
+          {unchanged && (
+            <p id={`${id}-save-note`} className="mt-2 text-sm">
+              Nenhuma alteração para salvar.
+            </p>
+          )}
           <ErrorSummary lines={summary} className="not-empty:mt-3" />
         </FormActionBar>
       </form>
