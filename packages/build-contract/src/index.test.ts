@@ -39,6 +39,17 @@ describe('result.json', () => {
       ResultSchema.safeParse({ ...failed, failure: { kind: 'talvez', message: 'x' } }).success,
     ).toBe(false);
   });
+
+  it('falha pode apontar o conteúdo culpado; sem o campo continua válida', () => {
+    const failed = { ...base, status: 'failed', failure: { kind: 'permanent', message: 'trava' } };
+    const withCulprit = (culprit: unknown) =>
+      ResultSchema.safeParse({ ...failed, failure: { ...failed.failure, culprit } }).success;
+    expect(ResultSchema.safeParse(failed).success).toBe(true);
+    expect(withCulprit({ origin: 'content', reference: '42' })).toBe(true);
+    expect(withCulprit({ origin: 'config', reference: 'config' })).toBe(true);
+    expect(withCulprit({ origin: 'release', reference: 'r1' })).toBe(false);
+    expect(withCulprit({ origin: 'content', reference: '' })).toBe(false);
+  });
 });
 
 describe('publish.json', () => {
