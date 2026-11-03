@@ -7,7 +7,7 @@
 
 - O `build-runner` cria um volume por build, montado em `/build` no `render` e depois no `publish`:
   `site/`, `wrangler.cloudflare.jsonc`, `wrangler.local.jsonc`, `result.json` (render), `publish.json` (publish).
-- `result.json` (`formatVersion: 1`) é escrito **sempre**: sucesso com `pendingChangeIds`, `pages`, `files`, `redirectUsage`, `durationMs`; falha com `failure: { kind, message }` — o motivo que o backoffice mostra ao pausar o site. `publish.json` segue o mesmo padrão, com `versionId` e `cacheKey`.
+- `result.json` (`formatVersion: 1`) é escrito **sempre**: sucesso com `pendingChangeIds`, `pages`, `files`, `redirectUsage`, `durationMs`; falha com `failure: { kind, message, culprit? }` — o motivo que o backoffice mostra ao pausar o site e, quando a falha aponta um conteúdo do snapshot, o culpado (`{ origin, reference }`, na identidade de `pending_changes`; acréscimo opcional da #517, dentro do `formatVersion: 1`). `publish.json` segue o mesmo padrão, com `versionId` e `cacheKey`.
 - Código de saída e arquivo concordam: 0 `ok`, 10 `permanent`, 20 `transient`. Erro sem `kind` é transitório.
 - A classificação vem do erro, não do log: o render roda o Astro no mesmo processo e procura `kind` na cadeia de `cause` (o blog e o content-client põem `kind`; o Astro às vezes embrulha).
 - Schemas Zod em `@orakel/build-contract` (`packages/build-contract`, só Zod), que o backoffice

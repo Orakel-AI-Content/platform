@@ -34,6 +34,22 @@ describe('classify', () => {
     expect(classify('texto')).toEqual({ kind: 'transient', message: 'texto' });
     expect(classify(new ClassifiedError('x', 'permanent')).kind).toBe('permanent');
   });
+
+  it('copia o culpado do erro embrulhado; culpado inválido é ignorado', () => {
+    const culprit = { origin: 'content', reference: '42' };
+    const inner = Object.assign(new Error('snapshot inválido'), { kind: 'permanent', culprit });
+    const wrapped = new Error('An unhandled error occurred', { cause: inner });
+    expect(classify(wrapped)).toEqual({ kind: 'permanent', message: 'snapshot inválido', culprit });
+
+    const invalid = Object.assign(new Error('x'), {
+      kind: 'permanent',
+      culprit: { origin: 'release', reference: '1' },
+    });
+    expect(classify(invalid)).not.toHaveProperty('culprit');
+    expect(classify(Object.assign(new Error('y'), { kind: 'permanent' }))).not.toHaveProperty(
+      'culprit',
+    );
+  });
 });
 
 describe('checkPageDrop', () => {

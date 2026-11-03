@@ -104,6 +104,26 @@ describe('render', () => {
     ).toBe('failed');
   });
 
+  it('falha por um conteúdo grava o culpado no result.json', async () => {
+    const dir = await buildDir();
+    const culprit = { origin: 'content', reference: '7' } as const;
+    const failing: BuildSite = () =>
+      Promise.reject(
+        new Error('An unhandled error occurred', {
+          // Como o SnapshotReadError do content-client, embrulhado pelo Astro.
+          cause: Object.assign(new Error('Snapshot de exemplo-a inválido'), {
+            kind: 'permanent',
+            culprit,
+          }),
+        }),
+      );
+    await render(renderEnv(dir), deps(failing));
+    const written = ResultSchema.parse(
+      JSON.parse(await readFile(join(dir, 'result.json'), 'utf8')),
+    );
+    expect(written).toMatchObject({ status: 'failed', failure: { kind: 'permanent', culprit } });
+  });
+
   it('a trava de segurança barra depois do build', async () => {
     const dir = await buildDir();
     const result = await render(renderEnv(dir, { ACTIVE_PAGE_COUNT: 10 }), deps(fakeBuild));

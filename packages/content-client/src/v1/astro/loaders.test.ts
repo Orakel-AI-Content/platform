@@ -80,5 +80,22 @@ describe('snapshotLoaders', () => {
     const error = await loaders.contents.load(fakeContext().context).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(SnapshotReadError);
     expect((error as SnapshotReadError).kind).toBe('transient');
+    expect((error as SnapshotReadError).culprit).toBeUndefined();
+  });
+
+  it('conteúdo inválido vira SnapshotReadError permanente com o culpado', async () => {
+    const lines = (await readFixture('exemplo-a')).trimEnd().split('\n');
+    const index = lines.findIndex((line) => line.includes('"type":"content"'));
+    const line = JSON.parse(lines[index] ?? '') as { data: { id: number; slug: string } };
+    line.data.slug = 'Slug Inválido!';
+    lines[index] = JSON.stringify(line);
+    const server = await startServer(() => ({ body: lines.join('\n') }));
+    close = server.close;
+    const loaders = snapshotLoaders({ baseUrl: server.baseUrl, site: 'exemplo-a', token: TOKEN });
+    const error = await loaders.contents.load(fakeContext().context).catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      kind: 'permanent',
+      culprit: { origin: 'content', reference: String(line.data.id) },
+    });
   });
 });

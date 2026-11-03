@@ -24,9 +24,35 @@ export const PATHS = {
 /** Código de saída de cada entrypoint; o `status`/`failure` do arquivo sempre concorda. */
 export const EXIT_CODES = { ok: 0, permanent: 10, transient: 20 } as const;
 
+/**
+ * Entidades do snapshot que podem causar uma falha. Subconjunto das origens de
+ * `pending_changes` do Backoffice (sem `release` nem `platform`, que não vêm do snapshot);
+ * um teste do Backoffice garante que a lista continua contida lá.
+ */
+export const CULPRIT_ORIGINS = [
+  'config',
+  'content',
+  'author',
+  'taxonomy',
+  'menu',
+  'media',
+  'redirect',
+] as const;
+export type CulpritOrigin = (typeof CULPRIT_ORIGINS)[number];
+
+/** O conteúdo que causou a falha: origem e referência, como em `pending_changes`. */
+export const CulpritSchema = z.object({
+  origin: z.enum(CULPRIT_ORIGINS),
+  /** `String(id)`; a `key` no caso de `menu`; `'config'` para a configuração do site. */
+  reference: z.string().min(1),
+});
+export type Culprit = z.infer<typeof CulpritSchema>;
+
 export const FailureSchema = z.object({
   kind: z.enum(['permanent', 'transient']),
   message: z.string().min(1),
+  /** Só quando a falha aponta um conteúdo; ausente em `result.json` antigo. */
+  culprit: CulpritSchema.optional(),
 });
 export type Failure = z.infer<typeof FailureSchema>;
 
