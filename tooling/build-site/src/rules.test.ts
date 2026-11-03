@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EXIT_CODES, ResultSchema, exitCodeOf } from '@orakel/build-contract';
-import { PublishEnvSchema, RenderEnvSchema, parseEnv } from './env.ts';
+import { PublishEnvSchema, RenderEnvSchema, RollbackEnvSchema, parseEnv } from './env.ts';
 import { ClassifiedError, classify } from './failures.ts';
 import { versionFromOutput } from './publish/cloudflare.ts';
 import { cacheKey } from './publish/build-cache.ts';
@@ -179,5 +179,41 @@ describe('env', () => {
       parseEnv(PublishEnvSchema, { ...s3, DEPLOY_TARGET: 'cloudflare' }, 'publish'),
     ).toThrow(/CLOUDFLARE_API_TOKEN/);
     expect(() => parseEnv(PublishEnvSchema, s3, 'publish')).toThrow(/DEPLOY_TARGET/);
+  });
+  it('rollback: exige a versão e o token do alvo, sem S3', () => {
+    const base = { SITE_ID: 'exemplo-a', VERSION_ID: '20260930T210249Z-4032e8d6' };
+    expect(
+      parseEnv(
+        RollbackEnvSchema,
+        { ...base, DEPLOY_TARGET: 'local', EDGE_LOCAL_URL: 'http://edge-local:8081' },
+        'rollback',
+      ),
+    ).toEqual({
+      ...base,
+      DEPLOY_TARGET: 'local',
+      EDGE_LOCAL_URL: 'http://edge-local:8081',
+      BUILD_DIR: '/build',
+    });
+    expect(() =>
+      parseEnv(
+        RollbackEnvSchema,
+        { SITE_ID: 'exemplo-a', DEPLOY_TARGET: 'local', EDGE_LOCAL_URL: 'http://e' },
+        'rollback',
+      ),
+    ).toThrow(/VERSION_ID/);
+    expect(() =>
+      parseEnv(
+        RollbackEnvSchema,
+        { ...base, DEPLOY_TARGET: 'cloudflare', CLOUDFLARE_API_TOKEN: 'segredo-curto' },
+        'rollback',
+      ),
+    ).toThrow(/CLOUDFLARE_API_TOKEN(?![\s\S]*segredo-curto)/);
+    expect(() =>
+      parseEnv(
+        RollbackEnvSchema,
+        { ...base, DEPLOY_TARGET: 'local', EDGE_LOCAL_URL: 'http://e', VERSION_ID: '../x' },
+        'rollback',
+      ),
+    ).toThrow(/VERSION_ID/);
   });
 });
