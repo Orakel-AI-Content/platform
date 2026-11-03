@@ -8,7 +8,6 @@ import {
   type Resources,
 } from '@orakel/content-model/v1';
 import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
-import { isDeepStrictEqual } from 'node:util';
 
 import type { Executor } from '../../db/client.ts';
 import {
@@ -248,11 +247,21 @@ export async function createContent(
 }
 
 /**
- * Igualdade dos dados como o JSONB os guarda: o round-trip JSON descarta `undefined` e a
- * comparação não depende da ordem das chaves (o Postgres não a preserva).
+ * Os dados como o JSONB os guarda, em texto canônico: o `JSON.stringify` descarta `undefined`
+ * e as chaves saem ordenadas, porque o Postgres não preserva a ordem. Sem `node:util`: o
+ * módulo também é importado pelos testes de navegador.
  */
+function canonical(data: ContentData): string {
+  return JSON.stringify(data, (_key, value: unknown) =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : value,
+  );
+}
+
+/** Igualdade estrutural dos dados, independente da ordem das chaves. */
 function sameData(a: ContentData, b: ContentData): boolean {
-  return isDeepStrictEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
+  return canonical(a) === canonical(b);
 }
 
 /**
