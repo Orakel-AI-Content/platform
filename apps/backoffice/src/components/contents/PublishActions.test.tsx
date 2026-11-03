@@ -6,7 +6,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import { toast, ToastProvider } from '@/components/ui/toast';
 
-import { PublishActions, PublishActionsScope } from './PublishActions.tsx';
+import { ContentActionScope } from './ContentActionScope.tsx';
+import { PublishActions } from './PublishActions.tsx';
 
 // Publicar, agendar e cancelar o agendamento (#492): os botões pelo status da versão mais
 // recente, o retorno padrão (sucesso no toast, recusa no Alert do escopo) e o agendamento na
@@ -48,9 +49,9 @@ function actions(overrides: Partial<Props> = {}): Props {
 function Publish(props: Props) {
   return (
     <>
-      <PublishActionsScope>
+      <ContentActionScope>
         <PublishActions {...props} />
-      </PublishActionsScope>
+      </ContentActionScope>
       <ToastProvider />
     </>
   );
@@ -94,7 +95,7 @@ describe('disponibilidade pelo status', () => {
   it('fora do escopo, acusa o erro de montagem', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<PublishActions {...actions()} />)).toThrow(
-      'PublishActions fora de um PublishActionsScope.',
+      'PublishActions fora de um ContentActionScope.',
     );
     vi.mocked(console.error).mockRestore();
   });

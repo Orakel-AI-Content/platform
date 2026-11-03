@@ -5,7 +5,8 @@ import { PageHeader } from '@/components/shared/PageHeader';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
-import { PublishActions, PublishActionsScope } from './PublishActions.tsx';
+import { ContentActionScope } from './ContentActionScope.tsx';
+import { PublishActions } from './PublishActions.tsx';
 
 // Ações de publicação no cabeçalho do conteúdo em Chromium (#492): o axe (WCAG 2.2 AA) nos dois
 // temas com a versão aprovada e a recusa do limite diário no Alert, com a versão agendada e o
@@ -16,7 +17,7 @@ const LIMIT = 'O site já publicou 3 conteúdos em 04/11/2026; o limite diário 
 function Header({ status, scheduledAt = null }: { status: string; scheduledAt?: Date | null }) {
   return (
     <section aria-labelledby="content-title">
-      <PublishActionsScope>
+      <ContentActionScope>
         <PageHeader
           id="content-title"
           title="Guia de receitas regionais"
@@ -30,7 +31,7 @@ function Header({ status, scheduledAt = null }: { status: string; scheduledAt?: 
             />
           }
         />
-      </PublishActionsScope>
+      </ContentActionScope>
     </section>
   );
 }

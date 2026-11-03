@@ -1,38 +1,26 @@
 'use client';
 
-import { createContext, use, useId, useState, type ReactNode } from 'react';
+import { useId, useState } from 'react';
 
 import type { ActionResult } from '@/components/shared/actionResult.ts';
-import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import { formatDateTime } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
 import { DateTimepicker } from '@/components/ui/DatePicker';
 import Dialog from '@/components/ui/Dialog';
 import { FormItem } from '@/components/ui/Form';
 
+import { useContentAction } from './ContentActionScope.tsx';
+
 // Publicar, agendar e cancelar o agendamento na página do conteúdo (#492), no retorno padrão das
 // ações: a Server Action delega ao domínio, o sucesso vai para o toast e a recusa (inclusive o
-// limite diário) para o Alert do escopo, abaixo da linha do título, como o `SubmitForReviewScope`.
-// A página monta as ações para quem tem content.publish; elas dependem do status da versão mais
-// recente: "Publicar" e "Agendar" com `aprovado`, o horário marcado e "Cancelar agendamento" com
+// limite diário) para o Alert do `ContentActionScope`, abaixo da linha do título, como "Enviar
+// para revisão". A página monta as ações para quem tem content.publish; elas dependem do status
+// da versão mais recente: "Publicar" e "Agendar" com `aprovado`, o horário marcado e "Cancelar agendamento" com
 // `agendado`. "Agendar" abre o Dialog com o DateTimepicker do Ecme na hora de parede de São
 // Paulo, o dia que conta no limite diário (`PUBLISH_DAY_TIME_ZONE`), e envia o instante em ISO.
 
 /** O fuso do agendamento: o do dia do limite diário, não o do site. */
 export const SCHEDULE_TIME_ZONE = 'America/Sao_Paulo';
-
-const PublishActionsContext = createContext<ReturnType<typeof useActionResult> | null>(null);
-
-/** Guarda o estado das ações e mostra a recusa no Alert, sempre montado, abaixo de `children`. */
-export function PublishActionsScope({ children }: { children: ReactNode }) {
-  const state = useActionResult();
-  return (
-    <PublishActionsContext value={state}>
-      {children}
-      <ActionAlert error={state.error} />
-    </PublishActionsContext>
-  );
-}
 
 type PublishActionsProps = {
   /** Status da versão mais recente; fora de `aprovado` e `agendado`, nada aparece. */
@@ -44,7 +32,7 @@ type PublishActionsProps = {
   cancel: () => Promise<ActionResult>;
 };
 
-/** As ações, dentro de um `PublishActionsScope`. */
+/** As ações, dentro de um `ContentActionScope`. */
 export function PublishActions({
   status,
   scheduledAt,
@@ -52,8 +40,7 @@ export function PublishActions({
   schedule,
   cancel,
 }: PublishActionsProps) {
-  const scope = use(PublishActionsContext);
-  if (scope === null) throw new Error('PublishActions fora de um PublishActionsScope.');
+  const scope = useContentAction('PublishActions');
 
   if (status === 'agendado') {
     return (
