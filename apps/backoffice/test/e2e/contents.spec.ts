@@ -685,9 +685,13 @@ test.describe('barra de ações do editor (#109)', () => {
     await expect(page).toHaveURL(new RegExp(`${editPath}$`));
     await expect(page.getByText('Partindo da versão 2', { exact: true })).toBeVisible();
 
-    // Salvar de novo sem mudar nada: nenhuma versão nova (#523), os mesmos 20 blocos.
-    await save.click();
-    await expect(toast).toContainText('Nenhuma alteração; a versão 2 continua a mais recente.');
+    // Sem mudar nada, "Salvar" fica indisponível e diz por quê (#525); o clique (forçado: o
+    // Playwright não clica em `aria-disabled`) não envia nem cria versão nova (#523).
+    await expect(save).toHaveAttribute('aria-disabled', 'true');
+    await expect(save).toHaveAccessibleDescription('Nenhuma alteração para salvar.');
+    await expect(page.getByText('Nenhuma alteração para salvar.', { exact: true })).toBeVisible();
+    await save.click({ force: true });
+    await expect(toast).not.toContainText('Nenhuma alteração; a versão 2 continua a mais recente.');
     await expect(page.getByText('Partindo da versão 2', { exact: true })).toBeVisible();
     await expect(page.getByRole('group', { name: /^Bloco \d+:/ })).toHaveCount(20);
     await expect(page.getByRole('main').getByRole('alert')).toHaveText('');
