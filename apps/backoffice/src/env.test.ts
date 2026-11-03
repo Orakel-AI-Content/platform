@@ -18,7 +18,12 @@ const valid = {
 
 describe('parseEnv', () => {
   it('aceita o ambiente completo, com padrões', () => {
-    expect(parseEnv(valid)).toMatchObject({ NODE_ENV: 'development', LOG_LEVEL: 'info' });
+    expect(parseEnv(valid)).toMatchObject({
+      NODE_ENV: 'development',
+      LOG_LEVEL: 'info',
+      BUILD_WINDOW_SECONDS: 900,
+      PUBLISH_DAILY_LIMIT: 10,
+    });
   });
 
   it('falha no boot listando tudo o que falta ou é inválido', () => {

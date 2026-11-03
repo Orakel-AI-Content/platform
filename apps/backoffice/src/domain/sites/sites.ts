@@ -18,7 +18,7 @@ import { lastBuilds, type LastBuild } from '../builds/builds.ts';
 import { effectiveBuildWindowMs } from '../builds/schedule.ts';
 import { toRedirect } from '../export/mappers.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
-import { effectiveDailyPublishLimit } from '../publications/publish.ts';
+import { effectiveDailyPublishLimit, publishedOnDayBySite } from '../publications/publish.ts';
 import { hasPolicyTrigger } from './policy-triggers.ts';
 
 /** Textos das páginas institucionais (o content-model só exporta o schema). */
@@ -46,6 +46,8 @@ export type SiteSummary = {
   dailyPublishLimit: number | null;
   /** Limite diário que a publicação aplica ao site. */
   effectiveDailyPublishLimit: number;
+  /** Vagas do limite já ocupadas hoje (dia de São Paulo): publicações feitas e agendadas. */
+  publishedToday: number;
   /** Fuso IANA da configuração corrente: as telas mostram as datas do site nele. */
   timeZone: string;
 };
@@ -315,6 +317,7 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
     .groupBy(pendingChanges.siteId);
   const pendingBySite = new Map(pending.map((row) => [row.siteId, row.total]));
   const buildsBySite = await lastBuilds(db);
+  const publishedToday = await publishedOnDayBySite(db);
 
   const summaries = await Promise.all(
     rows.map(async (site): Promise<SiteSummary> => {
@@ -334,6 +337,7 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
         effectiveBuildWindowSeconds: effectiveBuildWindowMs(site.buildWindowSeconds) / 1000,
         dailyPublishLimit: site.dailyPublishLimit,
         effectiveDailyPublishLimit: effectiveDailyPublishLimit(site.dailyPublishLimit),
+        publishedToday: publishedToday.get(site.id) ?? 0,
         timeZone: config?.timeZone ?? DEFAULT_TIME_ZONE,
       };
     }),

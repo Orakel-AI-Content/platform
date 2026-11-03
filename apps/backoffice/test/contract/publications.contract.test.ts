@@ -14,6 +14,7 @@ import { openSnapshot } from '../../src/domain/export/snapshot.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import {
   configureDailyPublishLimit,
+  publishedOnDayBySite,
   publishVersion,
 } from '../../src/domain/publications/publish.ts';
 import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
@@ -42,7 +43,7 @@ beforeEach(async () => {
   if (!imported.ok) throw new Error(JSON.stringify(imported.issues));
 });
 afterEach(() => {
-  configureDailyPublishLimit(3);
+  configureDailyPublishLimit(10);
 });
 
 async function versions(contentId: number) {
@@ -189,6 +190,21 @@ describe('limite diário', () => {
 
     const accepted = await publish(1, version, new Date('2026-11-01T00:00:30-03:00'));
     expect(accepted).toMatchObject({ ok: true });
+  });
+
+  it('o uso do dia por site conta no dia de São Paulo e recomeça à meia-noite de lá', async () => {
+    await setSiteLimit(5);
+    expect(await publishAt(1, '2026-10-30T22:00:00-03:00')).toMatchObject({ ok: true });
+    expect(await publishAt(2, '2026-10-31T09:00:00-03:00')).toMatchObject({ ok: true });
+    // 23:30 de São Paulo já é o dia 1º em UTC, e ainda conta no dia 31.
+    expect(await publishAt(3, '2026-10-31T23:30:00-03:00')).toMatchObject({ ok: true });
+
+    const usage = (at: string) => publishedOnDayBySite(db, new Date(at));
+    expect(await usage('2026-10-30T12:00:00-03:00')).toEqual(new Map([[SITE, 1]]));
+    expect(await usage('2026-10-31T00:00:00-03:00')).toEqual(new Map([[SITE, 2]]));
+    expect(await usage('2026-10-31T23:59:59-03:00')).toEqual(new Map([[SITE, 2]]));
+    // Dia novo em São Paulo: nenhuma vaga ocupada, o site fica fora do mapa.
+    expect(await usage('2026-11-01T00:00:00-03:00')).toEqual(new Map());
   });
 
   it('com dailyPublishLimit nulo vale o padrão; com valor próprio, vale o do site', async () => {

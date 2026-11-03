@@ -58,7 +58,7 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
   não entra em impasse com a publicação.
 - **Precedência do limite:** coluna operacional `sites.daily_publish_limit` (inteiro, nula,
   `check >= 0`), fora da `SiteConfig` e do snapshot. Nula usa `PUBLISH_DAILY_LIMIT` (padrão
-  3), aplicado na partida de cada processo por `configureDailyPublishLimit`. A regra única
+  10 desde 2026-11-03; era 3), aplicado na partida de cada processo por `configureDailyPublishLimit`. A regra única
   é `effectiveDailyPublishLimit`, como a `effectiveBuildWindowMs` da 0010. O valor `0`
   bloqueia as publicações do site.
 - **Agendar** (`schedulePublication`, em `domain/publications/schedule.ts`, #488): mesmas
@@ -120,3 +120,7 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
 - A despublicação não apaga a linha, então não devolve a vaga do dia.
 - Publicações de um mesmo site ficam serializadas pela trava do site, por uma transação
   curta.
+- O uso do dia aparece na página do site, no resumo ("Publicações hoje: N de L") e na aba
+  "Limite diário", na mesma conta da publicação (`publishedOnDayBySite`: feitas e agendadas
+  para o dia de São Paulo). A página é dinâmica, então o número vale a cada abertura e
+  recomeça à meia-noite de São Paulo.

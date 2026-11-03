@@ -96,6 +96,15 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
           {site.dailyPublishLimit === null ? 'padrão' : 'próprio'}
         </strong>
       </p>
+      <p className="text-sm">
+        Usadas hoje:{' '}
+        <strong className="tabular-nums">
+          {site.publishedToday} de {site.effectiveDailyPublishLimit}
+        </strong>{' '}
+        (feitas e agendadas para hoje); restam{' '}
+        {Math.max(0, site.effectiveDailyPublishLimit - site.publishedToday)}. A contagem recomeça à
+        meia-noite de São Paulo.
+      </p>
     </>
   );
 

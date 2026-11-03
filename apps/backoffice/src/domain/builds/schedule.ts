@@ -2,16 +2,16 @@ import { eq, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { sites } from '../../db/schema/index.ts';
+import { processSettings } from '../process-settings.ts';
 
 /**
  * Janela de agrupamento padrão dos builds (proposta): 15 min em produção, 30 s no local. Vem
  * de BUILD_WINDOW_SECONDS, aplicada na partida de cada processo (runProcess e instrumentation
  * do Next); o domínio não lê o ambiente. Um site pode ter a própria (`sites.buildWindowSeconds`).
+ * Guardada em `processSettings`, compartilhada pelas cópias do módulo no build do Next.
  */
-let windowMs = 15 * 60_000;
-
 export function configureBuildWindow(ms: number): void {
-  windowMs = ms;
+  processSettings().buildWindowMs = ms;
 }
 
 /**
@@ -19,7 +19,7 @@ export function configureBuildWindow(ms: number): void {
  * padrão. Única regra de precedência, usada pelo agendamento e pelo registro de instâncias.
  */
 export function effectiveBuildWindowMs(siteSeconds: number | null): number {
-  return siteSeconds === null ? windowMs : siteSeconds * 1000;
+  return siteSeconds === null ? processSettings().buildWindowMs : siteSeconds * 1000;
 }
 
 /**

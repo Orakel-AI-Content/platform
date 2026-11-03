@@ -418,6 +418,7 @@ test(
       'Mudanças pendentes',
       'Último build',
       'G1',
+      'Publicações hoje',
     ];
     const value = (term: string) => publication.getByRole('definition').nth(terms.indexOf(term));
     await expect(publication.getByRole('term')).toHaveText(terms);
@@ -428,6 +429,8 @@ test(
     await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
     await expect(value('Último build')).toHaveText(/^(—|Publicado|Falhou)/);
     await expect(value('G1')).toHaveText(/^(Registrado|Não registrado)$/);
+    // Uso do limite diário de hoje (dia de São Paulo), padrão de 10.
+    await expect(value('Publicações hoje')).toHaveText(/^\d+ de 10/);
 
     // Mesma ação da lista; o sucesso vai para o toast e a seção fica sem erro (#324).
     await page.waitForLoadState('networkidle');
@@ -499,7 +502,7 @@ test('operação vê o site pausado com o motivo e sem Publicar agora', async ({
 test('editor vê a página do site sem as ações', async ({ page }) => {
   await asRole(page, 'editor');
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
-  await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
+  await expect(siteSummary(page).getByRole('term')).toHaveCount(8);
   // Cada aba mostra o mesmo que para a operação, só de leitura (#370).
   const noActions = async () => {
     for (const name of [/^Marcar/, /^Publicar agora/, 'Registrar G1', /^Salvar$/, 'Usar padrão']) {
@@ -528,7 +531,7 @@ test(`página do site sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'operacao');
   await page.goto('/sites/exemplo-a');
-  await expect(siteSummary(page).getByRole('term')).toHaveCount(7);
+  await expect(siteSummary(page).getByRole('term')).toHaveCount(8);
   await expect(page.getByRole('tabpanel', { name: 'Ciclo de vida' })).toBeVisible();
   await expectNoViolations(page);
 

@@ -7,19 +7,19 @@ import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { liveSlug, slugInUse } from '../content/contents.ts';
 import { createRedirect } from '../content/redirects.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
+import { processSettings } from '../process-settings.ts';
 
 /** Fuso do dia do limite: sempre o de São Paulo, não o `timeZone` do site (workspace#20). */
 export const PUBLISH_DAY_TIME_ZONE = 'America/Sao_Paulo';
 
 /**
- * Limite diário padrão (proposta: 3, calibrado na fase 2). Vem de PUBLISH_DAILY_LIMIT,
+ * Limite diário padrão: 10 (era 3 na proposta). Vem de PUBLISH_DAILY_LIMIT,
  * aplicado na partida de cada processo (runProcess e instrumentation do Next); o domínio não
- * lê o ambiente. Um site pode ter o próprio (`sites.dailyPublishLimit`).
+ * lê o ambiente. Um site pode ter o próprio (`sites.dailyPublishLimit`). Guardado em
+ * `processSettings`, compartilhado pelas cópias do módulo no build do Next.
  */
-let defaultLimit = 3;
-
 export function configureDailyPublishLimit(limit: number): void {
-  defaultLimit = limit;
+  processSettings().dailyPublishLimit = limit;
 }
 
 /**
@@ -27,7 +27,7 @@ export function configureDailyPublishLimit(limit: number): void {
  * mesma da janela de agrupamento (`effectiveBuildWindowMs`).
  */
 export function effectiveDailyPublishLimit(siteLimit: number | null): number {
-  return siteLimit ?? defaultLimit;
+  return siteLimit ?? processSettings().dailyPublishLimit;
 }
 
 const refused = (code: string, message: string): Result<never> => ({
@@ -47,19 +47,38 @@ const notFound = (siteId: string, contentId: number): Issue => ({
  * marcado (schedule.ts).
  */
 async function publishedOnDay(tx: Executor, siteId: string, at: Date): Promise<number> {
-  const instant = sql`${at.toISOString()}::timestamptz`;
-  const dayStart = sql`(date_trunc('day', ${instant} at time zone ${PUBLISH_DAY_TIME_ZONE}) at time zone ${PUBLISH_DAY_TIME_ZONE})`;
   const [row] = await tx
     .select({ total: count() })
     .from(publications)
-    .where(
-      and(
-        eq(publications.siteId, siteId),
-        gte(publications.publishedAt, dayStart),
-        lt(publications.publishedAt, sql`${dayStart} + interval '1 day'`),
-      ),
-    );
+    .where(and(eq(publications.siteId, siteId), onPublishDay(at)));
   return row?.total ?? 0;
+}
+
+/** `published_at` dentro do dia de São Paulo que contém `at`. */
+function onPublishDay(at: Date) {
+  const instant = sql`${at.toISOString()}::timestamptz`;
+  const dayStart = sql`(date_trunc('day', ${instant} at time zone ${PUBLISH_DAY_TIME_ZONE}) at time zone ${PUBLISH_DAY_TIME_ZONE})`;
+  return and(
+    gte(publications.publishedAt, dayStart),
+    lt(publications.publishedAt, sql`${dayStart} + interval '1 day'`),
+  );
+}
+
+/**
+ * Vagas do limite diário já ocupadas por site no dia de São Paulo que contém `at` (padrão:
+ * agora), na mesma conta da publicação: as feitas e as agendadas para o dia. Sites sem nenhuma
+ * ficam fora do mapa. A contagem vira a cada dia, à meia-noite de São Paulo.
+ */
+export async function publishedOnDayBySite(
+  db: Executor,
+  at: Date = new Date(),
+): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ siteId: publications.siteId, total: count() })
+    .from(publications)
+    .where(onPublishDay(at))
+    .groupBy(publications.siteId);
+  return new Map(rows.map((row) => [row.siteId, row.total]));
 }
 
 const dayLabel = new Intl.DateTimeFormat('pt-BR', { timeZone: PUBLISH_DAY_TIME_ZONE });
