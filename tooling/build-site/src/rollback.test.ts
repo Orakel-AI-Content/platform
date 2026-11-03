@@ -237,7 +237,9 @@ describe('rollback', () => {
   });
 });
 
-describe('cli rollback', () => {
+// Cada caso sobe a CLI num processo Node novo (até dois por caso): no runner do CI, passa dos
+// 5 s padrão do Vitest.
+describe('cli rollback', { timeout: 30_000 }, () => {
   const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
   const run = (env: Record<string, string>, args = ['rollback']) =>
     promisify(execFile)(process.execPath, [cli, ...args], {
