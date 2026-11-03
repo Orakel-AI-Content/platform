@@ -247,10 +247,32 @@ export async function createContent(
 }
 
 /**
+ * Os dados como o JSONB os guarda, em texto canônico: o `JSON.stringify` descarta `undefined`
+ * e as chaves saem ordenadas, porque o Postgres não preserva a ordem. Sem `node:util`: o
+ * módulo também é importado pelos testes de navegador.
+ */
+function canonical(data: ContentData): string {
+  return JSON.stringify(data, (_key, value: unknown) =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : value,
+  );
+}
+
+/** Igualdade estrutural dos dados, independente da ordem das chaves. */
+function sameData(a: ContentData, b: ContentData): boolean {
+  return canonical(a) === canonical(b);
+}
+
+/**
  * Edita um conteúdo: grava a versão N+1 em `rascunho` (as anteriores ficam intactas). Bloco
  * existente mantém o `n` da versão mais recente; bloco novo recebe `nextBlockN`, em ordem, e
  * o `n` nunca é reutilizado. A linha de `contents` fica travada até o fim da transação: duas
  * edições simultâneas não calculam a mesma versão nem os mesmos `n`.
+ *
+ * Dados iguais aos da versão mais recente não gravam nada (#523): nem versão, nem
+ * `nextBlockN`, nem mudança pendente; devolve a versão atual com `created: false`, e ela
+ * continua com o status que tinha. Bloco novo sempre conta como alteração.
  */
 export async function updateContent(
   tx: Executor,
@@ -259,7 +281,7 @@ export async function updateContent(
   contentId: number,
   input: ContentEdit,
   resources: Resources = RESOURCES,
-): Promise<Result<{ version: number }>> {
+): Promise<Result<{ version: number; created: boolean }>> {
   const allowed = checkWrite(actor);
   if (!allowed.ok) return allowed;
 
@@ -309,6 +331,9 @@ export async function updateContent(
 
   const data = await validateContentData(tx, siteId, contentId, { ...input, blocks }, resources);
   if (!data.ok) return data;
+  if (nextBlockN === content.nextBlockN && sameData(data.value, latest.data)) {
+    return { ok: true, value: { version: latest.version, created: false } };
+  }
 
   const version = latest.version + 1;
   await tx
@@ -319,7 +344,7 @@ export async function updateContent(
     .set({ nextBlockN })
     .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)));
   await recordPendingChange(tx, siteId, 'content', String(contentId));
-  return { ok: true, value: { version } };
+  return { ok: true, value: { version, created: true } };
 }
 
 /**

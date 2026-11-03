@@ -57,14 +57,19 @@ async function latestData(contentId: number): Promise<Omit<Content, 'id'>> {
   return last.data;
 }
 
-const save = async (contentId: number, slug: string) =>
-  db.transaction(async (tx) =>
-    updateContent(tx, SYSTEM_ACTOR, SITE, contentId, { ...(await latestData(contentId)), slug }),
-  );
+const save = async (contentId: number, slug: string, retitle = false) =>
+  db.transaction(async (tx) => {
+    const data = await latestData(contentId);
+    const title = retitle ? `${data.title} (${slug})` : data.title;
+    return updateContent(tx, SYSTEM_ACTOR, SITE, contentId, { ...data, slug, title });
+  });
 
-/** Nova versão com o slug dado, enviada para revisão e aprovada. */
+/**
+ * Nova versão com o slug dado (e o título com ele: com o mesmo slug, sem alteração nenhuma
+ * versão seria criada, #523), enviada para revisão e aprovada.
+ */
 async function approved(contentId: number, slug: string): Promise<number> {
-  const saved = await save(contentId, slug);
+  const saved = await save(contentId, slug, true);
   if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
   await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
   const ok = await db.transaction((tx) =>
