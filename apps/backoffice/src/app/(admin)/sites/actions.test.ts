@@ -5,6 +5,7 @@ import {
   advanceLifecycleAction,
   createSiteAction,
   registerG1Action,
+  resumeSiteAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
   updateSiteConfigAction,
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   updateSiteConfig: vi.fn(),
   revalidatePath: vi.fn(),
   advanceLifecycle: vi.fn(),
+  resumeSite: vi.fn(),
   setBuildWindow: vi.fn(),
   setDailyPublishLimit: vi.fn(),
   registerPolicyTrigger: vi.fn(),
@@ -32,6 +34,7 @@ vi.mock('@/db/client.ts', () => ({
 vi.mock('@/domain/builds/builds.ts', () => ({ requestBuildNow: vi.fn() }));
 vi.mock('@/domain/builds/site-state.ts', () => ({
   advanceLifecycle: mocks.advanceLifecycle,
+  resumeSite: mocks.resumeSite,
   setBuildWindow: mocks.setBuildWindow,
   setDailyPublishLimit: mocks.setDailyPublishLimit,
 }));
@@ -207,6 +210,34 @@ describe('Server Actions da página do site', () => {
     });
     expect(mocks.setDailyPublishLimit).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a', null);
 
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('"Retomar" delega ao domínio; a recusa vira a mensagem, sem revalidar', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await resumeSiteAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.resumeSite).not.toHaveBeenCalled();
+
+    mocks.resumeSite.mockResolvedValueOnce({
+      ok: false,
+      issues: [{ code: 'forbidden', message: 'Sem permissão para operations.run', path: [] }],
+    });
+    expect(await resumeSiteAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'Sem permissão para operations.run',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+
+    mocks.resumeSite.mockResolvedValueOnce(done);
+    expect(await resumeSiteAction('exemplo-a')).toEqual({
+      ok: true,
+      message: 'exemplo-a retomado; build enfileirado.',
+    });
+    expect(mocks.resumeSite).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });

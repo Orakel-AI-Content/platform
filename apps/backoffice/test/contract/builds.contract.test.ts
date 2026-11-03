@@ -10,7 +10,11 @@ import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { requestBuildNow } from '../../src/domain/builds/builds.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
-import { setActiveVersion, setBuildWindow } from '../../src/domain/builds/site-state.ts';
+import {
+  resumeSite,
+  setActiveVersion,
+  setBuildWindow,
+} from '../../src/domain/builds/site-state.ts';
 import {
   failedFile,
   fakeRuntime,
@@ -406,6 +410,127 @@ describe('task build', () => {
       activeVersionId: 'v-1',
       pausedCulpritOrigin: 'menu',
       pausedCulpritReference: 'principal',
+    });
+  });
+});
+
+describe('retomar', () => {
+  /** Falha permanente com culpado: o site pausa e as mudanças ficam represadas. */
+  async function pauseByCulprit(): Promise<void> {
+    const fake = fakeRuntime({
+      render: {
+        exitCode: 10,
+        file: failedFile('permanent', 'Snapshot inválido', 'exemplo-a', {
+          origin: 'content',
+          reference: '42',
+        }),
+      },
+    });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      helpers(),
+    );
+    await db.execute(sql`delete from graphile_worker._private_jobs`);
+  }
+
+  async function buildJobs(): Promise<{ key: string; run_at: Date }[]> {
+    const result = await db.execute<{ key: string; run_at: Date }>(
+      sql`select key, run_at from graphile_worker.jobs where task_identifier = 'build'`,
+    );
+    return result.rows;
+  }
+
+  it('volta o site a ativo, limpa motivo e culpado e enfileira o build já', async () => {
+    await pauseByCulprit();
+    const before = Date.now();
+    expect(await db.transaction((tx) => resumeSite(tx, SYSTEM_ACTOR, 'exemplo-a'))).toEqual({
+      ok: true,
+      value: undefined,
+    });
+
+    expect(await site()).toMatchObject({
+      state: 'ativo',
+      pausedReason: null,
+      pausedCulpritOrigin: null,
+      pausedCulpritReference: null,
+    });
+    const jobs = await buildJobs();
+    expect(jobs.map((job) => job.key)).toEqual(['build:exemplo-a']);
+    expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeLessThanOrEqual(Date.now());
+    expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  it('com o culpado corrigido, o build seguinte publica as mudanças represadas', async () => {
+    await pauseByCulprit();
+    const held = await unresolvedPendingChangeIds(db, 'exemplo-a');
+    expect(held.length).toBeGreaterThan(0);
+    await db.transaction((tx) => resumeSite(tx, SYSTEM_ACTOR, 'exemplo-a'));
+
+    const fake = fakeRuntime({
+      render: { file: renderOk('exemplo-a', held) },
+      publish: { file: publishOk() },
+    });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      helpers(),
+    );
+
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual([]);
+    expect(await site()).toMatchObject({
+      state: 'ativo',
+      lifecycle: 'publicado',
+      activeVersionId: '20261001T120000Z-abcdef12',
+    });
+  });
+
+  it('não cria mudança pendente nem muda a versão ativa', async () => {
+    await pauseByCulprit();
+    await db.transaction((tx) => setActiveVersion(tx, 'exemplo-a', 'v-1'));
+    const held = await unresolvedPendingChangeIds(db, 'exemplo-a');
+    await db.transaction((tx) => resumeSite(tx, SYSTEM_ACTOR, 'exemplo-a'));
+
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(held);
+    expect(await site()).toMatchObject({ activeVersionId: 'v-1' });
+  });
+
+  it('recusa site que não está pausado, sem enfileirar', async () => {
+    await db.execute(sql`delete from graphile_worker._private_jobs`);
+    expect(await db.transaction((tx) => resumeSite(tx, SYSTEM_ACTOR, 'exemplo-a'))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_paused' }],
+    });
+    expect(await buildJobs()).toEqual([]);
+  });
+
+  it('recusa site inexistente', async () => {
+    expect(await db.transaction((tx) => resumeSite(tx, SYSTEM_ACTOR, 'nao-existe'))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
+  });
+
+  it('editor e revisor recebem forbidden e o site continua pausado', async () => {
+    await pauseByCulprit();
+    for (const role of ['editor', 'revisor'] as const) {
+      const actor = { email: `${role}@orakel.local`, roles: [role] };
+      expect(await db.transaction((tx) => resumeSite(tx, actor, 'exemplo-a'))).toMatchObject({
+        ok: false,
+        issues: [{ code: 'forbidden' }],
+      });
+    }
+    expect(await site()).toMatchObject({ state: 'pausado', pausedCulpritReference: '42' });
+    expect(await buildJobs()).toEqual([]);
+  });
+
+  it('de dois "Retomar" seguidos, só o primeiro passa', async () => {
+    await pauseByCulprit();
+    const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+    expect(await db.transaction((tx) => resumeSite(tx, operacao, 'exemplo-a'))).toMatchObject({
+      ok: true,
+    });
+    expect(await db.transaction((tx) => resumeSite(tx, operacao, 'exemplo-a'))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_paused' }],
     });
   });
 });
