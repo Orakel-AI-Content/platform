@@ -9,7 +9,7 @@ import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { toast, ToastProvider } from '@/components/ui/toast';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
-import { LastBuildSummary, PendingCount, PublishNowPanel } from './SiteStatus.tsx';
+import { LastBuildSummary, PendingCount, PublishNowPanel, ResumeSitePanel } from './SiteStatus.tsx';
 
 // Estado de publicação compartilhado pela lista de sites e pela página do site (#149).
 
@@ -142,5 +142,68 @@ describe('Publicar agora de um site', () => {
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(document.activeElement).toBe(button);
     expect(publishNow).not.toHaveBeenCalled();
+  });
+});
+
+describe('Retomar um site pausado', () => {
+  it('confirma no diálogo na cor de erro e só então chama a ação; o sucesso vai para o toast', async () => {
+    const user = userEvent.setup();
+    const resume = vi.fn((): Promise<ActionResult> =>
+      Promise.resolve({ ok: true, message: 'exemplo-a retomado; build enfileirado.' }),
+    );
+    render(
+      <>
+        <ResumeSitePanel siteId="exemplo-a" action={resume} />
+        <ToastProvider />
+      </>,
+    );
+    const button = screen.getByRole('button', { name: 'Retomar exemplo-a' });
+    expect(button.className).toContain('text-error');
+
+    await user.click(button);
+    const dialog = screen.getByRole('alertdialog', { name: 'Retomar exemplo-a?' });
+    const confirm = within(dialog).getByRole('button', { name: 'Retomar' });
+    expect(confirm.className).toContain('bg-error');
+    await user.click(confirm);
+
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('exemplo-a retomado; build enfileirado.'),
+    );
+    expect(resume).toHaveBeenCalledWith('exemplo-a');
+    expect(screen.getByRole('alert').textContent).toBe('');
+  });
+
+  it('Cancelar não retoma e devolve o foco ao botão', async () => {
+    const user = userEvent.setup();
+    const resume = vi.fn((): Promise<ActionResult> => Promise.resolve({ ok: true, message: 'ok' }));
+    render(<ResumeSitePanel siteId="exemplo-a" action={resume} />);
+    const button = screen.getByRole('button', { name: 'Retomar exemplo-a' });
+
+    await user.click(button);
+    const dialog = screen.getByRole('alertdialog', { name: 'Retomar exemplo-a?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(document.activeElement).toBe(button);
+    expect(resume).not.toHaveBeenCalled();
+  });
+
+  it('a recusa do domínio fica num Alert logo abaixo do botão', async () => {
+    const user = userEvent.setup();
+    const resume = vi.fn((): Promise<ActionResult> =>
+      Promise.resolve({
+        ok: false,
+        message: 'O site exemplo-a não está pausado; não há o que retomar',
+      }),
+    );
+    render(<ResumeSitePanel siteId="exemplo-a" action={resume} />);
+    const region = screen.getByRole('alert');
+
+    await user.click(screen.getByRole('button', { name: 'Retomar exemplo-a' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Retomar exemplo-a?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Retomar' }));
+
+    await waitFor(() =>
+      expect(region.textContent).toBe('O site exemplo-a não está pausado; não há o que retomar'),
+    );
   });
 });

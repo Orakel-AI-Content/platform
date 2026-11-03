@@ -84,19 +84,30 @@ export function PendingCount({ siteId, count }: { siteId: string; count: number 
   );
 }
 
+/** Ação de um site que muda o site publicado: o texto do botão, do diálogo e da confirmação. */
+type ConfirmedSiteAction = {
+  label: string;
+  pendingLabel: string;
+  title: (siteId: string) => string;
+  confirmText: string;
+  body: ReactNode;
+};
+
 /**
- * Enfileira o build já, com a própria transição (cada linha da lista tem o seu "Enfileirando…");
- * `onResult` é o `report` do `useActionResult` de quem decide onde fica o erro. Muda o site
- * publicado sem esperar a janela: pede confirmação, na cor de erro (#327).
+ * Botão de uma ação que muda o site publicado (#327): pede confirmação num `ConfirmDialog`, na
+ * cor de erro, e roda com a própria transição (cada linha da lista tem o seu "Enfileirando…");
+ * `onResult` é o `report` do `useActionResult` de quem decide onde fica o erro.
  */
-export function PublishNowButton({
+function ConfirmedSiteActionButton({
   siteId,
   action,
   onResult,
+  copy,
 }: {
   siteId: string;
-  action: PublishNow;
+  action: (siteId: string) => Promise<ActionResult>;
   onResult: (result: ActionResult) => void;
+  copy: ConfirmedSiteAction;
 }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
@@ -109,14 +120,14 @@ export function PublishNowButton({
         customColorClass={dangerButtonClass}
         onClick={() => setConfirming(true)}
       >
-        {pending ? 'Enfileirando…' : 'Publicar agora'}
+        {pending ? copy.pendingLabel : copy.label}
         <span className="sr-only"> {siteId}</span>
       </Button>
       <ConfirmDialog
         isOpen={confirming}
         type="danger"
-        title={`Publicar ${siteId} agora?`}
-        confirmText="Publicar"
+        title={copy.title(siteId)}
+        confirmText={copy.confirmText}
         confirmButtonProps={dangerConfirmButtonProps}
         onCancel={() => setConfirming(false)}
         onConfirm={() => {
@@ -124,9 +135,50 @@ export function PublishNowButton({
           startTransition(async () => onResult(await action(siteId)));
         }}
       >
-        <p>O build entra na fila já, sem esperar a janela de agrupamento, e o site no ar muda.</p>
+        {copy.body}
       </ConfirmDialog>
     </>
+  );
+}
+
+const PUBLISH_NOW: ConfirmedSiteAction = {
+  label: 'Publicar agora',
+  pendingLabel: 'Enfileirando…',
+  title: (siteId) => `Publicar ${siteId} agora?`,
+  confirmText: 'Publicar',
+  body: <p>O build entra na fila já, sem esperar a janela de agrupamento, e o site no ar muda.</p>,
+};
+
+const RESUME_SITE: ConfirmedSiteAction = {
+  label: 'Retomar',
+  pendingLabel: 'Retomando…',
+  title: (siteId) => `Retomar ${siteId}?`,
+  confirmText: 'Retomar',
+  body: (
+    <p>
+      O site volta a receber builds e o próximo entra na fila já, publicando as mudanças represadas.
+      Se o conteúdo culpado não foi corrigido, o build falha e o site pausa de novo.
+    </p>
+  ),
+};
+
+/** Enfileira o build já, sem esperar a janela; muda o site publicado. */
+export function PublishNowButton({
+  siteId,
+  action,
+  onResult,
+}: {
+  siteId: string;
+  action: PublishNow;
+  onResult: (result: ActionResult) => void;
+}) {
+  return (
+    <ConfirmedSiteActionButton
+      siteId={siteId}
+      action={action}
+      onResult={onResult}
+      copy={PUBLISH_NOW}
+    />
   );
 }
 
@@ -136,6 +188,27 @@ export function PublishNowPanel({ siteId, action }: { siteId: string; action: Pu
   return (
     <div className="space-y-2">
       <PublishNowButton siteId={siteId} action={action} onResult={report} />
+      <ActionAlert error={error} />
+    </div>
+  );
+}
+
+export type ResumeSite = (siteId: string) => Promise<ActionResult>;
+
+/**
+ * "Retomar" o site pausado (L4), com o erro logo abaixo (página do site): volta a receber
+ * builds e enfileira o próximo já.
+ */
+export function ResumeSitePanel({ siteId, action }: { siteId: string; action: ResumeSite }) {
+  const { error, report } = useActionResult();
+  return (
+    <div className="space-y-2">
+      <ConfirmedSiteActionButton
+        siteId={siteId}
+        action={action}
+        onResult={report}
+        copy={RESUME_SITE}
+      />
       <ActionAlert error={error} />
     </div>
   );
