@@ -17,7 +17,7 @@ import {
 
 /**
  * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: os dados do
- * site no `InfoList` e, ao pé, "Publicar agora". `publish` só vem de quem pode publicar
+ * site no `InfoList` (com o uso do limite diário de hoje) e, ao pé, "Publicar agora". `publish` só vem de quem pode publicar
  * (`operations.run` e site não pausado); sem ele, o botão não aparece. Sem estado próprio: o
  * `PublishNowPanel` é o único Client Component dentro dele.
  */
@@ -49,6 +49,12 @@ export function SiteSummaryCard({
           <LastBuildSummary build={site.lastBuild} timeZone={site.timeZone} />
         </InfoField>
         <InfoField label="G1">{g1Registered ? 'Registrado' : 'Não registrado'}</InfoField>
+        <InfoField label="Publicações hoje" className="tabular-nums">
+          {site.publishedToday} de {site.effectiveDailyPublishLimit}
+          {site.publishedToday >= site.effectiveDailyPublishLimit && (
+            <p className="mt-1 font-normal">Limite do dia atingido.</p>
+          )}
+        </InfoField>
       </InfoList>
       {publish && <PublishNowPanel siteId={site.id} action={publish} />}
     </Card>

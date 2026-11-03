@@ -25,7 +25,8 @@ const site: SiteSummary = {
   buildWindowSeconds: null,
   effectiveBuildWindowSeconds: 300,
   dailyPublishLimit: null,
-  effectiveDailyPublishLimit: 3,
+  effectiveDailyPublishLimit: 10,
+  publishedToday: 0,
   timeZone: 'America/Sao_Paulo',
 };
 
@@ -38,7 +39,7 @@ function field(label: string): HTMLElement {
 }
 
 describe('SiteSummaryCard', () => {
-  it('mostra domínio, indexável, estado, release, pendências, último build e G1 no InfoList', () => {
+  it('mostra domínio, indexável, estado, release, pendências, último build, G1 e o uso do limite', () => {
     render(<SiteSummaryCard site={site} g1Registered />);
 
     const list = document.querySelector('.card dl');
@@ -52,6 +53,13 @@ describe('SiteSummaryCard', () => {
     ).toBeTruthy();
     expect(field('Último build').textContent).toContain('v7');
     expect(field('G1').textContent).toBe('Registrado');
+    expect(field('Publicações hoje').textContent).toBe('0 de 10');
+  });
+
+  it('com o limite do dia ocupado, diz que foi atingido', () => {
+    render(<SiteSummaryCard site={{ ...site, publishedToday: 10 }} g1Registered />);
+
+    expect(field('Publicações hoje').textContent).toBe('10 de 10Limite do dia atingido.');
   });
 
   it('sem release, sem build e sem G1, diz o que falta', () => {

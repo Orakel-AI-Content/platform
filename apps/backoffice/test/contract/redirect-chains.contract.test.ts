@@ -43,7 +43,7 @@ beforeEach(async () => {
   configureDailyPublishLimit(100);
 });
 afterEach(() => {
-  configureDailyPublishLimit(3);
+  configureDailyPublishLimit(10);
 });
 
 async function latestData(contentId: number): Promise<Omit<Content, 'id'>> {

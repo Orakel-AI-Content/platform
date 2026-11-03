@@ -45,7 +45,8 @@ const SITES: SiteSummary[] = ids.map((id, index) => ({
   buildWindowSeconds: null,
   effectiveBuildWindowSeconds: 300,
   dailyPublishLimit: null,
-  effectiveDailyPublishLimit: 3,
+  effectiveDailyPublishLimit: 10,
+  publishedToday: 0,
   timeZone: index % 2 === 0 ? 'America/Sao_Paulo' : 'Europe/Lisbon',
 }));
 

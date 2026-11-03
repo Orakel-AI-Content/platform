@@ -18,5 +18,5 @@ const KEY = Symbol.for('orakel.backoffice.process-settings');
 /** Os valores do processo, criados com os padrões no primeiro acesso de qualquer cópia. */
 export function processSettings(): ProcessSettings {
   const store = globalThis as unknown as Record<symbol, ProcessSettings | undefined>;
-  return (store[KEY] ??= { buildWindowMs: 15 * 60_000, dailyPublishLimit: 3 });
+  return (store[KEY] ??= { buildWindowMs: 15 * 60_000, dailyPublishLimit: 10 });
 }
