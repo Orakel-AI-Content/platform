@@ -28,7 +28,7 @@ const TRAIL: TrailItem[] = [
   { label: 'Mudanças pendentes' },
 ];
 
-/** Os status de conteúdo cobrem as seis cores de `StateTagColor`, sem repetir nenhuma. */
+/** Os status de conteúdo cobrem as sete cores de `StateTagColor`, sem repetir nenhuma. */
 const STATUSES = Object.keys(CONTENT_STATUS_TAG) as (keyof typeof CONTENT_STATUS_TAG)[];
 
 export function StatesShowcase() {
