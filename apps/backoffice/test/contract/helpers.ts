@@ -71,6 +71,7 @@ const TABLES = [
   'authors',
   'site_sequences',
   'site_policy_triggers',
+  'releases',
   'site_configs',
   'sites',
   'user_roles',

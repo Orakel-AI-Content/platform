@@ -62,6 +62,16 @@ const navigationConfig: NavigationTree[] = [
     authority: ['site.read'],
     subMenu: [],
   },
+  // Registro de releases do core (#509): só para quem promove release (admin e operação).
+  {
+    key: 'releases',
+    path: '/releases',
+    title: 'Releases',
+    icon: 'releases',
+    type: NAV_ITEM_TYPE_ITEM,
+    authority: ['release.promote'],
+    subMenu: [],
+  },
   {
     key: 'site',
     path: '',
@@ -124,13 +134,15 @@ function areaSegment(nav: NavigationTree): string {
 
 /**
  * `key` do item ativo para o pathname: em `/sites/<site>/…`, a área pelo primeiro segmento
- * (também nas telas de item, criar e editar); fora dele, em `/sites` e abaixo, "Sites".
+ * (também nas telas de item, criar e editar); fora dele, em `/sites` e abaixo, "Sites"; em
+ * `/releases` e abaixo, "Releases".
  */
 export function activeNavigationKey(
   pathname: string,
   tree: readonly NavigationTree[] = navigationConfig,
 ): string | undefined {
   const parts = pathname.split('/');
+  if (parts[1] === 'releases') return 'releases';
   if (parts[1] !== 'sites') return undefined;
   const site = parts[2];
   // `/sites/novo` é a tela de criar site: a rota estática vence o `[site]` no Next.
