@@ -67,11 +67,12 @@ describe('cabeçalho e estados no navegador', () => {
       'Agendado',
       'Publicado',
       'Despublicado',
+      'Substituída',
     ]);
     const dots = tags.map(
       (tag) => getComputedStyle(tag.querySelector('.tag-affix')!).backgroundColor,
     );
-    expect(new Set(dots).size).toBe(6);
+    expect(new Set(dots).size).toBe(7);
 
     const steps = screen.getByRole('region', { name: 'LifecycleSteps' });
     const [withAction, done] = steps.getByRole('list').elements();

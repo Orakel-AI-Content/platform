@@ -1,7 +1,7 @@
 # 0017 – Publicação e limite diário por site
 
 - Status: aceito (completa a 0015 e segue a precedência da 0010)
-- Data: 2026-10-31
+- Data: 2026-10-31 (revisada em 2026-11-03: versões substituídas, #519)
 
 ## Contexto
 
@@ -19,7 +19,11 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
 - **Publicar** (`publishVersion`, em `domain/publications/publish.ts`): exige
   `content.publish`, só a versão mais recente e só em `aprovado`. Na mesma transação, leva
   a versão a `publicado`, grava a linha em `publications` e chama `recordPendingChange`, que
-  agenda o build na janela do site. As versões publicadas antes continuam `publicado`.
+  agenda o build na janela do site. As versões `publicado` anteriores do conteúdo passam a
+  `substituido` (rótulo "Substituída"): no máximo uma versão fica `publicado`, e as
+  substituídas ficam só como histórico (#519). `substituido` fica fora de `LIVE_STATUSES`; a
+  regra da versão no ar não muda. A migração `0009_versoes_substituidas` aplicou a regra ao
+  histórico existente.
 - **Versão no ar:** a mais recente entre `publicado` e `despublicado`, e só se for
   `publicado` (`LIVE_STATUSES` e `liveVersion`, em `domain/content/contents.ts`). É a regra
   da seleção `published` do snapshot, do caminho no ar da troca de endereço e da checagem de
@@ -66,8 +70,8 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
   as agendadas do dia.
 - **Job `publish-scheduled`** no `backoffice-worker`: `add_job` com `run_at` no horário e
   `job_key` `publish:<site>:<conteúdo>`. Trava o conteúdo e, se a versão ainda está
-  `agendado`, leva a `publicado` e registra a mudança pendente, sem conferir o limite e sem
-  outra linha em `publications`. Se não está (cancelada numa corrida com o worker), não faz
+  `agendado`, leva a `publicado` (e as publicadas antes a `substituido`) e registra a
+  mudança pendente, sem conferir o limite e sem outra linha em `publications`. Se não está (cancelada numa corrida com o worker), não faz
   nada. O autor da publicação é quem agendou. Com troca de slug, grava o 301 do endereço
   antigo como a publicação imediata (#489), com o ator de sistema; o slug em uso já é
   conferido no agendamento.
@@ -82,8 +86,12 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
   o dia num fuso só.
 - **Calcular o dia em JS com `Intl`:** criaria um segundo relógio para a mesma regra. No
   SQL, a faixa usa o índice.
-- **Despublicar todas as versões `publicado`:** reescreveria o histórico das versões, e a
-  regra da versão no ar continuaria espalhada.
+- **Manter as versões publicadas antes em `publicado`** (a decisão original): o histórico
+  mostrava várias versões "Publicado" ao mesmo tempo, como se todas estivessem no ar (#519).
+- **Levar as versões substituídas a `despublicado`:** confundiria versão substituída com
+  conteúdo tirado do ar.
+- **Derivar "substituída" na leitura:** a regra se repetiria na listagem, no filtro e na tela
+  do conteúdo; gravar mantém um único estado no banco.
 - **Origem `unpublish` no `Redirect.origin`:** mudaria o contrato do `content-model` sem
   consumidor que precise distinguir. O destino é escolhido por uma pessoa, como o redirect
   manual.
