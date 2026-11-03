@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { eq, sql } from 'drizzle-orm';
 import type { JobHelpers } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -8,7 +10,7 @@ import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { requestBuildNow } from '../../src/domain/builds/builds.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
-import { setBuildWindow } from '../../src/domain/builds/site-state.ts';
+import { setActiveVersion, setBuildWindow } from '../../src/domain/builds/site-state.ts';
 import {
   failedFile,
   fakeRuntime,
@@ -211,7 +213,11 @@ describe('task build', () => {
       versionId: '20261001T120000Z-abcdef12',
     });
     expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toHaveLength(1);
-    expect(await site()).toMatchObject({ lifecycle: 'publicado', state: 'ativo' });
+    expect(await site()).toMatchObject({
+      lifecycle: 'publicado',
+      state: 'ativo',
+      activeVersionId: '20261001T120000Z-abcdef12',
+    });
   });
 
   it('o próximo build recebe as páginas da versão ativa (trava de segurança)', async () => {
@@ -228,6 +234,63 @@ describe('task build', () => {
     expect(second.started[0]?.env).toMatchObject({ ACTIVE_PAGE_COUNT: '12' });
   });
 
+  /** Roda um build com sucesso que publica `versionId` com `pages` páginas. */
+  async function buildOk(versionId: string, pages: number) {
+    const fake = fakeRuntime({
+      render: { file: { ...renderOk(), pages } },
+      publish: { file: { ...publishOk(), versionId } },
+    });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      helpers(),
+    );
+    return fake;
+  }
+
+  it('a trava usa as páginas do build da versão ativa, não do último build ok', async () => {
+    await buildOk('v-antiga', 12);
+    await buildOk('v-nova', 30);
+    expect(await site()).toMatchObject({ activeVersionId: 'v-nova' });
+    // Como depois de um rollback: a versão no ar volta a ser a antiga.
+    await db.transaction((tx) => setActiveVersion(tx, 'exemplo-a', 'v-antiga'));
+
+    const next = await buildOk('v-seguinte', 12);
+    expect(next.started[0]?.env).toMatchObject({ ACTIVE_PAGE_COUNT: '12' });
+  });
+
+  it('sem build da versão ativa, a trava fica sem referência', async () => {
+    await buildOk('v-1', 12);
+    await db.transaction((tx) => setActiveVersion(tx, 'exemplo-a', 'v-sem-build'));
+
+    const next = await buildOk('v-2', 12);
+    expect(next.started[0]?.env).not.toHaveProperty('ACTIVE_PAGE_COUNT');
+  });
+
+  it('o backfill da migração põe no ar a versão do último build ok', async () => {
+    await buildOk('v-1', 12);
+    await buildOk('v-2', 12);
+    // Um build que falhou depois não conta: não tem versão.
+    const failed = fakeRuntime({ render: { exitCode: 10, file: failedFile('permanent', 'x') } });
+    await createBuildTask({ db, runtime: failed.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      helpers(),
+    );
+    await db.update(sites).set({ activeVersionId: null });
+
+    const migration = await readFile(
+      new URL('../../drizzle/0011_versao_ativa_e_culpado.sql', import.meta.url),
+      'utf8',
+    );
+    const backfill = migration.split('--> statement-breakpoint').at(-1) ?? '';
+    await db.execute(sql.raw(backfill));
+    expect(await site()).toMatchObject({ activeVersionId: 'v-2' });
+
+    // Idempotente: não sobrescreve uma versão ativa já gravada.
+    await db.update(sites).set({ activeVersionId: 'v-1' });
+    await db.execute(sql.raw(backfill));
+    expect(await site()).toMatchObject({ activeVersionId: 'v-1' });
+  });
+
   it('falha permanente: pausa o site com o motivo e as mudanças continuam pendentes', async () => {
     const before = await unresolvedPendingChangeIds(db, 'exemplo-a');
     const fake = fakeRuntime({
@@ -241,6 +304,8 @@ describe('task build', () => {
     expect(await site()).toMatchObject({
       state: 'pausado',
       pausedReason: 'render: Orçamento de JS: artigo 18 kB',
+      pausedCulpritOrigin: null,
+      pausedCulpritReference: null,
     });
     expect(await db.select().from(builds)).toMatchObject([
       { status: 'failed', failedStage: 'render', failureKind: 'permanent' },
@@ -256,6 +321,55 @@ describe('task build', () => {
     expect(next.started).toHaveLength(0);
   });
 
+  it('falha permanente com culpado: grava o culpado junto do motivo', async () => {
+    const fake = fakeRuntime({
+      render: {
+        exitCode: 10,
+        file: failedFile('permanent', 'Snapshot inválido', 'exemplo-a', {
+          origin: 'content',
+          reference: '42',
+        }),
+      },
+    });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      helpers(),
+    );
+
+    expect(await site()).toMatchObject({
+      state: 'pausado',
+      pausedReason: 'render: Snapshot inválido',
+      pausedCulpritOrigin: 'content',
+      pausedCulpritReference: '42',
+    });
+  });
+
+  it('falha permanente sem culpado limpa o culpado de uma pausa anterior', async () => {
+    await db
+      .update(sites)
+      .set({ pausedCulpritOrigin: 'author', pausedCulpritReference: '7' })
+      .where(eq(sites.id, 'exemplo-a'));
+    const fake = fakeRuntime({
+      render: { exitCode: 10, file: failedFile('permanent', 'Orçamento de JS') },
+    });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      helpers(),
+    );
+
+    expect(await site()).toMatchObject({
+      state: 'pausado',
+      pausedCulpritOrigin: null,
+      pausedCulpritReference: null,
+    });
+  });
+
+  it('o banco recusa culpado pela metade', async () => {
+    await expect(
+      db.update(sites).set({ pausedCulpritOrigin: 'content' }).where(eq(sites.id, 'exemplo-a')),
+    ).rejects.toThrow();
+  });
+
   it('falha transitória: registra a tentativa e lança para o Graphile Worker repetir', async () => {
     const fake = fakeRuntime({
       render: { exitCode: 20, file: failedFile('transient', 'API fora') },
@@ -267,5 +381,31 @@ describe('task build', () => {
       { status: 'failed', failureKind: 'transient', attempt: 3 },
     ]);
     expect(await site()).toMatchObject({ state: 'ativo' });
+  });
+
+  it('falha transitória não mexe na versão ativa nem no culpado', async () => {
+    await buildOk('v-1', 12);
+    await db
+      .update(sites)
+      .set({ pausedCulpritOrigin: 'menu', pausedCulpritReference: 'principal' })
+      .where(eq(sites.id, 'exemplo-a'));
+    const fake = fakeRuntime({
+      render: {
+        exitCode: 20,
+        file: failedFile('transient', 'API fora', 'exemplo-a', {
+          origin: 'content',
+          reference: '42',
+        }),
+      },
+    });
+    await expect(
+      createBuildTask({ db, runtime: fake.runtime, settings })({ siteId: 'exemplo-a' }, helpers()),
+    ).rejects.toBeInstanceOf(TransientBuildError);
+
+    expect(await site()).toMatchObject({
+      activeVersionId: 'v-1',
+      pausedCulpritOrigin: 'menu',
+      pausedCulpritReference: 'principal',
+    });
   });
 });

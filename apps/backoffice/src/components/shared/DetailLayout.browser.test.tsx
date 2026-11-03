@@ -31,6 +31,8 @@ const SITE: SiteSummary = {
   lifecycle: 'publicado',
   state: 'ativo',
   pausedReason: null,
+  pausedCulprit: null,
+  activeVersionId: null,
   release: '2026.10.1',
   indexavel: true,
   pendingChanges: 2,

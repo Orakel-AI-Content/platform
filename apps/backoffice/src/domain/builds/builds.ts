@@ -10,7 +10,7 @@ import { requireRole, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome } from './run-build.ts';
 import { buildNow } from './schedule.ts';
-import { clearMassUnpublish, markPublished, pauseSite } from './site-state.ts';
+import { clearMassUnpublish, markPublished, pauseSite, setActiveVersion } from './site-state.ts';
 
 export type BuildTarget = {
   siteId: string;
@@ -20,7 +20,7 @@ export type BuildTarget = {
   release: string | null;
   /** Domínio principal da configuração corrente. */
   domain: string;
-  /** Páginas da versão ativa (último build com sucesso): referência da trava. */
+  /** Páginas do build da versão ativa (`sites.activeVersionId`): referência da trava. */
   activePages: number | undefined;
   /** Despublicação em massa declarada e não consumida: libera a trava neste build. */
   massUnpublishDeclaredAt: Date | null;
@@ -33,12 +33,21 @@ export async function loadBuildTarget(
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId));
   if (site === undefined) return undefined;
   const config = await currentConfig(db, siteId);
-  const [active] = await db
-    .select({ pages: builds.pages })
-    .from(builds)
-    .where(and(eq(builds.siteId, siteId), eq(builds.status, 'ok')))
-    .orderBy(desc(builds.finishedAt), desc(builds.id))
-    .limit(1);
+  const [active] =
+    site.activeVersionId === null
+      ? []
+      : await db
+          .select({ pages: builds.pages })
+          .from(builds)
+          .where(
+            and(
+              eq(builds.siteId, siteId),
+              eq(builds.status, 'ok'),
+              eq(builds.versionId, site.activeVersionId),
+            ),
+          )
+          .orderBy(desc(builds.finishedAt), desc(builds.id))
+          .limit(1);
   return {
     siteId,
     state: site.state,
@@ -102,6 +111,7 @@ export async function recordBuild(
         );
     }
     await markPublished(tx, run.siteId);
+    await setActiveVersion(tx, run.siteId, outcome.publish.versionId);
     const declaredAt = run.massUnpublishDeclaredAt ?? null;
     if (declaredAt !== null) await clearMassUnpublish(tx, run.siteId, declaredAt);
     return row?.id ?? 0;
@@ -123,7 +133,12 @@ export async function recordBuild(
     })
     .returning({ id: builds.id });
   if (outcome.failure.kind === 'permanent') {
-    await pauseSite(tx, run.siteId, `${outcome.stage}: ${outcome.failure.message}`);
+    await pauseSite(
+      tx,
+      run.siteId,
+      `${outcome.stage}: ${outcome.failure.message}`,
+      outcome.failure.culprit,
+    );
   }
   return row?.id ?? 0;
 }

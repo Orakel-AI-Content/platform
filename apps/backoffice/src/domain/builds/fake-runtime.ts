@@ -81,11 +81,12 @@ export const failedFile = (
   kind: 'permanent' | 'transient',
   message: string,
   site = 'exemplo-a',
+  culprit?: { origin: string; reference: string },
 ) => ({
   formatVersion: 1,
   status: 'failed',
   site,
   release: 'local',
   durationMs: 10,
-  failure: { kind, message },
+  failure: { kind, message, ...(culprit && { culprit }) },
 });

@@ -1,7 +1,8 @@
-// Colunas operacionais do site (estado, motivo da pausa, ciclo de vida, janela dos builds,
-// limite diário de publicações, despublicação em massa declarada), gravadas pelo build e pela operação. Não vão para o
-// snapshot: gravar aqui não gera mudança pendente — senão cada build agendaria outro. Único
+// Colunas operacionais do site (estado, motivo e culpado da pausa, versão ativa, ciclo de
+// vida, janela dos builds, limite diário de publicações, despublicação em massa declarada),
+// gravadas pelo build e pela operação. Não vão para o snapshot: gravar aqui não gera mudança pendente — senão cada build agendaria outro. Único
 // módulo fora de pending-changes liberado no teste de varredura.
+import type { Culprit } from '@orakel/build-contract';
 import type { Result } from '@orakel/content-model';
 import { and, eq, ne } from 'drizzle-orm';
 
@@ -9,11 +10,24 @@ import type { Executor } from '../../db/client.ts';
 import { sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 
-/** Falha permanente: o site para de receber builds até ser retomado (L4). */
-export async function pauseSite(tx: Executor, siteId: string, reason: string): Promise<void> {
+/**
+ * Falha permanente: o site para de receber builds até ser retomado (L4). Grava o culpado
+ * junto do motivo; sem ele, limpa o de uma pausa anterior.
+ */
+export async function pauseSite(
+  tx: Executor,
+  siteId: string,
+  reason: string,
+  culprit?: Culprit,
+): Promise<void> {
   await tx
     .update(sites)
-    .set({ state: 'pausado', pausedReason: reason })
+    .set({
+      state: 'pausado',
+      pausedReason: reason,
+      pausedCulpritOrigin: culprit?.origin ?? null,
+      pausedCulpritReference: culprit?.reference ?? null,
+    })
     .where(eq(sites.id, siteId));
 }
 
@@ -23,6 +37,15 @@ export async function markPublished(tx: Executor, siteId: string): Promise<void>
     .update(sites)
     .set({ lifecycle: 'publicado' })
     .where(and(eq(sites.id, siteId), ne(sites.lifecycle, 'publicado')));
+}
+
+/** A versão publicada passa a ser a que está no ar (referência da trava de segurança). */
+export async function setActiveVersion(
+  tx: Executor,
+  siteId: string,
+  versionId: string,
+): Promise<void> {
+  await tx.update(sites).set({ activeVersionId: versionId }).where(eq(sites.id, siteId));
 }
 
 /**

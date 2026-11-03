@@ -1,3 +1,4 @@
+import type { Culprit } from '@orakel/build-contract';
 import {
   InstitutionalTextsSchema,
   SiteConfigSchema,
@@ -34,6 +35,10 @@ export type SiteSummary = {
   lifecycle: (typeof sites.$inferSelect)['lifecycle'];
   state: (typeof sites.$inferSelect)['state'];
   pausedReason: string | null;
+  /** Conteúdo que causou a pausa, quando a falha o apontou. */
+  pausedCulprit: Culprit | null;
+  /** Versão no ar (`versionId` do deploy); nula até a primeira publicação. */
+  activeVersionId: string | null;
   release: string | null;
   indexavel: boolean;
   pendingChanges: number;
@@ -305,6 +310,13 @@ export async function currentConfig(db: Executor, siteId: string): Promise<SiteC
 }
 
 /** Registro de instâncias, na forma da tela de sites. */
+function pausedCulprit(
+  site: Pick<typeof sites.$inferSelect, 'pausedCulpritOrigin' | 'pausedCulpritReference'>,
+): Culprit | null {
+  if (site.pausedCulpritOrigin === null || site.pausedCulpritReference === null) return null;
+  return { origin: site.pausedCulpritOrigin, reference: site.pausedCulpritReference };
+}
+
 export async function listSites(db: Executor, actor: Actor): Promise<Result<SiteSummary[]>> {
   const allowed = requireRole(actor, 'site.read');
   if (!allowed.ok) return allowed;
@@ -329,6 +341,8 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
         lifecycle: site.lifecycle,
         state: site.state,
         pausedReason: site.pausedReason,
+        pausedCulprit: pausedCulprit(site),
+        activeVersionId: site.activeVersionId,
         release: site.release,
         indexavel: config?.indexavel ?? false,
         pendingChanges: pendingBySite.get(site.id) ?? 0,
