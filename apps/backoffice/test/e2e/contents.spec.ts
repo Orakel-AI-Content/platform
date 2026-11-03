@@ -855,6 +855,8 @@ test.describe('barra de ações do editor (#109)', () => {
   // aberto e o rodapé fixo. Texto rico (#275): barra, conteúdo e o popover de link aberto com o
   // erro do campo. Nada é salvo.
   test(`editor sem violação do axe`, async ({ page }) => {
+    // 16 passagens do axe (8 estados × 2 temas): no runner do CI, passa dos 30 s padrão.
+    test.slow();
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await asRole(page, 'editor');
     await page.goto('/sites/exemplo-a/conteudos/novo');
