@@ -677,16 +677,28 @@ test.describe('barra de ações do editor (#109)', () => {
     }
     const toast = toastRegion(page);
 
+    // Digitar antes da hidratação perde o estado do formulário (no `next dev`, ela demora).
+    await page.waitForLoadState('networkidle');
+    await page.getByLabel(fieldLabel('Título')).fill(`${title} (salvo)`);
     await save.click();
     await expect(toast).toContainText('Versão 2 salva.');
     await expect(page).toHaveURL(new RegExp(`${editPath}$`));
     await expect(page.getByText('Partindo da versão 2', { exact: true })).toBeVisible();
 
-    // Salvar de novo sem mudar nada: nova versão, os mesmos 20 blocos.
-    await save.click();
-    await expect(toast).toContainText('Versão 3 salva.');
+    // Sem mudar nada, "Salvar" fica indisponível e diz por quê (#525); o clique (forçado: o
+    // Playwright não clica em `aria-disabled`) não envia nem cria versão nova (#523).
+    await expect(save).toHaveAttribute('aria-disabled', 'true');
+    await expect(save).toHaveAccessibleDescription('Nenhuma alteração para salvar.');
+    await expect(page.getByText('Nenhuma alteração para salvar.', { exact: true })).toBeVisible();
+    await save.click({ force: true });
+    await expect(toast).not.toContainText('Nenhuma alteração; a versão 2 continua a mais recente.');
+    await expect(page.getByText('Partindo da versão 2', { exact: true })).toBeVisible();
     await expect(page.getByRole('group', { name: /^Bloco \d+:/ })).toHaveCount(20);
     await expect(page.getByRole('main').getByRole('alert')).toHaveText('');
+    await page.goto(`/sites/exemplo-a/conteudos/${contentId}`);
+    const table = page.getByRole('table');
+    await expect(table.getByRole('link', { name: 'Versão 2', exact: true })).toBeVisible();
+    await expect(table.getByRole('link', { name: 'Versão 3', exact: true })).toHaveCount(0);
   });
 
   // Remover bloco se desfaz pelo toast (#112, #326): sem região nem botão no rodapé.
@@ -847,6 +859,8 @@ test.describe('barra de ações do editor (#109)', () => {
   // aberto e o rodapé fixo. Texto rico (#275): barra, conteúdo e o popover de link aberto com o
   // erro do campo. Nada é salvo.
   test(`editor sem violação do axe`, async ({ page }) => {
+    // 16 passagens do axe (8 estados × 2 temas): no runner do CI, passa dos 30 s padrão.
+    test.slow();
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await asRole(page, 'editor');
     await page.goto('/sites/exemplo-a/conteudos/novo');

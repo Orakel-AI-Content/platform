@@ -75,7 +75,7 @@ describe('editar conteúdo', () => {
 
     const result = await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
 
-    expect(result).toEqual({ ok: true, value: { version: 2 } });
+    expect(result).toEqual({ ok: true, value: { version: 2, created: true } });
     const rows = await versions(1);
     expect(rows.map((row) => [row.version, row.status])).toEqual([
       [1, 'publicado'],
@@ -108,7 +108,7 @@ describe('editar conteúdo', () => {
       blocks: [newText('novo'), textBlock(3, 'três'), textBlock(1, 'um')],
     });
 
-    expect(result).toEqual({ ok: true, value: { version: 2 } });
+    expect(result).toEqual({ ok: true, value: { version: 2, created: true } });
     expect((await latest(id)).blocks.map((block) => block.n)).toEqual([4, 3, 1]);
     const [row] = await db
       .select({ nextBlockN: contents.nextBlockN })
@@ -129,13 +129,43 @@ describe('editar conteúdo', () => {
 
     expect(
       await edit(3, { ...current, blocks: [...current.blocks, newText('outro', 99)] }),
-    ).toEqual({ ok: true, value: { version: 2 } });
+    ).toEqual({ ok: true, value: { version: 2, created: true } });
     expect((await latest(3)).blocks.map((block) => block.n)).toEqual([1, 2]);
 
     const refused = await edit(3, { ...current, blocks: [textBlock(99, 'inventado')] });
     expect(refused).toMatchObject({ ok: false, issues: [{ code: 'content.block_unknown' }] });
     expect((await versions(3)).length).toBe(2);
     expect((await unresolvedPendingChangeIds(db, SITE)).length).toBe(before.length + 1);
+  });
+
+  it('sem alteração não grava nada e devolve a versão atual (#523)', async () => {
+    const [before] = await versions(1);
+    const pending = await unresolvedPendingChangeIds(db, SITE);
+    const nextBlockN = async () =>
+      (
+        await db
+          .select({ nextBlockN: contents.nextBlockN })
+          .from(contents)
+          .where(and(eq(contents.siteId, SITE), eq(contents.id, 1)))
+      )[0]?.nextBlockN;
+    const counter = await nextBlockN();
+
+    // Mesmos dados, com as chaves em outra ordem: a comparação é estrutural.
+    const current = await latest(1);
+    const reordered = Object.fromEntries(Object.entries(current).reverse()) as typeof current;
+    expect(await edit(1, reordered)).toEqual({ ok: true, value: { version: 1, created: false } });
+
+    expect(await versions(1)).toEqual([before]);
+    expect(await nextBlockN()).toBe(counter);
+    expect(await unresolvedPendingChangeIds(db, SITE)).toEqual(pending);
+  });
+
+  it('bloco novo sempre conta como alteração (#523)', async () => {
+    const current = await latest(3);
+
+    const result = await edit(3, { ...current, blocks: [...current.blocks, newText('outro')] });
+
+    expect(result).toEqual({ ok: true, value: { version: 2, created: true } });
   });
 
   it('bloco de tipo fora dos recursos é recusado sem gravar nada', async () => {
@@ -280,7 +310,7 @@ describe('enviar para revisão (#72)', () => {
 
   it('recusa versão mais recente fora de rascunho e conteúdo inexistente', async () => {
     expect(await submit(2)).toMatchObject({ ok: false, issues: [{ code: 'content.not_draft' }] });
-    await edit(1, await latest(1));
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
     await submit(1);
     expect(await submit(1)).toMatchObject({ ok: false, issues: [{ code: 'content.not_draft' }] });
     expect(await submit(999)).toMatchObject({
@@ -291,7 +321,7 @@ describe('enviar para revisão (#72)', () => {
   });
 
   it.each(['revisor', 'operacao'] as const)('%s não envia', async (role) => {
-    await edit(1, await latest(1));
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
 
     const result = await submit(1, { email: `${role}@orakel.local`, roles: [role] });
 
@@ -300,7 +330,7 @@ describe('enviar para revisão (#72)', () => {
   });
 
   it('editor envia', async () => {
-    await edit(1, await latest(1));
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
     expect(await submit(1, { email: 'editor@orakel.local', roles: ['editor'] })).toMatchObject({
       ok: true,
     });
@@ -317,7 +347,7 @@ describe('fila de revisão (#72)', () => {
   it('lista só os conteúdos com a versão mais recente em revisão, da mais antiga à mais recente', async () => {
     await edit(3, { ...(await latest(3)), title: 'Quem somos (2)' });
     await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
-    await edit(2, await latest(2));
+    await edit(2, { ...(await latest(2)), title: 'Outro guia' });
     await submit(3);
     await submit(1);
 
@@ -330,7 +360,7 @@ describe('fila de revisão (#72)', () => {
   });
 
   it('salvar uma versão nova tira o conteúdo da fila', async () => {
-    await edit(1, await latest(1));
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
     await submit(1);
     expect((await queue()).map((item) => item.id)).toEqual([1]);
 
@@ -339,10 +369,28 @@ describe('fila de revisão (#72)', () => {
     expect(await queue()).toEqual([]);
   });
 
+  it('salvar sem alteração mantém o conteúdo na fila e a versão em revisão (#523)', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await submit(1);
+
+    expect(await edit(1, await latest(1))).toEqual({
+      ok: true,
+      value: { version: 2, created: false },
+    });
+
+    expect((await queue()).map(({ id, version }) => ({ id, version }))).toEqual([
+      { id: 1, version: 2 },
+    ]);
+    expect((await versions(1)).map((v) => [v.version, v.status])).toEqual([
+      [1, 'publicado'],
+      [2, 'em_revisao'],
+    ]);
+  });
+
   it('não traz conteúdos de outro site', async () => {
     const imported = await importSnapshot(db, SYSTEM_ACTOR, await readFixture('exemplo-b'));
     if (!imported.ok) throw new Error(JSON.stringify(imported.issues));
-    await edit(1, await latest(1));
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
     await submit(1);
 
     expect(await queue('exemplo-b')).toEqual([]);
@@ -385,7 +433,7 @@ describe('leituras de conteúdo', () => {
     await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
     const unpublished = await db.transaction((tx) => unpublishContent(tx, SYSTEM_ACTOR, SITE, 2));
     if (!unpublished.ok) throw new Error(JSON.stringify(unpublished.issues));
-    await edit(2, await latest(2));
+    await edit(2, { ...(await latest(2)), title: 'Outro guia' });
     const created = await db.transaction((tx) =>
       createContent(tx, SYSTEM_ACTOR, SITE, {
         kind: 'page',
