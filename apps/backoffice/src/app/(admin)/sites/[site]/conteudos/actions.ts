@@ -57,7 +57,8 @@ export async function createContentAction(
 
 /**
  * Grava a versão N+1 do conteúdo em rascunho e a devolve relida do servidor: o editor
- * continua nela (#109), com os `n` que o servidor deu aos blocos novos.
+ * continua nela (#109), com os `n` que o servidor deu aos blocos novos. Sem alteração, o
+ * domínio não grava nada (#523): a resposta é sucesso, com a versão atual.
  */
 export async function updateContentAction(
   siteId: string,
@@ -71,13 +72,17 @@ export async function updateContentAction(
     updateContent(tx, actor.value, siteId, contentId, input, await resourcesFor(tx, siteId)),
   );
   if (!result.ok) return refused(result.issues);
-  revalidatePath(`/sites/${siteId}/conteudos`);
-  revalidatePath(`/sites/${siteId}/conteudos/${contentId}`);
+  const { version, created } = result.value;
+  if (created) {
+    revalidatePath(`/sites/${siteId}/conteudos`);
+    revalidatePath(`/sites/${siteId}/conteudos/${contentId}`);
+  }
   const versions = await listContentVersions(db, actor.value, siteId, contentId);
-  const saved = versions.ok
-    ? versions.value.find((version) => version.version === result.value.version)?.data
-    : undefined;
-  return { ok: true, message: `Versão ${result.value.version} salva.`, id: contentId, saved };
+  const saved = versions.ok ? versions.value.find((v) => v.version === version)?.data : undefined;
+  const message = created
+    ? `Versão ${version} salva.`
+    : `Nenhuma alteração; a versão ${version} continua a mais recente.`;
+  return { ok: true, message, id: contentId, saved };
 }
 
 /** Envia a versão mais recente (em rascunho) para revisão; a regra é do domínio. */

@@ -63,18 +63,19 @@ async function versions(contentId: number) {
 const statusOf = async (contentId: number, version: number) =>
   (await versions(contentId)).find((row) => row.version === version)?.status;
 
-/** Nova versão enviada para revisão e, se pedido, aprovada. */
+/**
+ * Nova versão (o título ganha o número dela: sem alteração, nenhuma versão é criada, #523)
+ * enviada para revisão e, se pedido, aprovada.
+ */
 async function prepare(contentId: number, approve = true, slug?: string): Promise<number> {
   const last = (await versions(contentId)).at(-1);
   if (last === undefined) throw new Error(`conteúdo ${contentId} sem versão`);
   const saved = await db.transaction((tx) =>
-    updateContent(
-      tx,
-      SYSTEM_ACTOR,
-      SITE,
-      contentId,
-      slug === undefined ? last.data : { ...last.data, slug },
-    ),
+    updateContent(tx, SYSTEM_ACTOR, SITE, contentId, {
+      ...last.data,
+      title: `${last.data.title} (v${String(last.version + 1)})`,
+      ...(slug === undefined ? {} : { slug }),
+    }),
   );
   if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
   await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));

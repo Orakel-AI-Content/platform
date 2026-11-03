@@ -98,7 +98,7 @@ describe('ações do editor de conteúdo', () => {
 
   it('sucesso delega com o ator da sessão e revalida a lista do site', async () => {
     mocks.createContent.mockResolvedValue({ ok: true, value: { id: 4 } });
-    mocks.updateContent.mockResolvedValue({ ok: true, value: { version: 3 } });
+    mocks.updateContent.mockResolvedValue({ ok: true, value: { version: 3, created: true } });
     const saved = { ...input, blocks: [{ n: 1, type: 'toc', title: 'Neste guia' }] };
     mocks.listContentVersions.mockResolvedValue({
       ok: true,
@@ -131,6 +131,25 @@ describe('ações do editor de conteúdo', () => {
     });
     expect(mocks.updateContent).toHaveBeenCalledWith({}, editor, 'exemplo-a', 2, input, RESOURCES);
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/conteudos');
+  });
+
+  it('sem alteração: sucesso com mensagem própria, a versão atual e sem revalidar', async () => {
+    mocks.updateContent.mockResolvedValue({ ok: true, value: { version: 2, created: false } });
+    mocks.listContentVersions.mockResolvedValue({
+      ok: true,
+      value: [
+        { version: 1, data: { ...input, title: 'Antes' } },
+        { version: 2, data: input },
+      ],
+    });
+
+    expect(await updateContentAction('exemplo-a', 2, input)).toEqual({
+      ok: true,
+      message: 'Nenhuma alteração; a versão 2 continua a mais recente.',
+      id: 2,
+      saved: input,
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it('valida com os recursos da release do site: sem faq, a gravação com faq é recusada', async () => {

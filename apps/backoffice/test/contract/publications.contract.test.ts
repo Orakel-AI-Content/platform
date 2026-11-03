@@ -53,11 +53,17 @@ async function versions(contentId: number) {
     .orderBy(asc(contentVersions.version));
 }
 
-/** Nova versão (com o título dado), enviada para revisão e, se pedido, aprovada. */
+/**
+ * Nova versão (com o título dado ou, sem ele, o atual com o número dela: sem alteração,
+ * nenhuma versão é criada, #523), enviada para revisão e, se pedido, aprovada.
+ */
 async function prepare(contentId: number, title?: string, approve = true): Promise<number> {
   const last = (await versions(contentId)).at(-1);
   if (last === undefined) throw new Error(`conteúdo ${contentId} sem versão`);
-  const data = title === undefined ? last.data : { ...last.data, title };
+  const data = {
+    ...last.data,
+    title: title ?? `${last.data.title} (v${String(last.version + 1)})`,
+  };
   const saved = await db.transaction((tx) =>
     updateContent(tx, SYSTEM_ACTOR, SITE, contentId, data),
   );

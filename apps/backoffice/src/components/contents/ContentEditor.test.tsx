@@ -122,6 +122,10 @@ async function chooseNewType(user: ReturnType<typeof userEvent.setup>, label: st
 const save = (user: ReturnType<typeof userEvent.setup>) =>
   user.click(screen.getByRole('button', { name: /^(Salvar|Criar)$/ }));
 
+/** Na edição, sem alteração "Salvar" não envia (#525): muda o título antes. */
+const touch = (user: ReturnType<typeof userEvent.setup>) =>
+  user.type(screen.getByLabelText(fieldLabel('Título')), '!');
+
 describe('editor de conteúdo', () => {
   it('o tipo de bloco novo só oferece os tipos da release', async () => {
     renderEditor({ blockTypes: ['text', 'toc', 'image'] });
@@ -205,6 +209,7 @@ describe('editor de conteúdo', () => {
       defaultValues: { ...meta, blocks: [{ n: 1, type: 'image', mediaId: 1 }] },
     });
 
+    await touch(user);
     await save(user);
 
     const alt = await screen.findByLabelText(fieldLabel('Texto alternativo'));
@@ -246,6 +251,7 @@ describe('editor de conteúdo', () => {
       },
     });
 
+    await touch(user);
     await save(user);
 
     expect(await screen.findByText('Título recusado')).toBeTruthy();
@@ -313,6 +319,7 @@ describe('barra de ações e continuar no editor (#109)', () => {
         }),
     });
 
+    await touch(user);
     await save(user);
     const button = await screen.findByRole('button', { name: 'Salvando…' });
     expect(button).toHaveProperty('disabled', true);
@@ -365,6 +372,7 @@ describe('barra de ações e continuar no editor (#109)', () => {
     const button = await screen.findByRole('button', { name: 'Salvar' });
     expect(button).toHaveProperty('disabled', false);
 
+    await touch(user);
     await save(user);
 
     await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
@@ -795,6 +803,7 @@ describe('recolher e expandir blocos (#135)', () => {
     });
     await user.click(toggle(2));
 
+    await touch(user);
     await save(user);
     await screen.findByText('Versão 2 salva.');
 
@@ -812,6 +821,7 @@ describe('recolher e expandir blocos (#135)', () => {
     });
     await user.click(toggle(1));
 
+    await touch(user);
     await save(user);
 
     await waitFor(() => expect(toggle(1).getAttribute('aria-expanded')).toBe('true'));
@@ -832,6 +842,7 @@ describe('recolher e expandir blocos (#135)', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Recolher todos' }));
 
+    await touch(user);
     await save(user);
 
     await screen.findByText('Título recusado');

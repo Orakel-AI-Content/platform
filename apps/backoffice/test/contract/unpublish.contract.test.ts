@@ -60,17 +60,21 @@ async function versions(contentId: number) {
     .orderBy(asc(contentVersions.version));
 }
 
-/** Nova versão (com as mudanças dadas), enviada para revisão e aprovada. */
+/**
+ * Nova versão (com as mudanças dadas; sem elas, o título ganha o número dela, porque sem
+ * alteração nenhuma versão é criada, #523), enviada para revisão e aprovada.
+ */
 async function approved(contentId: number, changes: { title?: string; slug?: string } = {}) {
   const [last] = await db
-    .select({ data: contentVersions.data })
+    .select({ version: contentVersions.version, data: contentVersions.data })
     .from(contentVersions)
     .where(and(eq(contentVersions.siteId, SITE), eq(contentVersions.contentId, contentId)))
     .orderBy(sql`${contentVersions.version} desc`)
     .limit(1);
   if (last === undefined) throw new Error(`conteúdo ${contentId} sem versão`);
+  const title = `${last.data.title} (v${String(last.version + 1)})`;
   const saved = await db.transaction((tx) =>
-    updateContent(tx, SYSTEM_ACTOR, SITE, contentId, { ...last.data, ...changes }),
+    updateContent(tx, SYSTEM_ACTOR, SITE, contentId, { ...last.data, title, ...changes }),
   );
   if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
   await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
