@@ -79,6 +79,19 @@ describe('parseEnv: geração (LLM_*)', () => {
     expect(() => parseEnv({ ...valid, LLM_MODEL: 'claude-haiku-5-5' })).toThrow(/LLM_MODEL/);
   });
 
+  it('a rota interna do gerador é o backoffice-web da rede internal, por padrão', () => {
+    expect(parseEnv(valid).GENERATOR_API_URL).toBe('http://backoffice-web:3000');
+    expect(parseEnv({ ...valid, GENERATOR_API_URL: '' }).GENERATOR_API_URL).toBe(
+      'http://backoffice-web:3000',
+    );
+    expect(
+      parseEnv({ ...valid, GENERATOR_API_URL: 'http://localhost:3000' }).GENERATOR_API_URL,
+    ).toBe('http://localhost:3000');
+    expect(() => parseEnv({ ...valid, GENERATOR_API_URL: 'nao-e-url' })).toThrow(
+      /GENERATOR_API_URL/,
+    );
+  });
+
   it('lê a tabela de preços em JSON e recusa JSON ou preço inválido', () => {
     const pricing = '{"anthropic:claude-haiku-5-5":{"input":0.1,"output":0.5}}';
     expect(parseEnv({ ...valid, LLM_PRICING: pricing }).LLM_PRICING).toEqual({

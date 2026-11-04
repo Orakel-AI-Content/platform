@@ -58,6 +58,11 @@ const EnvObjectSchema = z.object({
   LLM_MODEL: blankAsUndefined(llmModel.default(DEFAULT_LLM_MODEL)),
   LLM_API_KEY: optional(z.string().min(1)),
   LLM_PRICING: blankAsUndefined(llmPricing.default({})),
+  /**
+   * Backoffice-web visto pelo backoffice-worker: a task generate-article cria o artigo pela
+   * rota interna, com o GENERATOR_TOKEN (contrato motor → Backoffice), na rede `internal`.
+   */
+  GENERATOR_API_URL: blankAsUndefined(z.url().default('http://backoffice-web:3000')),
 });
 
 export const EnvSchema = EnvObjectSchema.refine(

@@ -186,6 +186,12 @@ decisions:
       rationale: 'ADR 0018',
       source: decided,
     }
+  extra.generation-runs:
+    {
+      value: 'generation_runs grava cada execução (pendente → ok | falha) e o job generate-article (max_attempts 1) na mesma transação; a task cria o artigo pela rota interna com GENERATOR_TOKEN (GENERATOR_API_URL) e registra toda falha sem lançar',
+      rationale: 'ADR 0019',
+      source: decided,
+    }
 
 commands:
   dev: pnpm dev
