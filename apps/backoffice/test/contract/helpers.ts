@@ -57,6 +57,8 @@ async function refuseForeignDatabase(db: Db): Promise<void> {
 }
 
 const TABLES = [
+  'audience_daily_article',
+  'audience_daily_site',
   'builds',
   'pending_changes',
   'reviews',
