@@ -34,6 +34,7 @@ const AREAS = [
   'Taxonomias',
   'Menus',
   'Contextos editoriais',
+  'Geração',
 ];
 
 const toggle = () => page.getByRole('button', { name: 'Navegação lateral' });

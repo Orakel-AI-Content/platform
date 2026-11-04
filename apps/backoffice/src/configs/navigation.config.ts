@@ -94,6 +94,8 @@ const navigationConfig: NavigationTree[] = [
         'Contextos editoriais',
         'siteEditorialContexts',
       ),
+      // Disparo e acompanhamento da geração (R1, R5): ver é site.read; disparar, content.write.
+      siteArea('site.generation', 'geracao', 'Geração', 'siteGeneration'),
       // Só para quem edita: a tela é um formulário.
       siteArea(
         'site.institutional',

@@ -30,6 +30,7 @@ const AREAS = [
   'Taxonomias',
   'Menus',
   'Contextos editoriais',
+  'Geração',
 ];
 
 const actor = (role: Actor['roles'][number]): Actor => ({ email: `${role}@x`, roles: [role] });
