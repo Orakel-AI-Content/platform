@@ -488,6 +488,22 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   negada) mostra o identificador num `ActionAlert` dentro do diálogo, limpo ao fechar. Esc, o
   fundo ou o X fecham, e o foco volta à imagem.
 
+### Métricas
+
+O padrão do `AnalyticDashboard` do Ecme (#548), na audiência do site
+(`sites/[site]/audiencia/page.tsx`):
+
+- **Cabeçalho:** `AudienceHeader` (`src/components/audience/`, do `AnalyticHeader`): o `h1`
+  com a descrição à esquerda e o `Select` do período à direita, com `<label>` próprio. O
+  período fica na URL (`?periodo=`), lido pelo Server Component; trocá-lo usa
+  `router.replace` e volta a tabela à primeira página.
+- **Cartões:** `AudienceMetrics` (do `Metrics`): um `Card` por número, com o título, o valor
+  (`p.h3`, `tabular-nums`, `Intl.NumberFormat('pt-BR')`), a linha do período e o ícone num
+  círculo `*-subtle` (`aria-hidden`), lado a lado a partir de `md`. Sem `GrowShrinkValue`
+  enquanto não houver comparação com o período anterior.
+- **Tabela:** `DataTable` com `useListTable` no `AdaptiveCard`, sem toolbar (não há busca).
+- **Vazio:** sem dados no período, só o `EmptyState`, no lugar de cartões e tabela.
+
 ### Retorno das ações
 
 - **Retorno:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,

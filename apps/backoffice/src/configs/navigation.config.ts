@@ -94,6 +94,8 @@ const navigationConfig: NavigationTree[] = [
         'Contextos editoriais',
         'siteEditorialContexts',
       ),
+      // Visualizações e sessões por dia, das tabelas diárias consolidadas (#548).
+      siteArea('site.audience', 'audiencia', 'Audiência', 'siteAudience'),
       // Só para quem edita: a tela é um formulário.
       siteArea(
         'site.institutional',
