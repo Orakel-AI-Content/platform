@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ROLES } from '../../db/schema/index.ts';
-import { can, PERMISSIONS, requireRole, type Action } from './rbac.ts';
+import { can, GENERATOR_ACTOR, PERMISSIONS, requireRole, type Action } from './rbac.ts';
 
 const actor = (...roles: (typeof ROLES)[number][]) => ({ email: 'x@orakel.local', roles });
 
@@ -33,6 +33,11 @@ describe('RBAC', () => {
       ok: true,
       value: undefined,
     });
+  });
+
+  it('o gerador escreve conteúdo, mas não aprova nem publica', () => {
+    expect(can(GENERATOR_ACTOR, 'content.write')).toBe(true);
+    expect(can(GENERATOR_ACTOR, 'content.publish')).toBe(false);
   });
 
   it('cada papel da tabela existe no banco', () => {
