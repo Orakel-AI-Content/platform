@@ -168,6 +168,28 @@ describe('SiteSummaryCard', () => {
     expect(screen.getByRole('button', { name: 'Reconstruir na release' })).toBeTruthy();
   });
 
+  it('"Reverter" só quando a página passa a ação, ativo ou pausado', () => {
+    const rollback = {
+      versions: [],
+      action: vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' })),
+    };
+    const { rerender } = render(<SiteSummaryCard site={site} g1Registered />);
+    expect(screen.queryByRole('button', { name: 'Reverter' })).toBeNull();
+
+    rerender(<SiteSummaryCard site={site} g1Registered rollback={rollback} />);
+    const button = screen.getByRole('button', { name: 'Reverter' });
+    expect(document.querySelector('.card')?.contains(button)).toBe(true);
+
+    rerender(
+      <SiteSummaryCard
+        site={{ ...site, state: 'pausado', pausedReason: 'x' }}
+        g1Registered
+        rollback={rollback}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Reverter' })).toBeTruthy();
+  });
+
   it('sem a ação (editor, revisor), o site pausado não mostra "Retomar"', () => {
     render(
       <SiteSummaryCard site={{ ...site, state: 'pausado', pausedReason: 'x' }} g1Registered />,

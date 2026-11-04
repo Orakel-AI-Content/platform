@@ -13,6 +13,7 @@ import { SiteTabs } from '@/components/sites/SiteTabs';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
+import { listRollbackVersions } from '@/domain/builds/builds.ts';
 import { listReleases } from '@/domain/releases/releases.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
 import { redirectUsageFor } from '@/domain/sites/sites.ts';
@@ -27,6 +28,7 @@ import {
   rebuildOnReleaseAction,
   registerG1Action,
   resumeSiteAction,
+  rollbackSiteAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
 } from '../actions.ts';
@@ -36,7 +38,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Página do site na tela de detalhe do guia (#370): o resumo à esquerda (dados de publicação e
- * "Publicar agora" ou, pausado, "Retomar", e "Reconstruir na release", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1,
+ * "Publicar agora" ou, pausado, "Retomar", "Reconstruir na release" e "Reverter", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1,
  * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo sitePageContext (a mesma
  * busca do layout), os gatilhos e o uso de redirects, que vira um aviso acima do resumo quando
  * o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do limite e "Editar
@@ -55,6 +57,8 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   // As releases do "Reconstruir" (#515): listá-las exige release.promote, que a operação e o
   // admin têm junto de operations.run; recusada a lista, a ação não aparece.
   const releases = canOperate ? await listReleases(db, actor) : undefined;
+  // As versões do "Reverter" (#514): as dos builds `ok`, sem a que está no ar.
+  const versions = canOperate ? await listRollbackVersions(db, actor, siteId) : undefined;
 
   // Dica e estado das abas de G1, janela e limite (o nome da aba é o título): com permissão, o corpo do
   // cartão do formulário (gerado do schema, botões no rodapé, #333); sem, um cartão só de leitura.
@@ -141,6 +145,11 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                   releases: releases.value.map((release) => release.tag),
                   action: rebuildOnReleaseAction.bind(null, site.id),
                 }
+              : undefined
+          }
+          rollback={
+            versions?.ok
+              ? { versions: versions.value, action: rollbackSiteAction.bind(null, site.id) }
               : undefined
           }
         />

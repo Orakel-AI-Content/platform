@@ -1,15 +1,16 @@
 // Builds no banco (12.0, L3): o que o build-runner precisa antes de começar e o registro do
 // resultado. Com sucesso, a mesma transação grava o build e baixa as mudanças pela lista
-// que o snapshot viu; com falha permanente, pausa o site com o motivo.
+// que o snapshot viu; com falha permanente, pausa o site com o motivo. "Reverter" (L4) escolhe
+// entre as versões dos builds `ok` e enfileira o rollback.
 import type { Result } from '@orakel/content-model';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { builds, pendingChanges, sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome } from './run-build.ts';
-import { buildNow } from './schedule.ts';
+import { buildNow, scheduleRollback } from './schedule.ts';
 import { clearMassUnpublish, markPublished, pauseSite, setActiveVersion } from './site-state.ts';
 
 export type BuildTarget = {
@@ -187,5 +188,103 @@ export async function requestBuildNow(
     };
   }
   await buildNow(tx, siteId);
+  return { ok: true, value: undefined };
+}
+
+/** Versão já publicada que o site pode voltar a ter no ar ("Reverter"). */
+export type RollbackVersion = {
+  versionId: string;
+  release: string;
+  pages: number | null;
+  /** Fim do build mais recente que publicou a versão. */
+  finishedAt: Date;
+};
+
+const notFound = (siteId: string) => ({
+  ok: false as const,
+  issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+});
+
+/** Versões dos builds `ok` do site, da mais recente para a mais antiga, sem a que está no ar. */
+export async function listRollbackVersions(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<RollbackVersion[]>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+  const [site] = await db
+    .select({ activeVersionId: sites.activeVersionId })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) return notFound(siteId);
+
+  const rows = await db
+    .selectDistinctOn([builds.versionId], {
+      versionId: builds.versionId,
+      release: builds.release,
+      pages: builds.pages,
+      finishedAt: builds.finishedAt,
+    })
+    .from(builds)
+    .where(and(eq(builds.siteId, siteId), eq(builds.status, 'ok'), isNotNull(builds.versionId)))
+    .orderBy(builds.versionId, desc(builds.finishedAt), desc(builds.id));
+  const versions = rows
+    .filter(
+      (row): row is RollbackVersion =>
+        row.versionId !== null && row.versionId !== site.activeVersionId,
+    )
+    .sort((a, b) => b.finishedAt.getTime() - a.finishedAt.getTime());
+  return { ok: true, value: versions };
+}
+
+/**
+ * "Reverter": enfileira o rollback do site para uma versão de um build `ok` dele, diferente da
+ * que está no ar. Não muda o estado nem a pausa; a task `rollback` grava a versão ativa quando
+ * conclui.
+ */
+export async function requestRollback(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  versionId: string,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+  const [site] = await tx
+    .select({ activeVersionId: sites.activeVersionId })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) return notFound(siteId);
+  if (versionId === site.activeVersionId) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'rollback.version_active',
+          message: `A versão ${versionId} já está no ar`,
+          path: ['versionId'],
+        },
+      ],
+    };
+  }
+  const [published] = await tx
+    .select({ id: builds.id })
+    .from(builds)
+    .where(and(eq(builds.siteId, siteId), eq(builds.status, 'ok'), eq(builds.versionId, versionId)))
+    .limit(1);
+  if (published === undefined) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'rollback.version_unknown',
+          message: `A versão ${versionId} não é de um build bem-sucedido de ${siteId}`,
+          path: ['versionId'],
+        },
+      ],
+    };
+  }
+  await scheduleRollback(tx, siteId, versionId);
   return { ok: true, value: undefined };
 }

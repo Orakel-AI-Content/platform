@@ -3,9 +3,10 @@ import type { JobHelpers } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { sites } from '../../src/db/schema/index.ts';
+import { builds, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
+import { listRollbackVersions, requestRollback } from '../../src/domain/builds/builds.ts';
 import { failedFile, fakeRuntime, rollbackOk } from '../../src/domain/builds/fake-runtime.ts';
 import type { FakeStage } from '../../src/domain/builds/fake-runtime.ts';
 import type { BuildSettings } from '../../src/domain/builds/plan.ts';
@@ -178,5 +179,124 @@ describe('scheduleRollback', () => {
     const { rows } = await db.execute<{ task_identifier: string }>(sql`
       select task_identifier from graphile_worker.jobs order by task_identifier`);
     expect(rows.map((r) => r.task_identifier)).toEqual(['build', 'rollback', 'rollback']);
+  });
+});
+
+describe('reverter', () => {
+  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+
+  async function build(
+    siteId: string,
+    versionId: string | null,
+    finishedAt: string,
+    status: 'ok' | 'failed' = 'ok',
+  ) {
+    await db.insert(builds).values({
+      siteId,
+      release: 'local',
+      attempt: 1,
+      status,
+      versionId,
+      pages: 10,
+      startedAt: new Date(finishedAt),
+      finishedAt: new Date(finishedAt),
+    });
+  }
+
+  async function rollbackJobs() {
+    const { rows } = await db.execute<{ queue_name: string; payload: unknown }>(sql`
+      select q.queue_name, j.payload
+      from graphile_worker._private_jobs j
+      join graphile_worker._private_tasks t on t.id = j.task_id
+      join graphile_worker._private_job_queues q on q.id = j.job_queue_id
+      where t.identifier = 'rollback'`);
+    return rows;
+  }
+
+  beforeEach(async () => {
+    await build('exemplo-a', OLDER, '2026-10-01T12:00:00Z');
+    await build('exemplo-a', CURRENT, '2026-10-20T12:00:00Z');
+  });
+
+  it('lista as versões dos builds ok, da mais recente, sem a ativa nem falhas', async () => {
+    const MIDDLE = '20261010T120000Z-bbbbbbbb';
+    await build('exemplo-a', MIDDLE, '2026-10-10T12:00:00Z');
+    // A mesma versão publicada de novo aparece uma vez, com a data mais recente.
+    await build('exemplo-a', OLDER, '2026-10-02T12:00:00Z');
+    await build('exemplo-a', null, '2026-10-21T12:00:00Z', 'failed');
+    const listed = await listRollbackVersions(db, operacao, 'exemplo-a');
+    expect(listed).toEqual({
+      ok: true,
+      value: [
+        {
+          versionId: MIDDLE,
+          release: 'local',
+          pages: 10,
+          finishedAt: new Date('2026-10-10T12:00:00Z'),
+        },
+        {
+          versionId: OLDER,
+          release: 'local',
+          pages: 10,
+          finishedAt: new Date('2026-10-02T12:00:00Z'),
+        },
+      ],
+    });
+  });
+
+  it('enfileira o rollback na fila build:<site> sem mudar estado nem pausa', async () => {
+    await db.transaction((tx) => pauseSite(tx, 'exemplo-a', 'falhou'));
+    expect(await db.transaction((tx) => requestRollback(tx, operacao, 'exemplo-a', OLDER))).toEqual(
+      { ok: true, value: undefined },
+    );
+    expect(await rollbackJobs()).toEqual([
+      { queue_name: 'build:exemplo-a', payload: { siteId: 'exemplo-a', versionId: OLDER } },
+    ]);
+    expect(await site()).toMatchObject({
+      activeVersionId: CURRENT,
+      state: 'pausado',
+      pausedReason: 'falhou',
+    });
+  });
+
+  it.each([
+    ['a versão ativa', CURRENT, 'rollback.version_active'],
+    ['versão de build com falha', 'falhou-1', 'rollback.version_unknown'],
+    ['versão de outro site', 'outro-1', 'rollback.version_unknown'],
+    ['versão inexistente', '20260101T000000Z-00000000', 'rollback.version_unknown'],
+  ])('recusa %s, sem enfileirar', async (_, versionId, code) => {
+    await build('exemplo-a', 'falhou-1', '2026-10-05T12:00:00Z', 'failed');
+    const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
+    if (line?.type !== 'config') throw new Error('fixture sem config');
+    await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, line.data));
+    await build('exemplo-b', 'outro-1', '2026-10-05T12:00:00Z');
+    expect(
+      await db.transaction((tx) => requestRollback(tx, operacao, 'exemplo-a', versionId)),
+    ).toMatchObject({ ok: false, issues: [{ code, path: ['versionId'] }] });
+    expect(await rollbackJobs()).toEqual([]);
+  });
+
+  it('recusa site inexistente', async () => {
+    expect(
+      await db.transaction((tx) => requestRollback(tx, operacao, 'nao-existe', OLDER)),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+    expect(await listRollbackVersions(db, operacao, 'nao-existe')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
+  });
+
+  it('editor e revisor recebem forbidden e nada é enfileirado', async () => {
+    for (const role of ['editor', 'revisor'] as const) {
+      const actor = { email: `${role}@orakel.local`, roles: [role] };
+      expect(
+        await db.transaction((tx) => requestRollback(tx, actor, 'exemplo-a', OLDER)),
+      ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+      expect(await listRollbackVersions(db, actor, 'exemplo-a')).toMatchObject({
+        ok: false,
+        issues: [{ code: 'forbidden' }],
+      });
+    }
+    expect(await rollbackJobs()).toEqual([]);
   });
 });
