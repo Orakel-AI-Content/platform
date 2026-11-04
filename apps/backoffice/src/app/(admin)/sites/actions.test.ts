@@ -6,6 +6,7 @@ import {
   createSiteAction,
   rebuildOnReleaseAction,
   registerG1Action,
+  rollbackSiteAction,
   resumeSiteAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
@@ -23,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   advanceLifecycle: vi.fn(),
   resumeSite: vi.fn(),
   rebuildOnRelease: vi.fn(),
+  requestRollback: vi.fn(),
   setBuildWindow: vi.fn(),
   setDailyPublishLimit: vi.fn(),
   registerPolicyTrigger: vi.fn(),
@@ -33,7 +35,10 @@ vi.mock('@/auth/request-actor.ts', () => ({ currentActor: mocks.currentActor }))
 vi.mock('@/db/client.ts', () => ({
   getDb: () => ({ db: { transaction: (fn: (tx: unknown) => unknown) => fn({}) } }),
 }));
-vi.mock('@/domain/builds/builds.ts', () => ({ requestBuildNow: vi.fn() }));
+vi.mock('@/domain/builds/builds.ts', () => ({
+  requestBuildNow: vi.fn(),
+  requestRollback: mocks.requestRollback,
+}));
 vi.mock('@/domain/builds/site-state.ts', () => ({
   advanceLifecycle: mocks.advanceLifecycle,
   resumeSite: mocks.resumeSite,
@@ -281,6 +286,39 @@ describe('Server Actions da página do site', () => {
       'core-v1.2.0',
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('"Reverter" delega ao domínio; a recusa vira a mensagem, sem revalidar', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await rollbackSiteAction('exemplo-a', 'v-antiga')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.requestRollback).not.toHaveBeenCalled();
+
+    mocks.requestRollback.mockResolvedValueOnce({
+      ok: false,
+      issues: [
+        {
+          code: 'rollback.version_active',
+          message: 'A versão v-atual já está no ar',
+          path: ['versionId'],
+        },
+      ],
+    });
+    expect(await rollbackSiteAction('exemplo-a', 'v-atual')).toEqual({
+      ok: false,
+      message: 'A versão v-atual já está no ar',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+
+    mocks.requestRollback.mockResolvedValueOnce(done);
+    expect(await rollbackSiteAction('exemplo-a', 'v-antiga')).toEqual({
+      ok: true,
+      message: 'Rollback de exemplo-a para v-antiga enfileirado.',
+    });
+    expect(mocks.requestRollback).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a', 'v-antiga');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });
 
