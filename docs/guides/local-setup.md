@@ -7,7 +7,13 @@ Consulte para preparar a máquina e subir o ambiente local ponta a ponta.
 - **Node 22+** para rodar o pnpm. O pnpm baixa e usa o **Node 24.21.0** fixado
   (`devEngines.runtime`) nos scripts do projeto; com nvm, `nvm use` lê o `.nvmrc`.
 - **pnpm 11** via Corepack: `corepack enable` (a versão vem de `packageManager`).
-- **Docker** com Compose v2 e Buildx.
+- **Docker** com Compose v2 e Buildx, com pelo menos **8 GB** de memória (Docker Desktop:
+  Settings → Resources → Memory). O `local:images` constrói as imagens em paralelo; o pico
+  medido da subida mais o E2E foi de 6,5 GB.
+- **No Linux, `*.localhost` resolvendo para o loopback** no sistema, não só no navegador: o
+  Node do Backoffice e do Playwright usa o resolvedor do sistema. Com systemd-resolved já
+  funciona; sem ele (Debian mínimo, container), `sudo apt-get install libnss-myhostname`.
+  Confira com `getent hosts admin.orakel.localhost`.
 
 ## Primeira vez
 
@@ -37,7 +43,8 @@ para recriar o site, remova-o do banco (ou `pnpm local:reset`) e rode o seed de 
 Já tinha um `.env.local`? Compare com o `.env.example` e acrescente as variáveis novas
 (backoffice, Access local e o bloco "Ambiente local"); o compose avisa qual falta. Apague ou
 comente `BLOG_PREVIEW_UPSTREAM`: sem ela, `preview.orakel.localhost` vai para o container
-`blog-preview`. No Linux, `DOCKER_SOCKET_GID` é o gid do grupo `docker` (`getent group docker`).
+`blog-preview`. No Linux, o `compose.sh` usa o gid do dono de `/var/run/docker.sock` como
+`DOCKER_SOCKET_GID` (o `0` do `.env.example` é o do Docker Desktop); outro valor só pelo shell.
 
 Outro arquivo de ambiente (ex.: uma cópia do `.env.example` para testar):
 `ORAKEL_ENV_FILE=/caminho/env pnpm local:check` — vale para o `compose.sh` e os scripts.
@@ -61,6 +68,22 @@ oferece um usuário por papel.
 **Backoffice em modo dev:** `pnpm --filter @orakel/backoffice dev` na máquina e
 `BACKOFFICE_UPSTREAM=host.docker.internal:3000` no `.env.local` (recrie o `caddy`: `infra/local/compose.sh up -d caddy`), para
 o `admin.orakel.localhost` apontar para o `next dev`.
+
+## E2E completo
+
+Com o ambiente da "Primeira vez" no ar e o `exemplo-a` publicado:
+
+```sh
+pnpm --filter @orakel/backoffice exec playwright install --with-deps chromium   # uma vez por versão do Playwright
+pnpm local:e2e             # Playwright contra https://admin.orakel.localhost (E2E_STACK=1)
+```
+
+O `--with-deps` instala, no Linux, as bibliotecas do sistema que o Chromium usa (pede root ou
+`sudo`); no macOS, não faz nada.
+
+Para ensaiar esta seção e a "Primeira vez" numa máquina limpa, `infra/local/clean-machine.sh`
+roda os dois blocos acima, literalmente, num Linux com Docker próprio (Docker-in-Docker), sem
+tocar no ambiente da máquina; o log vai para `clean-machine.log`.
 
 ## Sessões em paralelo
 
@@ -246,6 +269,11 @@ Para ver ou desligar: acrescente o `--profile` ao `ps`, `logs` ou `down`.
 - **`ERR_PNPM_NO_MATURE_MATCHING_VERSION`**: a versão pedida saiu há menos de 24 h;
   use a anterior no `catalog` ou espere.
 - **Porta ocupada**: pare o serviço local que usa 5432, 8123 ou 8333.
+- **`exit code: 137` ou `Killed` no `local:images`**: memória do Docker abaixo do mínimo
+  (veja "Pré-requisitos"); aumente e rode de novo.
+- **`getaddrinfo ENOTFOUND admin.orakel.localhost` no E2E (Linux)**: o sistema não resolve
+  `*.localhost`, embora o curl e o Chromium resolvam; instale o `libnss-myhostname` (veja
+  "Pré-requisitos"). O `local:check` acusa em "Hostnames".
 - **`local:check` falha em "Serviços"**: `infra/local/compose.sh logs <serviço>`. Um serviço
   parado só é aceito se for one-shot (`backoffice-migrate`, `s3-init`, `glitchtip-db`).
 - **Imagem quebrada num site local**: `pnpm local:check` confere se cada `media.<site>.localhost`
