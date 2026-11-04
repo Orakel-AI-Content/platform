@@ -25,7 +25,16 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 const SITE_NAME = 'Exemplo A — Guias';
 const OTHER_SITE = 'Exemplo B — Receitas';
-const AREAS = ['Visão geral', 'Conteúdos', 'Revisão', 'Mídia', 'Autores', 'Taxonomias', 'Menus'];
+const AREAS = [
+  'Visão geral',
+  'Conteúdos',
+  'Revisão',
+  'Mídia',
+  'Autores',
+  'Taxonomias',
+  'Menus',
+  'Contextos editoriais',
+];
 
 const toggle = () => page.getByRole('button', { name: 'Navegação lateral' });
 const mobileToggle = () => page.getByRole('button', { name: 'Menu de navegação' });

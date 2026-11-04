@@ -9,6 +9,7 @@ import {
   PiFileTextDuotone,
   PiImagesDuotone,
   PiListDuotone,
+  PiNotebookDuotone,
   PiPackageDuotone,
   PiSquaresFourDuotone,
   PiTagDuotone,
@@ -27,6 +28,7 @@ const navigationIcon = {
   siteTaxonomies: <PiTagDuotone aria-hidden />,
   siteMenus: <PiListDuotone aria-hidden />,
   siteInstitutional: <PiArticleDuotone aria-hidden />,
+  siteEditorialContexts: <PiNotebookDuotone aria-hidden />,
 } as const satisfies Record<string, JSX.Element>;
 
 export type NavigationIcons = typeof navigationIcon;

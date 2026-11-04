@@ -21,7 +21,16 @@ const SITES = [
   { id: 'exemplo-b', name: 'Exemplo B' },
 ];
 
-const AREAS = ['Visão geral', 'Conteúdos', 'Revisão', 'Mídia', 'Autores', 'Taxonomias', 'Menus'];
+const AREAS = [
+  'Visão geral',
+  'Conteúdos',
+  'Revisão',
+  'Mídia',
+  'Autores',
+  'Taxonomias',
+  'Menus',
+  'Contextos editoriais',
+];
 
 const actor = (role: Actor['roles'][number]): Actor => ({ email: `${role}@x`, roles: [role] });
 
@@ -65,6 +74,7 @@ describe('SideNav', () => {
       '/sites/exemplo-a/autores',
       '/sites/exemplo-a/taxonomias',
       '/sites/exemplo-a/menus',
+      '/sites/exemplo-a/contextos',
     ]);
     expect(screen.getByRole('button', { name: 'Exemplo A, trocar de site' })).toBeTruthy();
   });

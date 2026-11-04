@@ -19,7 +19,16 @@ const actor = (role: Actor['roles'][number]): Actor => ({ email: `${role}@x`, ro
 const siteAreas = (tree: NavigationTree[]) =>
   tree.find((nav) => nav.key === 'site')?.subMenu.map((nav) => nav.title);
 
-const SETE = ['Visão geral', 'Conteúdos', 'Revisão', 'Mídia', 'Autores', 'Taxonomias', 'Menus'];
+const OITO = [
+  'Visão geral',
+  'Conteúdos',
+  'Revisão',
+  'Mídia',
+  'Autores',
+  'Taxonomias',
+  'Menus',
+  'Contextos editoriais',
+];
 
 const item = (key: string, authority: NavigationTree['authority']): NavigationTree => ({
   key,
@@ -32,18 +41,18 @@ const item = (key: string, authority: NavigationTree['authority']): NavigationTr
 });
 
 describe('filterNavigation', () => {
-  it('editor e admin veem as 7 áreas e "Textos institucionais" (content.write)', () => {
+  it('editor e admin veem as 8 áreas e "Textos institucionais" (content.write)', () => {
     for (const role of ['editor', 'admin'] as const) {
       expect(siteAreas(filterNavigation(navigationConfig, actor(role)))).toEqual([
-        ...SETE,
+        ...OITO,
         'Textos institucionais',
       ]);
     }
   });
 
-  it('operacao e revisor veem só as 7', () => {
+  it('operacao e revisor veem só as 8 (site.read)', () => {
     for (const role of ['operacao', 'revisor'] as const) {
-      expect(siteAreas(filterNavigation(navigationConfig, actor(role)))).toEqual(SETE);
+      expect(siteAreas(filterNavigation(navigationConfig, actor(role)))).toEqual(OITO);
     }
   });
 
@@ -99,6 +108,7 @@ describe('navigationPath', () => {
       '/sites/exemplo-a/autores',
       '/sites/exemplo-a/taxonomias',
       '/sites/exemplo-a/menus',
+      '/sites/exemplo-a/contextos',
       '/sites/exemplo-a/institucionais',
     ]);
   });
@@ -114,6 +124,8 @@ describe('activeNavigationKey', () => {
     ['/sites/x/autores/novo', 'site.authors'],
     ['/sites/x/autores/3', 'site.authors'],
     ['/sites/x/conteudos/12/editar', 'site.contents'],
+    ['/sites/x/contextos', 'site.editorialContexts'],
+    ['/sites/x/contextos/nova', 'site.editorialContexts'],
     ['/sites/x', 'site.overview'],
     ['/sites/x/configuracao', 'site.overview'],
     ['/sites/x/pendencias', 'site.overview'],
