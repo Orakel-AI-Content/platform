@@ -14,6 +14,7 @@ Stack: Next.js 16 (App Router) + Drizzle/Postgres + Graphile Worker; contratos e
 - Lint / tipos: `pnpm lint` · `pnpm typecheck`
 - Banco: `pnpm db:generate --name <nome>` · `pnpm db:migrate` · `pnpm db:seed`
 - Mídia: `pnpm media:reprocess [site]` (variantes que faltam no perfil de imagem)
+- Audiência: `pnpm audience:aggregate` (enfileira a consolidação de ontem e hoje; roda no worker)
 
 ## Regras invioláveis
 

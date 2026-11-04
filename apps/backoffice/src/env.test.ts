@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseAudienceEnv, parseBuildRunnerEnv, parseDatabaseEnv, parseEnv } from './env.ts';
+import {
+  findAudienceEnv,
+  parseAudienceEnv,
+  parseBuildRunnerEnv,
+  parseDatabaseEnv,
+  parseEnv,
+} from './env.ts';
 
 const valid = {
   DATABASE_URL: 'postgres://orakel:x@localhost:5432/orakel',
@@ -187,5 +193,12 @@ describe('parseAudienceEnv (#545)', () => {
 
   it('o ambiente do app não exige AE_SQL_*', () => {
     expect(() => parseEnv(valid)).not.toThrow();
+  });
+
+  it('findAudienceEnv: sem nenhuma AE_SQL_* é undefined; só uma delas lança (#547)', () => {
+    expect(findAudienceEnv({})).toBeUndefined();
+    expect(findAudienceEnv({ AE_SQL_TRANSPORT: '', AE_SQL_URL: '' })).toBeUndefined();
+    expect(findAudienceEnv(audience)).toEqual(audience);
+    expect(() => findAudienceEnv({ AE_SQL_URL: audience.AE_SQL_URL })).toThrow(/AE_SQL_TRANSPORT/);
   });
 });
