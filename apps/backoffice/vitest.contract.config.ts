@@ -1,9 +1,13 @@
+import { fileURLToPath } from 'node:url';
+
 import { baseConfig } from '@orakel/vitest-config';
 import { defineConfig } from 'vitest/config';
 
 // Contrato e integração com Postgres (DATABASE_URL). No CI: job "Contrato da API de exportação".
 export default defineConfig({
   ...baseConfig,
+  // O alias `@/` da interface (tsconfig), para chamar rotas de verdade (generation.contract).
+  resolve: { alias: { '@': fileURLToPath(new URL('src', import.meta.url)) } },
   test: {
     ...baseConfig.test,
     include: ['test/contract/**/*.test.ts'],
