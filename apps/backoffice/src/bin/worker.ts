@@ -7,7 +7,7 @@ import { WORKER_CRONTAB, workerTasks } from '../jobs/task-lists.ts';
 import { createS3Client, s3ObjectStore } from '../lib/s3.ts';
 import { runProcess } from './run-process.ts';
 
-// backoffice-worker: jobs gerais (mídia, publicação agendada, geração) e agregador (cron). Encerra com SIGTERM/SIGINT.
+// backoffice-worker: jobs gerais (mídia, publicação agendada, geração) e agregador da audiência (cron). Encerra com SIGTERM/SIGINT.
 await runProcess('backoffice-worker', async (logger) => {
   const { pool, db } = getDb();
   const env = getEnv();

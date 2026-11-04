@@ -173,6 +173,17 @@ export function getAudienceEnv(): AudienceEnv {
   return parseAudienceEnv(process.env);
 }
 
+/**
+ * Como `parseAudienceEnv`, mas sem nenhuma `AE_SQL_*` devolve `undefined`: o worker sobe e a
+ * consolidação só avisa (#547). Só uma delas definida é configuração errada e lança.
+ */
+export function findAudienceEnv(
+  source: Record<string, string | undefined> = process.env,
+): AudienceEnv | undefined {
+  if (!source.AE_SQL_TRANSPORT && !source.AE_SQL_URL) return undefined;
+  return parseAudienceEnv(source);
+}
+
 let cached: Env | undefined;
 
 export function getEnv(): Env {

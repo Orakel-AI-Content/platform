@@ -25,6 +25,8 @@ Redes com nome fixo (o `build-runner` cria os containers efêmeros nelas pelo no
   override local.
 - `orakel-docker` é a quinta rede, fora do 11.6: isola o proxy do socket do resto da VPS.
 - `blog-preview` fica em `internal` e `export` (lê a API de exportação como o `render`).
+- No local, o ClickHouse também fica em `internal`, para o `backoffice-worker` consolidar a
+  audiência (ADR 0018).
 - `pnpm local:check` confere o isolamento: `export` alcança a API de exportação e não alcança o
   Postgres nem a internet; `publish` alcança o `edge-local` e não o backoffice.
 

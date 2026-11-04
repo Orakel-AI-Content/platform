@@ -35,6 +35,7 @@ const AREAS = [
   'Menus',
   'Contextos editoriais',
   'Geração',
+  'Audiência',
 ];
 
 const toggle = () => page.getByRole('button', { name: 'Navegação lateral' });

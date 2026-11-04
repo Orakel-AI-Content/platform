@@ -78,6 +78,7 @@ describe('VerticalMenuContent', () => {
       '/sites/exemplo%20b/menus',
       '/sites/exemplo%20b/contextos',
       '/sites/exemplo%20b/geracao',
+      '/sites/exemplo%20b/audiencia',
       '/sites/exemplo%20b/institucionais',
     ]);
   });

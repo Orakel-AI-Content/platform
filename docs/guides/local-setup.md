@@ -125,25 +125,33 @@ sessão. Num worktree sem `.env.local`, aponte o da raiz (legado):
 
 ## Comandos
 
-| Comando                                                     | O que faz                                                    |
-| ----------------------------------------------------------- | ------------------------------------------------------------ |
-| `pnpm dev`                                                  | Todas as unidades em modo dev                                |
-| `pnpm build` · `pnpm lint` · `pnpm typecheck` · `pnpm test` | Pipeline do Turborepo                                        |
-| `pnpm format`                                               | Prettier no repositório                                      |
-| `pnpm local:up`                                             | Sobe o compose (base + override local) e roda `db:migrate`   |
-| `pnpm local:check`                                          | Confere o ambiente; sai com 1 se algo falhar                 |
-| `pnpm local:publish <site>`                                 | `render` (rede export) + `publish` (rede publish) no edge    |
-| `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere no ClickHouse          |
-| `pnpm local:trust`                                          | Instala a CA atual do Caddy no Keychain (macOS)              |
-| `pnpm local:seed`                                           | Roda `db:seed` (usuários, exemplos e `infra/local/seeds/`)   |
-| `pnpm local:down`                                           | Para os containers (mantém os dados)                         |
-| `pnpm local:reset`                                          | Para e **apaga os volumes**                                  |
-| `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit)  |
-| `pnpm local:e2e`                                            | E2E completo com Playwright                                  |
-| `pnpm local:e2e:telas <área>`                               | E2E de telas de uma área, sem build, numa das vagas          |
-| `pnpm local:e2e:area <área>` · `smoke`                      | E2E de uma área ou só os `@smoke`, numa das vagas da máquina |
-| `pnpm local:isolated up <id>` · `down <id>` (legado)        | Backoffice no host, banco e Caddy só da sessão               |
-| `infra/local/compose.sh <args>`                             | Qualquer comando do compose com os arquivos certos           |
+| Comando                                                     | O que faz                                                                          |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm dev`                                                  | Todas as unidades em modo dev                                                      |
+| `pnpm build` · `pnpm lint` · `pnpm typecheck` · `pnpm test` | Pipeline do Turborepo                                                              |
+| `pnpm format`                                               | Prettier no repositório                                                            |
+| `pnpm local:up`                                             | Sobe o compose (base + override local) e roda `db:migrate`                         |
+| `pnpm local:check`                                          | Confere o ambiente; sai com 1 se algo falhar                                       |
+| `pnpm local:publish <site>`                                 | `render` (rede export) + `publish` (rede publish) no edge                          |
+| `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere ClickHouse, tabelas diárias e ausência de IP |
+| `pnpm local:trust`                                          | Instala a CA atual do Caddy no Keychain (macOS)                                    |
+| `pnpm local:seed`                                           | Roda `db:seed` (usuários, exemplos e `infra/local/seeds/`)                         |
+| `pnpm local:down`                                           | Para os containers (mantém os dados)                                               |
+| `pnpm local:reset`                                          | Para e **apaga os volumes**                                                        |
+| `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit)                        |
+| `pnpm local:e2e`                                            | E2E completo com Playwright                                                        |
+| `pnpm local:e2e:telas <área>`                               | E2E de telas de uma área, sem build, numa das vagas                                |
+| `pnpm local:e2e:area <área>` · `smoke`                      | E2E de uma área ou só os `@smoke`, numa das vagas da máquina                       |
+| `pnpm local:isolated up <id>` · `down <id>` (legado)        | Backoffice no host, banco e Caddy só da sessão                                     |
+| `infra/local/compose.sh <args>`                             | Qualquer comando do compose com os arquivos certos                                 |
+
+O `local:load` precisa do site publicado e do `backoffice-worker` de pé. Depois do k6, confere
+no ClickHouse que todos os pageviews chegaram (com `sid` só fora do EEE, Reino Unido e Suíça),
+dispara `aggregate-audience` no `backoffice-worker`, espera o job terminar (prazo em
+`AGGREGATE_TIMEOUT`, padrão 120 s) e compara o total de `audience_daily_site` com o ClickHouse na
+janela da consolidação (ontem e hoje de São Paulo). Por fim, procura o IP do container do k6 em
+`analytics.events`, nas tabelas diárias e nos logs do `edge-local` e do `backoffice-worker`
+durante a carga; achar o IP, como qualquer outra divergência, faz o comando sair com 1.
 
 ## Serviços locais
 
@@ -179,6 +187,7 @@ imagem usada é `site-builder:<release do site>` ou, antes da primeira promoçã
 `orakel-internal` (serviços da VPS), `orakel-export` (API de exportação, `blog-preview` e
 `render`; sem internet), `orakel-publish` (`publish`, `edge-local`, S3), `orakel-docker`
 (`build-runner` e `docker-socket-proxy`) e `orakel-edge` (Caddy, `edge-local`, ClickHouse, S3).
+O ClickHouse também fica na `orakel-internal`, para o `backoffice-worker` (ADR 0018).
 Detalhes no ADR 0010; o proxy do socket, no ADR 0011.
 
 ## Serviços opcionais

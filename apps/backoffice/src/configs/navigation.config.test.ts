@@ -19,7 +19,7 @@ const actor = (role: Actor['roles'][number]): Actor => ({ email: `${role}@x`, ro
 const siteAreas = (tree: NavigationTree[]) =>
   tree.find((nav) => nav.key === 'site')?.subMenu.map((nav) => nav.title);
 
-const NOVE = [
+const AREAS = [
   'Visão geral',
   'Conteúdos',
   'Revisão',
@@ -29,6 +29,7 @@ const NOVE = [
   'Menus',
   'Contextos editoriais',
   'Geração',
+  'Audiência',
 ];
 
 const item = (key: string, authority: NavigationTree['authority']): NavigationTree => ({
@@ -42,18 +43,18 @@ const item = (key: string, authority: NavigationTree['authority']): NavigationTr
 });
 
 describe('filterNavigation', () => {
-  it('editor e admin veem as 9 áreas e "Textos institucionais" (content.write)', () => {
+  it('editor e admin veem as 10 áreas e "Textos institucionais" (content.write)', () => {
     for (const role of ['editor', 'admin'] as const) {
       expect(siteAreas(filterNavigation(navigationConfig, actor(role)))).toEqual([
-        ...NOVE,
+        ...AREAS,
         'Textos institucionais',
       ]);
     }
   });
 
-  it('operacao e revisor veem só as 9 (site.read)', () => {
+  it('operacao e revisor veem só as 10 (site.read), com "Geração" e "Audiência"', () => {
     for (const role of ['operacao', 'revisor'] as const) {
-      expect(siteAreas(filterNavigation(navigationConfig, actor(role)))).toEqual(NOVE);
+      expect(siteAreas(filterNavigation(navigationConfig, actor(role)))).toEqual(AREAS);
     }
   });
 
@@ -111,6 +112,7 @@ describe('navigationPath', () => {
       '/sites/exemplo-a/menus',
       '/sites/exemplo-a/contextos',
       '/sites/exemplo-a/geracao',
+      '/sites/exemplo-a/audiencia',
       '/sites/exemplo-a/institucionais',
     ]);
   });
@@ -129,6 +131,7 @@ describe('activeNavigationKey', () => {
     ['/sites/x/contextos', 'site.editorialContexts'],
     ['/sites/x/contextos/nova', 'site.editorialContexts'],
     ['/sites/x/geracao', 'site.generation'],
+    ['/sites/x/audiencia', 'site.audience'],
     ['/sites/x', 'site.overview'],
     ['/sites/x/configuracao', 'site.overview'],
     ['/sites/x/pendencias', 'site.overview'],
