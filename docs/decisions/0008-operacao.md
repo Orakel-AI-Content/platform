@@ -12,7 +12,9 @@ infraestrutura mínimo.
 ## Decisão
 
 - **Ambientes:** local e produção, sem staging. Só as variáveis de `.env.example`
-  mudam entre eles.
+  mudam entre eles. O arquivo é o inventário: agrupa as que mudam pelas costuras do
+  `12.0`, seção 4 (ou num grupo nomeado, quando não há costura) e separa as que não
+  mudam no grupo "Iguais nos dois ambientes".
 - **Compose:** base em `infra/vps/compose.yaml`, override em
   `infra/local/compose.override.yaml`. Serviços de apoio: Postgres 18.6 e SeaweedFS 4.48
   (emulador S3), presos por tag + digest. O MinIO deixou de publicar imagens da edição
