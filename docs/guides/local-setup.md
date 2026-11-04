@@ -182,6 +182,41 @@ resultado. Falha permanente pausa o site (motivo na coluna Estado); transitória
 imagem usada é `site-builder:<release do site>` ou, antes da primeira promoção,
 `site-builder:local` (do `pnpm local:images`). Detalhes: ADR 0008 do backoffice.
 
+## Geração
+
+A aba Geração de cada site (`/sites/<site>/geracao`) dispara um artigo por tema; o
+`backoffice-worker` chama o LLM e o artigo vai para a fila de revisão (ADRs 0018 e 0019 do
+backoffice). O site precisa de um contexto editorial (aba Contextos) e de um autor.
+
+- **Modo `fixture` (padrão):** o worker do compose local sobe com `LLM_MODEL=fixture`, mesmo
+  que o `.env.local` aponte para o provedor, e responde sem rede. É o modo do E2E
+  (`pnpm local:e2e:area geracao`) e do CI. O tema `fixture-saida-invalida` exercita a falha.
+  Para o fixture ter custo na lista, o `LLM_PRICING` do `.env.local` precisa da entrada
+  `fixture`, como no `.env.example`.
+- **Chave do provedor:** `LLM_API_KEY=<chave da Anthropic>` no `.env.local`, nunca em outro
+  arquivo (é lida por `src/env.ts` e passada ao provedor; `ANTHROPIC_API_KEY` é ignorada). O
+  preço do modelo fica no `LLM_PRICING`; modelo fora da tabela aparece sem custo.
+- **Limite de gasto (RN-GEN-07):** fica no provedor, não no código. No Console da Anthropic,
+  crie uma chave num workspace só da geração local e defina o limite de gasto mensal do
+  workspace (Settings → Limits); ao atingir o limite, as chamadas são recusadas e a execução
+  aparece como falha na lista.
+- **Rodada com o LLM real:** suba a pilha com o modelo no shell, que vale só para o worker e
+  tem precedência sobre o `.env.local`:
+
+  ```sh
+  LOCAL_LLM_MODEL=anthropic:claude-haiku-5-5 pnpm local:up
+  ```
+
+  Dispare os temas pela aba Geração e acompanhe custo e tokens na lista. Para conferir por
+  site:
+
+  ```sh
+  infra/local/compose.sh exec postgres psql -U orakel -d orakel -c \
+    "SELECT site_id, status, count(*), sum(cost_usd) FROM generation_runs GROUP BY 1, 2 ORDER BY 1, 2"
+  ```
+
+  Volte ao fixture com `pnpm local:up` sem a variável antes de rodar o E2E.
+
 ## Redes
 
 `orakel-internal` (serviços da VPS), `orakel-export` (API de exportação, `blog-preview` e

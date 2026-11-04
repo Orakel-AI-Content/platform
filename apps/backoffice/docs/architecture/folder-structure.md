@@ -19,7 +19,8 @@ apps/backoffice/
 │   ├── env.ts  proxy.ts  instrumentation.ts
 └── test/
     ├── contract/                Vitest + Postgres
-    └── e2e/                     Playwright + axe
+    └── e2e/                     Playwright + axe, um <área>.spec.ts por tela ou jornada
+                                 (geracao.spec.ts: da geração ao site, com o worker em fixture)
 ```
 
 Testes unitários ao lado do código (`src/**/*.test.ts`).
