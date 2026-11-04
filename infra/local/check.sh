@@ -44,6 +44,15 @@ $services
 EOF_SERVICES
 
 echo "Hostnames (Caddy)"
+# O curl e o Chromium resolvem *.localhost sozinhos; o Node (Backoffice, Playwright) usa o
+# resolvedor do sistema, que no Linux sem systemd-resolved precisa do libnss-myhostname.
+if command -v getent >/dev/null 2>&1; then
+  if getent hosts admin.orakel.localhost >/dev/null; then
+    ok "*.localhost no resolvedor do sistema"
+  else
+    ko "*.localhost no resolvedor do sistema" "instale o libnss-myhostname (docs/guides/local-setup.md, \"Pré-requisitos\")"
+  fi
+fi
 status_of() { curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$1"; }
 expect "admin.orakel.localhost pede login" "$(status_of https://admin.orakel.localhost/)" '302'
 expect "preview.orakel.localhost pede login" "$(status_of https://preview.orakel.localhost/)" '302'

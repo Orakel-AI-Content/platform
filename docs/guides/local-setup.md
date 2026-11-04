@@ -7,7 +7,13 @@ Consulte para preparar a máquina e subir o ambiente local ponta a ponta.
 - **Node 22+** para rodar o pnpm. O pnpm baixa e usa o **Node 24.21.0** fixado
   (`devEngines.runtime`) nos scripts do projeto; com nvm, `nvm use` lê o `.nvmrc`.
 - **pnpm 11** via Corepack: `corepack enable` (a versão vem de `packageManager`).
-- **Docker** com Compose v2 e Buildx.
+- **Docker** com Compose v2 e Buildx, com pelo menos **8 GB** de memória (Docker Desktop:
+  Settings → Resources → Memory). O `local:images` constrói as imagens em paralelo; o pico
+  medido da subida mais o E2E foi de 5,5 GB.
+- **No Linux, `*.localhost` resolvendo para o loopback** no sistema, não só no navegador: o
+  Node do Backoffice e do Playwright usa o resolvedor do sistema. Com systemd-resolved já
+  funciona; sem ele (Debian mínimo, container), `sudo apt-get install libnss-myhostname`.
+  Confira com `getent hosts admin.orakel.localhost`.
 
 ## Primeira vez
 
@@ -259,6 +265,11 @@ Para ver ou desligar: acrescente o `--profile` ao `ps`, `logs` ou `down`.
 - **`ERR_PNPM_NO_MATURE_MATCHING_VERSION`**: a versão pedida saiu há menos de 24 h;
   use a anterior no `catalog` ou espere.
 - **Porta ocupada**: pare o serviço local que usa 5432, 8123 ou 8333.
+- **`exit code: 137` ou `Killed` no `local:images`**: memória do Docker abaixo do mínimo
+  (veja "Pré-requisitos"); aumente e rode de novo.
+- **`getaddrinfo ENOTFOUND admin.orakel.localhost` no E2E (Linux)**: o sistema não resolve
+  `*.localhost`, embora o curl e o Chromium resolvam; instale o `libnss-myhostname` (veja
+  "Pré-requisitos"). O `local:check` acusa em "Hostnames".
 - **`local:check` falha em "Serviços"**: `infra/local/compose.sh logs <serviço>`. Um serviço
   parado só é aceito se for one-shot (`backoffice-migrate`, `s3-init`, `glitchtip-db`).
 - **Imagem quebrada num site local**: `pnpm local:check` confere se cada `media.<site>.localhost`
