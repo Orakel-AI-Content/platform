@@ -180,6 +180,12 @@ decisions:
       source: decided,
       provisional: true,
     }
+  extra.llm-sdk:
+    {
+      value: 'Vercel AI SDK (ai + @ai-sdk/anthropic), generateObject com o Zod dos blocos da release; LLM_MODEL padrão anthropic:claude-haiku-5-5, fixture com o mock model de ai/test; custo por LLM_PRICING',
+      rationale: 'ADR 0018',
+      source: decided,
+    }
 
 commands:
   dev: pnpm dev
@@ -202,7 +208,7 @@ structure:
     ├── vitest.config.ts  vitest.contract.config.ts  eslint.config.js  tsconfig.json
     ├── drizzle/                 migrações SQL
     ├── src/app/                 UI e route handlers (finos)
-    ├── src/domain/              access, pending-changes, sites, content, export, import, builds
+    ├── src/domain/              access, pending-changes, sites, content, export, import, builds, generation
     ├── src/db/                  pool, cliente, schema, site-ids
     ├── src/auth/                JWT do Access, tokens internos, ator da requisição
     ├── src/jobs/                tasks (build, heartbeat), crontab
@@ -218,7 +224,6 @@ structure:
 
 open_questions:
   - 'Backlog: módulos Conteúdo (TipTap), Mídia (ingestão com sharp), Revisão, Publicação (limite diário, redirects, agendamento), Registro de instâncias (ações), geração básica, agregador, backup/restore, expurgo, promoção de release, rotas config/routes/listing, rota interna do motor, E2E completo'
-  - 'SDK do LLM da geração básica (provedor e modelo configuráveis) — decidir com o módulo Geração'
   - 'Streaming do snapshot lê entidade por entidade; para acervos grandes, cursor no Postgres (critério da L1: 1.000 artigos)'
   - 'Imagem com ~1,1 GB (dependências de produção + standalone); otimizar (ex.: bundle dos processos Node)'
   - 'Retomar site pausado, rollback e reconstruir em outra release: ações do Registro de instâncias (L4)'

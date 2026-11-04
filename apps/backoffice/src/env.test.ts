@@ -14,6 +14,7 @@ const valid = {
   S3_ACCESS_KEY_ID: 'k',
   S3_SECRET_ACCESS_KEY: 's',
   PREVIEW_BASE_URL: 'https://preview.orakel.localhost',
+  LLM_API_KEY: 'sk-ant-teste',
 };
 
 describe('parseEnv', () => {
@@ -46,6 +47,47 @@ describe('parseEnv', () => {
     expect(parseEnv({ ...valid, SENTRY_DSN: '', HEARTBEAT_BASE_URL: '' })).toMatchObject({
       SENTRY_DSN: '',
     });
+  });
+});
+
+describe('parseEnv: geração (LLM_*)', () => {
+  it('padrão anthropic:claude-haiku-5-5, sem tabela de preços', () => {
+    expect(parseEnv(valid)).toMatchObject({
+      LLM_MODEL: 'anthropic:claude-haiku-5-5',
+      LLM_API_KEY: 'sk-ant-teste',
+      LLM_PRICING: {},
+    });
+    expect(parseEnv({ ...valid, LLM_MODEL: '', LLM_PRICING: '' })).toMatchObject({
+      LLM_MODEL: 'anthropic:claude-haiku-5-5',
+      LLM_PRICING: {},
+    });
+  });
+
+  it('a chave do provedor é obrigatória fora do modo fixture', () => {
+    expect(() => parseEnv({ ...valid, LLM_API_KEY: undefined })).toThrow(/LLM_API_KEY/);
+    expect(() => parseEnv({ ...valid, LLM_API_KEY: '' })).toThrow(/LLM_API_KEY/);
+    expect(parseEnv({ ...valid, LLM_API_KEY: '', LLM_MODEL: 'fixture' })).toMatchObject({
+      LLM_MODEL: 'fixture',
+    });
+  });
+
+  it('só aceita fixture ou anthropic:<modelo>', () => {
+    expect(parseEnv({ ...valid, LLM_MODEL: 'anthropic:claude-sonnet-5-5' }).LLM_MODEL).toBe(
+      'anthropic:claude-sonnet-5-5',
+    );
+    expect(() => parseEnv({ ...valid, LLM_MODEL: 'openai:gpt' })).toThrow(/LLM_MODEL/);
+    expect(() => parseEnv({ ...valid, LLM_MODEL: 'claude-haiku-5-5' })).toThrow(/LLM_MODEL/);
+  });
+
+  it('lê a tabela de preços em JSON e recusa JSON ou preço inválido', () => {
+    const pricing = '{"anthropic:claude-haiku-5-5":{"input":0.1,"output":0.5}}';
+    expect(parseEnv({ ...valid, LLM_PRICING: pricing }).LLM_PRICING).toEqual({
+      'anthropic:claude-haiku-5-5': { input: 0.1, output: 0.5 },
+    });
+    expect(() => parseEnv({ ...valid, LLM_PRICING: '{x' })).toThrow(/LLM_PRICING/);
+    expect(() => parseEnv({ ...valid, LLM_PRICING: '{"m":{"input":-1,"output":0}}' })).toThrow(
+      /LLM_PRICING/,
+    );
   });
 });
 

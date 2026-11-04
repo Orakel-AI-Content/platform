@@ -21,6 +21,7 @@ beforeAll(() => {
     S3_ACCESS_KEY_ID: 'k',
     S3_SECRET_ACCESS_KEY: 's',
     PREVIEW_BASE_URL: 'https://preview.orakel.localhost',
+    LLM_MODEL: 'fixture',
   })) {
     vi.stubEnv(name, value);
   }

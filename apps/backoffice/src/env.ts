@@ -1,11 +1,37 @@
 import * as z from 'zod';
 
+import { PricingTableSchema } from './domain/generation/pricing.ts';
+
 // Única leitura de process.env da unidade (convenção da raiz). Falha no boot com a lista
 // do que falta. Lido sob demanda, para o `next build` não exigir as variáveis.
 
 const token = z.string().min(32, 'Use um token com pelo menos 32 caracteres');
 
-export const EnvSchema = z.object({
+/** Vazio conta como ausente: o compose repassa variável não definida como ''. */
+const blankAsUndefined = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === '' ? undefined : value), schema);
+const optional = <T extends z.ZodType>(schema: T) => blankAsUndefined(schema.optional());
+
+/** Modelo da geração: `fixture` (sem rede, para os testes) ou `anthropic:<modelo>`. */
+export const DEFAULT_LLM_MODEL = 'anthropic:claude-haiku-5-5';
+const llmModel = z
+  .string()
+  .regex(/^(fixture|anthropic:[a-z0-9][a-z0-9.-]*)$/, 'Use fixture ou anthropic:<modelo>');
+
+/** Tabela de preços em JSON (`{"anthropic:claude-haiku-5-5":{"input":0.1,"output":0.5}}`). */
+const llmPricing = z
+  .string()
+  .transform((value, ctx) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      ctx.addIssue({ code: 'custom', message: 'Use um JSON válido' });
+      return z.NEVER;
+    }
+  })
+  .pipe(PricingTableSchema);
+
+const EnvObjectSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   DATABASE_URL: z.url(),
@@ -28,7 +54,16 @@ export const EnvSchema = z.object({
   HEARTBEAT_BASE_URL: z.union([z.url(), z.literal('')]).optional(),
   /** Só no E2E local: liga a página /teste-de-erro, que lança erro de propósito (#77). */
   E2E_ERROR_ROUTE: z.stringbool().default(false),
+  /** Geração básica (workspace#23): modelo, chave do provedor (só no .env.local) e preços. */
+  LLM_MODEL: blankAsUndefined(llmModel.default(DEFAULT_LLM_MODEL)),
+  LLM_API_KEY: optional(z.string().min(1)),
+  LLM_PRICING: blankAsUndefined(llmPricing.default({})),
 });
+
+export const EnvSchema = EnvObjectSchema.refine(
+  (env) => env.LLM_MODEL === 'fixture' || env.LLM_API_KEY !== undefined,
+  { message: 'Defina LLM_API_KEY, ou LLM_MODEL=fixture para gerar sem LLM', path: ['LLM_API_KEY'] },
+);
 
 export type Env = z.infer<typeof EnvSchema>;
 
@@ -43,10 +78,6 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
  * Só o build-runner (12.0, L3): como criar os containers do site-builder e o que entregar a
  * cada um. O token de deploy da Cloudflare só existe aqui e só vai para o container publish.
  */
-/** Vazio conta como ausente: o compose repassa variável não definida como ''. */
-const optional = <T extends z.ZodType>(schema: T) =>
-  z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
-
 export const BuildRunnerEnvSchema = z
   .object({
     /** API do Docker, sempre pelo docker-socket-proxy (ADR 0011 da raiz). */
@@ -97,7 +128,7 @@ export function getBuildRunnerEnv(): BuildRunnerEnv {
  * a limpeza do E2E. Uma variável do app ausente (ex.: `PREVIEW_BASE_URL` num `.env.local`
  * antigo) não impede de chegar ao banco.
  */
-export const DatabaseEnvSchema = EnvSchema.pick({ DATABASE_URL: true });
+export const DatabaseEnvSchema = EnvObjectSchema.pick({ DATABASE_URL: true });
 
 export function parseDatabaseEnv(source: Record<string, string | undefined>): string {
   const parsed = DatabaseEnvSchema.safeParse(source);
