@@ -22,6 +22,7 @@ const AREAS = [
   'Taxonomias',
   'Menus',
   'Contextos editoriais',
+  'Audiência',
 ];
 
 test('a aba mostra a área e, dentro de um site, o nome dele', async ({ page }) => {

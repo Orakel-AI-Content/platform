@@ -84,7 +84,7 @@ describe('SideNav recolhida', () => {
     expect(autores.getAttribute('aria-current')).toBe('page');
     expect(autores.querySelector('.sr-only')?.textContent).toBe('Autores');
     expect(autores.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
-    expect(within(areas()).getAllByRole('link')).toHaveLength(9);
+    expect(within(areas()).getAllByRole('link')).toHaveLength(10);
   });
 
   it('a dica com o nome aparece no hover e no foco, e descreve o link', async () => {
