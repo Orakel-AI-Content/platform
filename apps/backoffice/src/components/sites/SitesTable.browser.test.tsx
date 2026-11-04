@@ -14,7 +14,7 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // Lista de sites legível de relance em Chromium (#460; antes no E2E, `sites-list.spec.ts`, #100,
 // #153, #248): com 20 sites numa janela de 1280 px, na moldura do admin (barra de 290 px), nem a
 // página nem a tabela rolam na horizontal e nenhuma célula passa de duas linhas de texto. O pior
-// caso de largura fica nos dados: nome e domínio longos, um site pausado com motivo longo e um
+// caso de largura fica nos dados: nome e domínio longos, um site pausado com motivo longo e conteúdo culpado e um
 // com último build e versão longa. As ações são as da operação (publicar e configurar). O menu
 // "Mais ações" (#248; antes no E2E, #476) abre pelo mouse e pelo teclado, com o foco no primeiro
 // item e as setas nos outros, e acionar um item fecha o menu e navega.
@@ -33,7 +33,7 @@ const SITES: SiteSummary[] = ids.map((id, index) => ({
   lifecycle: 'cadastrado',
   state: index === 1 ? 'pausado' : 'ativo',
   pausedReason: index === 1 ? `render: ${LONG_FAILURE}` : null,
-  pausedCulprit: null,
+  pausedCulprit: index === 1 ? { origin: 'content', reference: '12345' } : null,
   activeVersionId: null,
   release: null,
   indexavel: false,
@@ -105,7 +105,15 @@ describe('SitesTable no navegador', () => {
     }
     // O pior caso, cortado, com o texto inteiro em `title` (#153).
     await expect.element(row(ids[1]!).getByText('Pausado', { exact: true })).toBeVisible();
-    await expect.element(row(ids[1]!).getByTitle(`render: ${LONG_FAILURE}`)).toBeVisible();
+    await expect
+      .element(
+        row(ids[1]!).getByTitle(`render: ${LONG_FAILURE} · Conteúdo culpado: Conteúdo 12345`),
+      )
+      .toBeVisible();
+    // O motivo cortado leva ao conteúdo culpado (#511).
+    await expect
+      .element(row(ids[1]!).getByRole('link', { name: /Conteúdo 12345 culpado pela pausa/ }))
+      .toHaveAttribute('href', `/sites/${ids[1]}/conteudos/12345`);
     await expect.element(row(ids[2]!).getByTitle(new RegExp(` · ${LONG_VERSION}$`))).toBeVisible();
     await expect
       .element(row(ids[0]!).getByRole('link', { name: `1 mudança pendente em ${ids[0]}` }))

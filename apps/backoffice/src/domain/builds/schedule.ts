@@ -73,3 +73,24 @@ export async function buildNow(
       job_key_mode => 'replace'
     )`);
 }
+
+export const ROLLBACK_TASK = 'rollback';
+
+/**
+ * Enfileira o rollback do site para a versão pedida, para já. Mesma fila do build
+ * (`build:<site>`): os dois nunca rodam ao mesmo tempo. Sem `job_key`: o do build agruparia
+ * ou substituiria o pedido.
+ */
+export async function scheduleRollback(
+  tx: Executor,
+  siteId: string,
+  versionId: string,
+): Promise<void> {
+  await tx.execute(sql`
+    select graphile_worker.add_job(
+      identifier => ${ROLLBACK_TASK},
+      payload => ${JSON.stringify({ siteId, versionId })}::json,
+      queue_name => ${`build:${siteId}`},
+      max_attempts => 5
+    )`);
+}
