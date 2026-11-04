@@ -12,7 +12,7 @@ import {
 } from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
 import type { RollbackVersion } from '@/domain/builds/builds.ts';
-import type { SiteSummary } from '@/domain/sites/sites.ts';
+import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
 import { RebuildReleaseDialog, type RebuildOnRelease } from './RebuildReleaseDialog.tsx';
 import { RollbackDialog, type RollbackSite } from './RollbackDialog.tsx';

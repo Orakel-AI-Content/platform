@@ -257,16 +257,17 @@ describe('SiteSummaryCard', () => {
       versions: [],
       action: vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' })),
     };
-    const { rerender } = render(<SiteSummaryCard site={site} g1Registered />);
+    const { rerender } = render(<SiteSummaryCard site={site} instance={instance} g1Registered />);
     expect(screen.queryByRole('button', { name: 'Reverter' })).toBeNull();
 
-    rerender(<SiteSummaryCard site={site} g1Registered rollback={rollback} />);
+    rerender(<SiteSummaryCard site={site} instance={instance} g1Registered rollback={rollback} />);
     const button = screen.getByRole('button', { name: 'Reverter' });
     expect(document.querySelector('.card')?.contains(button)).toBe(true);
 
     rerender(
       <SiteSummaryCard
         site={{ ...site, state: 'pausado', pausedReason: 'x' }}
+        instance={instance}
         g1Registered
         rollback={rollback}
       />,
