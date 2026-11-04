@@ -21,6 +21,7 @@ import type { Actor } from '@/domain/access/rbac.ts';
 import { requestBuildNow } from '@/domain/builds/builds.ts';
 import {
   advanceLifecycle,
+  rebuildOnRelease,
   resumeSite,
   setBuildWindow,
   setDailyPublishLimit,
@@ -126,6 +127,18 @@ export async function resumeSiteAction(siteId: string): Promise<ActionResult> {
     siteId,
     (tx, actor) => resumeSite(tx, actor, siteId),
     `${siteId} retomado; build enfileirado.`,
+  );
+}
+
+/**
+ * "Reconstruir na release X": grava a release do site, retoma se pausado e enfileira o build
+ * já. Release registrada, papel e site são conferidos pelo domínio.
+ */
+export async function rebuildOnReleaseAction(siteId: string, tag: string): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => rebuildOnRelease(tx, actor, siteId, tag),
+    `${siteId} na release ${tag}; build enfileirado.`,
   );
 }
 
