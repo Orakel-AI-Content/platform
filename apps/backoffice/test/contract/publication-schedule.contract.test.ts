@@ -1,6 +1,6 @@
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { Logger, runOnce } from 'graphile-worker';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
 import { contentVersions, publications, redirects, sites } from '../../src/db/schema/index.ts';
@@ -104,13 +104,24 @@ async function jobs(task: string) {
   return rows;
 }
 
-/** O horário chega: o job vence agora e o worker roda uma vez, com a task de verdade. */
+/**
+ * O horário chega: o job vence agora e o worker roda uma vez, com a task de verdade. O
+ * Graphile Worker 0.18 não espera o `complete_job` (worker.js chama `completeJob(job)` sem
+ * `await`): o `runOnce` pode resolver com o job ainda travado na fila. Espera nenhuma trava
+ * sobrar (concluído sai da fila; falho perde a trava) antes de conferir a fila.
+ */
 async function runDueJobs() {
   await db.execute(sql`update graphile_worker._private_jobs set run_at = now()`);
   await runOnce({
     pgPool: db.$client,
     logger: new Logger(() => () => {}),
     taskList: { [PUBLISH_SCHEDULED_TASK]: createPublishScheduledTask({ db }) },
+  });
+  await vi.waitFor(async () => {
+    const { rows } = await db.execute<{ locked: number }>(
+      sql`select count(*)::int as locked from graphile_worker._private_jobs where locked_at is not null`,
+    );
+    expect(rows[0]?.locked).toBe(0);
   });
 }
 

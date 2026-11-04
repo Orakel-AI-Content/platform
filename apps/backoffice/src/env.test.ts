@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseBuildRunnerEnv, parseDatabaseEnv, parseEnv } from './env.ts';
+import { parseAudienceEnv, parseBuildRunnerEnv, parseDatabaseEnv, parseEnv } from './env.ts';
 
 const valid = {
   DATABASE_URL: 'postgres://orakel:x@localhost:5432/orakel',
@@ -147,5 +147,32 @@ describe('parseDatabaseEnv (#145)', () => {
   it('sem DATABASE_URL, ou com uma URL inválida, recusa com o nome da variável', () => {
     expect(() => parseDatabaseEnv({})).toThrow(/DATABASE_URL/);
     expect(() => parseDatabaseEnv({ DATABASE_URL: 'banco' })).toThrow(/DATABASE_URL/);
+  });
+});
+
+describe('parseAudienceEnv (#545)', () => {
+  const audience = {
+    AE_SQL_TRANSPORT: 'clickhouse',
+    AE_SQL_URL: 'http://orakel:orakel-local@localhost:8123',
+  };
+
+  it('aceita o transporte clickhouse com a URL', () => {
+    expect(parseAudienceEnv(audience)).toEqual(audience);
+  });
+
+  it('recusa transporte diferente de clickhouse e URL inválida, sem repetir a URL', () => {
+    expect(() => parseAudienceEnv({ ...audience, AE_SQL_TRANSPORT: 'cloudflare' })).toThrow(
+      /AE_SQL_TRANSPORT/,
+    );
+    expect(() => parseAudienceEnv({ ...audience, AE_SQL_TRANSPORT: undefined })).toThrow(
+      /AE_SQL_TRANSPORT/,
+    );
+    expect(() => parseAudienceEnv({ ...audience, AE_SQL_URL: 'orakel-local@clickhouse' })).toThrow(
+      /^(?![\s\S]*orakel-local)[\s\S]*AE_SQL_URL/,
+    );
+  });
+
+  it('o ambiente do app não exige AE_SQL_*', () => {
+    expect(() => parseEnv(valid)).not.toThrow();
   });
 });
