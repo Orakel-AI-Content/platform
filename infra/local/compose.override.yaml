@@ -141,7 +141,9 @@ services:
       - '127.0.0.1:8123:8123'
     ulimits:
       nofile: { soft: 262144, hard: 262144 }
-    networks: [edge]
+    # Também na internal (#547): o backoffice-worker consolida a audiência por SQL sem entrar
+    # na rede edge, onde alcançaria o edge-local.
+    networks: [edge, internal]
     healthcheck:
       test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8123/ping || exit 1']
       interval: 5s
@@ -166,9 +168,14 @@ services:
     environment:
       S3_ENDPOINT: http://s3:8333
       BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-30}
+      # Consolidação da audiência (#547) pelo ClickHouse local, na rede internal.
+      AE_SQL_TRANSPORT: clickhouse
+      AE_SQL_URL: http://${CLICKHOUSE_USER:-orakel}:${CLICKHOUSE_PASSWORD:-orakel-local}@clickhouse:8123
     depends_on:
       s3-init:
         condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
 
   build-runner:
     environment:

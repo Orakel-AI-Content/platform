@@ -94,6 +94,10 @@ expect "export ↛ Postgres" "$(probe orakel-export "$(tcp postgres 5432)")" 'er
 expect "export ↛ internet" "$(probe orakel-export "$(http https://www.cloudflare.com/)")" 'erro'
 expect "publish → edge-local" "$(probe orakel-publish "$(http http://edge-local:8081/healthz)")" '200'
 expect "publish ↛ backoffice" "$(probe orakel-publish "$(http http://backoffice-web:3000/api/health)")" 'erro'
+# A consolidação da audiência (#547) lê o ClickHouse a partir do worker, pela rede internal.
+expect "backoffice-worker → ClickHouse (internal)" "$(compose exec -T backoffice-worker node -e "$(http http://clickhouse:8123/ping)" 2>/dev/null || echo erro)" '200'
+expect "internal → ClickHouse" "$(probe orakel-internal "$(http http://clickhouse:8123/ping)")" '200'
+expect "export ↛ ClickHouse" "$(probe orakel-export "$(http http://clickhouse:8123/ping)")" 'erro'
 
 echo "Proxy do socket do Docker (a partir do build-runner)"
 proxy() { # método, caminho
