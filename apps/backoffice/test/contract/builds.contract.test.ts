@@ -5,12 +5,13 @@ import type { JobHelpers } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { builds, sites } from '../../src/db/schema/index.ts';
+import { builds, releases, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { requestBuildNow } from '../../src/domain/builds/builds.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
 import {
+  rebuildOnRelease,
   resumeSite,
   setActiveVersion,
   setBuildWindow,
@@ -532,5 +533,106 @@ describe('retomar', () => {
       ok: false,
       issues: [{ code: 'site.not_paused' }],
     });
+  });
+});
+
+describe('reconstruir na release', () => {
+  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+
+  beforeEach(async () => {
+    await db.insert(releases).values([{ tag: 'core-v1.2.0' }, { tag: 'core-v1.3.0' }]);
+    await db.execute(sql`delete from graphile_worker._private_jobs`);
+  });
+
+  async function buildJobs(): Promise<{ key: string; run_at: Date }[]> {
+    const result = await db.execute<{ key: string; run_at: Date }>(
+      sql`select key, run_at from graphile_worker.jobs where task_identifier = 'build'`,
+    );
+    return result.rows;
+  }
+
+  async function pause(): Promise<void> {
+    await db
+      .update(sites)
+      .set({
+        state: 'pausado',
+        pausedReason: 'Snapshot inválido',
+        pausedCulpritOrigin: 'content',
+        pausedCulpritReference: '42',
+      })
+      .where(eq(sites.id, 'exemplo-a'));
+  }
+
+  it('site pausado: grava a release, retoma e enfileira o build já', async () => {
+    await pause();
+    const before = Date.now();
+    expect(
+      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', 'core-v1.2.0')),
+    ).toEqual({ ok: true, value: undefined });
+
+    expect(await site()).toMatchObject({
+      release: 'core-v1.2.0',
+      state: 'ativo',
+      pausedReason: null,
+      pausedCulpritOrigin: null,
+      pausedCulpritReference: null,
+    });
+    const jobs = await buildJobs();
+    expect(jobs.map((job) => job.key)).toEqual(['build:exemplo-a']);
+    expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeLessThanOrEqual(Date.now());
+    expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeGreaterThanOrEqual(before - 1000);
+  });
+
+  it('site ativo também é reconstruído, sem recusa de site não pausado', async () => {
+    expect(
+      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', 'core-v1.3.0')),
+    ).toEqual({ ok: true, value: undefined });
+    expect(await site()).toMatchObject({ release: 'core-v1.3.0', state: 'ativo' });
+    expect((await buildJobs()).map((job) => job.key)).toEqual(['build:exemplo-a']);
+  });
+
+  it('o build seguinte publica com a imagem site-builder:<release> e registra a release', async () => {
+    await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', 'core-v1.2.0'));
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      helpers(),
+    );
+
+    expect(fake.started.map((spec) => spec.image)).toEqual([
+      'site-builder:core-v1.2.0',
+      'site-builder:core-v1.2.0',
+    ]);
+    const [build] = await db.select().from(builds);
+    expect(build).toMatchObject({ status: 'ok', release: 'core-v1.2.0' });
+    expect(await site()).toMatchObject({ release: 'core-v1.2.0', lifecycle: 'publicado' });
+  });
+
+  it('recusa release não registrada, sem gravar nem enfileirar', async () => {
+    await pause();
+    expect(
+      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', 'core-v9.9.9')),
+    ).toMatchObject({ ok: false, issues: [{ code: 'release.not_registered', path: ['release'] }] });
+    expect(await site()).toMatchObject({ release: null, state: 'pausado' });
+    expect(await buildJobs()).toEqual([]);
+  });
+
+  it('recusa site inexistente, sem enfileirar', async () => {
+    expect(
+      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'nao-existe', 'core-v1.2.0')),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+    expect(await buildJobs()).toEqual([]);
+  });
+
+  it('editor e revisor recebem forbidden e nada muda', async () => {
+    await pause();
+    for (const role of ['editor', 'revisor'] as const) {
+      const actor = { email: `${role}@orakel.local`, roles: [role] };
+      expect(
+        await db.transaction((tx) => rebuildOnRelease(tx, actor, 'exemplo-a', 'core-v1.2.0')),
+      ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    }
+    expect(await site()).toMatchObject({ release: null, state: 'pausado' });
+    expect(await buildJobs()).toEqual([]);
   });
 });

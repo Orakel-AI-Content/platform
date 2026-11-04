@@ -15,6 +15,7 @@ import {
 import Card from '@/components/ui/Card';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
+import { RebuildReleaseDialog, type RebuildOnRelease } from './RebuildReleaseDialog.tsx';
 import {
   PendingCount,
   PublishNowPanel,
@@ -96,12 +97,15 @@ export function SiteSummaryCard({
   g1Registered,
   publish,
   resume,
+  rebuild,
 }: {
   site: SiteSummary;
   instance: SiteInstance;
   g1Registered: boolean;
   publish?: PublishNow;
   resume?: ResumeSite;
+  /** Releases registradas e a action de reconstruir, já ligada ao site. */
+  rebuild?: { releases: readonly string[]; action: RebuildOnRelease };
 }) {
   const paused = site.state === 'pausado';
   return (
@@ -135,6 +139,14 @@ export function SiteSummaryCard({
       </InfoList>
       {publish && !paused && <PublishNowPanel siteId={site.id} action={publish} />}
       {resume && paused && <ResumeSitePanel siteId={site.id} action={resume} />}
+      {rebuild && (
+        <RebuildReleaseDialog
+          current={site.release}
+          paused={paused}
+          releases={rebuild.releases}
+          action={rebuild.action}
+        />
+      )}
     </Card>
   );
 }
