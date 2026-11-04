@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BuildTarget } from './builds.ts';
-import { RENDER_LIMITS, planBuild, type BuildSettings } from './plan.ts';
+import { RENDER_LIMITS, planBuild, planRollback, type BuildSettings } from './plan.ts';
 
 const target: BuildTarget = {
   siteId: 'exemplo-a',
@@ -61,6 +61,51 @@ describe('planBuild', () => {
     const declared = { ...target, massUnpublishDeclaredAt: new Date('2026-10-31T12:00:00Z') };
     expect(planBuild(declared, settings, 'r').render.env).toMatchObject({
       ALLOW_MASS_UNPUBLISH: 'true',
+    });
+  });
+});
+
+describe('planRollback', () => {
+  const version = '20261001T120000Z-abcdef12';
+
+  it('a imagem é a da release do site, como no build', () => {
+    expect(planRollback(target, settings, version, 'r').image).toBe(
+      'ghcr.io/orakel-ai-content/site-builder:local',
+    );
+    expect(
+      planRollback({ ...target, release: 'core-v0.2.0' }, settings, version, 'r'),
+    ).toMatchObject({
+      release: 'core-v0.2.0',
+      image: 'ghcr.io/orakel-ai-content/site-builder:core-v0.2.0',
+    });
+  });
+
+  it('recebe o site, a versão e o env de deploy do publish, na rede publish, sem S3 nem exportação', () => {
+    const plan = planRollback(target, settings, version, 'r');
+    const publish = planBuild(target, settings, 'r').publish.env;
+    expect(plan.network).toBe('orakel-publish');
+    expect(plan.env).toEqual({
+      SITE_ID: 'exemplo-a',
+      VERSION_ID: version,
+      DEPLOY_TARGET: publish.DEPLOY_TARGET,
+      CLOUDFLARE_API_TOKEN: publish.CLOUDFLARE_API_TOKEN,
+      CLOUDFLARE_ACCOUNT_ID: publish.CLOUDFLARE_ACCOUNT_ID,
+    });
+    expect(Object.keys(plan.env).filter((k) => /^(S3_|EXPORT_)/.test(k))).toEqual([]);
+  });
+
+  it('no alvo local, o mesmo env de deploy do publish', () => {
+    const local: BuildSettings = {
+      ...settings,
+      deploy: { target: 'local', edgeLocalUrl: 'http://edge-local:8081' },
+    };
+    expect(planRollback(target, local, version, 'r').env).toMatchObject({
+      DEPLOY_TARGET: 'local',
+      EDGE_LOCAL_URL: 'http://edge-local:8081',
+    });
+    expect(planBuild(target, local, 'r').publish.env).toMatchObject({
+      DEPLOY_TARGET: 'local',
+      EDGE_LOCAL_URL: 'http://edge-local:8081',
     });
   });
 });
