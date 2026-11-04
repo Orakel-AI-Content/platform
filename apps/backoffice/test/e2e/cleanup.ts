@@ -27,6 +27,7 @@ export const SITE_TABLES = [
   'authors',
   'site_sequences',
   'site_policy_triggers',
+  'generation_runs',
   'editorial_contexts',
   'site_configs',
 ];

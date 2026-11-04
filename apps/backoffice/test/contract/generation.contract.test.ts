@@ -1,3 +1,4 @@
+import type { MockLanguageModelV4 } from 'ai/test';
 import { and, eq, sql } from 'drizzle-orm';
 import type { JobHelpers } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -34,7 +35,7 @@ const editor: Actor = { email: 'editora@orakel.local', roles: ['editor'] };
 const revisor: Actor = { email: 'revisor@orakel.local', roles: ['revisor'] };
 
 // A rota abre o banco por getDb(): o mesmo da suíte.
-const shared = vi.hoisted(() => ({ db: undefined }));
+const shared = vi.hoisted((): { db?: Db } => ({}));
 vi.mock('@/db/client.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof ClientModule>()),
   getDb: () => ({ db: shared.db }),
@@ -124,7 +125,7 @@ async function runTask(runId: number) {
     api: { url: 'http://backoffice-web:3000', token: GENERATOR_TOKEN },
     fetch,
   })({ runId }, helpers);
-  const model = settings.model.languageModel as { doGenerateCalls: unknown[] };
+  const model = settings.model.languageModel as MockLanguageModelV4;
   return { fetch, modelCalls: model.doGenerateCalls.length };
 }
 
