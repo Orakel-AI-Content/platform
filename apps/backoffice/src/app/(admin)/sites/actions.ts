@@ -18,7 +18,7 @@ import {
 } from '@/components/sites/siteOperationForms.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
-import { requestBuildNow } from '@/domain/builds/builds.ts';
+import { requestBuildNow, requestRollback } from '@/domain/builds/builds.ts';
 import {
   advanceLifecycle,
   rebuildOnRelease,
@@ -139,6 +139,18 @@ export async function rebuildOnReleaseAction(siteId: string, tag: string): Promi
     siteId,
     (tx, actor) => rebuildOnRelease(tx, actor, siteId, tag),
     `${siteId} na release ${tag}; build enfileirado.`,
+  );
+}
+
+/**
+ * "Reverter": enfileira o rollback do site para uma versão já publicada. A versão (de um
+ * build `ok` do site e diferente da ativa) e o papel são conferidos pelo domínio.
+ */
+export async function rollbackSiteAction(siteId: string, versionId: string): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => requestRollback(tx, actor, siteId, versionId),
+    `Rollback de ${siteId} para ${versionId} enfileirado.`,
   );
 }
 
