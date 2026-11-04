@@ -505,7 +505,14 @@ test('editor vê a página do site sem as ações', async ({ page }) => {
   await expect(siteSummary(page).getByRole('term')).toHaveCount(8);
   // Cada aba mostra o mesmo que para a operação, só de leitura (#370).
   const noActions = async () => {
-    for (const name of [/^Marcar/, /^Publicar agora/, 'Registrar G1', /^Salvar$/, 'Usar padrão']) {
+    for (const name of [
+      /^Marcar/,
+      /^Publicar agora/,
+      'Reverter',
+      'Registrar G1',
+      /^Salvar$/,
+      'Usar padrão',
+    ]) {
       await expect(page.getByRole('button', { name })).toHaveCount(0);
     }
     await expect(page.locator('form')).toHaveCount(0);
