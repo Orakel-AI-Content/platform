@@ -26,6 +26,34 @@ export type BuildTarget = {
   massUnpublishDeclaredAt: Date | null;
 };
 
+/** Páginas e arquivos do build que pôs no ar a versão ativa do site. */
+export type ActiveBuild = { pages: number | null; files: number | null };
+
+/**
+ * Build da versão ativa: o `ok` mais recente com `versionId = sites.activeVersionId`. Não é o
+ * último build: depois de um rollback ou de um build falho, o último não é o que está no ar.
+ */
+export async function activeBuild(
+  db: Executor,
+  siteId: string,
+  activeVersionId: string | null,
+): Promise<ActiveBuild | undefined> {
+  if (activeVersionId === null) return undefined;
+  const [row] = await db
+    .select({ pages: builds.pages, files: builds.files })
+    .from(builds)
+    .where(
+      and(
+        eq(builds.siteId, siteId),
+        eq(builds.status, 'ok'),
+        eq(builds.versionId, activeVersionId),
+      ),
+    )
+    .orderBy(desc(builds.finishedAt), desc(builds.id))
+    .limit(1);
+  return row;
+}
+
 export async function loadBuildTarget(
   db: Executor,
   siteId: string,
@@ -33,21 +61,7 @@ export async function loadBuildTarget(
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId));
   if (site === undefined) return undefined;
   const config = await currentConfig(db, siteId);
-  const [active] =
-    site.activeVersionId === null
-      ? []
-      : await db
-          .select({ pages: builds.pages })
-          .from(builds)
-          .where(
-            and(
-              eq(builds.siteId, siteId),
-              eq(builds.status, 'ok'),
-              eq(builds.versionId, site.activeVersionId),
-            ),
-          )
-          .orderBy(desc(builds.finishedAt), desc(builds.id))
-          .limit(1);
+  const active = await activeBuild(db, siteId, site.activeVersionId);
   return {
     siteId,
     state: site.state,
@@ -161,6 +175,32 @@ export async function lastBuilds(db: Executor): Promise<Map<string, LastBuild>> 
     .from(builds)
     .orderBy(builds.siteId, desc(builds.finishedAt), desc(builds.id));
   return new Map(rows.map(({ siteId, ...last }) => [siteId, last]));
+}
+
+/** Um dos últimos builds de um site, como o resumo da página do site os mostra. */
+export type RecentBuild = LastBuild & { id: number; release: string };
+
+/** Quantos builds o resumo do site mostra. */
+export const RECENT_BUILDS_LIMIT = 5;
+
+/** Os builds mais recentes de um site, do mais novo para o mais antigo. */
+export async function recentBuilds(
+  db: Executor,
+  siteId: string,
+  limit = RECENT_BUILDS_LIMIT,
+): Promise<RecentBuild[]> {
+  return db
+    .select({
+      id: builds.id,
+      status: builds.status,
+      release: builds.release,
+      versionId: builds.versionId,
+      finishedAt: builds.finishedAt,
+    })
+    .from(builds)
+    .where(eq(builds.siteId, siteId))
+    .orderBy(desc(builds.finishedAt), desc(builds.id))
+    .limit(limit);
 }
 
 /** "Publicar agora": o build do site roda já, sem esperar a janela. */
