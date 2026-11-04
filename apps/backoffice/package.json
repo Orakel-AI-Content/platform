@@ -22,6 +22,7 @@
     "media:reprocess": "node --env-file-if-exists=../../.env.local src/bin/reprocess-media.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
     "@floating-ui/react": "catalog:",
     "@hookform/resolvers": "catalog:",
@@ -47,6 +48,7 @@
     "@tiptap/extensions": "catalog:",
     "@tiptap/pm": "catalog:",
     "@tiptap/react": "catalog:",
+    "ai": "catalog:",
     "classnames": "catalog:",
     "dayjs": "catalog:",
     "drizzle-orm": "catalog:",
