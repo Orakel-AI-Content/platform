@@ -1,4 +1,4 @@
-// Colunas operacionais do site (estado, motivo e culpado da pausa, versão ativa, ciclo de
+// Colunas operacionais do site (estado, motivo e culpado da pausa, versão ativa, release, ciclo de
 // vida, janela dos builds, limite diário de publicações, despublicação em massa declarada),
 // gravadas pelo build e pela operação. Não vão para o snapshot: gravar aqui não gera mudança pendente — senão cada build agendaria outro. Único
 // módulo fora de pending-changes liberado no teste de varredura.
@@ -7,7 +7,7 @@ import type { Result } from '@orakel/content-model';
 import { and, eq, ne } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { sites } from '../../db/schema/index.ts';
+import { releases, sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { buildNow } from './schedule.ts';
 
@@ -33,6 +33,24 @@ export async function pauseSite(
 }
 
 /**
+ * Tira o site da pausa: volta a `ativo`, sem motivo nem culpado. O update condicional decide
+ * a corrida; devolve se o site estava pausado.
+ */
+async function unpause(tx: Executor, siteId: string): Promise<boolean> {
+  const updated = await tx
+    .update(sites)
+    .set({
+      state: 'ativo',
+      pausedReason: null,
+      pausedCulpritOrigin: null,
+      pausedCulpritReference: null,
+    })
+    .where(and(eq(sites.id, siteId), eq(sites.state, 'pausado')))
+    .returning({ id: sites.id });
+  return updated.length > 0;
+}
+
+/**
  * "Retomar" (L4): o site pausado volta a `ativo`, sem motivo nem culpado, e o build entra na
  * fila já, publicando as mudanças represadas (a falha não as baixou). O update condicional
  * decide a corrida: de dois "Retomar" simultâneos, só um enfileira.
@@ -45,17 +63,7 @@ export async function resumeSite(
   const allowed = requireRole(actor, 'operations.run');
   if (!allowed.ok) return allowed;
 
-  const updated = await tx
-    .update(sites)
-    .set({
-      state: 'ativo',
-      pausedReason: null,
-      pausedCulpritOrigin: null,
-      pausedCulpritReference: null,
-    })
-    .where(and(eq(sites.id, siteId), eq(sites.state, 'pausado')))
-    .returning({ id: sites.id });
-  if (updated.length > 0) {
+  if (await unpause(tx, siteId)) {
     await buildNow(tx, siteId);
     return { ok: true, value: undefined };
   }
@@ -77,6 +85,54 @@ export async function resumeSite(
       },
     ],
   };
+}
+
+/**
+ * "Reconstruir na release X" (L4): só release registrada (`releases`). Grava `sites.release`
+ * (a tag da imagem `site-builder` dos próximos builds), retoma o site se pausado (como
+ * "Retomar") e enfileira o build já. Site ativo também é reconstruído: trocar de release não
+ * depende de pausa.
+ */
+export async function rebuildOnRelease(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  tag: string,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+
+  const [registered] = await tx
+    .select({ tag: releases.tag })
+    .from(releases)
+    .where(eq(releases.tag, tag));
+  if (registered === undefined) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'release.not_registered',
+          message: `A release ${tag} não está registrada`,
+          path: ['release'],
+        },
+      ],
+    };
+  }
+
+  const updated = await tx
+    .update(sites)
+    .set({ release: registered.tag })
+    .where(eq(sites.id, siteId))
+    .returning({ id: sites.id });
+  if (updated.length === 0) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  await unpause(tx, siteId);
+  await buildNow(tx, siteId);
+  return { ok: true, value: undefined };
 }
 
 /** Primeira publicação bem-sucedida: o site passa a `publicado`. */
