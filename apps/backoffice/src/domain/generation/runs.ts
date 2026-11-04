@@ -1,8 +1,13 @@
 import type { Issue, Result } from '@orakel/content-model';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { authors, editorialContexts, generationRuns } from '../../db/schema/index.ts';
+import {
+  authors,
+  editorialContexts,
+  generationRuns,
+  type GenerationStatus,
+} from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { resourcesFor, siteExists } from '../sites/sites.ts';
 import { currentEditorialContext } from './editorial-contexts.ts';
@@ -84,6 +89,54 @@ export async function enqueueGeneration(
       max_attempts => 1
     )`);
   return { ok: true, value: { runId: run.id } };
+}
+
+/** Uma execução na lista do site: o que a operação acompanha (custo, tokens, duração). */
+export type GenerationRunSummary = {
+  id: number;
+  createdAt: Date;
+  topic: string;
+  status: GenerationStatus;
+  provider: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  /** Em dólares; nulo com a execução `pendente` ou o modelo fora de `LLM_PRICING`. */
+  costUsd: number | null;
+  durationMs: number | null;
+  /** Conteúdo gerado, com a execução `ok`. */
+  contentId: number | null;
+};
+
+/**
+ * Execuções do site, da mais recente para a primeira (índice `generation_runs_site_created_idx`).
+ * Ler exige site.read; o prompt e o erro completo ficam de fora (não há tela de detalhe).
+ */
+export async function listGenerationRuns(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<GenerationRunSummary[]>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+  const rows = await db
+    .select({
+      id: generationRuns.id,
+      createdAt: generationRuns.createdAt,
+      topic: generationRuns.topic,
+      status: generationRuns.status,
+      provider: generationRuns.provider,
+      model: generationRuns.model,
+      inputTokens: generationRuns.inputTokens,
+      outputTokens: generationRuns.outputTokens,
+      costUsd: generationRuns.costUsd,
+      durationMs: generationRuns.durationMs,
+      contentId: generationRuns.contentId,
+    })
+    .from(generationRuns)
+    .where(eq(generationRuns.siteId, siteId))
+    .orderBy(desc(generationRuns.createdAt), desc(generationRuns.id));
+  return { ok: true, value: rows };
 }
 
 export type PendingRun = { runId: number; siteId: string; input: GenerationInput };

@@ -30,6 +30,7 @@ const AREAS = [
   'Taxonomias',
   'Menus',
   'Contextos editoriais',
+  'Geração',
   'Audiência',
 ];
 
@@ -76,6 +77,7 @@ describe('SideNav', () => {
       '/sites/exemplo-a/taxonomias',
       '/sites/exemplo-a/menus',
       '/sites/exemplo-a/contextos',
+      '/sites/exemplo-a/geracao',
       '/sites/exemplo-a/audiencia',
     ]);
     expect(screen.getByRole('button', { name: 'Exemplo A, trocar de site' })).toBeTruthy();

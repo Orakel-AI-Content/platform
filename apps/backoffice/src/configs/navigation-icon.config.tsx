@@ -12,6 +12,7 @@ import {
   PiListDuotone,
   PiNotebookDuotone,
   PiPackageDuotone,
+  PiSparkleDuotone,
   PiSquaresFourDuotone,
   PiTagDuotone,
   PiUsersDuotone,
@@ -30,6 +31,7 @@ const navigationIcon = {
   siteMenus: <PiListDuotone aria-hidden />,
   siteInstitutional: <PiArticleDuotone aria-hidden />,
   siteEditorialContexts: <PiNotebookDuotone aria-hidden />,
+  siteGeneration: <PiSparkleDuotone aria-hidden />,
   siteAudience: <PiChartLineUpDuotone aria-hidden />,
 } as const satisfies Record<string, JSX.Element>;
 

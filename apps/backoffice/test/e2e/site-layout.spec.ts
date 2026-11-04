@@ -22,6 +22,7 @@ const AREAS = [
   'Taxonomias',
   'Menus',
   'Contextos editoriais',
+  'Geração',
   'Audiência',
 ];
 
