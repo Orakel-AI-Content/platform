@@ -14,8 +14,9 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
-import { redirectUsageFor } from '@/domain/sites/sites.ts';
+import { readSiteInstance, redirectUsageFor } from '@/domain/sites/sites.ts';
 import { DetailLayout } from '@/components/shared/DetailLayout';
+import { noRead } from '@/components/shared/ForbiddenScreen';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SECTION_HINT_CLASS } from '@/components/shared/sectionText.ts';
 import { siteTrail } from '@/components/shared/trail.ts';
@@ -48,6 +49,8 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const triggers = await listPolicyTriggers(db, actor, siteId);
   const g1 = triggers.ok ? triggers.value.find((record) => record.trigger === 'G1') : undefined;
   const redirects = await redirectUsageFor(db, actor, siteId);
+  const instance = await readSiteInstance(db, actor, siteId);
+  if (!instance.ok) return noRead;
   const canConfigure = can(actor, 'site.configure');
   const canOperate = can(actor, 'operations.run');
 
@@ -127,6 +130,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
       <DetailLayout>
         <SiteSummaryCard
           site={site}
+          instance={instance.value}
           g1Registered={g1 !== undefined}
           publish={canOperate ? publishNow : undefined}
           resume={canOperate ? resumeSiteAction : undefined}
