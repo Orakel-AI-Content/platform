@@ -302,6 +302,9 @@ importers:
       '@orakel/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@orakel/events':
+        specifier: workspace:*
+        version: link:../../packages/events
       '@orakel/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
