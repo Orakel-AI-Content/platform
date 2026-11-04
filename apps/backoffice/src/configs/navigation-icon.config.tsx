@@ -5,6 +5,7 @@
 import {
   PiArticleDuotone,
   PiBrowsersDuotone,
+  PiChartLineUpDuotone,
   PiCheckCircleDuotone,
   PiFileTextDuotone,
   PiImagesDuotone,

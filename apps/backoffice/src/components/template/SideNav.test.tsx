@@ -98,6 +98,7 @@ describe('SideNav', () => {
     ['/sites/exemplo-a/autores/novo', 'Autores'],
     ['/sites/exemplo-a/conteudos/7/editar', 'Conteúdos'],
     ['/sites/exemplo-a/revisao/3', 'Revisão'],
+    ['/sites/exemplo-a/audiencia', 'Audiência'],
     ['/sites/exemplo-a/configuracao', 'Visão geral'],
     ['/sites/exemplo-a/pendencias', 'Visão geral'],
   ])('em %s, só "%s" tem aria-current="page" e o destaque do Menu', (path, label) => {
