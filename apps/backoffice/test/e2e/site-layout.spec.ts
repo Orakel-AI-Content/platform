@@ -13,7 +13,16 @@ const OPERATOR = 'operacao@orakel.local';
 const SITE = 'exemplo-a';
 const SITE_NAME = 'Exemplo A — Guias';
 
-const AREAS = ['Visão geral', 'Conteúdos', 'Revisão', 'Mídia', 'Autores', 'Taxonomias', 'Menus'];
+const AREAS = [
+  'Visão geral',
+  'Conteúdos',
+  'Revisão',
+  'Mídia',
+  'Autores',
+  'Taxonomias',
+  'Menus',
+  'Contextos editoriais',
+];
 
 test('a aba mostra a área e, dentro de um site, o nome dele', async ({ page }) => {
   await asRole(page, 'operacao');

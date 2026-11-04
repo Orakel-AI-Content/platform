@@ -87,6 +87,13 @@ const navigationConfig: NavigationTree[] = [
       siteArea('site.authors', 'autores', 'Autores', 'siteAuthors'),
       siteArea('site.taxonomies', 'taxonomias', 'Taxonomias', 'siteTaxonomies'),
       siteArea('site.menus', 'menus', 'Menus', 'siteMenus'),
+      // Versões do contexto editorial da geração (RN-GEN-05): ler é site.read; criar, content.write.
+      siteArea(
+        'site.editorialContexts',
+        'contextos',
+        'Contextos editoriais',
+        'siteEditorialContexts',
+      ),
       // Só para quem edita: a tela é um formulário.
       siteArea(
         'site.institutional',
