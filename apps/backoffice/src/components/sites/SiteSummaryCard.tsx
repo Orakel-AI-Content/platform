@@ -10,6 +10,7 @@ import {
   LastBuildSummary,
   PendingCount,
   PublishNowPanel,
+  ResumeSitePanel,
   SiteStateIndicator,
   type PublishNow,
   type ResumeSite,

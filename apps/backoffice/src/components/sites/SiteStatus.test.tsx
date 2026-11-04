@@ -13,6 +13,7 @@ import {
   LastBuildSummary,
   PendingCount,
   PublishNowPanel,
+  ResumeSitePanel,
   SiteStateIndicator,
 } from './SiteStatus.tsx';
 
