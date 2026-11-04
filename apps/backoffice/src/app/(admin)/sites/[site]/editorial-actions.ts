@@ -11,9 +11,10 @@ import type { Actor } from '@/domain/access/rbac.ts';
 import { createAuthor, updateAuthor } from '@/domain/content/authors.ts';
 import { createMenu, updateMenu } from '@/domain/content/menus.ts';
 import { createTaxonomy, updateTaxonomy } from '@/domain/content/taxonomies.ts';
+import { createEditorialContext } from '@/domain/generation/editorial-contexts.ts';
 import { updateInstitutionalTexts, type InstitutionalTexts } from '@/domain/sites/sites.ts';
 
-// Ações das telas de autores, taxonomias, menus e textos institucionais: validação,
+// Ações das telas de autores, taxonomias, menus, textos institucionais e contextos editoriais: validação,
 // permissão (content.write) e unicidade ficam no domínio; aqui só a tradução do Result.
 // O valor chega do formulário sem tipo garantido; o domínio valida pelo schema.
 
@@ -103,5 +104,15 @@ export async function updateInstitutionalTextsAction(siteId: string, value: unkn
     listPath(siteId, 'institucionais'),
     'Textos salvos.',
     ['institutionalTexts'],
+  );
+}
+
+/** Grava a versão N+1 do contexto editorial do site (as anteriores ficam intactas). */
+export async function createEditorialContextAction(siteId: string, value: unknown) {
+  const body = (value as { body?: unknown } | null)?.body;
+  return run(
+    (tx, actor) => createEditorialContext(tx, actor, siteId, typeof body === 'string' ? body : ''),
+    listPath(siteId, 'contextos'),
+    'Contexto editorial salvo.',
   );
 }

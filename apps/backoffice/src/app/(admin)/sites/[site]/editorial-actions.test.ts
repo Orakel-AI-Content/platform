@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createAuthorAction,
+  createEditorialContextAction,
   createMenuAction,
   createTaxonomyAction,
   updateAuthorAction,
@@ -34,6 +35,9 @@ vi.mock('@/domain/content/taxonomies.ts', () => ({
 }));
 vi.mock('@/domain/content/menus.ts', () => ({ createMenu: mocks.write, updateMenu: mocks.write }));
 vi.mock('@/domain/sites/sites.ts', () => ({ updateInstitutionalTexts: mocks.write }));
+vi.mock('@/domain/generation/editorial-contexts.ts', () => ({
+  createEditorialContext: mocks.write,
+}));
 
 const editor = { email: 'editor@orakel.local', roles: ['editor'] };
 
@@ -52,6 +56,11 @@ const actions = [
     'institucionais',
     () => updateInstitutionalTextsAction('exemplo-a', {}),
     '/sites/exemplo-a/institucionais',
+  ],
+  [
+    'contexto editorial',
+    () => createEditorialContextAction('exemplo-a', { body: 'Tom leve.' }),
+    '/sites/exemplo-a/contextos',
   ],
 ] as const;
 
@@ -102,6 +111,15 @@ describe('ações das entidades editoriais', () => {
     expect(await updateInstitutionalTextsAction('exemplo-a', {})).toMatchObject({
       issues: [{ path: ['about'], message: 'Inválido' }],
     });
+  });
+
+  it('contexto editorial: o texto vai ao domínio; sem texto, vazio', async () => {
+    mocks.write.mockResolvedValue({ ok: true, value: { version: 2 } });
+
+    await createEditorialContextAction('exemplo-a', { body: 'Tom leve.' });
+    await createEditorialContextAction('exemplo-a', {});
+
+    expect(mocks.write.mock.calls.map((call: unknown[]) => call[3])).toEqual(['Tom leve.', '']);
   });
 
   it('slug repetido volta no campo slug', async () => {
