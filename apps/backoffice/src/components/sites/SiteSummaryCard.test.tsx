@@ -7,8 +7,8 @@ import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { SiteSummaryCard } from './SiteSummaryCard.tsx';
 
-// Resumo da página do site (#370): os campos no InfoList e "Publicar agora" ou "Retomar" só
-// com a ação.
+// Resumo da página do site (#370): os campos no InfoList e "Publicar agora" ou "Retomar" e
+// "Reconstruir na release" (#515) só com a ação.
 
 afterEach(cleanup);
 
@@ -124,6 +124,29 @@ describe('SiteSummaryCard', () => {
     rerender(<SiteSummaryCard site={site} g1Registered publish={action} resume={action} />);
     expect(screen.getByRole('button', { name: 'Publicar agora exemplo-a' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Retomar/ })).toBeNull();
+  });
+
+  it('"Reconstruir na release" só quando a página passa a ação, ativo ou pausado', () => {
+    const rebuild = {
+      releases: ['core-v1.3.0'],
+      action: vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' })),
+    };
+    const { rerender } = render(<SiteSummaryCard site={site} g1Registered />);
+    expect(screen.queryByRole('button', { name: 'Reconstruir na release' })).toBeNull();
+
+    rerender(<SiteSummaryCard site={site} g1Registered rebuild={rebuild} />);
+    const button = screen.getByRole('button', { name: 'Reconstruir na release' });
+    expect(document.querySelector('.card')?.contains(button)).toBe(true);
+    expect(button.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
+
+    rerender(
+      <SiteSummaryCard
+        site={{ ...site, state: 'pausado', pausedReason: 'x' }}
+        g1Registered
+        rebuild={rebuild}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Reconstruir na release' })).toBeTruthy();
   });
 
   it('sem a ação (editor, revisor), o site pausado não mostra "Retomar"', () => {

@@ -7,6 +7,7 @@ import { SITE_STATE_LABEL, SITE_STATE_VARIANT } from '@/components/shared/siteLa
 import Card from '@/components/ui/Card';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
+import { RebuildReleaseDialog, type RebuildOnRelease } from './RebuildReleaseDialog.tsx';
 import {
   LastBuildSummary,
   PendingCount,
@@ -20,20 +21,24 @@ import {
 /**
  * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: os dados do
  * site no `InfoList` (com o uso do limite diário de hoje) e, ao pé, "Publicar agora" ou, com o
- * site pausado, "Retomar". `publish` e `resume` só vêm de quem tem `operations.run`; cada botão
- * aparece só no estado dele (publicar com o site não pausado, retomar com ele pausado). Sem
- * estado próprio: os painéis são os únicos Client Components dentro dele.
+ * site pausado, "Retomar", e "Reconstruir na release" (#515) nos dois estados. `publish`, `resume`
+ * e `rebuild` só vêm de quem tem `operations.run`; publicar e retomar aparecem só no estado
+ * deles (publicar com o site não pausado, retomar com ele pausado). Sem estado próprio: os
+ * painéis são os únicos Client Components dentro dele.
  */
 export function SiteSummaryCard({
   site,
   g1Registered,
   publish,
   resume,
+  rebuild,
 }: {
   site: SiteSummary;
   g1Registered: boolean;
   publish?: PublishNow;
   resume?: ResumeSite;
+  /** Releases registradas e a action de reconstruir, já ligada ao site. */
+  rebuild?: { releases: readonly string[]; action: RebuildOnRelease };
 }) {
   const paused = site.state === 'pausado';
   return (
@@ -64,6 +69,14 @@ export function SiteSummaryCard({
       </InfoList>
       {publish && !paused && <PublishNowPanel siteId={site.id} action={publish} />}
       {resume && paused && <ResumeSitePanel siteId={site.id} action={resume} />}
+      {rebuild && (
+        <RebuildReleaseDialog
+          current={site.release}
+          paused={paused}
+          releases={rebuild.releases}
+          action={rebuild.action}
+        />
+      )}
     </Card>
   );
 }
