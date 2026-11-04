@@ -4,9 +4,11 @@ import {
 } from '@/components/shared/detailSummary.ts';
 import { InfoField, InfoList } from '@/components/shared/InfoList';
 import Card from '@/components/ui/Card';
+import type { RollbackVersion } from '@/domain/builds/builds.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { RebuildReleaseDialog, type RebuildOnRelease } from './RebuildReleaseDialog.tsx';
+import { RollbackDialog, type RollbackSite } from './RollbackDialog.tsx';
 import {
   LastBuildSummary,
   PendingCount,
@@ -20,8 +22,8 @@ import {
 /**
  * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: os dados do
  * site no `InfoList` (com o uso do limite diário de hoje) e, ao pé, "Publicar agora" ou, com o
- * site pausado, "Retomar", e "Reconstruir na release" (#515) nos dois estados. `publish`, `resume`
- * e `rebuild` só vêm de quem tem `operations.run`; publicar e retomar aparecem só no estado
+ * site pausado, "Retomar", e "Reconstruir na release" (#515) e "Reverter" (#514) nos dois
+ * estados. `publish`, `resume`, `rebuild` e `rollback` só vêm de quem tem `operations.run`; publicar e retomar aparecem só no estado
  * deles (publicar com o site não pausado, retomar com ele pausado). Sem estado próprio: os
  * painéis são os únicos Client Components dentro dele.
  */
@@ -31,6 +33,7 @@ export function SiteSummaryCard({
   publish,
   resume,
   rebuild,
+  rollback,
 }: {
   site: SiteSummary;
   g1Registered: boolean;
@@ -38,6 +41,8 @@ export function SiteSummaryCard({
   resume?: ResumeSite;
   /** Releases registradas e a action de reconstruir, já ligada ao site. */
   rebuild?: { releases: readonly string[]; action: RebuildOnRelease };
+  /** Versões revertíveis (sem a ativa) e a action de reverter, já ligada ao site. */
+  rollback?: { versions: readonly RollbackVersion[]; action: RollbackSite };
 }) {
   const paused = site.state === 'pausado';
   return (
@@ -71,6 +76,13 @@ export function SiteSummaryCard({
           paused={paused}
           releases={rebuild.releases}
           action={rebuild.action}
+        />
+      )}
+      {rollback && (
+        <RollbackDialog
+          versions={rollback.versions}
+          timeZone={site.timeZone}
+          action={rollback.action}
         />
       )}
     </Card>
