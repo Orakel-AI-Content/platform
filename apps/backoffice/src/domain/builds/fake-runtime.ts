@@ -1,4 +1,4 @@
-// Runtime de containers falso para os testes do build: cada etapa (render, publish) tem o
+// Runtime de containers falso para os testes do build: cada etapa (render, publish, rollback) tem o
 // código de saída, os arquivos que deixa no volume e se estoura o tempo.
 import type { ContainerRuntime, ContainerSpec } from './runtime.ts';
 
@@ -8,6 +8,7 @@ export function fakeRuntime(options: {
   image?: boolean;
   render?: FakeStage;
   publish?: FakeStage;
+  rollback?: FakeStage;
   failOn?: 'createVolume' | 'start';
 }) {
   const started: ContainerSpec[] = [];
@@ -15,7 +16,11 @@ export function fakeRuntime(options: {
   const volumes = { created: [] as string[], removed: [] as string[] };
   const killed: string[] = [];
   const stageOf = (id: string) =>
-    id.startsWith('orakel-render') ? options.render : options.publish;
+    id.startsWith('orakel-render')
+      ? options.render
+      : id.startsWith('orakel-rollback')
+        ? options.rollback
+        : options.publish;
 
   const runtime: ContainerRuntime = {
     imageExists: () => Promise.resolve(options.image ?? true),
@@ -75,6 +80,15 @@ export const publishOk = (site = 'exemplo-a') => ({
   versionId: '20261001T120000Z-abcdef12',
   cacheKey: `${site}/20261001T120000Z-abcdef12.tar.gz`,
   durationMs: 500,
+});
+
+export const rollbackOk = (site = 'exemplo-a', versionId = '20261001T120000Z-abcdef12') => ({
+  formatVersion: 1,
+  status: 'ok',
+  site,
+  target: 'local',
+  versionId,
+  durationMs: 200,
 });
 
 export const failedFile = (
