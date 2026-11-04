@@ -85,6 +85,13 @@
       "when": 1793742504871,
       "tag": "0011_versao_ativa_e_culpado",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793758984187,
+      "tag": "0012_contextos_editoriais",
+      "breakpoints": true
     }
   ]
 }
