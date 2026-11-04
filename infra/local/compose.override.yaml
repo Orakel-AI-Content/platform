@@ -171,6 +171,10 @@ services:
       # Consolidação da audiência (#547) pelo ClickHouse local, na rede internal.
       AE_SQL_TRANSPORT: clickhouse
       AE_SQL_URL: http://${CLICKHOUSE_USER:-orakel}:${CLICKHOUSE_PASSWORD:-orakel-local}@clickhouse:8123
+      # Geração (#543): fixture por padrão, mesmo com outro LLM_MODEL no .env.local, para o E2E
+      # nunca chamar o provedor. A rodada com o LLM real sobe a pilha com o modelo no shell:
+      # LOCAL_LLM_MODEL=anthropic:claude-haiku-5-5 pnpm local:up (docs/guides/local-setup.md).
+      LLM_MODEL: ${LOCAL_LLM_MODEL:-fixture}
     depends_on:
       s3-init:
         condition: service_completed_successfully
