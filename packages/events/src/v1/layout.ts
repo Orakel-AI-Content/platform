@@ -1,9 +1,9 @@
 import { FORMAT_VERSION } from './version.ts';
 
-// Layout posicional do Workers Analytics Engine, v1 (proposta). Único lugar que sabe que
-// `blob5` é país: o Worker grava com `pageviewDataPoint` e `discardDataPoint`, o agregador
-// monta o SQL com `COLUMNS`. Mudança compatível acrescenta posição no fim de BLOB_FIELDS;
-// nunca reordene nem reaproveite uma posição (ADR 0002 e 0005).
+// Layout posicional do Workers Analytics Engine, v1, definitivo (ADR 0007). Único lugar que
+// sabe que `blob5` é país: o Worker grava com `pageviewDataPoint` e `discardDataPoint`, o
+// agregador monta o SQL com `COLUMNS`. Mudança compatível acrescenta posição no fim de
+// BLOB_FIELDS; nunca reordene nem reaproveite uma posição (ADR 0002, 0005 e 0007).
 
 export const EVENT_TYPES = ['pageview', 'discard'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];

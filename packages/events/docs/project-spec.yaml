@@ -56,9 +56,9 @@ decisions:
   architecture.layout:
     {
       value: 'index1 site; blob1 versão; blob2 tipo; blob3 caminho; blob4 artigo; blob5 país; blob6 dispositivo; blob7 host do referrer; blob8 sid; blob9 motivo do descarte; double1 = 1',
-      source: input,
-      input_ref: 'L6 — layout posicional v1 (proposta); blob9 acrescentado (ADR 0005)',
-      provisional: true,
+      source: decided,
+      input_ref: 'L6 — layout posicional v1; blob9 acrescentado (ADR 0005)',
+      rationale: 'ADR 0007 — definitivo; mudança só aditiva no fim (ADR 0002)',
     }
   architecture.manifest:
     {
@@ -190,6 +190,6 @@ structure:
     layout: src/v1/layout.ts
 
 open_questions:
-  - 'Layout v1, limite de 2 kB do corpo e caminho do manifesto são proposta — calibrar na fase 0 (L6)'
+  - 'Limite de 2 kB do corpo e caminho do manifesto são proposta — calibrar na fase 0 (L6)'
   - 'Mensagem da fila de cliques, eventos de impressão e clique e blocos de afiliado no manifesto — fase 3'
   - 'Sinal de consentimento para emitir sessão no EEE, Reino Unido e Suíça — fase 3, com o CMP'
