@@ -9,7 +9,7 @@ Consulte para preparar a máquina e subir o ambiente local ponta a ponta.
 - **pnpm 11** via Corepack: `corepack enable` (a versão vem de `packageManager`).
 - **Docker** com Compose v2 e Buildx, com pelo menos **8 GB** de memória (Docker Desktop:
   Settings → Resources → Memory). O `local:images` constrói as imagens em paralelo; o pico
-  medido da subida mais o E2E foi de 5,5 GB.
+  medido da subida mais o E2E foi de 6,5 GB.
 - **No Linux, `*.localhost` resolvendo para o loopback** no sistema, não só no navegador: o
   Node do Backoffice e do Playwright usa o resolvedor do sistema. Com systemd-resolved já
   funciona; sem ele (Debian mínimo, container), `sudo apt-get install libnss-myhostname`.
@@ -80,6 +80,10 @@ pnpm local:e2e             # Playwright contra https://admin.orakel.localhost (E
 
 O `--with-deps` instala, no Linux, as bibliotecas do sistema que o Chromium usa (pede root ou
 `sudo`); no macOS, não faz nada.
+
+Para ensaiar esta seção e a "Primeira vez" numa máquina limpa, `infra/local/clean-machine.sh`
+roda os dois blocos acima, literalmente, num Linux com Docker próprio (Docker-in-Docker), sem
+tocar no ambiente da máquina; o log vai para `clean-machine.log`.
 
 ## Sessões em paralelo
 
