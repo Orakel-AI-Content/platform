@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   advanceLifecycleAction,
   createSiteAction,
+  rebuildOnReleaseAction,
   registerG1Action,
   resumeSiteAction,
   setBuildWindowAction,
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   advanceLifecycle: vi.fn(),
   resumeSite: vi.fn(),
+  rebuildOnRelease: vi.fn(),
   setBuildWindow: vi.fn(),
   setDailyPublishLimit: vi.fn(),
   registerPolicyTrigger: vi.fn(),
@@ -35,6 +37,7 @@ vi.mock('@/domain/builds/builds.ts', () => ({ requestBuildNow: vi.fn() }));
 vi.mock('@/domain/builds/site-state.ts', () => ({
   advanceLifecycle: mocks.advanceLifecycle,
   resumeSite: mocks.resumeSite,
+  rebuildOnRelease: mocks.rebuildOnRelease,
   setBuildWindow: mocks.setBuildWindow,
   setDailyPublishLimit: mocks.setDailyPublishLimit,
 }));
@@ -238,6 +241,45 @@ describe('Server Actions da página do site', () => {
       message: 'exemplo-a retomado; build enfileirado.',
     });
     expect(mocks.resumeSite).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('"Reconstruir na release" delega ao domínio; a recusa vira a mensagem, sem revalidar', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await rebuildOnReleaseAction('exemplo-a', 'core-v1.2.0')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.rebuildOnRelease).not.toHaveBeenCalled();
+
+    mocks.rebuildOnRelease.mockResolvedValueOnce({
+      ok: false,
+      issues: [
+        {
+          code: 'release.not_registered',
+          message: 'A release core-v9.9.9 não está registrada',
+          path: ['release'],
+        },
+      ],
+    });
+    expect(await rebuildOnReleaseAction('exemplo-a', 'core-v9.9.9')).toEqual({
+      ok: false,
+      message: 'A release core-v9.9.9 não está registrada',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+
+    mocks.rebuildOnRelease.mockResolvedValueOnce(done);
+    expect(await rebuildOnReleaseAction('exemplo-a', 'core-v1.2.0')).toEqual({
+      ok: true,
+      message: 'exemplo-a na release core-v1.2.0; build enfileirado.',
+    });
+    expect(mocks.rebuildOnRelease).toHaveBeenLastCalledWith(
+      {},
+      operacao,
+      'exemplo-a',
+      'core-v1.2.0',
+    );
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });
