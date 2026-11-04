@@ -142,6 +142,32 @@ export function getDatabaseUrl(): string {
   return parseDatabaseEnv(process.env);
 }
 
+/**
+ * Só quem consulta o Analytics Engine por SQL (agregador da audiência, #545): fora do
+ * `EnvSchema` para o web e o worker subirem sem elas. `AE_SQL_URL` leva usuário e senha no
+ * userinfo (`http://orakel:senha@localhost:8123`). O transporte `cloudflare` (SQL API do AE)
+ * entra no enum junto com o adaptador dele.
+ */
+export const AudienceEnvSchema = z.object({
+  AE_SQL_TRANSPORT: z.enum(['clickhouse']),
+  AE_SQL_URL: z.url(),
+});
+
+export type AudienceEnv = z.infer<typeof AudienceEnvSchema>;
+
+export function parseAudienceEnv(source: Record<string, string | undefined>): AudienceEnv {
+  const parsed = AudienceEnvSchema.safeParse(source);
+  if (parsed.success) return parsed.data;
+  // Só o caminho: a mensagem do Zod não repete o valor, mas a URL tem a senha.
+  const lines = parsed.error.issues.map((issue) => `- ${issue.path.join('.')}: ${issue.message}`);
+  throw new Error(`Variáveis do Analytics Engine inválidas ou ausentes:\n${lines.join('\n')}`);
+}
+
+/** Ambiente do cliente SQL do Analytics Engine, lido sob demanda. */
+export function getAudienceEnv(): AudienceEnv {
+  return parseAudienceEnv(process.env);
+}
+
 let cached: Env | undefined;
 
 export function getEnv(): Env {
