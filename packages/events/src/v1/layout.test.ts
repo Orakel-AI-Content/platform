@@ -10,7 +10,7 @@ import {
 import { SID } from './test-builders.ts';
 
 describe('layout posicional v1', () => {
-  it('fixa cada campo na posição da proposta', () => {
+  it('fixa cada campo na posição definitiva (ADR 0007)', () => {
     expect(COLUMNS).toEqual({
       site: 'index1',
       count: 'double1',

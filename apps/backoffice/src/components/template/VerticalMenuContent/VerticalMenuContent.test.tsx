@@ -76,6 +76,7 @@ describe('VerticalMenuContent', () => {
       '/sites/exemplo%20b/autores',
       '/sites/exemplo%20b/taxonomias',
       '/sites/exemplo%20b/menus',
+      '/sites/exemplo%20b/contextos',
       '/sites/exemplo%20b/institucionais',
     ]);
   });

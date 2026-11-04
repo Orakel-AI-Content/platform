@@ -32,6 +32,12 @@ export type Actor = { email: string; roles: readonly Role[] };
 
 export const SYSTEM_ACTOR: Actor = { email: 'system', roles: ['admin'] };
 
+/**
+ * O gerador (rota interna, `GENERATOR_TOKEN`): escreve conteúdo e o envia para revisão, mas
+ * nunca aprova nem publica (RN-GEN-02). O papel `editor` já não tem `content.publish`.
+ */
+export const GENERATOR_ACTOR: Actor = { email: 'generator', roles: ['editor'] };
+
 export function can(actor: Actor, action: Action): boolean {
   return actor.roles.some((role) => PERMISSIONS[role].includes(action));
 }
