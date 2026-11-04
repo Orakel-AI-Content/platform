@@ -24,7 +24,7 @@ Monorepo da plataforma Orakel AI: uma rede de 5 a 20 sites de conteúdo gerados 
 | ---------- | ------------------- | ------------------------------------------------------------- |
 | Node       | 22+ (para o pnpm)   | Os scripts baixam e usam o **Node 24.21.0** fixado (`.nvmrc`) |
 | pnpm       | 11, via Corepack    | `corepack enable`; a versão vem de `packageManager`           |
-| Docker     | Compose v2 e Buildx | Docker Desktop no macOS; no Linux, ajuste `DOCKER_SOCKET_GID` |
+| Docker     | Compose v2 e Buildx | Docker Desktop no macOS ou Docker Engine no Linux             |
 
 ## Primeira vez
 
@@ -172,7 +172,7 @@ Valores padrão do `.env.example`, só do ambiente local.
 | Aviso de plataforma `linux/amd64`          | `pnpm local:images`                                                                       |
 | Porta ocupada                              | Libere 80, 443, 5432, 8123, 8333 ou 8788                                                  |
 | `ERR_PNPM_NO_MATURE_MATCHING_VERSION`      | A versão saiu há menos de 24 h; use a anterior no `catalog` ou espere                     |
-| Linux: `build-runner` sem acesso ao Docker | `DOCKER_SOCKET_GID` = gid do grupo `docker` (`getent group docker`)                       |
+| Linux: `build-runner` sem acesso ao Docker | O `compose.sh` usa o gid de `/var/run/docker.sock`; outro: `DOCKER_SOCKET_GID` no shell   |
 
 ## Unidades
 

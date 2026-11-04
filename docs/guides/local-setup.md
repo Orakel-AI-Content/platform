@@ -37,7 +37,8 @@ para recriar o site, remova-o do banco (ou `pnpm local:reset`) e rode o seed de 
 Já tinha um `.env.local`? Compare com o `.env.example` e acrescente as variáveis novas
 (backoffice, Access local e o bloco "Ambiente local"); o compose avisa qual falta. Apague ou
 comente `BLOG_PREVIEW_UPSTREAM`: sem ela, `preview.orakel.localhost` vai para o container
-`blog-preview`. No Linux, `DOCKER_SOCKET_GID` é o gid do grupo `docker` (`getent group docker`).
+`blog-preview`. No Linux, o `compose.sh` usa o gid do dono de `/var/run/docker.sock` como
+`DOCKER_SOCKET_GID` (o `0` do `.env.example` é o do Docker Desktop); outro valor só pelo shell.
 
 Outro arquivo de ambiente (ex.: uma cópia do `.env.example` para testar):
 `ORAKEL_ENV_FILE=/caminho/env pnpm local:check` — vale para o `compose.sh` e os scripts.
@@ -61,6 +62,18 @@ oferece um usuário por papel.
 **Backoffice em modo dev:** `pnpm --filter @orakel/backoffice dev` na máquina e
 `BACKOFFICE_UPSTREAM=host.docker.internal:3000` no `.env.local` (recrie o `caddy`: `infra/local/compose.sh up -d caddy`), para
 o `admin.orakel.localhost` apontar para o `next dev`.
+
+## E2E completo
+
+Com o ambiente da "Primeira vez" no ar e o `exemplo-a` publicado:
+
+```sh
+pnpm --filter @orakel/backoffice exec playwright install --with-deps chromium   # uma vez por versão do Playwright
+pnpm local:e2e             # Playwright contra https://admin.orakel.localhost (E2E_STACK=1)
+```
+
+O `--with-deps` instala, no Linux, as bibliotecas do sistema que o Chromium usa (pede root ou
+`sudo`); no macOS, não faz nada.
 
 ## Sessões em paralelo
 
