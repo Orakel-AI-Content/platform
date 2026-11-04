@@ -3,10 +3,17 @@ import { count, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { siteConfigs, sitePolicyTriggers, sites } from '../../src/db/schema/index.ts';
+import {
+  builds,
+  pendingChanges,
+  siteConfigs,
+  sitePolicyTriggers,
+  sites,
+} from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
+import { createAuthor } from '../../src/domain/content/authors.ts';
 import { setBuildWindow, setDailyPublishLimit } from '../../src/domain/builds/site-state.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { configureDailyPublishLimit } from '../../src/domain/publications/publish.ts';
@@ -18,6 +25,7 @@ import {
   createSite,
   exportSitesTfvars,
   listSites,
+  readSiteInstance,
   resourcesFor,
   unresolvedPendingChangeIds,
   updateSiteConfig,
@@ -93,6 +101,167 @@ describe('versão ativa e culpado da pausa (#510)', () => {
       },
       { id: 'exemplo-b', activeVersionId: null, pausedCulprit: null },
     ]);
+  });
+});
+
+describe('estado da instância (#516)', () => {
+  const base = new Date('2026-10-20T12:00:00.000Z').getTime();
+  /** Build do site terminado `minute` minutos depois da base. */
+  const build = (
+    siteId: string,
+    minute: number,
+    status: 'ok' | 'failed',
+    versionId: string | null = null,
+    files: number | null = null,
+  ) => ({
+    siteId,
+    release: `core-v1.${minute}.0`,
+    attempt: 1,
+    status,
+    versionId,
+    files,
+    startedAt: new Date(base + minute * 60_000 - 30_000),
+    finishedAt: new Date(base + minute * 60_000),
+  });
+
+  it('traz os 5 builds mais recentes do site, do mais novo para o mais antigo', async () => {
+    // Inseridos fora de ordem: a ordem vem de finishedAt, não do id.
+    await db
+      .insert(builds)
+      .values([
+        build('exemplo-a', 4, 'ok', 'v-4', 40),
+        build('exemplo-a', 1, 'ok', 'v-1', 10),
+        build('exemplo-a', 7, 'failed'),
+        build('exemplo-a', 2, 'failed'),
+        build('exemplo-a', 6, 'ok', 'v-6', 60),
+        build('exemplo-a', 3, 'ok', 'v-3', 30),
+        build('exemplo-a', 5, 'failed'),
+        build('exemplo-b', 9, 'ok', 'v-b', 99),
+      ]);
+
+    const result = await readSiteInstance(db, SYSTEM_ACTOR, 'exemplo-a');
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(
+      result.value.recentBuilds.map(({ status, release, versionId, finishedAt }) => ({
+        status,
+        release,
+        versionId,
+        finishedAt: finishedAt.toISOString(),
+      })),
+    ).toEqual([
+      {
+        status: 'failed',
+        release: 'core-v1.7.0',
+        versionId: null,
+        finishedAt: '2026-10-20T12:07:00.000Z',
+      },
+      {
+        status: 'ok',
+        release: 'core-v1.6.0',
+        versionId: 'v-6',
+        finishedAt: '2026-10-20T12:06:00.000Z',
+      },
+      {
+        status: 'failed',
+        release: 'core-v1.5.0',
+        versionId: null,
+        finishedAt: '2026-10-20T12:05:00.000Z',
+      },
+      {
+        status: 'ok',
+        release: 'core-v1.4.0',
+        versionId: 'v-4',
+        finishedAt: '2026-10-20T12:04:00.000Z',
+      },
+      {
+        status: 'ok',
+        release: 'core-v1.3.0',
+        versionId: 'v-3',
+        finishedAt: '2026-10-20T12:03:00.000Z',
+      },
+    ]);
+  });
+
+  it('os arquivos vêm do build ok da versão ativa, não do último build', async () => {
+    // Rollback para v-3: o último build ok (v-6) e o falho depois dele não estão no ar.
+    await db
+      .insert(builds)
+      .values([
+        build('exemplo-a', 3, 'ok', 'v-3', 30),
+        build('exemplo-a', 6, 'ok', 'v-6', 60),
+        build('exemplo-a', 7, 'failed', null, 70),
+      ]);
+    await db.update(sites).set({ activeVersionId: 'v-3' }).where(eq(sites.id, 'exemplo-a'));
+
+    const result = await readSiteInstance(db, SYSTEM_ACTOR, 'exemplo-a');
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.activeFiles).toBe(30);
+  });
+
+  it('conta as pendências por origem, sem as resolvidas e sem as de outro site', async () => {
+    const author = (slug: string) => ({ slug, name: slug });
+    await db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, 'exemplo-a', author('ana')));
+    await db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, 'exemplo-a', author('bia')));
+    await db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, 'exemplo-b', author('caio')));
+    // O build baixou a criação dos sites (config v1).
+    await db
+      .update(pendingChanges)
+      .set({ resolvedAt: new Date() })
+      .where(eq(pendingChanges.reference, 'v1'));
+
+    const result = await readSiteInstance(db, SYSTEM_ACTOR, 'exemplo-a');
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.pendingByOrigin).toEqual([{ origin: 'author', count: 2 }]);
+  });
+
+  it('sem builds e sem pendências, devolve listas vazias e nenhum arquivo', async () => {
+    await db.update(pendingChanges).set({ resolvedAt: new Date() });
+
+    expect(await readSiteInstance(db, SYSTEM_ACTOR, 'exemplo-a')).toEqual({
+      ok: true,
+      value: { recentBuilds: [], activeFiles: null, pendingByOrigin: [] },
+    });
+  });
+
+  it('sem site.read, recusa', async () => {
+    const result = await readSiteInstance(db, { email: 'x@orakel.local', roles: [] }, 'exemplo-a');
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+  });
+
+  it('site inexistente, recusa', async () => {
+    const result = await readSiteInstance(db, SYSTEM_ACTOR, 'nao-existe');
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+  });
+
+  it('listSites não muda de forma', async () => {
+    const result = await listSites(db, SYSTEM_ACTOR);
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(Object.keys(result.value[0] ?? {}).sort()).toEqual(
+      [
+        'activeVersionId',
+        'buildWindowSeconds',
+        'dailyPublishLimit',
+        'domain',
+        'effectiveBuildWindowSeconds',
+        'effectiveDailyPublishLimit',
+        'id',
+        'indexavel',
+        'lastBuild',
+        'lifecycle',
+        'name',
+        'pausedCulprit',
+        'pausedReason',
+        'pendingChanges',
+        'publishedToday',
+        'release',
+        'state',
+        'timeZone',
+      ].sort(),
+    );
   });
 });
 
