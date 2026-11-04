@@ -15,9 +15,16 @@ import { and, count, desc, eq, isNull } from 'drizzle-orm';
 import type { Executor } from '../../db/client.ts';
 import { pendingChanges, redirects, siteConfigs, sites } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
-import { lastBuilds, type LastBuild } from '../builds/builds.ts';
+import {
+  activeBuild,
+  lastBuilds,
+  recentBuilds,
+  type LastBuild,
+  type RecentBuild,
+} from '../builds/builds.ts';
 import { effectiveBuildWindowMs } from '../builds/schedule.ts';
 import { toRedirect } from '../export/mappers.ts';
+import { countPendingChangesByOrigin, type PendingOriginCount } from '../pending-changes/list.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 import { effectiveDailyPublishLimit, publishedOnDayBySite } from '../publications/publish.ts';
 import { hasPolicyTrigger } from './policy-triggers.ts';
@@ -357,6 +364,47 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
     }),
   );
   return { ok: true, value: summaries };
+}
+
+/**
+ * Estado da instância que só a página do site mostra (#516), fora do `SiteSummary` para não
+ * pesar em `listSites`, que toda tela do admin lê.
+ */
+export type SiteInstance = {
+  /** Os últimos builds do site, do mais novo para o mais antigo. */
+  recentBuilds: RecentBuild[];
+  /** Arquivos do build da versão ativa; nulo sem versão no ar ou sem o build dela. */
+  activeFiles: number | null;
+  /** Mudanças pendentes por origem. */
+  pendingByOrigin: PendingOriginCount[];
+};
+
+export async function readSiteInstance(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<SiteInstance>> {
+  const pendingByOrigin = await countPendingChangesByOrigin(db, actor, siteId);
+  if (!pendingByOrigin.ok) return pendingByOrigin;
+  const [site] = await db
+    .select({ activeVersionId: sites.activeVersionId })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  const active = await activeBuild(db, siteId, site.activeVersionId);
+  return {
+    ok: true,
+    value: {
+      recentBuilds: await recentBuilds(db, siteId),
+      activeFiles: active?.files ?? null,
+      pendingByOrigin: pendingByOrigin.value,
+    },
+  };
 }
 
 /** Nome do arquivo de sites da raiz do OpenTofu (ADR 0011). */

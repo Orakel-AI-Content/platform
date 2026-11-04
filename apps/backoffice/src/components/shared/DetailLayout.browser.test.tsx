@@ -7,7 +7,7 @@ import { SiteSummaryCard } from '@/components/sites/SiteSummaryCard';
 import { SiteTabs } from '@/components/sites/SiteTabs';
 import Card from '@/components/ui/Card';
 import { REVIEW_CHECKLIST } from '@/domain/reviews/reviews.ts';
-import type { SiteSummary } from '@/domain/sites/sites.ts';
+import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
 import { pageOverflow } from '../../../test/browser/layout.ts';
@@ -49,6 +49,30 @@ const SITE: SiteSummary = {
   timeZone: 'America/Sao_Paulo',
 };
 
+const INSTANCE: SiteInstance = {
+  recentBuilds: [
+    {
+      id: 2,
+      status: 'failed',
+      release: 'core-v1.4.0',
+      versionId: null,
+      finishedAt: new Date('2026-10-20T13:00:00.000Z'),
+    },
+    {
+      id: 1,
+      status: 'ok',
+      release: 'core-v1.4.0',
+      versionId: 'v-0123456789abcdef',
+      finishedAt: new Date('2026-10-20T12:00:00.000Z'),
+    },
+  ],
+  activeFiles: 412,
+  pendingByOrigin: [
+    { origin: 'content', count: 3 },
+    { origin: 'redirect', count: 1 },
+  ],
+};
+
 /** Slug longo e sem hífen (#371): tem de quebrar dentro do cartão em vez de passar da borda. */
 const SLUG = `/detalhe${'x'.repeat(90)}1761000000000`;
 
@@ -61,6 +85,7 @@ function SiteDetail() {
       <DetailLayout>
         <SiteSummaryCard
           site={SITE}
+          instance={INSTANCE}
           g1Registered
           publish={() => Promise.resolve({ ok: true as const, message: 'ok' })}
         />

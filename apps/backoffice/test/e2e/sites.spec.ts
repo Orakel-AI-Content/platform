@@ -415,8 +415,10 @@ test(
       'Indexável',
       'Status',
       'Release',
+      'Versão no ar',
       'Mudanças pendentes',
-      'Último build',
+      'Pendências por origem',
+      'Últimos builds',
       'G1',
       'Publicações hoje',
     ];
@@ -427,7 +429,10 @@ test(
     await expect(value('Status')).toHaveText('Ativo');
     await expect(value('Release')).not.toBeEmpty();
     await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
-    await expect(value('Último build')).toHaveText(/^(—|Publicado|Falhou)/);
+    // Estado da instância (#516): cada campo com o valor ou o estado vazio dele.
+    await expect(value('Versão no ar')).not.toBeEmpty();
+    await expect(value('Pendências por origem')).not.toBeEmpty();
+    await expect(value('Últimos builds')).toHaveText(/^(Nenhum build ainda\.|Publicado|Falhou)/);
     await expect(value('G1')).toHaveText(/^(Registrado|Não registrado)$/);
     // Uso do limite diário de hoje (dia de São Paulo), padrão de 10.
     await expect(value('Publicações hoje')).toHaveText(/^\d+ de 10/);
@@ -502,7 +507,7 @@ test('operação vê o site pausado com o motivo e sem Publicar agora', async ({
 test('editor vê a página do site sem as ações', async ({ page }) => {
   await asRole(page, 'editor');
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
-  await expect(siteSummary(page).getByRole('term')).toHaveCount(8);
+  await expect(siteSummary(page).getByRole('term')).toHaveCount(10);
   // Cada aba mostra o mesmo que para a operação, só de leitura (#370).
   const noActions = async () => {
     for (const name of [
@@ -538,7 +543,7 @@ test(`página do site sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'operacao');
   await page.goto('/sites/exemplo-a');
-  await expect(siteSummary(page).getByRole('term')).toHaveCount(8);
+  await expect(siteSummary(page).getByRole('term')).toHaveCount(10);
   await expect(page.getByRole('tabpanel', { name: 'Ciclo de vida' })).toBeVisible();
   await expectNoViolations(page);
 
