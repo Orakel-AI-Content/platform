@@ -1,5 +1,5 @@
 import type { Result } from '@orakel/content-model';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, isNull } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { pendingChanges } from '../../db/schema/index.ts';
@@ -38,5 +38,29 @@ export async function listPendingChanges(
     .where(and(eq(pendingChanges.siteId, siteId), isNull(pendingChanges.resolvedAt)))
     .orderBy(desc(pendingChanges.id));
   // A coluna é texto; só `recordPendingChange` grava, sempre com uma `PendingOrigin`.
+  return { ok: true, value: rows.map((row) => ({ ...row, origin: row.origin as PendingOrigin })) };
+}
+
+/** Quantas mudanças pendentes um site tem de uma origem. */
+export type PendingOriginCount = { origin: PendingOrigin; count: number };
+
+/**
+ * Mudanças pendentes do site agrupadas por origem (o mesmo filtro de `listPendingChanges`),
+ * contadas no banco: da origem com mais pendências para a com menos, empate pelo nome.
+ */
+export async function countPendingChangesByOrigin(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<PendingOriginCount[]>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+  const total = count();
+  const rows = await db
+    .select({ origin: pendingChanges.origin, count: total })
+    .from(pendingChanges)
+    .where(and(eq(pendingChanges.siteId, siteId), isNull(pendingChanges.resolvedAt)))
+    .groupBy(pendingChanges.origin)
+    .orderBy(desc(total), pendingChanges.origin);
   return { ok: true, value: rows.map((row) => ({ ...row, origin: row.origin as PendingOrigin })) };
 }

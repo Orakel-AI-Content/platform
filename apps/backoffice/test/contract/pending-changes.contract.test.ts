@@ -7,7 +7,10 @@ import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { advanceLifecycle } from '../../src/domain/builds/site-state.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
-import { listPendingChanges } from '../../src/domain/pending-changes/list.ts';
+import {
+  countPendingChangesByOrigin,
+  listPendingChanges,
+} from '../../src/domain/pending-changes/list.ts';
 import {
   createSite,
   unresolvedPendingChangeIds,
@@ -100,6 +103,40 @@ describe('listPendingChanges (#99)', () => {
 
   it('sem site.read, recusa', async () => {
     const result = await listPendingChanges(
+      db,
+      { email: 'x@orakel.local', roles: [] },
+      'exemplo-b',
+    );
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+  });
+});
+
+describe('countPendingChangesByOrigin (#516)', () => {
+  it('agrupa as não resolvidas do site por origem, da maior contagem para a menor', async () => {
+    await db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, 'exemplo-b', author));
+    await db.transaction((tx) =>
+      createAuthor(tx, SYSTEM_ACTOR, 'exemplo-b', { slug: 'bia', name: 'Bia' }),
+    );
+    await db.transaction((tx) =>
+      updateSiteConfig(tx, SYSTEM_ACTOR, 'exemplo-b', { ...config, name: 'Receitas B' }),
+    );
+    // Resolvida: a criação do site (config v1) não conta.
+    await db
+      .update(pendingChanges)
+      .set({ resolvedAt: new Date() })
+      .where(eq(pendingChanges.reference, 'v1'));
+
+    expect(await countPendingChangesByOrigin(db, SYSTEM_ACTOR, 'exemplo-b')).toEqual({
+      ok: true,
+      value: [
+        { origin: 'author', count: 2 },
+        { origin: 'config', count: 1 },
+      ],
+    });
+  });
+
+  it('sem site.read, recusa', async () => {
+    const result = await countPendingChangesByOrigin(
       db,
       { email: 'x@orakel.local', roles: [] },
       'exemplo-b',
