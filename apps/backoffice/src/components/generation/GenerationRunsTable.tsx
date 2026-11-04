@@ -33,9 +33,8 @@ const GENERATION_STATUS_TAG: Record<GenerationStatus, StateTagColor> = {
 export const MISSING = '—';
 
 const integer = new Intl.NumberFormat('pt-BR');
+/** Em dólares, com a moeda no cabeçalho da coluna. */
 const usd = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'USD',
   minimumFractionDigits: 2,
   maximumFractionDigits: 6,
 });
@@ -67,7 +66,7 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
       header: 'Tema',
       accessorKey: 'topic',
       enableSorting: false,
-      cell: ({ row }) => <Truncated text={row.original.topic} className="max-w-56" />,
+      cell: ({ row }) => <Truncated text={row.original.topic} className="max-w-32" />,
     },
     {
       header: 'Status',
@@ -80,33 +79,42 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
       ),
     },
     {
-      header: 'Provedor',
-      accessorKey: 'provider',
+      // Provedor e modelo na mesma célula (duas linhas): a lista cabe na largura sem rolagem.
+      header: 'Provedor e modelo',
+      id: 'model',
       enableSorting: false,
-      cell: ({ row }) => row.original.provider ?? MISSING,
+      cell: ({ row }) => {
+        const { provider, model } = row.original;
+        if (provider === null && model === null) return MISSING;
+        return (
+          <div className="flex flex-col">
+            <span>{provider ?? MISSING}</span>
+            <Truncated text={model ?? MISSING} className="max-w-24 text-xs" />
+          </div>
+        );
+      },
     },
     {
-      header: 'Modelo',
-      accessorKey: 'model',
+      // Entrada e saída na mesma célula, rotuladas (duas linhas), pelo mesmo motivo.
+      header: 'Tokens (entrada / saída)',
+      id: 'tokens',
       enableSorting: false,
-      cell: ({ row }) =>
-        row.original.model === null ? (
-          MISSING
-        ) : (
-          <Truncated text={row.original.model} className="max-w-40" />
-        ),
-    },
-    {
-      header: 'Tokens de entrada',
-      accessorKey: 'inputTokens',
-      enableSorting: false,
-      cell: ({ row }) => formatTokens(row.original.inputTokens),
-    },
-    {
-      header: 'Tokens de saída',
-      accessorKey: 'outputTokens',
-      enableSorting: false,
-      cell: ({ row }) => formatTokens(row.original.outputTokens),
+      cell: ({ row }) => {
+        const { inputTokens, outputTokens } = row.original;
+        if (inputTokens === null && outputTokens === null) return MISSING;
+        return (
+          <div className="flex flex-col whitespace-nowrap">
+            <span>
+              {formatTokens(inputTokens)}
+              <span className="sr-only"> de entrada</span>
+            </span>
+            <span>
+              {formatTokens(outputTokens)}
+              <span className="sr-only"> de saída</span>
+            </span>
+          </div>
+        );
+      },
     },
     {
       header: 'Custo (US$)',
@@ -132,7 +140,7 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
             href={`/sites/${encodeURIComponent(siteId)}/conteudos/${contentId}`}
             className={ROW_LINK_CLASS}
           >
-            Conteúdo {contentId}
+            <span className="sr-only">Conteúdo </span>#{contentId}
             <span className="sr-only"> (abrir)</span>
           </Link>
         );
@@ -142,7 +150,7 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
 }
 
 /**
- * Execuções da geração do site (R5), só leitura: quando, tema, status, provedor, modelo, tokens,
+ * Execuções da geração do site (R5), só leitura: quando, tema, status, provedor e modelo, tokens,
  * custo, duração e o link para o conteúdo gerado. No DataTable do template, como a lista de
  * pendências (#365), sem toolbar (busca e filtro ficam fora, #541); o que a execução ainda não
  * tem aparece como "—". Sem execuções, o estado vazio.

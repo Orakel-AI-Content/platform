@@ -89,8 +89,8 @@ describe('lista das execuções', () => {
     for (const text of ['Concluída', 'anthropic', 'claude-sonnet-5-5', '12.345', '678', '12,3 s']) {
       expect(row.getAllByText(text).length).toBeGreaterThan(0);
     }
-    expect(row.getByText(/US\$\s0,00035/)).toBeTruthy();
-    expect(row.getByRole('link', { name: 'Conteúdo 42 (abrir)' }).getAttribute('href')).toBe(
+    expect(row.getByText('0,00035')).toBeTruthy();
+    expect(row.getByRole('link', { name: 'Conteúdo #42 (abrir)' }).getAttribute('href')).toBe(
       '/sites/exemplo-a/conteudos/42',
     );
   });
@@ -98,7 +98,7 @@ describe('lista das execuções', () => {
   it('pendente e custo nulo aparecem como "—", sem link', () => {
     renderTable();
     const pending = within(rowOf('Café coado'));
-    expect(pending.getAllByText('—')).toHaveLength(7);
+    expect(pending.getAllByText('—')).toHaveLength(5);
     expect(pending.queryByRole('link')).toBeNull();
     const unpriced = within(rowOf('Pão de fermentação'));
     expect(unpriced.getAllByText('—')).toHaveLength(2);
@@ -120,8 +120,8 @@ describe('formatação', () => {
     ]);
   });
 
-  it('custo em dólares com até 6 casas; duração em ms ou s', () => {
-    expect(formatCost(1.5)).toMatch(/US\$\s1,50/);
+  it('custo com até 6 casas; duração em ms ou s', () => {
+    expect(formatCost(1.5)).toBe('1,50');
     expect(formatRunDuration(999)).toBe('999 ms');
     expect(formatRunDuration(1000)).toBe('1 s');
   });
