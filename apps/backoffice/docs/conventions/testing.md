@@ -18,6 +18,13 @@ Pronto, numa tarefa: `lint`, `typecheck`, `test`, `test:browser` e, se tocar o d
 
 - **Unitários** ao lado do código; o domínio é testado sem banco quando a regra é pura
   (RBAC, mapeamentos) e pela suíte de contrato quando depende de transação.
+- **Integração com o ClickHouse** (`src/**/*.integration.test.ts`, dentro do `test`; #545,
+  #546): o cliente SQL e a SQL da audiência contra o Analytics Engine local, num banco
+  descartável criado do `infra/local/clickhouse/init.sql`. Rodam com
+  `BACKOFFICE_TEST_AE_SQL_URL` (no CI, o serviço `clickhouse` do job `quality`); sem ela, são
+  pulados. Na máquina: `docker run -d --rm --name ch-teste -e CLICKHOUSE_USER=orakel -e
+CLICKHOUSE_PASSWORD=orakel-ci -p 127.0.0.1:58123:8123 clickhouse/clickhouse-server:25.8.33.6`
+  e `BACKOFFICE_TEST_AE_SQL_URL='http://orakel:orakel-ci@127.0.0.1:58123/?database=default'`.
 - **Componente em Chromium** (`src/**/*.browser.test.tsx`, ao lado do componente; #457): teclado,
   foco, axe, tema e movimento no navegador de verdade, com o CSS de `globals.css`, sem servidor
   nem banco. É onde ficam os testes de acessibilidade de um componente (antes na vitrine do E2E).

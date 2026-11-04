@@ -29,6 +29,8 @@ export const SITE_TABLES = [
   'site_policy_triggers',
   'generation_runs',
   'editorial_contexts',
+  'audience_daily_site',
+  'audience_daily_article',
   'site_configs',
 ];
 
