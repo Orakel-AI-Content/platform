@@ -167,6 +167,7 @@ describe('SiteSummaryCard', () => {
           pausedReason: 'Build falhou três vezes.',
           pausedCulprit: { origin: 'author', reference: '3' },
         }}
+        instance={instance}
         g1Registered
       />,
     );
@@ -232,10 +233,10 @@ describe('SiteSummaryCard', () => {
       releases: ['core-v1.3.0'],
       action: vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' })),
     };
-    const { rerender } = render(<SiteSummaryCard site={site} g1Registered />);
+    const { rerender } = render(<SiteSummaryCard site={site} instance={instance} g1Registered />);
     expect(screen.queryByRole('button', { name: 'Reconstruir na release' })).toBeNull();
 
-    rerender(<SiteSummaryCard site={site} g1Registered rebuild={rebuild} />);
+    rerender(<SiteSummaryCard site={site} instance={instance} g1Registered rebuild={rebuild} />);
     const button = screen.getByRole('button', { name: 'Reconstruir na release' });
     expect(document.querySelector('.card')?.contains(button)).toBe(true);
     expect(button.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
@@ -243,6 +244,7 @@ describe('SiteSummaryCard', () => {
     rerender(
       <SiteSummaryCard
         site={{ ...site, state: 'pausado', pausedReason: 'x' }}
+        instance={instance}
         g1Registered
         rebuild={rebuild}
       />,

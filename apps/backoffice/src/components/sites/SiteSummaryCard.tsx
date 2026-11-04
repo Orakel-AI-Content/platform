@@ -8,8 +8,6 @@ import {
   BUILD_STATUS_LABEL,
   BUILD_STATUS_VARIANT,
   PENDING_ORIGIN_LABEL,
-  SITE_STATE_LABEL,
-  SITE_STATE_VARIANT,
   formatDateTime,
 } from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
@@ -21,6 +19,7 @@ import {
   PublishNowPanel,
   ResumeSitePanel,
   SiteStateIndicator,
+  StateTag,
   type PublishNow,
   type ResumeSite,
 } from './SiteStatus.tsx';
