@@ -7,7 +7,14 @@ import Button from '@/components/ui/Button';
 import { FormContainer, FormItem } from '@/components/ui/Form';
 import Input from '@/components/ui/Input';
 
-import { COLOR_SCHEMES, focusRing, outline, setTheme, tabTo } from '../../../test/browser/a11y.ts';
+import {
+  audit,
+  COLOR_SCHEMES,
+  focusRing,
+  outline,
+  setTheme,
+  tabTo,
+} from '../../../test/browser/a11y.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInFrame } from '../../../test/browser/render.tsx';
 
@@ -17,7 +24,8 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // #170): a primeira parada do Tab é "Pular para o conteúdo", que leva o foco ao <main>, e o
 // próximo Tab já é do conteúdo; navegando só com Tab, link, campo e botão mostram o contorno
 // --ring de 2px da regra global de `globals.css`, nos dois temas. A fixture é um formulário de
-// tela de item: trilha, campo e botão.
+// tela de item: trilha, campo e botão. Com site pausado, o aviso fica no topo do <main>, antes
+// da tela, com um link para cada site pausado (#511).
 
 function AuthorForm() {
   return (
@@ -86,4 +94,39 @@ describe('moldura do admin no navegador', () => {
       }
     },
   );
+
+  it.each(COLOR_SCHEMES)(
+    'com site pausado, o aviso abre o <main> com o link do site, sem violação do axe (%s)',
+    async (scheme) => {
+      await setTheme(scheme);
+      await renderInFrame(<AuthorForm />, {
+        pausedSites: [
+          { id: 'exemplo-b', name: 'Exemplo B — Receitas', pausedReason: 'render: cota' },
+        ],
+      });
+
+      await expect.element(main().getByText('Site pausado')).toBeVisible();
+      await expect
+        .element(main().getByRole('link', { name: 'Exemplo B — Receitas' }))
+        .toHaveAttribute('href', '/sites/exemplo-b');
+      // O aviso vem antes do título da tela.
+      const alert = main().getByText('Site pausado').element();
+      const heading = main().getByRole('heading', { name: 'Criar autor' }).element();
+      expect(
+        alert.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(await audit()).toEqual([]);
+    },
+  );
+
+  it('sem site pausado, nenhum aviso', async () => {
+    await renderInFrame(<AuthorForm />);
+
+    await expect.element(main().getByRole('heading', { name: 'Criar autor' })).toBeVisible();
+    expect(
+      main()
+        .getByText(/pausado/)
+        .elements(),
+    ).toHaveLength(0);
+  });
 });

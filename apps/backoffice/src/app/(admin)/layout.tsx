@@ -5,6 +5,7 @@ import { currentActor } from '@/auth/request-actor.ts';
 import CollapsibleSide from '@/components/layouts/CollapsibleSide';
 import { NavigationIndicator } from '@/components/shared/NavigationIndicator';
 import { NoAccessScreen } from '@/components/shared/NoAccessScreen';
+import { PausedSitesAlert } from '@/components/sites/PausedSitesAlert';
 import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from '@/components/template/constants';
 import ThemeSwitcher from '@/components/template/ThemeSwitcher';
 import UserProfileDropdown from '@/components/template/UserProfileDropdown';
@@ -18,7 +19,8 @@ import { readVisibleSites } from './visible-sites.ts';
 // domínio confere de novo a permissão de cada ação (nunca só aqui nem no proxy). A moldura é o
 // CollapsibleSide do Ecme (#237; workspace#46): a árvore de navegação filtrada pelo RBAC e os
 // sites visíveis saem daqui, do servidor, e a barra lateral marca o item pelo endereço. O modo
-// de tema sai do mesmo cookie que o layout raiz lê, para a troca (#240) já vir marcada.
+// de tema sai do mesmo cookie que o layout raiz lê, para a troca (#240) já vir marcada. Dos
+// mesmos sites visíveis sai o aviso de site pausado no topo de toda tela (#511).
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const actor = await currentActor();
   if (!actor.ok) {
@@ -37,6 +39,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   }
   const sites = await readVisibleSites();
   const visible = sites?.ok ? sites.value.map((site) => ({ id: site.id, name: site.name })) : [];
+  const paused = sites?.ok ? sites.value.filter((site) => site.state === 'pausado') : [];
   const themeMode = parseThemeMode((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <div className="min-h-screen">
@@ -70,6 +73,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             PAGE_CONTAINER_GUTTER_Y,
           )}
         >
+          <PausedSitesAlert sites={paused} />
           {children}
         </main>
       </CollapsibleSide>

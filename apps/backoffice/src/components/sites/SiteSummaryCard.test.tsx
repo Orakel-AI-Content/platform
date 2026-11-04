@@ -91,6 +91,25 @@ describe('SiteSummaryCard', () => {
     expect(field('Status').textContent).toBe('PausadoBuild falhou três vezes.');
   });
 
+  it('pausado com culpado, o estado leva ao conteúdo culpado (#511)', () => {
+    render(
+      <SiteSummaryCard
+        site={{
+          ...site,
+          state: 'pausado',
+          pausedReason: 'Build falhou três vezes.',
+          pausedCulprit: { origin: 'author', reference: '3' },
+        }}
+        g1Registered
+      />,
+    );
+
+    const link = within(field('Status')).getByRole('link', {
+      name: `Autor 3 culpado pela pausa de ${site.id}`,
+    });
+    expect(link.getAttribute('href')).toBe(`/sites/${site.id}/autores/3`);
+  });
+
   it('"Publicar agora" em sm só quando a página passa a ação', () => {
     const { rerender } = render(<SiteSummaryCard site={site} g1Registered />);
     expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
