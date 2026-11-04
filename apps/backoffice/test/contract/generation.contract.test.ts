@@ -16,6 +16,7 @@ import { resolveModel, type GenerationSettings } from '../../src/domain/generati
 import {
   enqueueGeneration,
   GENERATE_ARTICLE_TASK,
+  listGenerationRuns,
   type GenerationRequest,
 } from '../../src/domain/generation/runs.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
@@ -187,6 +188,76 @@ describe('disparo da geração', () => {
 
     expect(await db.select().from(generationRuns)).toEqual([]);
     expect(await jobs()).toEqual([]);
+  });
+});
+
+describe('lista das execuções do site', () => {
+  /** Dispara em `siteId` e grava a data de criação (a de `now()` não separa os disparos). */
+  async function runAt(siteId: string, author: number, topic: string, createdAt: string) {
+    const enqueued = await db.transaction((tx) =>
+      enqueueGeneration(tx, editor, siteId, { topic, authorId: author }),
+    );
+    if (!enqueued.ok) throw new Error(JSON.stringify(enqueued.issues));
+    await db
+      .update(generationRuns)
+      .set({ createdAt: new Date(createdAt) })
+      .where(eq(generationRuns.id, enqueued.value.runId));
+    return enqueued.value.runId;
+  }
+
+  it('só as do site pedido, da mais recente para a primeira, com o que a tela mostra', async () => {
+    await withContext();
+    const other = 'exemplo-b';
+    const imported = await importSnapshot(db, SYSTEM_ACTOR, await readFixture(other));
+    if (!imported.ok) throw new Error(JSON.stringify(imported.issues));
+    const created = await db.transaction((tx) => createEditorialContext(tx, editor, other, 'B.'));
+    if (!created.ok) throw new Error(JSON.stringify(created.issues));
+    const [otherAuthor] = await db
+      .select({ id: authors.id })
+      .from(authors)
+      .where(eq(authors.siteId, other));
+    if (otherAuthor === undefined) throw new Error('fixture sem autor');
+
+    const oldest = await runAt(SITE, authorId, 'Primeiro', '2026-11-01T10:00Z');
+    const newest = await runAt(SITE, authorId, 'Terceiro', '2026-11-03T10:00Z');
+    const middle = await runAt(SITE, authorId, 'Segundo', '2026-11-02T10:00Z');
+    await runAt(other, otherAuthor.id, 'De outro site', '2026-11-04T10:00Z');
+    await runTask(middle);
+
+    const listed = await listGenerationRuns(db, revisor, SITE);
+
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    expect(listed.value.map((run) => run.id)).toEqual([newest, middle, oldest]);
+    expect(listed.value[0]).toEqual({
+      id: newest,
+      createdAt: new Date('2026-11-03T10:00Z'),
+      topic: 'Terceiro',
+      status: 'pendente',
+      provider: null,
+      model: null,
+      inputTokens: null,
+      outputTokens: null,
+      costUsd: null,
+      durationMs: null,
+      contentId: null,
+    });
+    expect(listed.value[1]).toMatchObject({
+      status: 'ok',
+      provider: 'fixture',
+      model: 'fixture',
+      inputTokens: 1000,
+      outputTokens: 500,
+      costUsd: 0.00035,
+    });
+    expect(listed.value[1]?.contentId).toEqual(expect.any(Number));
+    expect(listed.value[1]?.durationMs).toEqual(expect.any(Number));
+  });
+
+  it('recusa sem site.read', async () => {
+    expect(
+      await listGenerationRuns(db, { email: 'x@orakel.local', roles: [] }, SITE),
+    ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
   });
 });
 
