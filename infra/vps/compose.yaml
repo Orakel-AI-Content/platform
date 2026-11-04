@@ -83,6 +83,11 @@ services:
   backoffice-worker:
     <<: *backoffice
     command: ['node', 'src/bin/worker.ts']
+    environment:
+      <<: *backoffice-env
+      # A task generate-article cria o artigo pela rota interna do backoffice-web (rede
+      # internal), nunca pelo hostname público, que bloqueia /api/internal.
+      GENERATOR_API_URL: http://backoffice-web:3000
     depends_on:
       backoffice-migrate:
         condition: service_completed_successfully
