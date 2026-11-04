@@ -76,6 +76,7 @@ describe('SideNav', () => {
       '/sites/exemplo-a/taxonomias',
       '/sites/exemplo-a/menus',
       '/sites/exemplo-a/contextos',
+      '/sites/exemplo-a/geracao',
     ]);
     expect(screen.getByRole('button', { name: 'Exemplo A, trocar de site' })).toBeTruthy();
   });
