@@ -50,6 +50,8 @@ echo "Node $(node -v)"
 
 git clone --quiet /in/repo.bundle /work/platform
 cd /work/platform
+# Numa falha depois do local:up, os logs do compose vão para o log do ensaio, como no e2e.yml.
+trap 'status=$?; [ "$status" = 0 ] || [ ! -f .env.local ] || { step "Logs do compose"; infra/local/compose.sh logs --no-color --timestamps --tail 300 build-runner backoffice-worker backoffice-web edge-local || true; }' EXIT
 echo "Commit $(git rev-parse HEAD)"
 
 for section in "Primeira vez" "E2E completo"; do
