@@ -33,6 +33,10 @@ x-backoffice: &backoffice
     BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-900}
     # Limite diário de publicações por site (dia de America/Sao_Paulo); o site pode ter o próprio.
     PUBLISH_DAILY_LIMIT: ${PUBLISH_DAILY_LIMIT:-10}
+    # Geração básica (ADR 0018 do backoffice): fora de fixture, a chave é obrigatória.
+    LLM_MODEL: ${LLM_MODEL:-anthropic:claude-haiku-5-5}
+    LLM_API_KEY: ${LLM_API_KEY:-}
+    LLM_PRICING: ${LLM_PRICING:-}
   networks: [internal]
 
 services:

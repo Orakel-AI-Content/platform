@@ -190,6 +190,8 @@ jobs:
       S3_ACCESS_KEY_ID: orakel-ci
       S3_SECRET_ACCESS_KEY: orakel-ci-secret
       PREVIEW_BASE_URL: https://preview.orakel.localhost
+      # Geração sem LLM: o E2E de telas nunca chama o provedor.
+      LLM_MODEL: fixture
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
