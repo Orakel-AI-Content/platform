@@ -1,0 +1,11 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // O teste de integração do cliente SQL do Analytics Engine só roda com um ClickHouse
+    // (serviço do CI ou o do compose).
+    "test": {
+      "passThroughEnv": ["BACKOFFICE_TEST_AE_SQL_URL"]
+    }
+  }
+}
