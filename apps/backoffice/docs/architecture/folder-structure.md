@@ -10,7 +10,7 @@ apps/backoffice/
 │   │   ├── (admin)/             área autenticada (layout confere o Access)
 │   │   └── api/                 export/v1 (rede interna), health
 │   ├── components/              ver "Componentes" abaixo
-│   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, media, export, import, builds, releases)
+│   ├── domain/<módulo>/         regras de negócio (access, pending-changes, sites, content, media, export, import, builds, releases, generation)
 │   ├── db/                      client.ts, schema/, site-ids.ts
 │   ├── auth/                    access-jwt.ts, internal-tokens.ts, request-actor.ts
 │   ├── jobs/                    task-lists.ts, tasks/ (build, heartbeat, ingest-media, media-variants, media-reprocess)
@@ -38,7 +38,7 @@ src/components/
 ├── forms/       infraestrutura do SchemaForm: campos, rich text, schemaWalk (usada por
 │                sites/, contents/ e editorial/)
 └── <área>/      componentes de uma tela ou de uma área só (sites/, contents/, media/,
-                 review/, editorial/)
+                 review/, editorial/, generation/)
 ```
 
 Nomes de arquivo: PascalCase para componente e contexto (`EmptyState.tsx`,
