@@ -11,9 +11,11 @@ import {
   formatDateTime,
 } from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
-import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
+import type { RollbackVersion } from '@/domain/builds/builds.ts';
+import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { RebuildReleaseDialog, type RebuildOnRelease } from './RebuildReleaseDialog.tsx';
+import { RollbackDialog, type RollbackSite } from './RollbackDialog.tsx';
 import {
   PendingCount,
   PublishNowPanel,
@@ -83,12 +85,11 @@ function RecentBuilds({
 
 /**
  * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: os dados do
- * site no `InfoList` (com o uso do limite diário de hoje), o estado da instância que só a página
- * lê (#516: versão no ar com os arquivos, pendências por origem e últimos builds, cada um com o
- * estado vazio) e, ao pé, "Publicar agora" ou, com o
- * site pausado, "Retomar". `publish` e `resume` só vêm de quem tem `operations.run`; cada botão
- * aparece só no estado dele (publicar com o site não pausado, retomar com ele pausado). Sem
- * estado próprio: os painéis são os únicos Client Components dentro dele.
+ * site no `InfoList` (com o uso do limite diário de hoje) e, ao pé, "Publicar agora" ou, com o
+ * site pausado, "Retomar", e "Reconstruir na release" (#515) e "Reverter" (#514) nos dois
+ * estados. `publish`, `resume`, `rebuild` e `rollback` só vêm de quem tem `operations.run`; publicar e retomar aparecem só no estado
+ * deles (publicar com o site não pausado, retomar com ele pausado). Sem estado próprio: os
+ * painéis são os únicos Client Components dentro dele.
  */
 export function SiteSummaryCard({
   site,
@@ -97,6 +98,7 @@ export function SiteSummaryCard({
   publish,
   resume,
   rebuild,
+  rollback,
 }: {
   site: SiteSummary;
   instance: SiteInstance;
@@ -105,6 +107,8 @@ export function SiteSummaryCard({
   resume?: ResumeSite;
   /** Releases registradas e a action de reconstruir, já ligada ao site. */
   rebuild?: { releases: readonly string[]; action: RebuildOnRelease };
+  /** Versões revertíveis (sem a ativa) e a action de reverter, já ligada ao site. */
+  rollback?: { versions: readonly RollbackVersion[]; action: RollbackSite };
 }) {
   const paused = site.state === 'pausado';
   return (
@@ -144,6 +148,13 @@ export function SiteSummaryCard({
           paused={paused}
           releases={rebuild.releases}
           action={rebuild.action}
+        />
+      )}
+      {rollback && (
+        <RollbackDialog
+          versions={rollback.versions}
+          timeZone={site.timeZone}
+          action={rollback.action}
         />
       )}
     </Card>
