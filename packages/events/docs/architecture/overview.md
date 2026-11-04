@@ -29,11 +29,11 @@ flowchart LR
 - **Privacidade:** nenhum campo de IP; referrer gravado só como host; sessão só com ID
   aleatório, nunca no EEE, Reino Unido e Suíça nem com país desconhecido.
 - **Layout posicional:** um único lugar sabe as posições (`layout.ts`). Posição nova só
-  no fim; nunca reordene nem reaproveite (ADR 0002).
+  no fim; nunca reordene nem reaproveite (ADR 0002). O layout v1 é definitivo (ADR 0007).
 - **Descartes contam:** ponto `discard` com o motivo em `blob9` (ADR 0005).
 - **O script não carrega o Zod** e não passa de 2 kB com gzip (ADR 0004).
 
 ## A definir
 
-Ver `open_questions` em `docs/project-spec.yaml`: calibrar layout, limite do corpo e
-caminho do manifesto; fila e eventos de afiliado na fase 3; sinal de consentimento com o CMP.
+Ver `open_questions` em `docs/project-spec.yaml`: calibrar limite do corpo e caminho
+do manifesto; fila e eventos de afiliado na fase 3; sinal de consentimento com o CMP.
