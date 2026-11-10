@@ -69,7 +69,7 @@ relevantes e leia-os primeiro.
 - `docs/architecture/overview.md` – planos, contratos, mapa das unidades, como criar uma
 - `docs/conventions/coding.md` – fronteiras, erros, logs, configuração, dependências
 - `docs/conventions/testing.md` – tipos de teste, cobertura, fixtures
-- `docs/conventions/git.md` – branches, commits, releases do core
+- `docs/conventions/git.md` – branches, commits, versões do site-builder
 - `docs/design/accessibility.md` – meta WCAG 2.2 AA
 - `docs/domain/glossary.md` – termos do domínio
 - `docs/guides/local-setup.md` – ambiente local

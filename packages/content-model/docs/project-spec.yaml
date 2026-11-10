@@ -113,7 +113,7 @@ decisions:
   quality.git_hooks: { value: lefthook (raiz), source: inherited }
   quality.git_conventions:
     {
-      value: 'Conventional Commits, escopo content-model; schema incompatível = major do core',
+      value: 'Conventional Commits, escopo content-model; schema incompatível = major da versão do site-builder',
       source: inherited,
     }
 

@@ -66,8 +66,9 @@ flowchart LR
 | Variáveis CSS dos temas                                           | `@orakel/tokens`         | elements, ui, blog                                           |
 
 Regras de evolução: aditiva dentro de uma versão; mudança incompatível cria a próxima
-versão; o parse ignora campos desconhecidos. Release do core por tag `core-vX.Y.Z`
-(major = muda o schema da API ou exige migração de configuração).
+versão; o parse ignora campos desconhecidos. Versão do site-builder por tag
+`site-builder-vX.Y.Z`, que publica a imagem `site-builder:X.Y.Z` (major = muda o schema
+da API ou exige migração de configuração; ADR 0018).
 
 ## Mapa das unidades
 

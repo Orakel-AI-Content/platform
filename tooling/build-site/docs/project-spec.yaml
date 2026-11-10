@@ -16,7 +16,7 @@ project:
   type: [cli]
   goal: >-
     Entrypoints da imagem site-builder — render, publish e ssr — que constroem, publicam e
-    visualizam os sites; a imagem é a release do core.
+    visualizam os sites; a imagem é versionada pela tag site-builder-vX.Y.Z (ADR 0018 da raiz).
   scale: mvp
 
 decisions:
