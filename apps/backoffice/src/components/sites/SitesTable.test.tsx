@@ -325,7 +325,11 @@ describe('tabela de sites', () => {
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
 
-    act(() => resolve({ ok: true, message: '' }));
+    // A resposta chega: o item volta a "Publicar agora".
+    await act(() => {
+      resolve({ ok: true, message: '' });
+      return new Promise((done) => setTimeout(done, 0));
+    });
     await openMenu('exemplo-a');
     const done = await screen.findByRole('menuitem', { name: 'Publicar agora exemplo-a' });
     expect(done.getAttribute('aria-disabled')).not.toBe('true');
