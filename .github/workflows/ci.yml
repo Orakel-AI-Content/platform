@@ -251,7 +251,7 @@ jobs:
           filter: '@orakel/blog'
       - run: pnpm turbo run build:examples test:a11y test:parity --affected
 
-  # A release do core não deve ser o primeiro build da imagem (ADR 0007 do build-site):
+  # A versão do site-builder não deve ser o primeiro build da imagem (ADR 0007 do build-site):
   # build local da site-builder e fumaça de render, wrangler --dry-run e ssr.
   site-builder:
     name: Imagem site-builder (build e fumaça)

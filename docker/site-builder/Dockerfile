@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# Imagem site-builder (ADR 0006 do build-site): a release do core. Leva o apps/blog, os
-# pacotes, o Pagefind e o wrangler, e três entrypoints:
+# Imagem site-builder (ADR 0006 do build-site), versionada por site-builder-vX.Y.Z (ADR
+# 0018). Leva o apps/blog, os pacotes, o Pagefind e o wrangler, e três entrypoints:
 #
 #   docker run … site-builder:<release> render    astro build do site → /build (rede export)
 #   docker run … site-builder:<release> publish   deploy do /build (rede publish)

@@ -1,5 +1,5 @@
-# Release do core (ADR 0005): a tag manual core-vX.Y.Z publica a imagem site-builder
-# com a tag X.Y.Z. Merge na main não cria release. A imagem é testada em todo PR pelo
+# Versão do site-builder (ADR 0018): a tag manual site-builder-vX.Y.Z publica a imagem
+# site-builder:X.Y.Z. Merge na main não cria release. A imagem é testada em todo PR pelo
 # job "Imagem site-builder" do ci.yml. O release só sai com o último E2E completo da main
 # verde (#475).
 name: Release
@@ -7,7 +7,7 @@ name: Release
 on:
   push:
     tags:
-      - 'core-v*.*.*'
+      - 'site-builder-v*.*.*'
 
 permissions:
   contents: read
@@ -57,4 +57,4 @@ jobs:
       - name: Bake do grupo release
         env:
           REF_NAME: ${{ github.ref_name }}
-        run: TAG="${REF_NAME#core-v}" docker/bake.sh release --push
+        run: TAG="${REF_NAME#site-builder-v}" docker/bake.sh release --push
