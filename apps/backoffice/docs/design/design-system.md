@@ -262,7 +262,9 @@ menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo ca
     ("Nenhum autor encontrado.") vai no `customNoDataIcon` do `DataTable`. Só a mensagem: a
     única ação de limpar é a "Limpar filtros" da toolbar.
 - **Células:** no máximo duas linhas por célula, `TwoLines` (`src/components/shared/TwoLines.tsx`)
-  com a principal e a secundária em `text-xs` (ex.: nome com `id · domínio` embaixo); texto
+  com a principal e a secundária em `text-xs` (ex.: nome com `id · domínio` embaixo; na
+  tabela de versões do conteúdo, o título sob "Versão N" e `revisor · data` da aprovação sob a
+  tag do status, em vez de colunas próprias, #588); texto
   longo é cortado pelo `Truncated` com o inteiro em `title`, em vez de quebrar. A coluna
   principal (título, nome) é fluida: `meta: { fluid: true }` na `ColumnDef` dá `w-full max-w-0`
   à célula, ela ocupa a largura que sobra e o `Truncated` sem `className` só corta quando falta
