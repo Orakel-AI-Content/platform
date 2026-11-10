@@ -358,6 +358,14 @@ const ECME_PAIRS: readonly EcmePair[] = [
     minimum: 4.5,
   },
   {
+    // O selo da fila no item Revisão da barra lateral (#583): o Badge em `bg-primary`.
+    name: 'selo da barra lateral',
+    theme: 'claro',
+    text: 'text-neutral',
+    background: 'bg-primary',
+    minimum: 4.5,
+  },
+  {
     name: 'tag',
     theme: 'claro',
     text: 'text-gray-900',
@@ -379,6 +387,13 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-error',
     minimum: 4.5,
     ecme: 'text-white',
+  },
+  {
+    name: 'selo da barra lateral',
+    theme: 'escuro',
+    text: 'dark:text-gray-950',
+    background: 'dark:bg-primary',
+    minimum: 4.5,
   },
   {
     name: 'tag',

@@ -13,10 +13,13 @@ const OPERATOR = 'operacao@orakel.local';
 const SITE = 'exemplo-a';
 const SITE_NAME = 'Exemplo A — Guias';
 
+// O texto de Revisão leva o selo da fila (#583) quando há conteúdo aguardando; a contagem
+// depende dos dados e de outros arquivos rodando em paralelo, então só o formato é conferido.
+// Selo e nome acessível ficam em `CollapsibleSide.browser.test.tsx`.
 const AREAS = [
   'Visão geral',
   'Conteúdos',
-  'Revisão',
+  /^Revisão\d*$/,
   'Mídia',
   'Autores',
   'Taxonomias',
