@@ -214,8 +214,9 @@ A aba Geração de cada site (`/sites/<site>/geracao`) dispara um artigo por tem
 `backoffice-worker` chama o LLM e o artigo vai para a fila de revisão (ADRs 0018 e 0019 do
 backoffice). O site precisa de um contexto editorial (aba Contextos) e de um autor.
 
-- **Modo `fixture` (padrão):** o worker do compose local sobe com `LLM_MODEL=fixture`, mesmo
-  que o `.env.local` aponte para o provedor, e responde sem rede. É o modo do E2E
+- **Modo `fixture` (padrão):** os processos do backoffice no compose local sobem com
+  `LLM_MODEL=fixture`, mesmo que o `.env.local` aponte para o provedor ou não defina
+  `LLM_MODEL`, e o worker responde sem rede. É o modo do E2E
   (`pnpm local:e2e:area geracao`) e do CI. O tema `fixture-saida-invalida` exercita a falha.
   Para o fixture ter custo na lista, o `LLM_PRICING` do `.env.local` precisa da entrada
   `fixture`, como no `.env.example`.
@@ -226,8 +227,8 @@ backoffice). O site precisa de um contexto editorial (aba Contextos) e de um aut
   crie uma chave num workspace só da geração local e defina o limite de gasto mensal do
   workspace (Settings → Limits); ao atingir o limite, as chamadas são recusadas e a execução
   aparece como falha na lista.
-- **Rodada com o LLM real:** suba a pilha com o modelo no shell, que vale só para o worker e
-  tem precedência sobre o `.env.local`:
+- **Rodada com o LLM real:** suba a pilha com o modelo no shell, que vale para os processos
+  do backoffice e tem precedência sobre o `.env.local`:
 
   ```sh
   LOCAL_LLM_MODEL=anthropic:claude-haiku-5-5 pnpm local:up
