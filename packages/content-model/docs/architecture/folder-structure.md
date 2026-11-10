@@ -53,4 +53,4 @@ chamada em `semantic/index.ts`, testada em `semantic.test.ts`.
    reaproveite por import de `../v1/` o que não mudou.
 2. `exports`: `"./v2"` e `"./fixtures/v2/*"`; `fixtures/v2/`.
 3. Acrescente `2` em `SUPPORTED_SCHEMA_VERSIONS` e o validador em `src/fixtures.test.ts`.
-4. ADR na raiz: é major do core.
+4. ADR na raiz: é major da versão do site-builder (ADR 0018 da raiz).

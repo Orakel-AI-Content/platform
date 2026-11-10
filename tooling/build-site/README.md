@@ -1,6 +1,6 @@
 # @orakel/build-site
 
-Entrypoints da imagem `site-builder` (a release do core): `render`, `publish`, `rollback` e `ssr`.
+Entrypoints da imagem `site-builder` (versionada por `site-builder-vX.Y.Z`, ADR 0018 da raiz): `render`, `publish`, `rollback` e `ssr`.
 
 ```sh
 # Imagem e fumaça (da raiz)
