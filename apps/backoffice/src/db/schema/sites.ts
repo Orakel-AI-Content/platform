@@ -29,7 +29,7 @@ export const sites = pgTable(
      */
     activeVersionId: text(),
     /**
-     * Release do core registrada para o site (X.Y.Z, a tag da imagem site-builder); nula até a
+     * Versão do site-builder registrada para o site (X.Y.Z, a tag da imagem site-builder); nula até a
      * primeira promoção.
      */
     release: text(),

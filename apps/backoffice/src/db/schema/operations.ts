@@ -33,7 +33,7 @@ export const builds = pgTable(
     siteId: text()
       .notNull()
       .references(() => sites.id),
-    /** Release do core usada (tag da imagem site-builder). */
+    /** Versão do site-builder usada (X.Y.Z, a tag da imagem site-builder). */
     release: text().notNull(),
     /** Job do Graphile Worker e tentativa (1 a 5). */
     jobId: text(),
