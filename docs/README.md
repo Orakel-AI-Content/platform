@@ -12,7 +12,7 @@ de repeti-los.
 | `design/accessibility.md`  | Meta WCAG 2.2 AA e como é verificada                                           |
 | `conventions/coding.md`    | Fronteiras, erros, logs, configuração, dependências                            |
 | `conventions/testing.md`   | Vitest, Playwright, cobertura, fixtures                                        |
-| `conventions/git.md`       | Branches, commits, PRs, releases do core                                       |
+| `conventions/git.md`       | Branches, commits, PRs, versões do site-builder                                |
 | `guides/local-setup.md`    | Pré-requisitos, instalação, ambiente local em containers                       |
 | `guides/claude-code.md`    | Como o repositório está organizado para o Claude Code                          |
 | `decisions/`               | ADRs: por que cada escolha foi feita (0010–0015: ambiente local)               |

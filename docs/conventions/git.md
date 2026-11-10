@@ -18,9 +18,10 @@ Consulte ao criar branch, commit, PR ou release.
 - Escopo = nome da unidade sem `@orakel/` (ex.: `feat(content-model): adiciona bloco faq`).
 - O `pre-commit` (lefthook) formata e corrige lint nos arquivos staged.
 
-## Releases do core
+## Versões do site-builder
 
-- Tag manual `core-vX.Y.Z` na `main`; o `release.yml` publica a imagem `site-builder`.
+- Tag manual `site-builder-vX.Y.Z` na `main`; o `release.yml` publica a imagem
+  `site-builder:X.Y.Z`, e o Backoffice registra o valor `X.Y.Z` (ADR 0018).
 - **Major:** muda o schema da API ou exige migração de configuração.
 - **Minor:** funcionalidades. **Patch:** correções.
 - Merge na `main` não cria release. Imagens do backoffice e serviços são publicadas
