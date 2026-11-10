@@ -97,14 +97,15 @@ function seqScans(node: PlanNode, found: Set<string>): Set<string> {
 }
 
 /**
- * Roda `read` num banco que registra as consultas e devolve o resultado, o tempo e as tabelas
- * que algum plano lê por `Seq Scan` (`EXPLAIN (FORMAT JSON)` de cada consulta, depois). Para os
- * casos de volume (#461): rode o `analyzeTables` antes, ou o plano é o de tabelas vazias.
+ * Roda `read` num banco que registra as consultas e devolve o resultado, o tempo, o número de
+ * consultas e as tabelas que algum plano lê por `Seq Scan` (`EXPLAIN (FORMAT JSON)` de cada
+ * consulta, depois). Para os casos de volume (#461): rode o `analyzeTables` antes, ou o plano é
+ * o de tabelas vazias.
  */
 export async function profileQueries<T>(
   db: Db,
   read: (traced: Db) => Promise<T>,
-): Promise<{ result: T; ms: number; seqScans: string[] }> {
+): Promise<{ result: T; ms: number; queries: number; seqScans: string[] }> {
   const queries: { query: string; params: unknown[] }[] = [];
   const traced = drizzle(db.$client, {
     schema,
@@ -123,5 +124,5 @@ export async function profileQueries<T>(
     const [plan] = rows[0]?.['QUERY PLAN'] ?? [];
     if (plan) seqScans(plan.Plan, found);
   }
-  return { result, ms, seqScans: [...found].sort() };
+  return { result, ms, queries: queries.length, seqScans: [...found].sort() };
 }
