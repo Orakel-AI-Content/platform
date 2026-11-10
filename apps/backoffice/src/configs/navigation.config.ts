@@ -62,7 +62,7 @@ const navigationConfig: NavigationTree[] = [
     authority: ['site.read'],
     subMenu: [],
   },
-  // Registro de releases do core (#509): só para quem promove release (admin e operação).
+  // Registro de versões do site-builder (#509): só para quem promove release (admin e operação).
   {
     key: 'releases',
     path: '/releases',
