@@ -35,6 +35,7 @@
     "local:load": "infra/local/load.sh",
     "local:trust": "infra/local/trust-ca.sh",
     "local:isolated": "infra/local/isolated.sh",
+    "worktree": "infra/local/worktree.sh",
     "prepare": "lefthook install"
   },
   "prettier": "@orakel/prettier-config",

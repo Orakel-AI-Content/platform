@@ -6,6 +6,10 @@ acrescentar regras, skills e agentes.
 ## Onde abrir
 
 Principalmente **na raiz**, com worktrees para trabalho em paralelo (ADR 0003, M.8).
+Cada sessão de branch (ex.: `/execute`) trabalha na própria worktree, porque outra sessão pode
+trocar a branch do checkout principal entre dois comandos. Sempre pelo `pnpm worktree`
+(`docs/guides/local-setup.md`, "Worktrees"): `new` no começo, `rm` ao terminar, e o `gc` do
+`SessionStart` remove o que uma sessão interrompida deixou para trás.
 A tarefa está pronta com `lint`, `typecheck`, `test`, `test:browser` e, se tocar o domínio,
 `test:contract` (ADR 0017). O E2E local é opcional e só na camada de telas:
 `pnpm local:e2e:telas <área>` roda o spec da área contra o `next dev` do worktree, numa das
@@ -34,6 +38,8 @@ a sessão for aberta direto nela.
 - Bloqueia `pnpm local:reset`, `rm -rf` e `git push --force`.
 - Hook `PostToolUse` formata com Prettier cada arquivo editado (`.claude/hooks/format.sh`).
 - Worktrees recebem `.env.local` (`.worktreeinclude`) e reaproveitam `node_modules`.
+- Hook `SessionStart` (só no `startup`) roda `pnpm worktree gc` em segundo plano: remove as
+  worktrees cujo PR foi mergeado ou fechado, sem mudança pendente nem commit fora do remoto.
 
 ## Skills e agentes
 
