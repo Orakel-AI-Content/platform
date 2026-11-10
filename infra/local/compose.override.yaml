@@ -150,6 +150,15 @@ services:
       timeout: 5s
       retries: 12
 
+  # Geração (#543): todos os processos do backoffice usam fixture por padrão, mesmo com outro
+  # LLM_MODEL (ou nenhum) no .env.local. Sem isso, um .env.local sem LLM_MODEL herda o
+  # anthropic:… da VPS e, sem LLM_API_KEY, o EnvSchema derruba o migrate, o web e o
+  # build-runner. A rodada com o LLM real sobe a pilha com o modelo no shell:
+  # LOCAL_LLM_MODEL=anthropic:claude-haiku-5-5 pnpm local:up (docs/guides/local-setup.md).
+  backoffice-migrate:
+    environment:
+      LLM_MODEL: ${LOCAL_LLM_MODEL:-fixture}
+
   # Quem usa o S3 espera os buckets. A dependência também faz o `up --wait` aceitar o s3-init
   # terminado (one-shot sem dependente conta como falha). No local, a janela dos builds é de
   # 30 s (12.0, L3), mesmo sem BUILD_WINDOW_SECONDS no .env.local.
@@ -160,6 +169,7 @@ services:
       BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-30}
       # Página /teste-de-erro para o E2E da tela de erro (#77); nunca no compose da VPS.
       E2E_ERROR_ROUTE: ${E2E_ERROR_ROUTE:-1}
+      LLM_MODEL: ${LOCAL_LLM_MODEL:-fixture}
     depends_on:
       s3-init:
         condition: service_completed_successfully
@@ -171,9 +181,7 @@ services:
       # Consolidação da audiência (#547) pelo ClickHouse local, na rede internal.
       AE_SQL_TRANSPORT: clickhouse
       AE_SQL_URL: http://${CLICKHOUSE_USER:-orakel}:${CLICKHOUSE_PASSWORD:-orakel-local}@clickhouse:8123
-      # Geração (#543): fixture por padrão, mesmo com outro LLM_MODEL no .env.local, para o E2E
-      # nunca chamar o provedor. A rodada com o LLM real sobe a pilha com o modelo no shell:
-      # LOCAL_LLM_MODEL=anthropic:claude-haiku-5-5 pnpm local:up (docs/guides/local-setup.md).
+      # Geração: o E2E nunca chama o provedor (ver backoffice-migrate).
       LLM_MODEL: ${LOCAL_LLM_MODEL:-fixture}
     depends_on:
       s3-init:
@@ -187,6 +195,7 @@ services:
       BUILD_WINDOW_SECONDS: ${BUILD_WINDOW_SECONDS:-30}
       # Destino do publish no local; o container publish o alcança pela rede publish.
       EDGE_LOCAL_URL: http://edge-local:8081
+      LLM_MODEL: ${LOCAL_LLM_MODEL:-fixture}
     depends_on:
       s3-init:
         condition: service_completed_successfully
