@@ -53,11 +53,13 @@ const currentLinks = (element: HTMLElement) =>
     .filter((link) => link.getAttribute('aria-current') === 'page');
 
 describe('VerticalMenuContent', () => {
-  it('o <nav> tem o nome recebido; o grupo é uma lista nomeada pelo rótulo', () => {
+  it('o <nav> tem o nome recebido; cada grupo é uma lista nomeada pelo rótulo', () => {
     render(<VerticalMenuContent aria-label="Áreas do site" navigationTree={TREE} siteId="a" />);
 
     const areas = nav('Áreas do site');
-    expect(within(areas).getByRole('list', { name: 'Áreas do site' })).toBeTruthy();
+    for (const title of ['Site', 'Conteúdo', 'Estrutura', 'Geração', 'Análise']) {
+      expect(within(areas).getByRole('list', { name: title })).toBeTruthy();
+    }
     expect(within(areas).getByRole('link', { name: 'Sites' }).getAttribute('href')).toBe('/sites');
   });
 
@@ -70,16 +72,17 @@ describe('VerticalMenuContent', () => {
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/sites',
       '/sites/exemplo%20b',
+      '/sites/exemplo%20b/pendencias',
       '/sites/exemplo%20b/conteudos',
       '/sites/exemplo%20b/revisao',
       '/sites/exemplo%20b/midia',
       '/sites/exemplo%20b/autores',
       '/sites/exemplo%20b/taxonomias',
       '/sites/exemplo%20b/menus',
+      '/sites/exemplo%20b/institucionais',
       '/sites/exemplo%20b/contextos',
       '/sites/exemplo%20b/geracao',
       '/sites/exemplo%20b/audiencia',
-      '/sites/exemplo%20b/institucionais',
     ]);
   });
 
@@ -119,7 +122,8 @@ describe('VerticalMenuContent', () => {
     );
 
     const areas = nav('Áreas do site');
-    expect(within(areas).queryByRole('list', { name: 'Áreas do site' })).toBeNull();
+    expect(within(areas).queryByRole('list', { name: 'Site' })).toBeNull();
+    expect(areas.querySelector('.menu-title')).toBeNull();
     const autores = within(areas).getByRole('link', { name: 'Autores' });
     expect(autores.getAttribute('aria-current')).toBe('page');
     expect(autores.querySelector('.sr-only')?.textContent).toBe('Autores');
