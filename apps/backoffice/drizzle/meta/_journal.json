@@ -110,8 +110,15 @@
     {
       "idx": 15,
       "version": "7",
-      "when": 1794321985080,
-      "tag": "0015_conferencia_imagem_release",
+      "when": 1794321659103,
+      "tag": "0015_release_sem_prefixo",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794332544776,
+      "tag": "0016_conferencia_imagem_release",
       "breakpoints": true
     }
   ]

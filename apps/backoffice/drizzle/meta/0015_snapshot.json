@@ -1,5 +1,5 @@
 {
-  "id": "ef04b114-15a8-4fde-9036-268cc28cf065",
+  "id": "0da0f98d-7b7a-467c-a4f3-14de53bd28bc",
   "prevId": "ad9729c1-7113-4c78-8105-e64020bee85e",
   "version": "7",
   "dialect": "postgresql",
@@ -51,20 +51,20 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "audience_daily_article_site_id_sites_id_fk": {
           "name": "audience_daily_article_site_id_sites_id_fk",
           "tableFrom": "audience_daily_article",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -124,20 +124,20 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "audience_daily_site_site_id_sites_id_fk": {
           "name": "audience_daily_site_site_id_sites_id_fk",
           "tableFrom": "audience_daily_site",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -208,11 +208,11 @@
         "authors_site_id_sites_id_fk": {
           "name": "authors_site_id_sites_id_fk",
           "tableFrom": "authors",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -224,8 +224,8 @@
       "uniqueConstraints": {
         "authors_siteId_slug_unique": {
           "name": "authors_siteId_slug_unique",
-          "nullsNotDistinct": false,
-          "columns": ["site_id", "slug"]
+          "columns": ["site_id", "slug"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -279,11 +279,11 @@
         "content_versions_site_id_sites_id_fk": {
           "name": "content_versions_site_id_sites_id_fk",
           "tableFrom": "content_versions",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -339,11 +339,11 @@
         "contents_site_id_sites_id_fk": {
           "name": "contents_site_id_sites_id_fk",
           "tableFrom": "contents",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -397,11 +397,11 @@
         "media_site_id_sites_id_fk": {
           "name": "media_site_id_sites_id_fk",
           "tableFrom": "media",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -482,20 +482,20 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "media_uploads_site_id_sites_id_fk": {
           "name": "media_uploads_site_id_sites_id_fk",
           "tableFrom": "media_uploads",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -544,11 +544,11 @@
         "media_variants_site_id_sites_id_fk": {
           "name": "media_variants_site_id_sites_id_fk",
           "tableFrom": "media_variants",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -596,11 +596,11 @@
         "menus_site_id_sites_id_fk": {
           "name": "menus_site_id_sites_id_fk",
           "tableFrom": "menus",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -612,8 +612,8 @@
       "uniqueConstraints": {
         "menus_siteId_key_unique": {
           "name": "menus_siteId_key_unique",
-          "nullsNotDistinct": false,
-          "columns": ["site_id", "key"]
+          "columns": ["site_id", "key"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -686,20 +686,20 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "publications_site_id_sites_id_fk": {
           "name": "publications_site_id_sites_id_fk",
           "tableFrom": "publications",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -754,11 +754,11 @@
         "redirects_site_id_sites_id_fk": {
           "name": "redirects_site_id_sites_id_fk",
           "tableFrom": "redirects",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -770,8 +770,8 @@
       "uniqueConstraints": {
         "redirects_siteId_from_unique": {
           "name": "redirects_siteId_from_unique",
-          "nullsNotDistinct": false,
-          "columns": ["site_id", "from"]
+          "columns": ["site_id", "from"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -831,11 +831,11 @@
         "reviews_site_id_sites_id_fk": {
           "name": "reviews_site_id_sites_id_fk",
           "tableFrom": "reviews",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -890,11 +890,11 @@
         "taxonomies_site_id_sites_id_fk": {
           "name": "taxonomies_site_id_sites_id_fk",
           "tableFrom": "taxonomies",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -906,8 +906,8 @@
       "uniqueConstraints": {
         "taxonomies_siteId_kind_slug_unique": {
           "name": "taxonomies_siteId_kind_slug_unique",
-          "nullsNotDistinct": false,
-          "columns": ["site_id", "kind", "slug"]
+          "columns": ["site_id", "kind", "slug"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -955,11 +955,11 @@
         "editorial_contexts_site_id_sites_id_fk": {
           "name": "editorial_contexts_site_id_sites_id_fk",
           "tableFrom": "editorial_contexts",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1106,29 +1106,29 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "generation_runs_site_id_sites_id_fk": {
           "name": "generation_runs_site_id_sites_id_fk",
           "tableFrom": "generation_runs",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "generation_runs_editorial_context_fk": {
           "name": "generation_runs_editorial_context_fk",
           "tableFrom": "generation_runs",
-          "tableTo": "editorial_contexts",
           "columnsFrom": ["site_id", "editorial_context_version"],
+          "tableTo": "editorial_contexts",
           "columnsTo": ["site_id", "version"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1275,20 +1275,20 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "builds_site_id_sites_id_fk": {
           "name": "builds_site_id_sites_id_fk",
           "tableFrom": "builds",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1344,11 +1344,11 @@
         "pending_changes_site_id_sites_id_fk": {
           "name": "pending_changes_site_id_sites_id_fk",
           "tableFrom": "pending_changes",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1379,11 +1379,11 @@
         "user_roles_user_id_users_id_fk": {
           "name": "user_roles_user_id_users_id_fk",
           "tableFrom": "user_roles",
-          "tableTo": "users",
           "columnsFrom": ["user_id"],
+          "tableTo": "users",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1433,8 +1433,8 @@
       "uniqueConstraints": {
         "users_email_unique": {
           "name": "users_email_unique",
-          "nullsNotDistinct": false,
-          "columns": ["email"]
+          "columns": ["email"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1457,18 +1457,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "image_status": {
-          "name": "image_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "image_checked_at": {
-          "name": "image_checked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {},
@@ -1514,11 +1502,11 @@
         "site_configs_site_id_sites_id_fk": {
           "name": "site_configs_site_id_sites_id_fk",
           "tableFrom": "site_configs",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1573,11 +1561,11 @@
         "site_policy_triggers_site_id_sites_id_fk": {
           "name": "site_policy_triggers_site_id_sites_id_fk",
           "tableFrom": "site_policy_triggers",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1619,11 +1607,11 @@
         "site_sequences_site_id_sites_id_fk": {
           "name": "site_sequences_site_id_sites_id_fk",
           "tableFrom": "site_sequences",
-          "tableTo": "sites",
           "columnsFrom": ["site_id"],
+          "tableTo": "sites",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1753,10 +1741,10 @@
   },
   "enums": {},
   "schemas": {},
+  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

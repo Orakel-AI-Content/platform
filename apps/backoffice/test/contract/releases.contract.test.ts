@@ -1,4 +1,6 @@
-import { sql } from 'drizzle-orm';
+import { readFile } from 'node:fs/promises';
+
+import { asc, eq, sql } from 'drizzle-orm';
 import type { JobHelpers } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -14,6 +16,7 @@ import {
   registerRelease,
   requestReleaseImageCheck,
 } from '../../src/domain/releases/releases.ts';
+import { createSite } from '../../src/domain/sites/sites.ts';
 import { createCheckReleaseImageTask } from '../../src/jobs/tasks/check-release-image.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
@@ -91,6 +94,112 @@ describe('registro de releases (#509)', () => {
       expect(await tags()).toEqual([]);
     },
   );
+});
+
+describe('migração das releases com prefixo core-v (#569)', () => {
+  // O setupDatabase já migrou o banco vazio: o teste grava as linhas antigas e roda de novo
+  // os comandos da migração, como o db:migrate faria num banco com registros antigos.
+  const migrate = async () => {
+    const migration = await readFile(
+      new URL('../../drizzle/0015_release_sem_prefixo.sql', import.meta.url),
+      'utf8',
+    );
+    for (const statement of migration.split('--> statement-breakpoint')) {
+      await db.execute(sql.raw(statement));
+    }
+  };
+  const rows = () =>
+    db
+      .select({ tag: releases.tag, registeredAt: releases.registeredAt })
+      .from(releases)
+      .orderBy(asc(releases.tag));
+  const siteReleases = async () =>
+    (await db.select({ id: sites.id, release: sites.release }).from(sites).orderBy(sites.id)).map(
+      ({ id, release }) => [id, release],
+    );
+  const at = (iso: string) => new Date(iso);
+
+  beforeEach(async () => {
+    for (const id of ['exemplo-a', 'exemplo-b']) {
+      const line = (await readFixture(id)).find((l) => l.type === 'config');
+      if (line?.type !== 'config') throw new Error(`fixture ${id} sem config`);
+      await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, line.data));
+    }
+  });
+
+  it('tira o prefixo de releases.tag e de sites.release', async () => {
+    await db.insert(releases).values([
+      { tag: 'core-v1.2.0', registeredAt: at('2026-01-01T00:00:00Z') },
+      { tag: '1.3.0', registeredAt: at('2026-02-01T00:00:00Z') },
+    ]);
+    await db.update(sites).set({ release: 'core-v1.2.0' }).where(eq(sites.id, 'exemplo-a'));
+
+    await migrate();
+
+    expect(await rows()).toEqual([
+      { tag: '1.2.0', registeredAt: at('2026-01-01T00:00:00Z') },
+      { tag: '1.3.0', registeredAt: at('2026-02-01T00:00:00Z') },
+    ]);
+    expect(await siteReleases()).toEqual([
+      ['exemplo-a', '1.2.0'],
+      ['exemplo-b', null],
+    ]);
+  });
+
+  it.each([
+    ['a antiga é a com prefixo', '2026-01-01T00:00:00Z', '2026-03-01T00:00:00Z'],
+    ['a antiga é a sem prefixo', '2026-03-01T00:00:00Z', '2026-01-01T00:00:00Z'],
+  ])(
+    'colisão com a mesma versão sem prefixo (%s): fica uma linha, a mais antiga',
+    async (_, old, current) => {
+      await db.insert(releases).values([
+        { tag: 'core-v1.2.0', registeredAt: at(old) },
+        { tag: '1.2.0', registeredAt: at(current) },
+      ]);
+
+      await migrate();
+
+      expect(await rows()).toEqual([{ tag: '1.2.0', registeredAt: at('2026-01-01T00:00:00Z') }]);
+    },
+  );
+
+  it('deixa intactos valores sem o prefixo, fora do formato e nulos', async () => {
+    await db.insert(releases).values([
+      { tag: '1.3.0', registeredAt: at('2026-02-01T00:00:00Z') },
+      { tag: 'core-v1.2', registeredAt: at('2026-01-01T00:00:00Z') },
+    ]);
+    await db.update(sites).set({ release: '1.3.0' }).where(eq(sites.id, 'exemplo-a'));
+
+    await migrate();
+
+    expect(await rows()).toEqual([
+      { tag: '1.3.0', registeredAt: at('2026-02-01T00:00:00Z') },
+      { tag: 'core-v1.2', registeredAt: at('2026-01-01T00:00:00Z') },
+    ]);
+    expect(await siteReleases()).toEqual([
+      ['exemplo-a', '1.3.0'],
+      ['exemplo-b', null],
+    ]);
+  });
+
+  it('rodar de novo num banco já migrado não muda nada', async () => {
+    await db.insert(releases).values([
+      { tag: 'core-v1.2.0', registeredAt: at('2026-01-01T00:00:00Z') },
+      { tag: '1.2.0', registeredAt: at('2026-03-01T00:00:00Z') },
+      { tag: 'core-v1.4.0', registeredAt: at('2026-04-01T00:00:00Z') },
+    ]);
+    await db.update(sites).set({ release: 'core-v1.4.0' }).where(eq(sites.id, 'exemplo-b'));
+    await migrate();
+    const first = { releases: await rows(), sites: await siteReleases() };
+
+    await migrate();
+
+    expect({ releases: await rows(), sites: await siteReleases() }).toEqual(first);
+    expect(first.sites).toEqual([
+      ['exemplo-a', null],
+      ['exemplo-b', '1.4.0'],
+    ]);
+  });
 });
 
 const settings = { image: 'ghcr.io/orakel-ai-content/site-builder' } as BuildSettings;
