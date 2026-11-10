@@ -65,13 +65,25 @@ export function tableOverflow(table: Target): number {
 /**
  * Se o texto foi cortado (o `truncate` escondeu parte dele): a largura do texto inteiro passa da
  * caixa. Em px fracionários, pela Range: `scrollWidth` e `clientWidth` arredondam, e um texto de
- * 99,6 px numa caixa do mesmo tamanho daria 1 px de "corte".
+ * 99,6 px numa caixa do mesmo tamanho daria 1 px de "corte". Só o texto visível conta: o de um
+ * `.sr-only` (ex.: "(abre em nova aba)") transborda da caixa de 1 px dele sem aparecer.
  */
 export function isClipped(target: Target): boolean {
   const element = toElement(target);
   const range = document.createRange();
-  range.selectNodeContents(element);
-  return range.getBoundingClientRect().width > element.getBoundingClientRect().width + 0.5;
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  let left = Infinity;
+  let right = -Infinity;
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    if (node.parentElement?.closest('.sr-only')) continue;
+    range.selectNodeContents(node);
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0) continue;
+    left = Math.min(left, rect.left);
+    right = Math.max(right, rect.right);
+  }
+  if (right < left) return false;
+  return right - left > element.getBoundingClientRect().width + 0.5;
 }
 
 /** Linhas de texto de cada célula de uma coluna, achada pelo texto do cabeçalho (#585). */
