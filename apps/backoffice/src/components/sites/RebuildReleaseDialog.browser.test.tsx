@@ -7,13 +7,16 @@ import { renderInApp } from '../../../test/browser/render.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { toast } from '@/components/ui/toast';
 
-import { RebuildReleaseDialog } from './RebuildReleaseDialog.tsx';
+import { RebuildReleaseDialog, type RebuildRelease } from './RebuildReleaseDialog.tsx';
 
 // Reconstruir na release em Chromium (#515): foco preso no alertdialog, o foco volta ao
 // gatilho ao fechar (Esc, Cancelar e confirmar) e o axe (WCAG 2.2 AA) com o diálogo e o
-// seletor abertos, nos dois temas.
+// seletor abertos e com o aviso de imagem ausente (#574), nos dois temas.
 
-const RELEASES = ['1.3.0', '1.2.0'];
+const RELEASES: RebuildRelease[] = [
+  { tag: '1.3.0', imageStatus: 'ausente' },
+  { tag: '1.2.0', imageStatus: 'disponivel' },
+];
 const NAME = 'Reconstruir o site numa release?';
 
 function Rebuild({ action }: { action: (tag: string) => Promise<ActionResult> }) {
@@ -91,7 +94,16 @@ describe.each(COLOR_SCHEMES)('Reconstruir na release no navegador (%s)', (scheme
     await expect.element(page.getByRole('option').first()).toBeVisible();
     expect(await audit()).toEqual([]);
 
-    await userEvent.keyboard('{Escape}{Escape}');
+    await page.getByRole('option', { name: '1.3.0' }).click();
+    await expect
+      .element(dialog.getByText(/A imagem site-builder:1\.3\.0 não estava no host/))
+      .toBeVisible();
+    await expect
+      .element(dialog.getByRole('button', { name: 'Reconstruir', exact: true }))
+      .toBeEnabled();
+    expect(await audit()).toEqual([]);
+
+    await userEvent.keyboard('{Escape}');
     await expect.element(dialog).not.toBeInTheDocument();
   });
 });

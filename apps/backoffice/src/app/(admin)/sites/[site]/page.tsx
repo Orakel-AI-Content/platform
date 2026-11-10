@@ -146,7 +146,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
           rebuild={
             releases?.ok
               ? {
-                  releases: releases.value.map((release) => release.tag),
+                  releases: releases.value.map(({ tag, imageStatus }) => ({ tag, imageStatus })),
                   action: rebuildOnReleaseAction.bind(null, site.id),
                 }
               : undefined
