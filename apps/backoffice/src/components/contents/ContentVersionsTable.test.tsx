@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ContentVersionsTable, type ContentVersionRow } from './ContentVersionsTable.tsx';
 
-// Versões de um conteúdo (#44): em ordem, cada uma com link para a leitura. Busca pelo título,
+// Versões de um conteúdo (#44): da mais recente à primeira (#588), cada uma com link para a leitura. Busca pelo título,
 // filtro por status, ordem e paginação com o estado na URL (#366): router.replace simulado.
 
 const navigation = vi.hoisted(() => {
@@ -62,6 +62,9 @@ const column = (index: number) =>
     .slice(1)
     .map((row) => within(row).getAllByRole('cell')[index]?.textContent);
 
+/** O link da versão na linha `index` (sem o título que vem embaixo). */
+const link = (index: number) => screen.getAllByRole('link')[index]?.textContent;
+
 // O filtro é o combobox do react-select: abre com a seta e escolhe a opção pelo nome.
 async function choose(user: ReturnType<typeof userEvent.setup>, label: string, option: string) {
   screen.getByRole('combobox', { name: label }).focus();
@@ -75,7 +78,7 @@ function tagColor(element: HTMLElement) {
 }
 
 describe('tabela de versões', () => {
-  it('lista as versões em ordem crescente com link para cada uma', () => {
+  it('lista as versões da mais recente à primeira, com link para cada uma (#588)', () => {
     render(
       <ContentVersionsTable
         siteId="exemplo-a"
@@ -86,24 +89,31 @@ describe('tabela de versões', () => {
     );
 
     const links = screen.getAllByRole('link');
-    expect(links.map((link) => link.textContent)).toEqual(['Versão 1', 'Versão 2', 'Versão 3']);
+    expect(links.map((link) => link.textContent)).toEqual(['Versão 3', 'Versão 2', 'Versão 1']);
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
-      '/sites/exemplo-a/conteudos/7/versoes/1',
-      '/sites/exemplo-a/conteudos/7/versoes/2',
       '/sites/exemplo-a/conteudos/7/versoes/3',
+      '/sites/exemplo-a/conteudos/7/versoes/2',
+      '/sites/exemplo-a/conteudos/7/versoes/1',
     ]);
-    expect(screen.getAllByRole('row')[1]?.textContent).toContain('Publicado');
+    expect(screen.getAllByRole('row')[3]?.textContent).toContain('Publicado');
     expect(screen.getByRole('status').textContent).toBe('3 resultados');
     expect(screen.getByRole('columnheader', { name: /Versão/ }).getAttribute('aria-sort')).toBe(
-      'ascending',
+      'descending',
     );
     expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
       'Versão',
       'Status',
-      'Título',
       'Gravada em',
-      'Aprovação',
     ]);
+  });
+
+  it('mostra o título como linha secundária da versão, em text-xs (#588)', () => {
+    renderTable();
+
+    const title = screen.getByText('Guia v2');
+    expect(title.getAttribute('title')).toBe('Guia v2');
+    expect(title.parentElement?.className).toContain('text-xs');
+    expect(within(title.closest('td')!).getByRole('link').textContent).toBe('Versão 2');
   });
 
   it('dá a cada status a tag da sua cor, com o texto do status (#86)', () => {
@@ -131,7 +141,7 @@ describe('tabela de versões', () => {
         rows={rows}
       />,
     );
-    expect(screen.getAllByRole('row')[1]?.textContent).toContain('01/10/2026, 09:00 BRT');
+    expect(screen.getAllByRole('row')[3]?.textContent).toContain('01/10/2026, 09:00 BRT');
 
     rerender(
       <ContentVersionsTable
@@ -141,10 +151,10 @@ describe('tabela de versões', () => {
         rows={rows}
       />,
     );
-    expect(screen.getAllByRole('row')[1]?.textContent).toContain('01/10/2026, 13:00 GMT+1');
+    expect(screen.getAllByRole('row')[3]?.textContent).toContain('01/10/2026, 13:00 GMT+1');
   });
 
-  it('mostra quem aprovou e quando, no fuso do site; sem aprovação, a célula fica vazia (#76)', () => {
+  it('mostra quem aprovou e quando sob o status, no fuso do site; sem aprovação, só a tag (#76, #588)', () => {
     const approved: ContentVersionRow[] = [
       { ...rows[0]!, approval: null },
       {
@@ -165,16 +175,17 @@ describe('tabela de versões', () => {
       />,
     );
 
-    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toContain('Aprovação');
-    const [, first, second] = screen.getAllByRole('row');
-    const approvalCell = (row: HTMLElement | undefined) => row?.querySelectorAll('td')[4];
-    expect(approvalCell(first)?.textContent).toBe('');
-    expect(approvalCell(second)?.textContent).toContain('revisor@orakel.local');
-    expect(approvalCell(second)?.textContent).toContain('01/10/2026, 09:00 BRT');
-    // O `TwoLines` compartilhado: o revisor e, embaixo, a data menor, numa linha só (#585).
-    const date = within(approvalCell(second)!).getByText('01/10/2026, 09:00 BRT');
-    expect(date.className).toBe('whitespace-nowrap');
-    expect(date.parentElement?.className).toContain('text-xs');
+    // Da mais recente à primeira: a versão 2 (aprovada) vem antes da 1.
+    const [, approvedRow, draftRow] = screen.getAllByRole('row');
+    const statusCell = (row: HTMLElement | undefined) => row?.querySelectorAll('td')[1];
+    expect(statusCell(draftRow)?.textContent).toBe('Publicado');
+    expect(statusCell(approvedRow)?.textContent).toBe(
+      'Aprovadorevisor@orakel.local · 01/10/2026, 09:00 BRT',
+    );
+    // O `TwoLines` compartilhado: a tag e, embaixo, o revisor e a data menores, numa linha só.
+    const approval = within(statusCell(approvedRow)!).getByText(/revisor@orakel\.local/);
+    expect(approval.className).toBe('whitespace-nowrap');
+    expect(approval.parentElement?.className).toContain('text-xs');
   });
 
   it('sem versões mostra o estado vazio no lugar da tabela e da toolbar', () => {
@@ -202,12 +213,12 @@ describe('busca, filtro, ordem e paginação (#366)', () => {
     await user.type(screen.getByLabelText('Buscar por título'), 'RECEITA');
 
     expect(screen.getByRole('status').textContent).toBe('10 resultados');
-    expect(column(2).every((title) => title?.startsWith('Receita'))).toBe(true);
+    expect(column(0).every((cell) => cell?.includes('Receita'))).toBe(true);
     expect(navigation.get()).toBe('q=RECEITA');
 
     await user.clear(screen.getByLabelText('Buscar por título'));
     await user.type(screen.getByLabelText('Buscar por título'), 'cafe v3');
-    expect(column(2)).toEqual(['Guia de café v3']);
+    expect(column(0)).toEqual(['Versão 3Guia de café v3']);
   });
 
   it('o filtro por status vai para a URL; "Limpar filtros" volta tudo', async () => {
@@ -224,18 +235,18 @@ describe('busca, filtro, ordem e paginação (#366)', () => {
     expect(screen.getByRole('status').textContent).toBe('30 resultados');
   });
 
-  it('pagina em 25 por padrão e ordena pela versão, da primeira à mais recente', async () => {
+  it('pagina em 25 por padrão e ordena pela versão, da mais recente à primeira (#588)', async () => {
     const user = userEvent.setup();
     renderTable(many);
 
     expect(screen.getAllByRole('row')).toHaveLength(26);
-    expect(column(0)[0]).toBe('Versão 1');
+    expect(link(0)).toBe('Versão 30');
 
     await user.click(
       within(screen.getByRole('columnheader', { name: /Versão/ })).getByRole('button'),
     );
-    expect(column(0)[0]).toBe('Versão 30');
-    expect(navigation.get()).toBe('ordem=-version');
+    expect(link(0)).toBe('Versão 1');
+    expect(navigation.get()).toBe('ordem=version');
   });
 
   it('a URL de uma lista filtrada e ordenada restaura o mesmo estado', () => {
@@ -245,7 +256,7 @@ describe('busca, filtro, ordem e paginação (#366)', () => {
     expect(screen.getByRole('combobox', { name: 'Status' }).closest('.select')?.textContent).toBe(
       'Rascunho',
     );
-    expect(column(0)[0]).toBe('Versão 30');
+    expect(link(0)).toBe('Versão 30');
     expect(screen.getAllByRole('row')).toHaveLength(21);
     expect(screen.getByRole('status').textContent).toBe('20 resultados');
   });
