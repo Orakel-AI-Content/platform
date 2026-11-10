@@ -21,7 +21,7 @@ const areas = ({ configure = false, write = false } = {}) => [
   ...(configure ? ['Configuração do site'] : []),
   'Mudanças pendentes',
   'Conteúdos',
-  'Revisão',
+  /^Revisão\d*$/,
   'Mídia',
   'Autores',
   'Taxonomias',

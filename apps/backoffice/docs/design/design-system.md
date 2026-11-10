@@ -155,6 +155,13 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
   listando os sites visíveis (`readVisibleSites`, uma leitura por requisição), cada um levando à
   mesma área (`sameAreaIn`: item, criar e editar caem na lista); o atual com
   `aria-current="true"`. Recolhida, a barra mostra as iniciais, com o nome na dica.
+- **Selo da fila de revisão:** o item Revisão mostra, à direita do título, o `Badge` do Ecme com
+  o número de conteúdos da fila do site do endereço (`countReviewQueues`, uma consulta para
+  todos os sites no layout `(admin)`; o `SideNavContent` escolhe o site). Fila vazia, sem selo.
+  O selo usa `bg-primary` (par "selo da barra lateral" em `ECME_PAIRS`), não o `bg-error`
+  padrão: contagem é informação, não erro. Ele é `aria-hidden`; o link diz a contagem no
+  `aria-label`, começando pelo título ("Revisão, 2 aguardando"), e a barra recolhida, sem o
+  selo, a mantém na dica. A contagem só chega com a navegação, sem atualização em tempo real.
 - **Cabeçalho de página:** `PageHeader` (`src/components/shared/PageHeader.tsx`), nas telas
   de detalhe e de formulário: trilha (`nav` "Trilha de navegação", com `aria-current="page"` no
   item atual; opcional, Sites é a raiz), título (`h1`) à esquerda e a ação principal à direita

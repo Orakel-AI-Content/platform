@@ -7,12 +7,13 @@
 // - `siteId` resolve o `[site]` dos caminhos (`navigationPath`);
 // - `aria-label` no <nav> do Menu: a barra tem dois landmarks, "Principal" e "Áreas do site";
 // - `collapsed` (#238) passa ao Menu (`sideCollapsed`: sem o rótulo do grupo) e aos itens
-//   (só o ícone, com a dica).
+//   (só o ícone, com a dica);
+// - `itemCounts` (#583) leva a contagem de um item, pela chave, ao selo dele.
 'use client';
 
 import { Fragment } from 'react';
 import { Menu } from '@/components/ui/Menu';
-import VerticalSingleMenuItem from './VerticalSingleMenuItem';
+import VerticalSingleMenuItem, { type NavItemCount } from './VerticalSingleMenuItem';
 import {
   navigationPath,
   NAV_ITEM_TYPE_ITEM,
@@ -24,6 +25,8 @@ export interface VerticalMenuContentProps {
   'aria-label': string;
   activeKey?: string;
   collapsed?: boolean;
+  /** Contagem do selo de cada item, pela chave (`nav.key`). */
+  itemCounts?: Readonly<Record<string, NavItemCount>>;
   navigationTree?: NavigationTree[];
   onMenuItemClick?: () => void;
   siteId?: string;
@@ -36,6 +39,7 @@ const VerticalMenuContent = (props: VerticalMenuContentProps) => {
     'aria-label': ariaLabel,
     activeKey,
     collapsed = false,
+    itemCounts,
     navigationTree = [],
     onMenuItemClick,
     siteId = '',
@@ -51,6 +55,7 @@ const VerticalMenuContent = (props: VerticalMenuContentProps) => {
               path={navigationPath(nav, siteId)}
               isActive={nav.key === activeKey}
               sideCollapsed={collapsed}
+              count={itemCounts?.[nav.key]}
               showIcon={cascade <= 1}
               onLinkClick={() => onMenuItemClick?.()}
             />

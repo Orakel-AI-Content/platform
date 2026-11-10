@@ -16,7 +16,8 @@ import VerticalMenuContent from './VerticalMenuContent.tsx';
 // Menu da barra (#237, #238), com `VerticalSingleMenuItem` e `VerticalMenuIcon`: o <nav> com o
 // nome recebido, os grupos com o rótulo (some recolhido), os caminhos com o `siteId`, só o
 // `activeKey` em aria-current, recolhido o título em `sr-only` e a dica, o link externo em
-// outra aba, o ícone só até o primeiro nível de grupo e o clique avisado.
+// outra aba, o ícone só até o primeiro nível de grupo e o clique avisado. O selo de um item
+// (#583): o número à vista, fora da árvore de acessibilidade, e por extenso no nome e na dica.
 
 afterEach(cleanup);
 beforeAll(() => {
@@ -130,6 +131,46 @@ describe('VerticalMenuContent', () => {
 
     autores.focus();
     expect((await screen.findByRole('tooltip')).textContent).toBe('Autores');
+  });
+
+  it('o item com contagem mostra o selo e diz a contagem no nome; os outros, não', () => {
+    render(
+      <VerticalMenuContent
+        aria-label="Áreas do site"
+        navigationTree={TREE}
+        siteId="a"
+        itemCounts={{ 'site.review': { count: 2, label: '2 aguardando' } }}
+      />,
+    );
+
+    const areas = nav('Áreas do site');
+    const revisao = within(areas).getByRole('link', { name: 'Revisão, 2 aguardando' });
+    const badge = revisao.querySelector('.badge');
+    expect(badge?.textContent).toBe('2');
+    expect(badge?.getAttribute('aria-hidden')).toBe('true');
+    expect(
+      within(areas).getByRole('link', { name: 'Conteúdos' }).querySelector('.badge'),
+    ).toBeNull();
+  });
+
+  it('recolhido, o item com contagem fica sem o selo e diz a contagem no nome e na dica', async () => {
+    render(
+      <VerticalMenuContent
+        aria-label="Áreas do site"
+        navigationTree={TREE}
+        siteId="a"
+        itemCounts={{ 'site.review': { count: 2, label: '2 aguardando' } }}
+        collapsed
+      />,
+    );
+
+    const revisao = within(nav('Áreas do site')).getByRole('link', {
+      name: 'Revisão, 2 aguardando',
+    });
+    expect(revisao.querySelector('.badge')).toBeNull();
+
+    revisao.focus();
+    expect((await screen.findByRole('tooltip')).textContent).toBe('Revisão, 2 aguardando');
   });
 
   it('link externo abre em outra aba; o interno, não', () => {

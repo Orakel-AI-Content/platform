@@ -22,10 +22,12 @@ import SideNavContent from './SideNavContent';
 type MobileNavProps = {
   navigationTree: NavigationTree[];
   sites: readonly SwitcherSite[];
+  /** Tamanho da fila de revisão por site (`countReviewQueues`): o selo do item Revisão. */
+  reviewCounts?: Readonly<Record<string, number>>;
   className?: string;
 };
 
-const MobileNav = ({ navigationTree, sites, className }: MobileNavProps) => {
+const MobileNav = ({ navigationTree, sites, reviewCounts, className }: MobileNavProps) => {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [openedAt, setOpenedAt] = useState(pathname);
@@ -64,6 +66,7 @@ const MobileNav = ({ navigationTree, sites, className }: MobileNavProps) => {
           <SideNavContent
             navigationTree={navigationTree}
             sites={sites}
+            reviewCounts={reviewCounts}
             onMenuItemClick={handleDrawerClose}
           />
         )}

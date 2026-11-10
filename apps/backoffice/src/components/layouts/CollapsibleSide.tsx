@@ -19,20 +19,38 @@ type CollapsibleSideProps = {
   headerEnd?: ReactNode;
   navigationTree: NavigationTree[];
   sites: readonly SwitcherSite[];
+  /** Tamanho da fila de revisão por site (`countReviewQueues`): o selo do item Revisão. */
+  reviewCounts?: Readonly<Record<string, number>>;
 };
 
-const CollapsibleSide = ({ children, headerEnd, navigationTree, sites }: CollapsibleSideProps) => {
+const CollapsibleSide = ({
+  children,
+  headerEnd,
+  navigationTree,
+  sites,
+  reviewCounts,
+}: CollapsibleSideProps) => {
   return (
     <SideNavProvider>
       <div className="app-layout-collapsible-side flex flex-auto flex-col">
         <div className="flex flex-auto min-w-0">
-          <SideNav className="hidden lg:flex" navigationTree={navigationTree} sites={sites} />
+          <SideNav
+            className="hidden lg:flex"
+            navigationTree={navigationTree}
+            sites={sites}
+            reviewCounts={reviewCounts}
+          />
           <div className="flex flex-col flex-auto min-h-screen min-w-0 relative w-full">
             <Header
               className="shadow-sm dark:shadow-2xl"
               headerStart={
                 <>
-                  <MobileNav className="lg:hidden" navigationTree={navigationTree} sites={sites} />
+                  <MobileNav
+                    className="lg:hidden"
+                    navigationTree={navigationTree}
+                    sites={sites}
+                    reviewCounts={reviewCounts}
+                  />
                   <SideNavToggle className="hidden lg:flex" />
                 </>
               }
