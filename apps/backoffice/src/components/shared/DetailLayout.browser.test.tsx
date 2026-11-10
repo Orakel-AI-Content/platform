@@ -10,7 +10,7 @@ import { REVIEW_CHECKLIST } from '@/domain/reviews/reviews.ts';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
-import { pageOverflow } from '../../../test/browser/layout.ts';
+import { pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInFrame } from '../../../test/browser/render.tsx';
 import { DETAIL_SUMMARY_CLASS, DETAIL_SUMMARY_LIST_CLASS } from './detailSummary.ts';
@@ -76,6 +76,9 @@ const INSTANCE: SiteInstance = {
 /** Slug longo e sem hífen (#371): tem de quebrar dentro do cartão em vez de passar da borda. */
 const SLUG = `/detalhe${'x'.repeat(90)}1761000000000`;
 
+/** Título longo de versão (#588): vai cortado sob a versão, sem empurrar a tabela para fora. */
+const LONG_TITLE = `Como montar uma horta vertical em apartamento pequeno ${'com pouca luz '.repeat(6)}`;
+
 const box = (element: Element) => element.getBoundingClientRect();
 
 /** A tela do site: o resumo à esquerda das abas. */
@@ -127,6 +130,16 @@ function ContentDetail() {
                 title: 'Detalhe',
                 createdAt: new Date('2026-10-20T12:00Z'),
                 approval: null,
+              },
+              {
+                version: 2,
+                status: 'aprovado',
+                title: LONG_TITLE,
+                createdAt: new Date('2026-10-21T12:00Z'),
+                approval: {
+                  reviewer: 'revisora.editorial@orakel.local',
+                  approvedAt: new Date('2026-10-21T15:30Z'),
+                },
               },
             ]}
           />
@@ -206,6 +219,23 @@ describe('DetailLayout no navegador', () => {
     expect(pageOverflow()).toBe(0);
     const slug = screen.getByText(SLUG, { exact: true }).element();
     expect(box(slug).right).toBeLessThanOrEqual(box(columns()[0]).right);
+  });
+
+  it('tela do conteúdo a 1440 px: as versões cabem no cartão sem rolagem (#588)', async () => {
+    await page.viewport(1440, 800);
+    const screen = await renderInFrame(<ContentDetail />);
+    expectSideBySide(true);
+    expect(pageOverflow()).toBe(0);
+    const table = screen.getByRole('table', { name: 'Versões' });
+    expect(tableOverflow(table)).toBeLessThanOrEqual(0);
+    expect(
+      [...table.element().querySelectorAll('thead th')].map((th) => th.textContent?.trim()),
+    ).toEqual(['Versão', 'Status', 'Gravada em']);
+    // A aprovação aparece inteira sob o status, e o título longo é cortado sob a versão.
+    expect(screen.getByText(/revisora\.editorial@orakel\.local/).element()).toBeVisible();
+    expect(box(screen.getByTitle(LONG_TITLE).element()).right).toBeLessThanOrEqual(
+      box(table.element()).right,
+    );
   });
 
   it.each(WIDTHS)('tela de revisão a %i px: o painel com 330 px ao lado', async (width, side) => {
