@@ -64,6 +64,8 @@ const rows: ContentListItem[] = [
     version: 3,
     updatedAt: new Date('2026-10-01T12:00:00Z'),
     live: false,
+    authors: ['Ana Souza', 'Bruno Lima'],
+    liveSlug: null,
   },
   {
     id: 2,
@@ -74,6 +76,8 @@ const rows: ContentListItem[] = [
     version: 1,
     updatedAt: new Date('2026-09-20T09:30:00Z'),
     live: true,
+    authors: [],
+    liveSlug: 'sobre',
   },
 ];
 
@@ -197,6 +201,8 @@ const many: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
   // Mais recente quanto maior o índice.
   updatedAt: new Date(Date.UTC(2026, 8, 1 + index)),
   live: index % 2 === 0,
+  authors: [],
+  liveSlug: index % 2 === 0 ? `c-${index}` : null,
 }));
 
 function renderMany() {
@@ -372,6 +378,8 @@ describe('despublicar em massa (#495)', () => {
     version: 2,
     updatedAt: new Date(Date.UTC(2026, 9, id)),
     live,
+    authors: [],
+    liveSlug: live ? `c-${id}` : null,
   });
   const mixed: ContentListItem[] = [
     item(1, 'Publicado', 'publicado', true),

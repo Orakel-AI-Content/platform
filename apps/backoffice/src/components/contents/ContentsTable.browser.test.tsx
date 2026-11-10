@@ -40,6 +40,8 @@ const ROWS: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
   version: index + 1,
   updatedAt: new Date('2026-10-20T12:00Z'),
   live: index % 3 !== 0,
+  authors: index === 5 ? ['Ana Souza', 'Bruno Lima', 'Carla Mendes Albuquerque'] : ['Ana Souza'],
+  liveSlug: index % 3 !== 0 ? `conteudo-${index + 1}` : null,
 }));
 
 function Contents({ canPublish = false }: { canPublish?: boolean }) {

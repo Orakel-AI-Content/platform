@@ -460,6 +460,25 @@ describe('leituras de conteúdo', () => {
     ]);
   });
 
+  it('a lista traz os autores na ordem de authorIds e o slug da versão no ar (#587)', async () => {
+    // Rascunho com outro slug e autores trocados sobre a versão publicada: o slug no ar continua.
+    await edit(1, { ...(await latest(1)), slug: 'guia-novo', authorIds: [2, 1] });
+    const unpublished = await db.transaction((tx) => unpublishContent(tx, SYSTEM_ACTOR, SITE, 2));
+    if (!unpublished.ok) throw new Error(JSON.stringify(unpublished.issues));
+
+    const result = await listContents(db, SYSTEM_ACTOR, SITE);
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(
+      result.value.map(({ id, slug, liveSlug, authors }) => ({ id, slug, liveSlug, authors })),
+    ).toEqual([
+      { id: 1, slug: 'guia-novo', liveSlug: 'guia-completo', authors: ['Bruno Lima', 'Ana Souza'] },
+      // Fora do ar: sem slug no ar.
+      { id: 2, slug: 'rotina-da-manha', liveSlug: null, authors: ['Bruno Lima'] },
+      { id: 3, slug: 'quem-somos', liveSlug: 'quem-somos', authors: [] },
+    ]);
+  });
+
   it('com 2.000 conteúdos de duas versões, a lista traz só a mais recente em menos de 500 ms (#105)', async () => {
     const template = await latest(1);
     const ids = Array.from({ length: 2000 }, (_, index) => 1001 + index);
@@ -486,7 +505,18 @@ describe('leituras de conteúdo', () => {
     const bulk = result.value.filter((item) => item.id > 1000);
     expect(bulk).toHaveLength(2000);
     expect(Object.keys(bulk[0] ?? {}).sort()).toEqual(
-      ['id', 'kind', 'live', 'slug', 'status', 'title', 'updatedAt', 'version'].sort(),
+      [
+        'authors',
+        'id',
+        'kind',
+        'live',
+        'liveSlug',
+        'slug',
+        'status',
+        'title',
+        'updatedAt',
+        'version',
+      ].sort(),
     );
     expect(bulk[0]).toMatchObject({
       id: 1001,
