@@ -33,6 +33,12 @@ const renderForm = (result: ReleaseFormResult) => {
 };
 
 describe('ReleaseForm', () => {
+  it('o hint liga a tag Git site-builder-vX.Y.Z ao valor X.Y.Z registrado', () => {
+    renderForm({ ok: true, message: '' });
+
+    expect(screen.getByText(/tag Git site-builder-vX\.Y\.Z publica a imagem X\.Y\.Z/)).toBeTruthy();
+  });
+
   it('registra a tag aparada e volta para a lista com ?registrada', async () => {
     const user = userEvent.setup();
     const action = renderForm({ ok: true, message: 'Release 1.2.0 registrada.' });

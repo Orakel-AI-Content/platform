@@ -53,7 +53,7 @@ describe('registro de releases (#509)', () => {
     expect(await tags()).toEqual(['1.0.0']);
   });
 
-  it.each(['core-v1.2.0', 'v1.2.3', '1.2', '1.2.3-rc.1', ''])(
+  it.each(['site-builder-v1.2.0', 'v1.2.3', '1.2', '1.2.3-rc.1', ''])(
     'recusa %j com release.invalid_tag',
     async (tag) => {
       const result = await register(operacao, tag);
