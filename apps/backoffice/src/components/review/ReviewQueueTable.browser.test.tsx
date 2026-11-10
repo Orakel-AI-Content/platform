@@ -4,7 +4,13 @@ import { page } from 'vitest/browser';
 import type { ReviewQueueItem } from '@/domain/content/contents.ts';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
-import { cellsOverLines, pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
+import {
+  cellsOverLines,
+  columnLines,
+  isClipped,
+  pageOverflow,
+  tableOverflow,
+} from '../../../test/browser/layout.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { ListScreen, renderInFrame } from '../../../test/browser/render.tsx';
 import { ReviewQueueTable } from './ReviewQueueTable.tsx';
@@ -13,17 +19,18 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 // Fila de revisão em Chromium (#460; antes no E2E, `revisao.spec.ts`, #276, #365): a 1280 px, na
 // moldura do admin, nada rola na horizontal e nenhuma célula passa de duas linhas de texto, com
-// um título longo; o axe roda nos dois temas.
+// um título longo; o axe roda nos dois temas. A 1440 px, um título de 70 caracteres aparece
+// inteiro: a coluna usa a largura que sobra (#585).
 
 const SITE = 'exemplo-a';
+
+const TITLE_70 = 'Como montar uma horta vertical na varanda do apartamento em dez passos';
+const LONG_TITLE = 'Artigo e2e-fila-light-1761000000000 com um título longo para a fila de revisão';
 
 const ROWS: ReviewQueueItem[] = Array.from({ length: 12 }, (_, index) => ({
   id: 2000 + index,
   kind: index % 2 === 0 ? 'article' : 'page',
-  title:
-    index === 0
-      ? 'Artigo e2e-fila-light-1761000000000 com um título longo para a fila de revisão'
-      : `Artigo ${index + 1}`,
+  title: index === 0 ? LONG_TITLE : index === 1 ? TITLE_70 : `Artigo ${index + 1}`,
   version: index + 1,
   updatedAt: new Date('2026-10-20T12:00Z'),
 }));
@@ -59,6 +66,15 @@ describe('ReviewQueueTable no navegador', () => {
     expect(pageOverflow()).toBe(0);
     expect(tableOverflow(table())).toBe(0);
     expect(cellsOverLines(table())).toEqual([]);
+    expect(new Set(columnLines(table(), 'Enviado em'))).toEqual(new Set([1]));
+  });
+
+  it('a 1440 px, o título de 70 caracteres aparece inteiro', async () => {
+    await page.viewport(1440, 900);
+    await renderInFrame(<Queue />, { roles: ['revisor'] });
+
+    expect(isClipped(table().getByTitle(TITLE_70, { exact: true }))).toBe(false);
+    expect(tableOverflow(table())).toBe(0);
   });
 
   it.each(COLOR_SCHEMES)('sem violação do axe (%s)', async (scheme) => {

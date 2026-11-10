@@ -139,7 +139,10 @@ describe('último build', () => {
     expect(screen.getByText('Publicado').querySelector('.tag-prefix')?.className).toContain(
       'bg-success',
     );
-    expect(screen.getByText('01/10/2026, 09:00 BRT · v1')).toBeTruthy();
+    // A data inteira numa linha (#585); a versão ao lado, a parte que a lista corta.
+    const date = screen.getByText('01/10/2026, 09:00 BRT ·', { exact: false });
+    expect(date.className).toContain('whitespace-pre');
+    expect(date.parentElement?.textContent).toBe('01/10/2026, 09:00 BRT · v1');
   });
 
   it('sem build mostra "—"', () => {

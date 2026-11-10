@@ -4,7 +4,12 @@ import { page, userEvent } from 'vitest/browser';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
-import { cellsOverLines, pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
+import {
+  cellsOverLines,
+  isClipped,
+  pageOverflow,
+  tableOverflow,
+} from '../../../test/browser/layout.ts';
 import { followLinks, navigation } from '../../../test/browser/navigation.ts';
 import { ListScreen, renderInFrame } from '../../../test/browser/render.tsx';
 import { SitesTable } from './SitesTable.tsx';
@@ -115,7 +120,17 @@ describe('SitesTable no navegador', () => {
     await expect
       .element(row(ids[1]!).getByRole('link', { name: /Conteúdo 12345 culpado pela pausa/ }))
       .toHaveAttribute('href', `/sites/${ids[1]}/conteudos/12345`);
-    await expect.element(row(ids[2]!).getByTitle(new RegExp(` · ${LONG_VERSION}$`))).toBeVisible();
+    await expect
+      .element(row(ids[2]!).getByTitle(LONG_VERSION, { exact: true }))
+      .toHaveTextContent('3f9c2a7e');
+    // A data do build fica inteira numa linha; só a versão corta.
+    const when = row(ids[2]!)
+      .getByText(/^20\/10\/2026, 09:00 BRT ·\s*$/)
+      .element();
+    expect(when.getBoundingClientRect().height).toBeLessThan(24);
+    expect(when.getBoundingClientRect().right).toBeLessThanOrEqual(
+      when.closest('td')!.getBoundingClientRect().right,
+    );
     await expect
       .element(row(ids[0]!).getByRole('link', { name: `1 mudança pendente em ${ids[0]}` }))
       .toHaveAttribute('href', `/sites/${ids[0]}/pendencias`);
@@ -128,6 +143,33 @@ describe('SitesTable no navegador', () => {
     await expect
       .element(row(ids[3]!).getByRole('link', { name: `${ids[3]}.example.com (abre em nova aba)` }))
       .toHaveAttribute('href', `https://${ids[3]}.example.com`);
+  });
+
+  it('a 1440 px, os sites do seed aparecem inteiros, com a data do último build', async () => {
+    await page.viewport(1440, 900);
+    const seed = [
+      ['exemplo-a', 'Exemplo A'],
+      ['exemplo-b', 'Exemplo B'],
+      ['horta-em-casa', 'Horta em Casa'],
+    ].map(([id, name]) => ({ ...SITES[2]!, id: id!, name: name!, domain: `${id}.localhost` }));
+    await renderInFrame(
+      <ListScreen title="Sites">
+        <SitesTable rows={seed} publishNow={publishNow} canConfigure labelledBy="lista-titulo" />
+      </ListScreen>,
+      { roles: ['admin'] },
+    );
+
+    for (const site of seed) {
+      const line = row(site.id);
+      expect(isClipped(line.getByRole('link', { name: site.name, exact: true }))).toBe(false);
+      const domain = line.getByTitle(`${site.id} · ${site.domain}`, { exact: true });
+      expect(isClipped(domain)).toBe(false);
+      const when = line.getByText(/^20\/10\/2026, 09:00 BRT ·\s*$/).element();
+      expect(when.getBoundingClientRect().right).toBeLessThanOrEqual(
+        when.closest('td')!.getBoundingClientRect().right,
+      );
+    }
+    expect(tableOverflow(table())).toBe(0);
   });
 
   it.each(COLOR_SCHEMES)(

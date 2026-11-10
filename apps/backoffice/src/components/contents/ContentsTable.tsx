@@ -16,6 +16,7 @@ import { IconButton } from '@/components/shared/IconButton';
 import { ListToolbar } from '@/components/shared/ListControls.tsx';
 import { ROW_LINK_CLASS } from '@/components/shared/rowLink';
 import StickyFooter from '@/components/shared/StickyFooter';
+import { NoWrap } from '@/components/shared/NoWrap';
 import { Truncated } from '@/components/shared/Truncated';
 import { useListTable } from '@/components/shared/useListTable';
 import type { ListConfig } from '@/components/shared/useListState.ts';
@@ -70,10 +71,11 @@ function columnsFor(
     {
       header: 'Título',
       accessorKey: 'title',
+      meta: { fluid: true },
       sortFn: byText((item) => item.title),
       cell: ({ row }) => (
         <Link href={`/sites/${siteId}/conteudos/${row.original.id}`} className={ROW_LINK_CLASS}>
-          <Truncated text={row.original.title} className="max-w-xs" />
+          <Truncated text={row.original.title} />
           <span className="sr-only"> (ver versões)</span>
         </Link>
       ),
@@ -96,7 +98,7 @@ function columnsFor(
       accessorKey: 'updatedAt',
       enableGlobalFilter: false,
       sortFn: 'datetime',
-      cell: ({ row }) => formatDateTime(row.original.updatedAt, timeZone),
+      cell: ({ row }) => <NoWrap>{formatDateTime(row.original.updatedAt, timeZone)}</NoWrap>,
     },
   ];
   if (!canWrite) return columns;

@@ -195,6 +195,14 @@ describe('tabela de sites', () => {
     expect(tagColor(screen.getByText('Falhou'))).toContain('bg-error');
   });
 
+  it('mostra a versão do último build com 8 caracteres, inteira em `title` (#585)', () => {
+    const versionId = '3f9c2a7e-5b1d-4c8e-9a6f-0d2e4b7c1a95';
+    const finishedAt = new Date('2026-10-01T12:00:00Z');
+    render(<SitesTable rows={[{ ...site, lastBuild: { status: 'ok', versionId, finishedAt } }]} />);
+
+    expect(screen.getByText('3f9c2a7e', { exact: true }).getAttribute('title')).toBe(versionId);
+  });
+
   it('não mostra "SITE_ID" em nenhum cabeçalho; o ID fica sob o nome (#100)', () => {
     render(<SitesTable rows={[site]} />);
 
