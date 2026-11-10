@@ -26,7 +26,9 @@ decidiu pelo Vercel AI SDK com o Claude Haiku.
 - **Sem retentativa:** `maxRetries: 0` também desliga as retentativas internas do SDK (R4).
   Saída fora do schema (`NoObjectGeneratedError`), reprovada na validação ou recusa do
   provedor (`APICallError`) volta como falha com os mesmos dados de execução.
-- **Modelo:** `LLM_MODEL` no formato `provedor:modelo`, padrão `anthropic:claude-haiku-5-5`.
+- **Modelo:** `LLM_MODEL` no formato `provedor:modelo`, padrão `anthropic:claude-haiku-5-5`
+  em produção e `fixture` fora dela (`NODE_ENV` diferente de `production`; emenda de
+  2026-11-10).
   Só `anthropic:*` e `fixture` são aceitos. A chave fica em `LLM_API_KEY`, só no
   `.env.local` e lida por `src/env.ts`, passada explicitamente ao provedor (sem cair no
   `ANTHROPIC_API_KEY` do processo). Fora de `fixture`, a chave é obrigatória no boot.
@@ -55,8 +57,10 @@ decidiu pelo Vercel AI SDK com o Claude Haiku.
 
 ## Consequências
 
-- Um `.env.local` anterior a esta decisão precisa de `LLM_MODEL=fixture` ou de
-  `LLM_API_KEY`; sem eles, o boot do Backoffice falha listando `LLM_API_KEY`.
+- Em produção, sem `LLM_API_KEY` fora de `fixture`, o boot do Backoffice falha listando
+  `LLM_API_KEY`. Fora dela, um `.env.local` sem `LLM_MODEL` (anterior a esta decisão) cai em
+  `fixture` e o migrate, o seed e o `pnpm dev` sobem sem a chave (emenda de 2026-11-10;
+  antes, esse `.env.local` derrubava o `pnpm local:up`).
 - A task `generate-article` (#542) chama `generate` com `resolveModel(LLM_MODEL,
 LLM_API_KEY)` e `LLM_PRICING`, e grava o resultado em `generation_runs`.
 - Outro provedor é um caso novo em `resolveModel` e um pacote `@ai-sdk/*` no catalog.

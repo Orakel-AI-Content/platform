@@ -14,6 +14,11 @@ const optional = <T extends z.ZodType>(schema: T) => blankAsUndefined(schema.opt
 
 /** Modelo da geração: `fixture` (sem rede, para os testes) ou `anthropic:<modelo>`. */
 export const DEFAULT_LLM_MODEL = 'anthropic:claude-haiku-5-5';
+/**
+ * Fora de produção, sem `LLM_MODEL` vale `fixture`: um `.env.local` sem a geração configurada
+ * não derruba o migrate, o seed nem o `pnpm dev`, e nada chama o provedor sem querer.
+ */
+export const DEV_LLM_MODEL = 'fixture';
 const llmModel = z
   .string()
   .regex(/^(fixture|anthropic:[a-z0-9][a-z0-9.-]*)$/, 'Use fixture ou anthropic:<modelo>');
@@ -65,9 +70,16 @@ const EnvObjectSchema = z.object({
   GENERATOR_API_URL: blankAsUndefined(z.url().default('http://backoffice-web:3000')),
 });
 
-export const EnvSchema = EnvObjectSchema.refine(
-  (env) => env.LLM_MODEL === 'fixture' || env.LLM_API_KEY !== undefined,
-  { message: 'Defina LLM_API_KEY, ou LLM_MODEL=fixture para gerar sem LLM', path: ['LLM_API_KEY'] },
+export const EnvSchema = z.preprocess(
+  (source) => {
+    const env = source as Record<string, unknown>;
+    const blank = env.LLM_MODEL === undefined || env.LLM_MODEL === '';
+    return blank && env.NODE_ENV !== 'production' ? { ...env, LLM_MODEL: DEV_LLM_MODEL } : env;
+  },
+  EnvObjectSchema.refine((env) => env.LLM_MODEL === 'fixture' || env.LLM_API_KEY !== undefined, {
+    message: 'Defina LLM_API_KEY, ou LLM_MODEL=fixture para gerar sem LLM',
+    path: ['LLM_API_KEY'],
+  }),
 );
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -57,21 +57,33 @@ describe('parseEnv', () => {
 });
 
 describe('parseEnv: geração (LLM_*)', () => {
-  it('padrão anthropic:claude-haiku-5-5, sem tabela de preços', () => {
-    expect(parseEnv(valid)).toMatchObject({
+  const production = { ...valid, NODE_ENV: 'production' };
+
+  it('em produção, padrão anthropic:claude-haiku-5-5, sem tabela de preços', () => {
+    expect(parseEnv(production)).toMatchObject({
       LLM_MODEL: 'anthropic:claude-haiku-5-5',
       LLM_API_KEY: 'sk-ant-teste',
       LLM_PRICING: {},
     });
-    expect(parseEnv({ ...valid, LLM_MODEL: '', LLM_PRICING: '' })).toMatchObject({
+    expect(parseEnv({ ...production, LLM_MODEL: '', LLM_PRICING: '' })).toMatchObject({
       LLM_MODEL: 'anthropic:claude-haiku-5-5',
       LLM_PRICING: {},
     });
   });
 
+  it('fora de produção, sem LLM_MODEL vale fixture e a chave é dispensada', () => {
+    const local = { ...valid, LLM_API_KEY: undefined };
+    expect(parseEnv(local).LLM_MODEL).toBe('fixture');
+    expect(parseEnv({ ...local, LLM_MODEL: '' }).LLM_MODEL).toBe('fixture');
+    expect(parseEnv({ ...local, NODE_ENV: 'test' }).LLM_MODEL).toBe('fixture');
+    expect(() => parseEnv({ ...local, LLM_MODEL: 'anthropic:claude-haiku-5-5' })).toThrow(
+      /LLM_API_KEY/,
+    );
+  });
+
   it('a chave do provedor é obrigatória fora do modo fixture', () => {
-    expect(() => parseEnv({ ...valid, LLM_API_KEY: undefined })).toThrow(/LLM_API_KEY/);
-    expect(() => parseEnv({ ...valid, LLM_API_KEY: '' })).toThrow(/LLM_API_KEY/);
+    expect(() => parseEnv({ ...production, LLM_API_KEY: undefined })).toThrow(/LLM_API_KEY/);
+    expect(() => parseEnv({ ...production, LLM_API_KEY: '' })).toThrow(/LLM_API_KEY/);
     expect(parseEnv({ ...valid, LLM_API_KEY: '', LLM_MODEL: 'fixture' })).toMatchObject({
       LLM_MODEL: 'fixture',
     });
