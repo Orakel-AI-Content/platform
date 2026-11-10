@@ -15,9 +15,9 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // horizontal e nenhuma célula passa de duas linhas; o axe roda nos dois temas.
 
 const ROWS: ReleaseRecord[] = [
-  { tag: 'core-v1.10.0', registeredAt: new Date('2026-11-02T15:00Z') },
-  { tag: 'core-v1.9.0', registeredAt: new Date('2026-10-20T12:30Z') },
-  { tag: 'core-v0.1.0', registeredAt: new Date('2026-09-01T09:00Z') },
+  { tag: '1.10.0', registeredAt: new Date('2026-11-02T15:00Z') },
+  { tag: '1.9.0', registeredAt: new Date('2026-10-20T12:30Z') },
+  { tag: '0.1.0', registeredAt: new Date('2026-09-01T09:00Z') },
 ];
 
 function Releases() {
@@ -41,7 +41,7 @@ afterEach(() => {
 describe('ReleasesTable no navegador', () => {
   it('a 1280 px, sem rolagem horizontal e com até duas linhas por célula', async () => {
     await renderInFrame(<Releases />, { roles: ['operacao'] });
-    await expect.element(table().getByText('core-v1.10.0')).toBeVisible();
+    await expect.element(table().getByText('1.10.0')).toBeVisible();
 
     expect(pageOverflow()).toBe(0);
     expect(tableOverflow(table())).toBe(0);

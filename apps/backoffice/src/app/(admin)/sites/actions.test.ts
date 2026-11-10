@@ -252,7 +252,7 @@ describe('Server Actions da página do site', () => {
 
   it('"Reconstruir na release" delega ao domínio; a recusa vira a mensagem, sem revalidar', async () => {
     mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
-    expect(await rebuildOnReleaseAction('exemplo-a', 'core-v1.2.0')).toEqual({
+    expect(await rebuildOnReleaseAction('exemplo-a', '1.2.0')).toEqual({
       ok: false,
       message: 'Sessão inválida; entre de novo.',
     });
@@ -263,28 +263,23 @@ describe('Server Actions da página do site', () => {
       issues: [
         {
           code: 'release.not_registered',
-          message: 'A release core-v9.9.9 não está registrada',
+          message: 'A release 9.9.9 não está registrada',
           path: ['release'],
         },
       ],
     });
-    expect(await rebuildOnReleaseAction('exemplo-a', 'core-v9.9.9')).toEqual({
+    expect(await rebuildOnReleaseAction('exemplo-a', '9.9.9')).toEqual({
       ok: false,
-      message: 'A release core-v9.9.9 não está registrada',
+      message: 'A release 9.9.9 não está registrada',
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
 
     mocks.rebuildOnRelease.mockResolvedValueOnce(done);
-    expect(await rebuildOnReleaseAction('exemplo-a', 'core-v1.2.0')).toEqual({
+    expect(await rebuildOnReleaseAction('exemplo-a', '1.2.0')).toEqual({
       ok: true,
-      message: 'exemplo-a na release core-v1.2.0; build enfileirado.',
+      message: 'exemplo-a na release 1.2.0; build enfileirado.',
     });
-    expect(mocks.rebuildOnRelease).toHaveBeenLastCalledWith(
-      {},
-      operacao,
-      'exemplo-a',
-      'core-v1.2.0',
-    );
+    expect(mocks.rebuildOnRelease).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a', '1.2.0');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });

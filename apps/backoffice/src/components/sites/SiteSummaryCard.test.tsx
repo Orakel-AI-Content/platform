@@ -38,14 +38,14 @@ const instance: SiteInstance = {
     {
       id: 9,
       status: 'failed',
-      release: 'core-v1.5.0',
+      release: '1.5.0',
       versionId: null,
       finishedAt: new Date('2026-10-21T12:00:00.000Z'),
     },
     {
       id: 8,
       status: 'ok',
-      release: 'core-v1.4.0',
+      release: '1.4.0',
       versionId: 'v7',
       finishedAt: new Date('2026-10-20T12:00:00.000Z'),
     },
@@ -98,8 +98,8 @@ describe('SiteSummaryCard', () => {
     expect(origins.map((item) => item.textContent)).toEqual(['Conteúdo2', 'Configuração1']);
     const builds = within(field('Últimos builds')).getAllByRole('listitem');
     expect(builds.map((item) => item.textContent)).toEqual([
-      'Falhou21/10/2026, 09:00 BRT · core-v1.5.0',
-      'Publicado20/10/2026, 09:00 BRT · core-v1.4.0 · v7',
+      'Falhou21/10/2026, 09:00 BRT · 1.5.0',
+      'Publicado20/10/2026, 09:00 BRT · 1.4.0 · v7',
     ]);
   });
 
@@ -230,7 +230,7 @@ describe('SiteSummaryCard', () => {
 
   it('"Reconstruir na release" só quando a página passa a ação, ativo ou pausado', () => {
     const rebuild = {
-      releases: ['core-v1.3.0'],
+      releases: ['1.3.0'],
       action: vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' })),
     };
     const { rerender } = render(<SiteSummaryCard site={site} instance={instance} g1Registered />);

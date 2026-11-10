@@ -15,14 +15,14 @@ import { RebuildReleaseDialog } from './RebuildReleaseDialog.tsx';
 // mais recente), a action com a tag escolhida e o retorno padrão (sucesso no toast, recusa no
 // Alert). Foco e axe no navegador, em `RebuildReleaseDialog.browser.test.tsx`.
 
-const RELEASES = ['core-v1.3.0', 'core-v1.2.0', 'core-v1.1.0'];
+const RELEASES = ['1.3.0', '1.2.0', '1.1.0'];
 const NAME = 'Reconstruir o site numa release?';
 
 let app: HTMLElement;
 
 function Rebuild({
   action,
-  current = 'core-v1.2.0',
+  current = '1.2.0',
   paused = false,
   releases = RELEASES,
 }: {
@@ -69,11 +69,11 @@ describe('reconstruir na release', () => {
     render(<Rebuild action={action} />, { container: app });
 
     const dialog = await openDialog();
-    expect(dialog.textContent).toContain('site-builder:core-v1.2.0');
+    expect(dialog.textContent).toContain('site-builder:1.2.0');
     expect(dialog.textContent).not.toContain('sai da pausa');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reconstruir' }));
 
-    await waitFor(() => expect(action).toHaveBeenCalledWith('core-v1.2.0'));
+    await waitFor(() => expect(action).toHaveBeenCalledWith('1.2.0'));
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Build enfileirado.'));
     expect(screen.getByRole('alert').textContent).toBe('');
   });
@@ -85,15 +85,15 @@ describe('reconstruir na release', () => {
     const dialog = await openDialog();
     await userEvent.click(screen.getByRole('combobox', { name: 'Release' }));
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'core-v1.3.0',
-      'core-v1.2.0 (atual)',
-      'core-v1.1.0',
+      '1.3.0',
+      '1.2.0 (atual)',
+      '1.1.0',
     ]);
-    await userEvent.click(screen.getByText('core-v1.3.0'));
-    expect(dialog.textContent).toContain('site-builder:core-v1.3.0');
+    await userEvent.click(screen.getByText('1.3.0'));
+    expect(dialog.textContent).toContain('site-builder:1.3.0');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reconstruir' }));
 
-    await waitFor(() => expect(action).toHaveBeenCalledWith('core-v1.3.0'));
+    await waitFor(() => expect(action).toHaveBeenCalledWith('1.3.0'));
   });
 
   it('sem release atual registrada, começa na mais recente; pausado, avisa que sai da pausa', async () => {
@@ -101,11 +101,11 @@ describe('reconstruir na release', () => {
     render(<Rebuild action={action} current={null} paused />, { container: app });
 
     const dialog = await openDialog();
-    expect(dialog.textContent).toContain('site-builder:core-v1.3.0');
+    expect(dialog.textContent).toContain('site-builder:1.3.0');
     expect(dialog.textContent).toContain('O site sai da pausa.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reconstruir' }));
 
-    await waitFor(() => expect(action).toHaveBeenCalledWith('core-v1.3.0'));
+    await waitFor(() => expect(action).toHaveBeenCalledWith('1.3.0'));
   });
 
   it('sem nenhuma release registrada, o Reconstruir fica desabilitado', async () => {
@@ -133,7 +133,7 @@ describe('reconstruir na release', () => {
   it('a recusa do domínio vai ao Alert, sem toast de sucesso', async () => {
     const action = vi.fn().mockResolvedValue({
       ok: false,
-      message: 'A release core-v1.2.0 não está registrada',
+      message: 'A release 1.2.0 não está registrada',
     });
     render(<Rebuild action={action} />, { container: app });
 
@@ -141,9 +141,7 @@ describe('reconstruir na release', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reconstruir' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toBe(
-        'A release core-v1.2.0 não está registrada',
-      ),
+      expect(screen.getByRole('alert').textContent).toBe('A release 1.2.0 não está registrada'),
     );
     expect(screen.queryByRole('status')?.textContent ?? '').toBe('');
   });

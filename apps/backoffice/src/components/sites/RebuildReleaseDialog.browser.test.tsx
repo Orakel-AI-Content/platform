@@ -13,11 +13,11 @@ import { RebuildReleaseDialog } from './RebuildReleaseDialog.tsx';
 // gatilho ao fechar (Esc, Cancelar e confirmar) e o axe (WCAG 2.2 AA) com o diálogo e o
 // seletor abertos, nos dois temas.
 
-const RELEASES = ['core-v1.3.0', 'core-v1.2.0'];
+const RELEASES = ['1.3.0', '1.2.0'];
 const NAME = 'Reconstruir o site numa release?';
 
 function Rebuild({ action }: { action: (tag: string) => Promise<ActionResult> }) {
-  return <RebuildReleaseDialog current="core-v1.2.0" paused releases={RELEASES} action={action} />;
+  return <RebuildReleaseDialog current="1.2.0" paused releases={RELEASES} action={action} />;
 }
 
 afterEach(() => {
@@ -58,18 +58,18 @@ describe('Reconstruir na release no navegador', () => {
     await trigger.click();
     const dialog = page.getByRole('alertdialog', { name: NAME });
     await dialog.getByRole('combobox', { name: 'Release' }).click();
-    await page.getByRole('option', { name: 'core-v1.3.0' }).click();
+    await page.getByRole('option', { name: '1.3.0' }).click();
     await expect
       .element(
         dialog.getByText(
-          'O site passa a usar a imagem site-builder:core-v1.3.0, o build entra na fila já e o site no ar muda. O site sai da pausa.',
+          'O site passa a usar a imagem site-builder:1.3.0, o build entra na fila já e o site no ar muda. O site sai da pausa.',
         ),
       )
       .toBeVisible();
     await dialog.getByRole('button', { name: 'Reconstruir', exact: true }).click();
 
     await expect.element(dialog).not.toBeInTheDocument();
-    expect(action).toHaveBeenCalledWith('core-v1.3.0');
+    expect(action).toHaveBeenCalledWith('1.3.0');
     await expect.element(trigger).toHaveFocus();
     await expect.element(page.getByRole('alert')).toHaveTextContent('Recusado.');
   });
