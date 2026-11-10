@@ -203,7 +203,10 @@ que roda depois de `BUILD_WINDOW_SECONDS` (30 s no local). Em
 resultado. Falha permanente pausa o site (motivo na coluna Estado); transitória é repetida até
 5 vezes. Logs: `infra/local/compose.sh logs -f build-runner`; histórico: tabela `builds`. A
 imagem usada é `site-builder:<release do site>` ou, antes da primeira promoção,
-`site-builder:local` (do `pnpm local:images`). Detalhes: ADR 0008 do backoffice.
+`site-builder:local` (do `pnpm local:images`). Detalhes: ADR 0008 do backoffice. Versão do
+site-builder, quando usar "Reconstruir na release", "Reverter" e "Publicar agora", e como
+testar uma versão nova no local:
+[README, "Versão do site-builder e builds"](../../README.md#versão-do-site-builder-e-builds).
 
 ## Geração
 

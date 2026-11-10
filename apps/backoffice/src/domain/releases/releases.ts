@@ -7,7 +7,7 @@ import type { RELEASE_IMAGE_STATUSES } from '../../db/schema/releases.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { RELEASE_TAG_MESSAGE, ReleaseTagSchema } from './tag.ts';
 
-// Registro de releases do core (L1): a operação cadastra as tags já publicadas no GHCR, e a
+// Registro de versões do site-builder (L1): a operação cadastra as tags já publicadas no GHCR, e a
 // ação "Reconstruir na release X" escolhe entre elas. Tabela operacional, fora do snapshot.
 // A imagem é conferida no host (não no GHCR) por um job do build-runner, o único com acesso ao
 // Docker (ADR 0011 da raiz): o registro enfileira a conferência e a operação pode pedir de novo.

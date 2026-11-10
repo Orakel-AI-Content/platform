@@ -2,7 +2,9 @@ import { sql } from 'drizzle-orm';
 import type { JobHelpers } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { readFixture } from '../../src/bin/seed.ts';
 import type { Db } from '../../src/db/client.ts';
+import { releases, sites } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { fakeRuntime } from '../../src/domain/builds/fake-runtime.ts';
 import type { BuildSettings } from '../../src/domain/builds/plan.ts';
@@ -63,7 +65,7 @@ describe('registro de releases (#509)', () => {
     expect(await tags()).toEqual(['1.0.0']);
   });
 
-  it.each(['core-v1.2.0', 'v1.2.3', '1.2', '1.2.3-rc.1', ''])(
+  it.each(['site-builder-v1.2.0', 'v1.2.3', '1.2', '1.2.3-rc.1', ''])(
     'recusa %j com release.invalid_tag',
     async (tag) => {
       const result = await register(operacao, tag);
