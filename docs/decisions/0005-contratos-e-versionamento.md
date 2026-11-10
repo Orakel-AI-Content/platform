@@ -1,6 +1,6 @@
 # 0005 – Contratos entre unidades e versionamento
 
-- Status: aceito
+- Status: aceito (a parte "Release do core" foi substituída pelo 0018)
 - Data: 2026-09-29
 
 ## Contexto
