@@ -8,6 +8,7 @@ import { EmptyState, NoResults } from '@/components/shared/EmptyState';
 import { ListToolbar } from '@/components/shared/ListControls.tsx';
 import { ROW_LINK_CLASS } from '@/components/shared/rowLink';
 import { CONTENT_KIND_LABEL, formatDateTime } from '@/components/shared/siteLabels.ts';
+import { NoWrap } from '@/components/shared/NoWrap';
 import { Truncated } from '@/components/shared/Truncated';
 import { useListTable } from '@/components/shared/useListTable';
 import type { ListConfig } from '@/components/shared/useListState.ts';
@@ -34,10 +35,11 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueItem
     {
       header: 'Título',
       accessorKey: 'title',
+      meta: { fluid: true },
       sortFn: byText((item) => item.title),
       cell: ({ row }) => (
         <Link href={`/sites/${siteId}/revisao/${row.original.id}`} className={ROW_LINK_CLASS}>
-          <Truncated text={row.original.title} className="max-w-xs" />
+          <Truncated text={row.original.title} />
           <span className="sr-only"> (revisar)</span>
         </Link>
       ),
@@ -57,7 +59,7 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueItem
       accessorKey: 'updatedAt',
       enableGlobalFilter: false,
       sortFn: 'datetime',
-      cell: ({ row }) => formatDateTime(row.original.updatedAt, timeZone),
+      cell: ({ row }) => <NoWrap>{formatDateTime(row.original.updatedAt, timeZone)}</NoWrap>,
     },
   ];
 }

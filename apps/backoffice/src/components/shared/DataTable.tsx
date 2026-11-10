@@ -22,6 +22,9 @@
 // ser escolhida. As caixas leem a seleção por contexto, com as colunas estáveis: no Ecme, o
 // `checkboxChecked` novo a cada clique recriava as colunas, remontava as células e tirava o
 // foco da caixa marcada pelo teclado.
+// Acrescentado (#585): a coluna com `meta: { fluid: true }` ocupa a largura que sobra na tabela
+// (`w-full max-w-0` no Th e no Td, sem a largura do `getSize()`), e o `Truncated` dentro dela só
+// corta quando falta espaço. As outras colunas ficam como no Ecme.
 'use client';
 
 import { createContext, use, useImperativeHandle, useMemo, useState } from 'react';
@@ -55,8 +58,10 @@ import type {
   ColumnDef as BaseColumnDef,
   Row as BaseRow,
   CellContext as BaseCellContext,
+  CellData,
   RowData,
   SortingState,
+  TableFeatures,
   Table as TanstackTable,
 } from '@tanstack/react-table';
 import type { TableProps } from '@/components/ui/Table';
@@ -82,6 +87,23 @@ export const dataTableFeatures = tableFeatures({
 });
 
 export type DataTableFeatures = typeof dataTableFeatures;
+
+// Os parâmetros repetem os da declaração do TanStack, como a fusão de interfaces exige.
+/* eslint-disable @typescript-eslint/no-unused-vars */
+declare module '@tanstack/table-core' {
+  interface ColumnMeta<
+    in out TFeatures extends TableFeatures,
+    in out TData extends RowData,
+    TValue extends CellData = CellData,
+  > {
+    /** Coluna principal da lista: ocupa a largura que sobra, e o texto longo corta nela (#585). */
+    fluid?: boolean;
+  }
+}
+/* eslint-enable @typescript-eslint/no-unused-vars */
+
+/** Classe da coluna fluida no Th e no Td: `max-w-0` deixa o `truncate` seguir a coluna. */
+export const FLUID_CELL_CLASS = 'w-full max-w-0';
 
 export type ColumnDef<T extends RowData, TValue = unknown> = BaseColumnDef<
   DataTableFeatures,
@@ -383,6 +405,7 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
                     <Th
                       key={header.id}
                       colSpan={header.colSpan}
+                      className={header.column.columnDef.meta?.fluid ? FLUID_CELL_CLASS : undefined}
                       sort={canSort ? sorted || 'none' : undefined}
                     >
                       {canSort && !header.isPlaceholder ? (
@@ -442,9 +465,14 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
                           return (
                             <Td
                               key={cell.id}
-                              style={{
-                                width: cell.column.getSize(),
-                              }}
+                              className={
+                                cell.column.columnDef.meta?.fluid ? FLUID_CELL_CLASS : undefined
+                              }
+                              style={
+                                cell.column.columnDef.meta?.fluid
+                                  ? undefined
+                                  : { width: cell.column.getSize() }
+                              }
                             >
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </Td>

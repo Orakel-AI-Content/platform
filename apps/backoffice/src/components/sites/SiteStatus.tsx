@@ -130,7 +130,8 @@ export function SiteStateIndicator({
 
 /**
  * Último build no fuso do próprio site, com a sigla (#90): o resultado e, abaixo, data e versão.
- * `details` deixa a lista cortar a linha de baixo numa largura máxima; "—" sem build.
+ * A data fica inteira numa linha (#585); `details` deixa a lista cortar a versão numa largura
+ * máxima. "—" sem build.
  */
 export function LastBuildSummary({
   build,
@@ -142,13 +143,16 @@ export function LastBuildSummary({
   details?: (text: string) => ReactNode;
 }) {
   if (build === null) return <span>—</span>;
-  const when = `${formatDateTime(new Date(build.finishedAt), timeZone)}${build.versionId ? ` · ${build.versionId}` : ''}`;
+  const when = formatDateTime(new Date(build.finishedAt), timeZone);
   return (
     <span className="flex flex-col items-start gap-0.5">
       <StateTag color={BUILD_STATUS_VARIANT[build.status]}>
         {BUILD_STATUS_LABEL[build.status]}
       </StateTag>
-      <span className="text-xs">{details(when)}</span>
+      <span className="flex max-w-full text-xs">
+        <span className="whitespace-pre">{build.versionId ? `${when} · ` : when}</span>
+        {build.versionId && <span className="min-w-0">{details(build.versionId)}</span>}
+      </span>
     </span>
   );
 }

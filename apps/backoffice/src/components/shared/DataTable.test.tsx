@@ -34,6 +34,23 @@ const rowTexts = () =>
     .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
 
 describe('DataTable', () => {
+  it('a coluna fluida ocupa a largura que sobra; as outras ficam com a do `getSize()` (#585)', () => {
+    const columns: ColumnDef<Artigo>[] = [
+      { header: 'Título', accessorKey: 'titulo', meta: { fluid: true } },
+      { header: 'Status', accessorKey: 'status', enableSorting: false },
+    ];
+    render(<DataTable columns={columns} data={ARTIGOS} pagingData={paging} />);
+
+    const [titleHeader, statusHeader] = screen.getAllByRole('columnheader');
+    expect(titleHeader?.className).toBe('w-full max-w-0');
+    expect(statusHeader?.className).toBe('');
+    const [title, status] = within(screen.getAllByRole('row')[1]!).getAllByRole('cell');
+    expect(title?.className).toBe('w-full max-w-0');
+    expect(title?.style.width).toBe('');
+    expect(status?.className).toBe('');
+    expect(status?.style.width).toBe('150px');
+  });
+
   it('renderiza as linhas dos dados, na ordem recebida (ordenação manual)', () => {
     render(<DataTable aria-label="Artigos" columns={COLUNAS} data={ARTIGOS} pagingData={paging} />);
 
