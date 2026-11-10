@@ -103,3 +103,21 @@ describe.each(COLOR_SCHEMES)('ThemeSwitcher no navegador (sistema %s)', (scheme)
     await expect.element(button()).toHaveFocus();
   });
 });
+
+// O gatilho leva o `header-action-item` (#584): o ícone herda o `text-2xl` pelo `1em` do
+// `react-icons` (24 px, como o toggle da barra) e o `p-2` deixa a área clicável maior que 24 px.
+describe.each(['light', 'dark', 'system'] as const)('ThemeSwitcher no modo %s', (mode) => {
+  it('o ícone do gatilho mede 24 px e a área clicável, pelo menos 24×24 px', async () => {
+    await renderUi(
+      <header className="header">
+        <ThemeSwitcher initialMode={mode === 'system' ? undefined : mode} />
+      </header>,
+    );
+    const trigger = button().element() as HTMLElement;
+    const icon = trigger.querySelector('svg')!.getBoundingClientRect();
+    expect([icon.width, icon.height]).toEqual([24, 24]);
+    const area = trigger.getBoundingClientRect();
+    expect(area.width).toBeGreaterThanOrEqual(24);
+    expect(area.height).toBeGreaterThanOrEqual(24);
+  });
+});
