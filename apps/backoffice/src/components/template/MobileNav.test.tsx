@@ -75,7 +75,7 @@ describe('MobileNav', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('aberto: o Drawer tem Principal, o seletor e as áreas, com a atual em aria-current', async () => {
+  it('aberto: o Drawer tem Principal, o seletor e as áreas nos grupos, com a atual em aria-current', async () => {
     const { drawer } = await open();
 
     expect(toggle().getAttribute('aria-expanded')).toBe('true');
@@ -83,6 +83,9 @@ describe('MobileNav', () => {
     expect(within(drawer).getByRole('navigation', { name: 'Principal' })).toBeTruthy();
     expect(within(drawer).getByRole('button', { name: 'Exemplo A, trocar de site' })).toBeTruthy();
     const areas = within(drawer).getByRole('navigation', { name: 'Áreas do site' });
+    expect(
+      Array.from(areas.querySelectorAll('.menu-title')).map((title) => title.textContent),
+    ).toEqual(['Site', 'Conteúdo', 'Estrutura', 'Geração', 'Análise']);
     const current = within(areas)
       .getAllByRole('link')
       .filter((link) => link.getAttribute('aria-current') === 'page');

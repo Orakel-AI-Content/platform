@@ -6,9 +6,10 @@
 //   de papéis; como no `useAuthority` do Ecme, lista vazia é visível e basta uma;
 // - sem `translateKey` (não há i18n), `meta.horizontalMenu` (não há barra no topo) e o tipo
 //   `collapse` (não há submenus, #235);
-// - as áreas do site levam o marcador `[site]` no caminho, trocado por `navigationPath`;
-// - o item ativo sai do pathname (`activeNavigationKey`), com as telas que só se alcançam pela
-//   Visão geral (`OVERVIEW_SEGMENTS`, da antiga `site-nav.tsx`) marcando a Visão geral.
+// - as áreas do site levam o marcador `[site]` no caminho, trocado por `navigationPath`, e ficam
+//   em grupos com título (`title`: Site, Conteúdo, Estrutura, Geração e Análise, #582), todos
+//   no mesmo `nav "Áreas do site"`;
+// - o item ativo sai do pathname (`activeNavigationKey`), pelo primeiro segmento depois do site.
 import { can, type Action, type Actor } from '../domain/access/rbac.ts';
 import type { NavigationIconKey } from './navigation-icon.config.tsx';
 
@@ -52,6 +53,19 @@ function siteArea(
   };
 }
 
+/** Grupo com título das áreas do site: some, na `filterNavigation`, se nenhum item ficar. */
+function siteGroup(key: string, title: string, subMenu: NavigationTree[]): NavigationTree {
+  return {
+    key,
+    path: '',
+    title,
+    icon: subMenu[0]?.icon ?? 'siteOverview',
+    type: NAV_ITEM_TYPE_TITLE,
+    authority: ['site.read'],
+    subMenu,
+  };
+}
+
 const navigationConfig: NavigationTree[] = [
   {
     key: 'sites',
@@ -72,42 +86,43 @@ const navigationConfig: NavigationTree[] = [
     authority: ['release.promote'],
     subMenu: [],
   },
-  {
-    key: 'site',
-    path: '',
-    title: 'Áreas do site',
-    icon: 'siteOverview',
-    type: NAV_ITEM_TYPE_TITLE,
-    authority: ['site.read'],
-    subMenu: [
-      siteArea('site.overview', '', 'Visão geral', 'siteOverview'),
-      siteArea('site.contents', 'conteudos', 'Conteúdos', 'siteContents'),
-      siteArea('site.review', 'revisao', 'Revisão', 'siteReview'),
-      siteArea('site.media', 'midia', 'Mídia', 'siteMedia'),
-      siteArea('site.authors', 'autores', 'Autores', 'siteAuthors'),
-      siteArea('site.taxonomies', 'taxonomias', 'Taxonomias', 'siteTaxonomies'),
-      siteArea('site.menus', 'menus', 'Menus', 'siteMenus'),
-      // Versões do contexto editorial da geração (RN-GEN-05): ler é site.read; criar, content.write.
-      siteArea(
-        'site.editorialContexts',
-        'contextos',
-        'Contextos editoriais',
-        'siteEditorialContexts',
-      ),
-      // Disparo e acompanhamento da geração (R1, R5): ver é site.read; disparar, content.write.
-      siteArea('site.generation', 'geracao', 'Geração', 'siteGeneration'),
-      // Visualizações e sessões por dia, das tabelas diárias consolidadas (#548).
-      siteArea('site.audience', 'audiencia', 'Audiência', 'siteAudience'),
-      // Só para quem edita: a tela é um formulário.
-      siteArea(
-        'site.institutional',
-        'institucionais',
-        'Textos institucionais',
-        'siteInstitutional',
-        ['content.write'],
-      ),
-    ],
-  },
+  // Áreas do site em grupos (#582). Configuração e Mudanças pendentes com a permissão da tela.
+  siteGroup('site.group.site', 'Site', [
+    siteArea('site.overview', '', 'Visão geral', 'siteOverview'),
+    siteArea('site.config', 'configuracao', 'Configuração do site', 'siteConfig', [
+      'site.configure',
+    ]),
+    siteArea('site.pending', 'pendencias', 'Mudanças pendentes', 'sitePending'),
+  ]),
+  siteGroup('site.group.content', 'Conteúdo', [
+    siteArea('site.contents', 'conteudos', 'Conteúdos', 'siteContents'),
+    siteArea('site.review', 'revisao', 'Revisão', 'siteReview'),
+    siteArea('site.media', 'midia', 'Mídia', 'siteMedia'),
+  ]),
+  siteGroup('site.group.structure', 'Estrutura', [
+    siteArea('site.authors', 'autores', 'Autores', 'siteAuthors'),
+    siteArea('site.taxonomies', 'taxonomias', 'Taxonomias', 'siteTaxonomies'),
+    siteArea('site.menus', 'menus', 'Menus', 'siteMenus'),
+    // Só para quem edita: a tela é um formulário.
+    siteArea('site.institutional', 'institucionais', 'Textos institucionais', 'siteInstitutional', [
+      'content.write',
+    ]),
+  ]),
+  siteGroup('site.group.generation', 'Geração', [
+    // Versões do contexto editorial da geração (RN-GEN-05): ler é site.read; criar, content.write.
+    siteArea(
+      'site.editorialContexts',
+      'contextos',
+      'Contextos editoriais',
+      'siteEditorialContexts',
+    ),
+    // Disparo e acompanhamento da geração (R1, R5): ver é site.read; disparar, content.write.
+    siteArea('site.generation', 'geracao', 'Geração', 'siteGeneration'),
+  ]),
+  siteGroup('site.group.analytics', 'Análise', [
+    // Visualizações e sessões por dia, das tabelas diárias consolidadas (#548).
+    siteArea('site.audience', 'audiencia', 'Audiência', 'siteAudience'),
+  ]),
 ];
 
 export default navigationConfig;
@@ -135,9 +150,6 @@ export function navigationPath(nav: Pick<NavigationTree, 'path'>, siteId: string
   return nav.path.replace(SITE_PARAM, encodeURIComponent(siteId));
 }
 
-/** Telas que só se alcançam pela Visão geral: destacam a Visão geral. */
-const OVERVIEW_SEGMENTS = new Set(['', 'configuracao', 'pendencias']);
-
 /** Segmento de cada área do site ('' = Visão geral), pela `key`. */
 function areaSegment(nav: NavigationTree): string {
   return nav.path === SITE_PREFIX ? '' : nav.path.slice(SITE_PREFIX.length + 1);
@@ -158,8 +170,7 @@ export function activeNavigationKey(
   const site = parts[2];
   // `/sites/novo` é a tela de criar site: a rota estática vence o `[site]` no Next.
   if (site === undefined || site === '' || site === 'novo') return 'sites';
-  const segment = parts[3] ?? '';
-  const target = OVERVIEW_SEGMENTS.has(segment) ? '' : segment;
+  const target = parts[3] ?? '';
   const areas = tree.flatMap((nav) => (nav.type === NAV_ITEM_TYPE_TITLE ? nav.subMenu : [nav]));
   return areas.find((nav) => nav.path.startsWith(SITE_PREFIX) && areaSegment(nav) === target)?.key;
 }

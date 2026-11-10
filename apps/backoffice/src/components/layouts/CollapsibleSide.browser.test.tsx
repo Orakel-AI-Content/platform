@@ -27,14 +27,18 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 const SITE_NAME = 'Exemplo A — Guias';
 const OTHER_SITE = 'Exemplo B — Receitas';
-const AREAS = [
+/** Áreas da barra, nos grupos (#582); Configuração do site com site.configure. */
+const areaTitles = ({ configure = false, write = false } = {}) => [
   'Visão geral',
+  ...(configure ? ['Configuração do site'] : []),
+  'Mudanças pendentes',
   'Conteúdos',
   'Revisão',
   'Mídia',
   'Autores',
   'Taxonomias',
   'Menus',
+  ...(write ? ['Textos institucionais'] : []),
   'Contextos editoriais',
   'Geração',
   'Audiência',
@@ -99,7 +103,9 @@ describe('CollapsibleSide no navegador', () => {
         .getByRole('link')
         .elements()
         .map((link) => link.textContent),
-    ).toEqual([...AREAS, 'Textos institucionais']);
+    ).toEqual(areaTitles({ write: true }));
+    // Recolhida, sem os títulos dos grupos.
+    expect(areas().element().querySelectorAll('.menu-title')).toHaveLength(0);
     await expect
       .element(areas().getByRole('link', { name: 'Autores' }))
       .toHaveAttribute('aria-current', 'page');
@@ -143,7 +149,8 @@ describe('CollapsibleSide no navegador', () => {
       ['/sites/exemplo-a/conteudos/novo', 'Conteúdos'],
       ['/sites/exemplo-a/conteudos/1/editar', 'Conteúdos'],
       ['/sites/exemplo-a/revisao', 'Revisão'],
-      ['/sites/exemplo-a/configuracao', 'Visão geral'],
+      // Configuração do site (site.configure) fica atual em `site-layout.spec.ts`, com operacao.
+      ['/sites/exemplo-a/pendencias', 'Mudanças pendentes'],
     ] as const) {
       navigation.set(path);
       await expect.poll(current).toBe(area);
@@ -288,7 +295,7 @@ describe('CollapsibleSide no navegador', () => {
           .getByRole('link')
           .elements()
           .map((link) => link.textContent),
-      ).toEqual(AREAS);
+      ).toEqual(areaTitles({ configure: true }));
       expect(drawerAreas.element().querySelector('[aria-current="page"]')?.textContent).toBe(
         'Autores',
       );

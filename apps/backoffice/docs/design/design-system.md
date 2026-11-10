@@ -141,9 +141,16 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
   seção da escala tipográfica.
 - **Navegação:** os itens vêm de `src/configs/navigation.config.ts` (`NavigationTree` do Ecme,
   com `authority` como lista de permissões de `rbac.ts`), filtrados no servidor pelo RBAC
-  (`filterNavigation`, com `can()`; Textos institucionais só com `content.write`). A barra marca
-  o item pelo endereço (`activeNavigationKey`, por `usePathname`), com `aria-current="page"`,
-  também nas telas de item; Configuração e Pendências marcam a Visão geral. O seletor
+  (`filterNavigation`, com `can()`; Configuração do site só com `site.configure`, Textos
+  institucionais só com `content.write`). As áreas do site ficam em cinco grupos com título
+  (nós `title`, desenhados pelo `MenuGroup`, cada um uma lista nomeada pelo título), todos no
+  mesmo `nav "Áreas do site"`: **Site** (Visão geral, Configuração do site, Mudanças
+  pendentes), **Conteúdo** (Conteúdos, Revisão, Mídia), **Estrutura** (Autores, Taxonomias,
+  Menus, Textos institucionais), **Geração** (Contextos editoriais, Geração) e **Análise**
+  (Audiência). Grupo sem item visível para o papel não aparece; recolhida, a barra esconde os
+  títulos e fica só com os ícones. A barra marca o item pelo endereço (`activeNavigationKey`,
+  pelo primeiro segmento depois do site, com `usePathname`), com `aria-current="page"`, também
+  nas telas de item. O seletor
   (`SiteSwitcher`, `src/components/template/SiteSwitcher.tsx`) é o `Dropdown` do Ecme com o nome do site,
   listando os sites visíveis (`readVisibleSites`, uma leitura por requisição), cada um levando à
   mesma área (`sameAreaIn`: item, criar e editar caem na lista); o atual com
