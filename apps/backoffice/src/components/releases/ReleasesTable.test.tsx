@@ -41,8 +41,18 @@ afterEach(() => {
 });
 
 const rows: ReleaseRecord[] = [
-  { tag: '1.10.0', registeredAt: new Date('2026-11-02T15:00Z') },
-  { tag: '1.9.0', registeredAt: new Date('2026-10-20T12:30Z') },
+  {
+    tag: '1.10.0',
+    registeredAt: new Date('2026-11-02T15:00Z'),
+    imageStatus: null,
+    imageCheckedAt: null,
+  },
+  {
+    tag: '1.9.0',
+    registeredAt: new Date('2026-10-20T12:30Z'),
+    imageStatus: null,
+    imageCheckedAt: null,
+  },
 ];
 
 const tags = () =>

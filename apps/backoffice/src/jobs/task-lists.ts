@@ -7,11 +7,13 @@ import { INGEST_TASK } from '../domain/media/upload.ts';
 import { VARIANTS_TASK } from '../domain/media/variants.ts';
 import { ROLLBACK_TASK } from '../domain/builds/schedule.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../domain/publications/schedule.ts';
+import { CHECK_RELEASE_IMAGE_TASK } from '../domain/releases/releases.ts';
 import {
   createAggregateAudienceTask,
   type AggregateAudienceTaskDeps,
 } from './tasks/aggregate-audience.ts';
 import { createBuildTask, type BuildTaskDeps } from './tasks/build.ts';
+import { createCheckReleaseImageTask } from './tasks/check-release-image.ts';
 import {
   createGenerateArticleTask,
   type GenerateArticleTaskDeps,
@@ -49,8 +51,15 @@ export const WORKER_CRONTAB = [
   `0 * * * * ${AGGREGATE_AUDIENCE_TASK} ?queue=${AUDIENCE_QUEUE}`,
 ].join('\n');
 
-/** O build-runner só executa builds e rollbacks (fila `build:<site>`), com concorrência 2. */
+/**
+ * O build-runner executa builds e rollbacks (fila `build:<site>`) e a conferência da imagem
+ * das releases, os únicos jobs que falam com o Docker; concorrência 2.
+ */
 export function buildRunnerTasks(deps: BuildTaskDeps): TaskList {
-  return { build: createBuildTask(deps), [ROLLBACK_TASK]: createRollbackTask(deps) };
+  return {
+    build: createBuildTask(deps),
+    [ROLLBACK_TASK]: createRollbackTask(deps),
+    [CHECK_RELEASE_IMAGE_TASK]: createCheckReleaseImageTask(deps),
+  };
 }
 export const BUILD_RUNNER_CONCURRENCY = 2;

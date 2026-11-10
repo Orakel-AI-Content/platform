@@ -15,9 +15,24 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // horizontal e nenhuma célula passa de duas linhas; o axe roda nos dois temas.
 
 const ROWS: ReleaseRecord[] = [
-  { tag: '1.10.0', registeredAt: new Date('2026-11-02T15:00Z') },
-  { tag: '1.9.0', registeredAt: new Date('2026-10-20T12:30Z') },
-  { tag: '0.1.0', registeredAt: new Date('2026-09-01T09:00Z') },
+  {
+    tag: '1.10.0',
+    registeredAt: new Date('2026-11-02T15:00Z'),
+    imageStatus: null,
+    imageCheckedAt: null,
+  },
+  {
+    tag: '1.9.0',
+    registeredAt: new Date('2026-10-20T12:30Z'),
+    imageStatus: null,
+    imageCheckedAt: null,
+  },
+  {
+    tag: '0.1.0',
+    registeredAt: new Date('2026-09-01T09:00Z'),
+    imageStatus: null,
+    imageCheckedAt: null,
+  },
 ];
 
 function Releases() {
