@@ -7,6 +7,9 @@
 //   servidor não conhece.
 // - A troca grava ou apaga o cookie e troca a classe do <html> na hora; no modo sistema, a
 //   classe sai da preferência, como no THEME_SCRIPT. Sem zustand (docs/migration/ecme.md).
+// - Sem `className` no <Dropdown> (#584): o `DropdownMenu` repassa o `className` ao toggle
+//   depois do `toggleClassName` e o sobrescreveria, tirando o `header-action-item` (o ícone
+//   ficava com 14 px, sem o `text-2xl`, o `p-2` e o hover).
 'use client';
 
 import { useState } from 'react';
@@ -37,7 +40,6 @@ const ThemeSwitcher = ({ initialMode }: ThemeSwitcherProps) => {
 
   return (
     <Dropdown
-      className="flex"
       toggleClassName="flex items-center header-action-item header-action-item-hoverable"
       activeKey={choice}
       renderTitle={
