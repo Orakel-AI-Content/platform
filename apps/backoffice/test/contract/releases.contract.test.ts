@@ -29,31 +29,31 @@ const tags = async () => {
 
 describe('registro de releases (#509)', () => {
   it('admin e operação registram; a lista mostra da mais recente para a mais antiga', async () => {
-    const first = await register(SYSTEM_ACTOR, 'core-v1.0.0');
-    expect(first).toMatchObject({ ok: true, value: { tag: 'core-v1.0.0' } });
+    const first = await register(SYSTEM_ACTOR, '1.0.0');
+    expect(first).toMatchObject({ ok: true, value: { tag: '1.0.0' } });
     if (first.ok) expect(first.value.registeredAt).toBeInstanceOf(Date);
-    expect(await register(operacao, ' core-v1.1.0 ')).toMatchObject({
+    expect(await register(operacao, ' 1.1.0 ')).toMatchObject({
       ok: true,
-      value: { tag: 'core-v1.1.0' },
+      value: { tag: '1.1.0' },
     });
 
-    expect(await tags()).toEqual(['core-v1.1.0', 'core-v1.0.0']);
+    expect(await tags()).toEqual(['1.1.0', '1.0.0']);
     expect(await listReleases(db, operacao)).toMatchObject({ ok: true });
   });
 
   it('recusa tag repetida com release.exists', async () => {
-    await register(operacao, 'core-v1.0.0');
+    await register(operacao, '1.0.0');
 
-    const result = await register(SYSTEM_ACTOR, 'core-v1.0.0');
+    const result = await register(SYSTEM_ACTOR, '1.0.0');
 
     expect(result).toEqual({
       ok: false,
       issues: [expect.objectContaining({ code: 'release.exists', path: ['tag'] })],
     });
-    expect(await tags()).toEqual(['core-v1.0.0']);
+    expect(await tags()).toEqual(['1.0.0']);
   });
 
-  it.each(['v1.2.3', 'core-v1.2', 'core-v1.2.3-rc.1', ''])(
+  it.each(['core-v1.2.0', 'v1.2.3', '1.2', '1.2.3-rc.1', ''])(
     'recusa %j com release.invalid_tag',
     async (tag) => {
       const result = await register(operacao, tag);
@@ -74,7 +74,7 @@ describe('registro de releases (#509)', () => {
         issues: [expect.objectContaining({ code: 'forbidden' })],
       };
 
-      expect(await register(actor, 'core-v1.0.0')).toEqual(forbidden);
+      expect(await register(actor, '1.0.0')).toEqual(forbidden);
       expect(await listReleases(db, actor)).toEqual(forbidden);
       expect(await tags()).toEqual([]);
     },

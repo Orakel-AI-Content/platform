@@ -115,7 +115,7 @@ describe('estado da instância (#516)', () => {
     files: number | null = null,
   ) => ({
     siteId,
-    release: `core-v1.${minute}.0`,
+    release: `1.${minute}.0`,
     attempt: 1,
     status,
     versionId,
@@ -152,31 +152,31 @@ describe('estado da instância (#516)', () => {
     ).toEqual([
       {
         status: 'failed',
-        release: 'core-v1.7.0',
+        release: '1.7.0',
         versionId: null,
         finishedAt: '2026-10-20T12:07:00.000Z',
       },
       {
         status: 'ok',
-        release: 'core-v1.6.0',
+        release: '1.6.0',
         versionId: 'v-6',
         finishedAt: '2026-10-20T12:06:00.000Z',
       },
       {
         status: 'failed',
-        release: 'core-v1.5.0',
+        release: '1.5.0',
         versionId: null,
         finishedAt: '2026-10-20T12:05:00.000Z',
       },
       {
         status: 'ok',
-        release: 'core-v1.4.0',
+        release: '1.4.0',
         versionId: 'v-4',
         finishedAt: '2026-10-20T12:04:00.000Z',
       },
       {
         status: 'ok',
-        release: 'core-v1.3.0',
+        release: '1.3.0',
         versionId: 'v-3',
         finishedAt: '2026-10-20T12:03:00.000Z',
       },
@@ -357,7 +357,7 @@ describe('fuso do site (#90)', () => {
 
 describe('recursos da release do site (#71)', () => {
   it('sem registro por release, devolve os RESOURCES com release nula ou registrada', async () => {
-    await db.update(sites).set({ release: 'core-v1.2.0' }).where(eq(sites.id, 'exemplo-b'));
+    await db.update(sites).set({ release: '1.2.0' }).where(eq(sites.id, 'exemplo-b'));
 
     expect(await resourcesFor(db, 'exemplo-a')).toEqual(RESOURCES);
     expect(await resourcesFor(db, 'exemplo-b')).toEqual(RESOURCES);

@@ -54,14 +54,14 @@ const INSTANCE: SiteInstance = {
     {
       id: 2,
       status: 'failed',
-      release: 'core-v1.4.0',
+      release: '1.4.0',
       versionId: null,
       finishedAt: new Date('2026-10-20T13:00:00.000Z'),
     },
     {
       id: 1,
       status: 'ok',
-      release: 'core-v1.4.0',
+      release: '1.4.0',
       versionId: 'v-0123456789abcdef',
       finishedAt: new Date('2026-10-20T12:00:00.000Z'),
     },

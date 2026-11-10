@@ -540,7 +540,7 @@ describe('reconstruir na release', () => {
   const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
 
   beforeEach(async () => {
-    await db.insert(releases).values([{ tag: 'core-v1.2.0' }, { tag: 'core-v1.3.0' }]);
+    await db.insert(releases).values([{ tag: '1.2.0' }, { tag: '1.3.0' }]);
     await db.execute(sql`delete from graphile_worker._private_jobs`);
   });
 
@@ -567,11 +567,11 @@ describe('reconstruir na release', () => {
     await pause();
     const before = Date.now();
     expect(
-      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', 'core-v1.2.0')),
+      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', '1.2.0')),
     ).toEqual({ ok: true, value: undefined });
 
     expect(await site()).toMatchObject({
-      release: 'core-v1.2.0',
+      release: '1.2.0',
       state: 'ativo',
       pausedReason: null,
       pausedCulpritOrigin: null,
@@ -585,14 +585,14 @@ describe('reconstruir na release', () => {
 
   it('site ativo também é reconstruído, sem recusa de site não pausado', async () => {
     expect(
-      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', 'core-v1.3.0')),
+      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', '1.3.0')),
     ).toEqual({ ok: true, value: undefined });
-    expect(await site()).toMatchObject({ release: 'core-v1.3.0', state: 'ativo' });
+    expect(await site()).toMatchObject({ release: '1.3.0', state: 'ativo' });
     expect((await buildJobs()).map((job) => job.key)).toEqual(['build:exemplo-a']);
   });
 
   it('o build seguinte publica com a imagem site-builder:<release> e registra a release', async () => {
-    await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', 'core-v1.2.0'));
+    await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', '1.2.0'));
     const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
@@ -600,18 +600,18 @@ describe('reconstruir na release', () => {
     );
 
     expect(fake.started.map((spec) => spec.image)).toEqual([
-      'site-builder:core-v1.2.0',
-      'site-builder:core-v1.2.0',
+      'site-builder:1.2.0',
+      'site-builder:1.2.0',
     ]);
     const [build] = await db.select().from(builds);
-    expect(build).toMatchObject({ status: 'ok', release: 'core-v1.2.0' });
-    expect(await site()).toMatchObject({ release: 'core-v1.2.0', lifecycle: 'publicado' });
+    expect(build).toMatchObject({ status: 'ok', release: '1.2.0' });
+    expect(await site()).toMatchObject({ release: '1.2.0', lifecycle: 'publicado' });
   });
 
   it('recusa release não registrada, sem gravar nem enfileirar', async () => {
     await pause();
     expect(
-      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', 'core-v9.9.9')),
+      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', '9.9.9')),
     ).toMatchObject({ ok: false, issues: [{ code: 'release.not_registered', path: ['release'] }] });
     expect(await site()).toMatchObject({ release: null, state: 'pausado' });
     expect(await buildJobs()).toEqual([]);
@@ -619,7 +619,7 @@ describe('reconstruir na release', () => {
 
   it('recusa site inexistente, sem enfileirar', async () => {
     expect(
-      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'nao-existe', 'core-v1.2.0')),
+      await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'nao-existe', '1.2.0')),
     ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
     expect(await buildJobs()).toEqual([]);
   });
@@ -629,7 +629,7 @@ describe('reconstruir na release', () => {
     for (const role of ['editor', 'revisor'] as const) {
       const actor = { email: `${role}@orakel.local`, roles: [role] };
       expect(
-        await db.transaction((tx) => rebuildOnRelease(tx, actor, 'exemplo-a', 'core-v1.2.0')),
+        await db.transaction((tx) => rebuildOnRelease(tx, actor, 'exemplo-a', '1.2.0')),
       ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
     }
     expect(await site()).toMatchObject({ release: null, state: 'pausado' });

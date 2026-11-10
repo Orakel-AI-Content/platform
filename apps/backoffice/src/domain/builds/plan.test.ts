@@ -30,9 +30,9 @@ describe('planBuild', () => {
     expect(planBuild(target, settings, 'r').image).toBe(
       'ghcr.io/orakel-ai-content/site-builder:local',
     );
-    expect(planBuild({ ...target, release: 'core-v0.2.0' }, settings, 'r')).toMatchObject({
-      release: 'core-v0.2.0',
-      image: 'ghcr.io/orakel-ai-content/site-builder:core-v0.2.0',
+    expect(planBuild({ ...target, release: '1.2.0' }, settings, 'r')).toMatchObject({
+      release: '1.2.0',
+      image: 'ghcr.io/orakel-ai-content/site-builder:1.2.0',
     });
   });
 
@@ -72,11 +72,9 @@ describe('planRollback', () => {
     expect(planRollback(target, settings, version, 'r').image).toBe(
       'ghcr.io/orakel-ai-content/site-builder:local',
     );
-    expect(
-      planRollback({ ...target, release: 'core-v0.2.0' }, settings, version, 'r'),
-    ).toMatchObject({
-      release: 'core-v0.2.0',
-      image: 'ghcr.io/orakel-ai-content/site-builder:core-v0.2.0',
+    expect(planRollback({ ...target, release: '1.2.0' }, settings, version, 'r')).toMatchObject({
+      release: '1.2.0',
+      image: 'ghcr.io/orakel-ai-content/site-builder:1.2.0',
     });
   });
 

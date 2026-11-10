@@ -30,7 +30,7 @@ const COLUMNS: ColumnDef<ReleaseRecord>[] = [
   {
     header: 'Tag',
     accessorKey: 'tag',
-    // Ordem numérica das partes (core-v1.10.0 depois de core-v1.9.0), não alfabética.
+    // Ordem numérica das partes (1.10.0 depois de 1.9.0), não alfabética.
     sortFn: (a, b) => a.original.tag.localeCompare(b.original.tag, 'pt-BR', { numeric: true }),
     cell: ({ row }) => <span className="font-semibold">{row.original.tag}</span>,
   },

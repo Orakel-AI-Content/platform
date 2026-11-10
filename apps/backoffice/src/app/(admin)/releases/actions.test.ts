@@ -29,7 +29,7 @@ describe('registerReleaseAction', () => {
   it('sem sessão, recusa sem chamar o domínio', async () => {
     mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
 
-    expect(await registerReleaseAction({ tag: 'core-v1.0.0' })).toMatchObject({
+    expect(await registerReleaseAction({ tag: '1.0.0' })).toMatchObject({
       ok: false,
       issues: [],
     });
@@ -39,14 +39,14 @@ describe('registerReleaseAction', () => {
   it('registra pelo domínio e revalida a lista', async () => {
     mocks.registerRelease.mockResolvedValue({
       ok: true,
-      value: { tag: 'core-v1.0.0', registeredAt: new Date() },
+      value: { tag: '1.0.0', registeredAt: new Date() },
     });
 
-    expect(await registerReleaseAction({ tag: 'core-v1.0.0' })).toEqual({
+    expect(await registerReleaseAction({ tag: '1.0.0' })).toEqual({
       ok: true,
-      message: 'Release core-v1.0.0 registrada.',
+      message: 'Release 1.0.0 registrada.',
     });
-    expect(mocks.registerRelease).toHaveBeenCalledWith({}, operacao, 'core-v1.0.0');
+    expect(mocks.registerRelease).toHaveBeenCalledWith({}, operacao, '1.0.0');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/releases');
   });
 
@@ -56,7 +56,7 @@ describe('registerReleaseAction', () => {
       issues: [{ code: 'release.exists', message: 'Já registrada', path: ['tag'] }],
     });
 
-    expect(await registerReleaseAction({ tag: 'core-v1.0.0' })).toEqual({
+    expect(await registerReleaseAction({ tag: '1.0.0' })).toEqual({
       ok: false,
       message: 'Não foi possível registrar a release.',
       issues: [{ path: ['tag'], message: 'Já registrada' }],

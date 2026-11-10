@@ -30,7 +30,9 @@ export function ReleaseForm({
       schema={RegisterReleaseSchema}
       defaultValues={{ tag: '' }}
       labels={{ tag: 'Tag' }}
-      hints={{ tag: 'Tag do core já publicada no GHCR, no formato core-vX.Y.Z.' }}
+      hints={{
+        tag: 'Versão da imagem site-builder já publicada no GHCR, no formato X.Y.Z: a tag Git core-vX.Y.Z publica a imagem X.Y.Z.',
+      }}
       actionBar={{ kind: 'create', href: RELEASES_HREF }}
       contentClassName={contentClassName}
       submitLabel="Registrar"

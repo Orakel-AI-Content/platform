@@ -41,8 +41,8 @@ afterEach(() => {
 });
 
 const rows: ReleaseRecord[] = [
-  { tag: 'core-v1.10.0', registeredAt: new Date('2026-11-02T15:00Z') },
-  { tag: 'core-v1.9.0', registeredAt: new Date('2026-10-20T12:30Z') },
+  { tag: '1.10.0', registeredAt: new Date('2026-11-02T15:00Z') },
+  { tag: '1.9.0', registeredAt: new Date('2026-10-20T12:30Z') },
 ];
 
 const tags = () =>
@@ -55,7 +55,7 @@ describe('ReleasesTable', () => {
   it('mostra tag e data no fuso da operação, a mais recente primeiro', () => {
     render(<ReleasesTable rows={rows} />);
 
-    expect(tags()).toEqual(['core-v1.10.0', 'core-v1.9.0']);
+    expect(tags()).toEqual(['1.10.0', '1.9.0']);
     expect(screen.getByText(/02\/11\/2026.*12:00/)).toBeTruthy();
   });
 
@@ -64,7 +64,7 @@ describe('ReleasesTable', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /Tag/ }));
 
-    expect(tags()).toEqual(['core-v1.9.0', 'core-v1.10.0']);
+    expect(tags()).toEqual(['1.9.0', '1.10.0']);
   });
 
   it('busca pela tag', async () => {
@@ -73,7 +73,7 @@ describe('ReleasesTable', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar pela tag' }), '1.9');
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
 
-    expect(tags()).toEqual(['core-v1.9.0']);
+    expect(tags()).toEqual(['1.9.0']);
   });
 
   it('sem releases, o estado vazio com a ação', () => {

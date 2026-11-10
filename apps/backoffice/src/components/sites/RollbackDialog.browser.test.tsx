@@ -17,13 +17,13 @@ import { RollbackDialog } from './RollbackDialog.tsx';
 const VERSIONS: RollbackVersion[] = [
   {
     versionId: '20261010T120000Z-bbbbbbbb',
-    release: 'core-v1.2.0',
+    release: '1.2.0',
     pages: 12,
     finishedAt: new Date('2026-10-10T12:00:00Z'),
   },
   {
     versionId: '20261001T120000Z-abcdef12',
-    release: 'core-v1.1.0',
+    release: '1.1.0',
     pages: 10,
     finishedAt: new Date('2026-10-01T12:00:00Z'),
   },

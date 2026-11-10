@@ -24,7 +24,7 @@ const SITE: SiteSummary = {
   pausedReason: null,
   pausedCulprit: null,
   activeVersionId: 'v-0123456789abcdef',
-  release: 'core-v1.4.0',
+  release: '1.4.0',
   indexavel: true,
   pendingChanges: 4,
   lastBuild: {
@@ -46,7 +46,7 @@ const INSTANCE: SiteInstance = {
   recentBuilds: statuses.map((status, index) => ({
     id: 5 - index,
     status,
-    release: 'core-v1.4.0',
+    release: '1.4.0',
     versionId: status === 'ok' ? `v-0123456789abcde${index}` : null,
     finishedAt: new Date(Date.UTC(2026, 9, 20, 13 - index)),
   })),

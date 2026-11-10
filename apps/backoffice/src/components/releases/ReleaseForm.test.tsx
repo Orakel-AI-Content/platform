@@ -35,13 +35,13 @@ const renderForm = (result: ReleaseFormResult) => {
 describe('ReleaseForm', () => {
   it('registra a tag aparada e volta para a lista com ?registrada', async () => {
     const user = userEvent.setup();
-    const action = renderForm({ ok: true, message: 'Release core-v1.2.0 registrada.' });
+    const action = renderForm({ ok: true, message: 'Release 1.2.0 registrada.' });
 
-    await user.type(screen.getByRole('textbox', { name: /Tag/ }), ' core-v1.2.0 ');
+    await user.type(screen.getByRole('textbox', { name: /Tag/ }), ' 1.2.0 ');
     await user.click(screen.getByRole('button', { name: 'Registrar' }));
 
-    expect(action).toHaveBeenCalledWith({ tag: 'core-v1.2.0' });
-    expect(router.push).toHaveBeenCalledWith('/releases?registrada=core-v1.2.0');
+    expect(action).toHaveBeenCalledWith({ tag: '1.2.0' });
+    expect(router.push).toHaveBeenCalledWith('/releases?registrada=1.2.0');
   });
 
   it('fora do formato, recusa no campo sem chamar a action', async () => {
@@ -51,7 +51,7 @@ describe('ReleaseForm', () => {
     await user.type(screen.getByRole('textbox', { name: /Tag/ }), 'v1.2.0');
     await user.click(screen.getByRole('button', { name: 'Registrar' }));
 
-    expect(await screen.findAllByText(/formato core-vX\.Y\.Z \(ex\./)).not.toHaveLength(0);
+    expect(await screen.findAllByText(/formato X\.Y\.Z \(ex\./)).not.toHaveLength(0);
     expect(action).not.toHaveBeenCalled();
   });
 
@@ -60,15 +60,13 @@ describe('ReleaseForm', () => {
     renderForm({
       ok: false,
       message: 'Não foi possível registrar a release.',
-      issues: [{ path: ['tag'], message: 'A release core-v1.2.0 já está registrada' }],
+      issues: [{ path: ['tag'], message: 'A release 1.2.0 já está registrada' }],
     });
 
-    await user.type(screen.getByRole('textbox', { name: /Tag/ }), 'core-v1.2.0');
+    await user.type(screen.getByRole('textbox', { name: /Tag/ }), '1.2.0');
     await user.click(screen.getByRole('button', { name: 'Registrar' }));
 
-    expect(await screen.findAllByText('A release core-v1.2.0 já está registrada')).not.toHaveLength(
-      0,
-    );
+    expect(await screen.findAllByText('A release 1.2.0 já está registrada')).not.toHaveLength(0);
     expect(router.push).not.toHaveBeenCalled();
   });
 });

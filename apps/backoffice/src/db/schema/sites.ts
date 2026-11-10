@@ -28,7 +28,10 @@ export const sites = pgTable(
      * rollback. Nula até a primeira publicação. Operacional: fora do snapshot.
      */
     activeVersionId: text(),
-    /** Release do core registrada para o site (core-vX.Y.Z); nula até a primeira promoção. */
+    /**
+     * Release do core registrada para o site (X.Y.Z, a tag da imagem site-builder); nula até a
+     * primeira promoção.
+     */
     release: text(),
     /**
      * Janela de agrupamento dos builds do site, em segundos; nula usa BUILD_WINDOW_SECONDS.
