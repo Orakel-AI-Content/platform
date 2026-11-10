@@ -17,7 +17,8 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // caso de largura fica nos dados: nome e domínio longos, um site pausado com motivo longo e conteúdo culpado e um
 // com último build e versão longa. As ações são as da operação (publicar e configurar). O menu
 // "Mais ações" (#248; antes no E2E, #476) abre pelo mouse e pelo teclado, com o foco no primeiro
-// item e as setas nos outros, e acionar um item fecha o menu e navega.
+// item e as setas nos outros, e acionar um item fecha o menu e navega. A data do último build
+// fica inteira numa linha; só a versão corta (#585).
 
 const STAMP = '1761000000000';
 const LONG_NAME = 'Guia completo de receitas regionais brasileiras para o dia a dia';
@@ -114,7 +115,15 @@ describe('SitesTable no navegador', () => {
     await expect
       .element(row(ids[1]!).getByRole('link', { name: /Conteúdo 12345 culpado pela pausa/ }))
       .toHaveAttribute('href', `/sites/${ids[1]}/conteudos/12345`);
-    await expect.element(row(ids[2]!).getByTitle(new RegExp(` · ${LONG_VERSION}$`))).toBeVisible();
+    await expect.element(row(ids[2]!).getByTitle(LONG_VERSION, { exact: true })).toBeVisible();
+    // A data do build fica inteira numa linha; só a versão corta.
+    const when = row(ids[2]!)
+      .getByText(/^20\/10\/2026, 09:00 BRT ·\s*$/)
+      .element();
+    expect(when.getBoundingClientRect().height).toBeLessThan(24);
+    expect(when.getBoundingClientRect().right).toBeLessThanOrEqual(
+      when.closest('td')!.getBoundingClientRect().right,
+    );
     await expect
       .element(row(ids[0]!).getByRole('link', { name: `1 mudança pendente em ${ids[0]}` }))
       .toHaveAttribute('href', `/sites/${ids[0]}/pendencias`);

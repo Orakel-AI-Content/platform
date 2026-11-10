@@ -47,15 +47,16 @@ function byText(text: (site: SiteSummary) => string) {
 }
 
 /**
- * Último build: a lista mistura fusos, cada linha com a sigla; data e versão cortadas. Os cortes
- * desta tabela (nome, motivo, build) cabem a 1280 px dentro do cartão do template (#248, #364).
+ * Último build: a lista mistura fusos, cada linha com a sigla; a data inteira e a versão cortada
+ * (#585). O nome e o domínio cortam na largura que sobra (coluna fluida); o resto cabe a 1280 px
+ * dentro do cartão do template (#248, #364).
  */
 function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; timeZone: string }) {
   return (
     <LastBuildSummary
       build={build}
       timeZone={timeZone}
-      details={(text) => <Truncated text={text} className="max-w-28" />}
+      details={(text) => <Truncated text={text} className="max-w-24" />}
     />
   );
 }
@@ -100,17 +101,16 @@ function columnsFor(
       id: 'name',
       // A busca procura no nome, no id e no domínio; a ordem é só pelo nome.
       accessorFn: (site) => `${site.name} ${site.id} ${site.domain}`,
+      meta: { fluid: true },
       sortFn: byText((site) => site.name),
       cell: ({ row }) => {
         const site = row.original;
         return (
-          <TwoLines
-            secondary={<Truncated text={`${site.id} · ${site.domain}`} className="max-w-32" />}
-          >
+          <TwoLines secondary={<Truncated text={`${site.id} · ${site.domain}`} />}>
             <Link
               href={`/sites/${site.id}`}
               title={site.name}
-              className={classNames('block max-w-32 truncate', ROW_LINK_CLASS)}
+              className={classNames('block truncate', ROW_LINK_CLASS)}
             >
               {site.name}
             </Link>

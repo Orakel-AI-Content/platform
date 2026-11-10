@@ -61,3 +61,27 @@ export function tableOverflow(table: Target): number {
   const container = toElement(table).parentElement!;
   return container.scrollWidth - container.clientWidth;
 }
+
+/**
+ * Se o texto foi cortado (o `truncate` escondeu parte dele): a largura do texto inteiro passa da
+ * caixa. Em px fracionários, pela Range: `scrollWidth` e `clientWidth` arredondam, e um texto de
+ * 99,6 px numa caixa do mesmo tamanho daria 1 px de "corte".
+ */
+export function isClipped(target: Target): boolean {
+  const element = toElement(target);
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  return range.getBoundingClientRect().width > element.getBoundingClientRect().width + 0.5;
+}
+
+/** Linhas de texto de cada célula de uma coluna, achada pelo texto do cabeçalho (#585). */
+export function columnLines(table: Target, header: string): number[] {
+  const element = toElement(table);
+  const column = Array.from(element.querySelectorAll('thead th'), (th) =>
+    th.textContent?.trim(),
+  ).indexOf(header);
+  if (column === -1) throw new Error(`A tabela não tem a coluna ${header}`);
+  return cellLines(element)
+    .filter((cell) => cell.column === column)
+    .map((cell) => cell.lines);
+}
