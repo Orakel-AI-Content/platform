@@ -18,7 +18,6 @@ import EllipsisButton from '@/components/shared/EllipsisButton';
 import { EmptyState, NoResults } from '@/components/shared/EmptyState';
 import { ListToolbar } from '@/components/shared/ListControls.tsx';
 import { ROW_LINK_CLASS } from '@/components/shared/rowLink.ts';
-import { Truncated } from '@/components/shared/Truncated';
 import { TwoLines } from '@/components/shared/TwoLines';
 import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
 import { useListTable } from '@/components/shared/useListTable';
@@ -133,12 +132,12 @@ function MoreActions({
 
 /**
  * Segunda linha do nome: o ID e o domínio, que abre o site no ar em nova aba (#586). Sem
- * domínio configurado, fica só o texto.
+ * domínio configurado, fica só o texto. Corta só quando falta espaço na coluna fluida (#585).
  */
 function SiteIdAndDomain({ site }: { site: SiteSummary }) {
   const text = site.domain ? `${site.id} · ${site.domain}` : site.id;
   return (
-    <span title={text} className="block max-w-32 truncate">
+    <span title={text} className="block truncate">
       {site.id}
       {site.domain && (
         <>
