@@ -4,7 +4,13 @@ import { page, userEvent } from 'vitest/browser';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
-import { cellsOverLines, pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
+import {
+  cellsOverLines,
+  columnLines,
+  isClipped,
+  pageOverflow,
+  tableOverflow,
+} from '../../../test/browser/layout.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { ListScreen, renderInFrame } from '../../../test/browser/render.tsx';
 import { ContentsTable } from './ContentsTable.tsx';
@@ -14,16 +20,21 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // Lista de conteúdos cheia em Chromium (#460; antes no E2E, `contents.spec.ts`, #273): com 30
 // conteúdos e a página de 25, a 1280 px, na moldura do admin, nada rola na horizontal e nenhuma
 // célula passa de duas linhas de texto; o axe roda nos dois temas. Os títulos são os do seed do
-// E2E (`Receita N`): com um título longo, a tabela passa da janela, um defeito que o E2E também
-// não cobria (fica para uma issue própria, #460 não muda o visual).
+// E2E (`Receita N`), mais um de 45 caracteres e um longo demais: o título usa a largura que
+// sobra e corta só quando falta espaço, sem a tabela passar da janela, e a data fica numa linha.
+// A 1440 px, o de 45 aparece inteiro; sobram 352 px de texto, e o de 50 fica no limite (#585).
 
 const SITE = 'exemplo-a';
 const STATUSES = ['rascunho', 'em_revisao', 'aprovado', 'agendado', 'publicado', 'despublicado'];
 
+const TITLE_45 = 'Como montar uma horta vertical na sua varanda';
+const TOO_LONG =
+  'Como montar uma horta vertical na varanda do apartamento em dez passos, com a lista de materiais, o substrato e a rega de cada espécie';
+
 const ROWS: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
   id: 1000 + index,
   kind: index % 2 === 0 ? 'article' : 'page',
-  title: `Receita ${index + 1}`,
+  title: index === 4 ? TITLE_45 : index === 5 ? TOO_LONG : `Receita ${index + 1}`,
   slug: `conteudo-${index + 1}`,
   status: STATUSES[index % STATUSES.length] as ContentListItem['status'],
   version: index + 1,
@@ -65,6 +76,19 @@ describe('ContentsTable no navegador', () => {
     expect(pageOverflow()).toBe(0);
     expect(tableOverflow(table())).toBe(0);
     expect(cellsOverLines(table())).toEqual([]);
+    expect(new Set(columnLines(table(), 'Última alteração'))).toEqual(new Set([1]));
+    // O que não cabe continua cortado, com o inteiro em `title`.
+    expect(isClipped(table().getByTitle(TOO_LONG, { exact: true }))).toBe(true);
+  });
+
+  it('a 1440 px, o título de 45 caracteres aparece inteiro', async () => {
+    await page.viewport(1440, 900);
+    await renderInFrame(<Contents />);
+
+    expect(TITLE_45).toHaveLength(45);
+    expect(isClipped(table().getByTitle(TITLE_45, { exact: true }))).toBe(false);
+    expect(new Set(columnLines(table(), 'Última alteração'))).toEqual(new Set([1]));
+    expect(tableOverflow(table())).toBe(0);
   });
 
   it.each(COLOR_SCHEMES)('sem violação do axe (%s)', async (scheme) => {

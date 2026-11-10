@@ -171,10 +171,10 @@ describe('tabela de versões', () => {
     expect(approvalCell(first)?.textContent).toBe('');
     expect(approvalCell(second)?.textContent).toContain('revisor@orakel.local');
     expect(approvalCell(second)?.textContent).toContain('01/10/2026, 09:00 BRT');
-    // O `TwoLines` compartilhado: o revisor e, embaixo, a data menor.
-    expect(within(approvalCell(second)!).getByText('01/10/2026, 09:00 BRT').className).toBe(
-      'text-xs',
-    );
+    // O `TwoLines` compartilhado: o revisor e, embaixo, a data menor, numa linha só (#585).
+    const date = within(approvalCell(second)!).getByText('01/10/2026, 09:00 BRT');
+    expect(date.className).toBe('whitespace-nowrap');
+    expect(date.parentElement?.className).toContain('text-xs');
   });
 
   it('sem versões mostra o estado vazio no lugar da tabela e da toolbar', () => {

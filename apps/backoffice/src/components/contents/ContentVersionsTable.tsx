@@ -12,6 +12,7 @@ import {
   CONTENT_STATUS_TAG,
   formatDateTime,
 } from '@/components/shared/siteLabels.ts';
+import { NoWrap } from '@/components/shared/NoWrap';
 import { Truncated } from '@/components/shared/Truncated';
 import { TwoLines } from '@/components/shared/TwoLines';
 import { useListTable } from '@/components/shared/useListTable';
@@ -83,15 +84,16 @@ function columnsFor(
     {
       header: 'Título',
       accessorKey: 'title',
+      meta: { fluid: true },
       sortFn: byText((row) => row.title),
-      cell: ({ row }) => <Truncated text={row.original.title} className="max-w-xs" />,
+      cell: ({ row }) => <Truncated text={row.original.title} />,
     },
     {
       header: 'Gravada em',
       accessorKey: 'createdAt',
       enableGlobalFilter: false,
       sortFn: 'datetime',
-      cell: ({ row }) => formatDateTime(row.original.createdAt, timeZone),
+      cell: ({ row }) => <NoWrap>{formatDateTime(row.original.createdAt, timeZone)}</NoWrap>,
     },
     // Duas linhas: o revisor e, embaixo, a data; vazia sem aprovação.
     {
@@ -103,7 +105,7 @@ function columnsFor(
         const { approval } = row.original;
         if (approval === null) return null;
         return (
-          <TwoLines secondary={formatDateTime(approval.approvedAt, timeZone)}>
+          <TwoLines secondary={<NoWrap>{formatDateTime(approval.approvedAt, timeZone)}</NoWrap>}>
             {approval.reviewer}
           </TwoLines>
         );
