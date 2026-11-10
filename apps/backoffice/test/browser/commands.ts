@@ -54,16 +54,24 @@ export const resetPointer = defineBrowserCommand<[]>(async (context) => {
  *
  * O Playwright liga a interceptação do seletor sem esperar o navegador confirmar: com a máquina
  * ocupada, a primeira tecla pode chegar antes e o seletor (sem interceptação, cancelado no
- * headless) não vira evento. Por isso, até três tentativas.
+ * headless) não vira evento. Por isso, até três tentativas, com um ouvinte fixo durante o
+ * comando: o `waitForEvent` sozinho tira o ouvinte ao estourar o tempo, o que desliga a
+ * interceptação e faz cada tentativa recomeçar a mesma corrida.
  */
 export const pressAndChooseFiles = defineBrowserCommand<[string, ChosenFile[]]>(
   async (context, key, files) => {
+    const keepIntercepting = () => {};
+    context.page.on('filechooser', keepIntercepting);
     let chooser: FileChooser | null = null;
-    for (let attempt = 0; attempt < 3 && !chooser; attempt += 1) {
-      [chooser] = await Promise.all([
-        context.page.waitForEvent('filechooser', { timeout: 2000 }).catch(() => null),
-        context.page.keyboard.press(key),
-      ]);
+    try {
+      for (let attempt = 0; attempt < 3 && !chooser; attempt += 1) {
+        [chooser] = await Promise.all([
+          context.page.waitForEvent('filechooser', { timeout: 2000 }).catch(() => null),
+          context.page.keyboard.press(key),
+        ]);
+      }
+    } finally {
+      context.page.off('filechooser', keepIntercepting);
     }
     if (!chooser) throw new Error(`A tecla ${key} não abriu o seletor de arquivos`);
     await chooser.setFiles(
