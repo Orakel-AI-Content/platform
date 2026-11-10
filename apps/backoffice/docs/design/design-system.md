@@ -276,8 +276,14 @@ menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo ca
   (`src/components/ui/Dropdown/`), cujo nome acessível leva o item ("Mais ações: exemplo-a"),
   com os itens em `Dropdown.Item` (links por `asElement={Link}`) e o item da linha em `sr-only`
   quando o texto visível não o diz. O Dropdown abre, fecha (clique fora e Esc), navega por
-  setas e devolve o foco ao gatilho. O sucesso de uma ação vai para o toast e o erro para um
-  `ActionAlert` acima da tabela, nunca para a linha (ver "Retorno das ações").
+  setas e devolve o foco ao gatilho. Ação que muda o site no ar não é botão na linha: fica por
+  último no menu, depois de um divisor ("Publicar agora" da lista de sites, #586), com a
+  confirmação montada uma vez na tabela (o menu fecha ao escolher o item) e o foco devolvido ao
+  gatilho no `onAfterClose`; enquanto a ação roda, o item fica desabilitado com o texto de
+  espera ("Enfileirando…"). O domínio de um site, na lista, é link para o site no ar em nova
+  aba (`target="_blank"`, `rel="noopener noreferrer"` e "(abre em nova aba)" em `sr-only`).
+  O sucesso de uma ação vai para o toast e o erro para um `ActionAlert` acima da tabela, nunca
+  para a linha (ver "Retorno das ações").
 
 ### Formulário
 
@@ -514,8 +520,8 @@ O padrão do `AnalyticDashboard` do Ecme (#548), na audiência do site
   junto da ação, pelo `ActionAlert`. O Alert não tem papel de região viva: o `ActionAlert` é um
   contêiner `role="alert"` sempre montado, que recebe o Alert quando há erro. `run(ação)` roda
   numa transição e limpa o erro anterior; `fail(mensagem)` mostra a validação local no mesmo
-  Alert; `report(resultado)` serve ao botão com a própria transição (o "Publicar agora" de cada
-  linha). Nenhuma tela cria `role="status"` próprio para o retorno de uma ação.
+  Alert; `report(resultado)` serve a quem roda a ação com a própria transição (o "Publicar agora" do
+  menu de cada linha). Nenhuma tela cria `role="status"` próprio para o retorno de uma ação.
 - **Editor de conteúdo:** salvar e criar confirmam no toast, e o resumo de validação da barra
   do rodapé é o `ErrorSummary` do `SchemaForm` (o foco vai ao primeiro campo inválido).
   Remover bloco é imediato e se desfaz (#112): um toast `Notification type="info"` "Bloco N
