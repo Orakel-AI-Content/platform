@@ -17,6 +17,7 @@ sites é configuração.
 - Formatar: `pnpm format`
 - Ambiente local: `pnpm local:up` · `local:seed` · `local:check` · `local:publish <site>` · `local:load` · `local:trust` · `local:down` · `local:e2e` · `local:e2e:area <área>|smoke` · `local:e2e:telas <área>`
 - Compose direto: `infra/local/compose.sh <args>`
+- Sessão de branch em paralelo (ex.: `/execute`): `pnpm worktree new <issue> <branch>` no começo, `pnpm worktree rm <issue>` ao terminar; nunca deixe worktree para trás
 
 ## Unidades
 

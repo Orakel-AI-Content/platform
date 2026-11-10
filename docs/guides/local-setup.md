@@ -85,6 +85,29 @@ Para ensaiar esta seção e a "Primeira vez" numa máquina limpa, `infra/local/c
 roda os dois blocos acima, literalmente, num Linux com Docker próprio (Docker-in-Docker), sem
 tocar no ambiente da máquina; o log vai para `clean-machine.log`.
 
+## Worktrees
+
+Cada sessão de branch em paralelo trabalha numa worktree própria, criada e removida pelo
+`pnpm worktree` (`infra/local/worktree.sh`). As cópias ficam todas em
+`../.worktrees/<repo>-<id>`, ao lado do checkout principal e fora dele (lint, Prettier e
+Vitest não as veem). A pasta pode ser trocada com `ORAKEL_WORKTREES_DIR`.
+
+```sh
+pnpm worktree new 566 566-tag-imagem-release   # cria (ou reabre) e imprime o caminho
+pnpm worktree rm 566                           # ao terminar: remove a worktree e a branch local
+pnpm worktree gc --dry-run                     # o que a varredura removeria
+pnpm worktree list
+```
+
+- `new` usa a branch local, a remota (ajustes de revisão de um PR aberto) ou cria uma nova sobre
+  `origin/main`. Copia os arquivos do `.worktreeinclude` (`.env.local`) e roda `pnpm install`.
+- `rm` só remove quando nada se perde: árvore limpa e todos os commits num remoto. Senão, diz
+  por que não removeu.
+- `gc` remove, com o mesmo critério, as worktrees cujo trabalho acabou (PR mergeado ou fechado,
+  ou só commits da `main` e parada há mais de 24 h) e que não são o diretório de nenhum processo. Roda sozinho no
+  `SessionStart` do Claude Code, em segundo plano. Uma worktree esquecida dura, no máximo, até o
+  merge do PR.
+
 ## Sessões em paralelo
 
 O `backoffice-web` e o Caddy do compose são um só para todas as sessões: recriá-los com a
