@@ -6,7 +6,7 @@ import { releases } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { RELEASE_TAG_MESSAGE, ReleaseTagSchema } from './tag.ts';
 
-// Registro de releases do core (L1): a operação cadastra as tags já publicadas no GHCR, e a
+// Registro de versões do site-builder (L1): a operação cadastra as tags já publicadas no GHCR, e a
 // ação "Reconstruir na release X" escolhe entre elas. Tabela operacional, fora do snapshot.
 // Não confere a imagem no GHCR nem no host; editar e remover estão fora do escopo atual.
 

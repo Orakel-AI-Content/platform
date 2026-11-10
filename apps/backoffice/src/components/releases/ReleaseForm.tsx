@@ -31,7 +31,7 @@ export function ReleaseForm({
       defaultValues={{ tag: '' }}
       labels={{ tag: 'Tag' }}
       hints={{
-        tag: 'Versão da imagem site-builder já publicada no GHCR, no formato X.Y.Z: a tag Git core-vX.Y.Z publica a imagem X.Y.Z.',
+        tag: 'Versão da imagem site-builder já publicada no GHCR, no formato X.Y.Z: a tag Git site-builder-vX.Y.Z publica a imagem X.Y.Z.',
       }}
       actionBar={{ kind: 'create', href: RELEASES_HREF }}
       contentClassName={contentClassName}

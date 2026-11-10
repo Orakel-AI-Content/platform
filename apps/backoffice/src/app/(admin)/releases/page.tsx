@@ -16,7 +16,7 @@ export const metadata = { title: 'Releases' };
 type SearchParams = { searchParams: Promise<{ registrada?: string | string[] }> };
 
 /**
- * Registro de releases do core (#509), só para quem promove release (admin e operação): tag e
+ * Registro de versões do site-builder (#509), só para quem promove release (admin e operação): tag e
  * data de registro, com "Registrar release". `?registrada=<tag>` vem do cadastro. Lista no
  * padrão do template, como `/sites`: título, ação, toolbar e tabela no cartão.
  */
