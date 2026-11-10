@@ -143,6 +143,55 @@ describe('tabela de conteúdos', () => {
     expect(edit.getAttribute('aria-describedby')).toBeNull();
   });
 
+  it('mostra os autores de cada conteúdo, cortados com o nome inteiro em title (#587)', () => {
+    render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
+
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toContain('Autores');
+    const authors = screen.getByText('Ana Souza, Bruno Lima');
+    expect(authors.getAttribute('title')).toBe('Ana Souza, Bruno Lima');
+    expect(authors.className).toContain('truncate');
+  });
+
+  it('o conteúdo no ar tem "Ver no site" com o endereço público em nova aba (#587)', () => {
+    render(
+      <ContentsTable
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        rows={rows}
+        publicOrigin="https://exemplo-a.com.br"
+      />,
+    );
+
+    const view = screen.getByRole('link', { name: 'Ver Sobre no site' });
+    expect(view.getAttribute('href')).toBe('https://exemplo-a.com.br/sobre/');
+    expect(view.getAttribute('target')).toBe('_blank');
+    expect(view.getAttribute('rel')).toContain('noopener');
+    // Fora do ar (o rascunho em revisão nunca publicado): sem o link.
+    expect(screen.queryByRole('link', { name: 'Ver Guia de uso no site' })).toBeNull();
+  });
+
+  it('"Ver no site" usa o slug da versão no ar, não o da mais recente (#587)', () => {
+    const renamed: ContentListItem = { ...rows[1]!, slug: 'sobre-nos', liveSlug: 'sobre' };
+    render(
+      <ContentsTable
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        rows={[renamed]}
+        publicOrigin="https://exemplo-a.com.br"
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Ver Sobre no site' }).getAttribute('href')).toBe(
+      'https://exemplo-a.com.br/sobre/',
+    );
+  });
+
+  it('sem a origem pública do site, nenhum "Ver no site"', () => {
+    render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} canWrite />);
+
+    expect(screen.queryByRole('link', { name: /no site$/ })).toBeNull();
+  });
+
   it('o teclado alcança o link de versões de cada linha', async () => {
     const user = userEvent.setup();
     render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
@@ -280,7 +329,7 @@ describe('busca, filtros, ordem e paginação (#107)', () => {
     const statuses = screen
       .getAllByRole('row')
       .slice(1)
-      .map((row) => within(row).getAllByRole('cell')[2]?.textContent);
+      .map((row) => within(row).getAllByRole('cell')[3]?.textContent);
     expect(statuses[0]).toBe('Publicado');
     expect(statuses.at(-1)).toBe('Rascunho');
   });
@@ -417,15 +466,23 @@ describe('despublicar em massa (#495)', () => {
     expect(screen.queryByRole('button', { name: 'Despublicar em massa' })).toBeNull();
   });
 
-  it('com content.publish só os conteúdos no ar têm caixa, inclusive com rascunho por cima', () => {
+  it('com content.publish toda linha tem caixa; a do fora do ar fica desabilitada, com o motivo (#587)', () => {
     renderBulk();
 
-    expect(screen.getAllByRole('checkbox').map((box) => box.getAttribute('aria-label'))).toEqual([
-      'Selecionar todas as linhas',
+    const boxes = screen.getAllByRole<HTMLInputElement>('checkbox');
+    expect(boxes.map((box) => [box.getAttribute('aria-label'), box.disabled])).toEqual([
+      ['Selecionar todas as linhas', false],
       // Mais recente primeiro: 4, 3, 2, 1; o 4 e o 3 não estão no ar.
-      'Selecionar Rascunho sobre o publicado',
-      'Selecionar Publicado',
+      ['Selecionar Despublicado', true],
+      ['Selecionar Nunca publicado', true],
+      ['Selecionar Rascunho sobre o publicado', false],
+      ['Selecionar Publicado', false],
     ]);
+    for (const box of boxes.filter((candidate) => candidate.disabled)) {
+      const reason = document.getElementById(box.getAttribute('aria-describedby') ?? '');
+      expect(reason?.textContent).toBe('Só conteúdo no ar pode ser despublicado');
+    }
+    expect(boxes[3]?.getAttribute('aria-describedby')).toBeNull();
     // A barra só aparece com seleção.
     expect(screen.queryByRole('button', { name: 'Despublicar em massa' })).toBeNull();
   });

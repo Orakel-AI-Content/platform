@@ -19,7 +19,7 @@ export const metadata = { title: 'Conteúdos' };
 /**
  * Conteúdos do site com a versão mais recente de cada um. Ler exige site.read (o domínio
  * confere); criar e editar só aparecem com content.write; a seleção e a despublicação em massa,
- * com content.publish (#495). Lista no padrão do template (#362):
+ * com content.publish (#495). "Ver no site" leva ao domínio configurado do site (#587). Lista no padrão do template (#362):
  * a trilha acima do cartão; título, ação, toolbar e tabela dentro dele.
  */
 export default async function ContentsPage({ params }: { params: Promise<{ site: string }> }) {
@@ -55,6 +55,7 @@ export default async function ContentsPage({ params }: { params: Promise<{ site:
             unpublishAction={unpublishContentsAction}
             emptyAction={create}
             labelledBy="contents-title"
+            publicOrigin={site.domain ? `https://${site.domain}` : undefined}
           />
         </div>
       </AdaptiveCard>

@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // E2E (`Receita N`), mais um de 45 caracteres e um longo demais: o título usa a largura que
 // sobra e corta só quando falta espaço, sem a tabela passar da janela, e a data fica numa linha.
 // A 1440 px, o de 45 aparece inteiro; sobram 352 px de texto, e o de 50 fica no limite (#585).
+// A coluna de autores e o "Ver no site" (#587) entram nas mesmas medidas.
 
 const SITE = 'exemplo-a';
 const STATUSES = ['rascunho', 'em_revisao', 'aprovado', 'agendado', 'publicado', 'despublicado'];
@@ -55,6 +56,7 @@ function Contents({ canPublish = false }: { canPublish?: boolean }) {
         canPublish={canPublish}
         unpublishAction={() => Promise.resolve({ ok: true, message: 'Despublicados.' })}
         labelledBy="lista-titulo"
+        publicOrigin="https://horta-em-casa.com.br"
       />
     </ListScreen>
   );
@@ -130,8 +132,13 @@ describe('ContentsTable no navegador', () => {
     await userEvent.keyboard(' ');
     await expect.element(box).toBeChecked();
     expect(document.activeElement).toBe(box.element());
-    // A Receita 1 (índice 0) não está no ar: sem caixa.
-    expect(page.getByRole('checkbox', { name: 'Selecionar Receita 1' }).query()).toBeNull();
+    // A Receita 1 (índice 0) não está no ar: a caixa fica desabilitada, com o motivo (#587).
+    await expect
+      .element(page.getByRole('checkbox', { name: 'Selecionar Receita 1' }))
+      .toBeDisabled();
+    await expect
+      .element(page.getByRole('checkbox', { name: 'Selecionar Receita 1' }))
+      .toHaveAccessibleDescription('Só conteúdo no ar pode ser despublicado');
 
     const button = page.getByRole('button', { name: 'Despublicar em massa' });
     for (let step = 0; step < 80 && document.activeElement !== button.element(); step++) {

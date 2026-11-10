@@ -1,8 +1,9 @@
 'use client';
 
+import { contentPath } from '@orakel/core/v1';
 import Link from 'next/link';
 import { useMemo, useState, type ReactNode } from 'react';
-import { TbChecks, TbPencil } from 'react-icons/tb';
+import { TbChecks, TbExternalLink, TbPencil } from 'react-icons/tb';
 
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
@@ -54,10 +55,20 @@ function byText(text: (item: ContentListItem) => string) {
     text(a.original).localeCompare(text(b.original), 'pt-BR');
 }
 
+/** Motivo da caixa desabilitada no conteúdo fora do ar (#587). */
+export const NOT_LIVE_REASON = 'Só conteúdo no ar pode ser despublicado';
+
+/** Endereço público do conteúdo no ar, ou nada fora do ar ou sem a origem do site (#587). */
+function publicUrl(item: ContentListItem, publicOrigin: string | undefined): string | undefined {
+  if (item.liveSlug === null || !publicOrigin) return undefined;
+  return `${publicOrigin}${contentPath({ slug: item.liveSlug })}`;
+}
+
 function columnsFor(
   siteId: string,
   timeZone: string,
   canWrite: boolean,
+  publicOrigin: string | undefined,
 ): ColumnDef<ContentListItem>[] {
   const columns: ColumnDef<ContentListItem>[] = [
     {
@@ -81,6 +92,17 @@ function columnsFor(
       ),
     },
     {
+      id: 'authors',
+      header: 'Autores',
+      accessorFn: (item) => item.authors.join(', '),
+      enableGlobalFilter: false,
+      enableSorting: false,
+      cell: ({ row }) =>
+        row.original.authors.length > 0 ? (
+          <Truncated text={row.original.authors.join(', ')} className="max-w-40" />
+        ) : null,
+    },
+    {
       header: 'Status',
       accessorKey: 'status',
       enableGlobalFilter: false,
@@ -101,23 +123,41 @@ function columnsFor(
       cell: ({ row }) => <NoWrap>{formatDateTime(row.original.updatedAt, timeZone)}</NoWrap>,
     },
   ];
-  if (!canWrite) return columns;
+  if (!canWrite && !publicOrigin) return columns;
   return [
     ...columns,
     {
       id: 'actions',
       header: () => <span className="sr-only">Ações</span>,
       enableSorting: false,
-      // Na largura do botão de ícone, como no `CustomerListTable` do Ecme.
+      // Na largura dos botões de ícone, como no `CustomerListTable` do Ecme. O Editar fica na
+      // ponta, alinhado entre as linhas com e sem o "Ver no site".
       size: 1,
-      cell: ({ row }) => (
-        <IconButton
-          asElement={Link}
-          href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
-          label={`Editar ${row.original.title}`}
-          icon={<TbPencil />}
-        />
-      ),
+      cell: ({ row }) => {
+        const href = publicUrl(row.original, publicOrigin);
+        return (
+          <div className="flex items-center justify-end gap-1">
+            {href !== undefined && (
+              <IconButton
+                asElement="a"
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                label={`Ver ${row.original.title} no site`}
+                icon={<TbExternalLink />}
+              />
+            )}
+            {canWrite && (
+              <IconButton
+                asElement={Link}
+                href={`/sites/${siteId}/conteudos/${row.original.id}/editar`}
+                label={`Editar ${row.original.title}`}
+                icon={<TbPencil />}
+              />
+            )}
+          </div>
+        );
+      },
     },
   ];
 }
@@ -210,7 +250,8 @@ function ContentsSelected({
  * da página, repetida no estado vazio. As rotas são do editor (#45). Com `canPublish`
  * (content.publish) e a ação, os conteúdos no ar da página ganham caixa de seleção e a barra dos
  * selecionados despublica em massa (#495); a seleção vale para a página visível e zera quando
- * ela muda (página, busca, filtro) e depois do sucesso.
+ * ela muda (página, busca, filtro) e depois do sucesso. Os fora do ar têm a caixa desabilitada,
+ * com o motivo; a lista mostra os autores, e o conteúdo no ar ganha "Ver no site" (#587).
  */
 export function ContentsTable({
   siteId,
@@ -221,6 +262,7 @@ export function ContentsTable({
   unpublishAction,
   emptyAction,
   labelledBy,
+  publicOrigin,
 }: {
   siteId: string;
   /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
@@ -234,10 +276,12 @@ export function ContentsTable({
   emptyAction?: ReactNode;
   /** Id do título da lista, que dá nome à tabela. */
   labelledBy?: string;
+  /** Origem pública do site (`https://<domínio>`): sem ela, nenhum "Ver no site". */
+  publicOrigin?: string;
 }) {
   const columns = useMemo(
-    () => columnsFor(siteId, timeZone, canWrite),
-    [siteId, timeZone, canWrite],
+    () => columnsFor(siteId, timeZone, canWrite, publicOrigin),
+    [siteId, timeZone, canWrite, publicOrigin],
   );
   const { list, tableProps } = useListTable({ config: LIST, columns, data: rows });
   const [selection, setSelection] = useState<{ page: string; ids: number[] }>({
@@ -306,6 +350,7 @@ export function ContentsTable({
           ? {
               selectable: true,
               rowSelectable: (item: ContentListItem) => item.live,
+              rowUnselectableReason: () => NOT_LIVE_REASON,
               checkboxLabel: (item: ContentListItem) => `Selecionar ${item.title}`,
               checkboxChecked: (item: ContentListItem) =>
                 selected.some((chosen) => chosen.id === item.id),
