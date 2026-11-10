@@ -13,6 +13,7 @@ Monorepo da plataforma Orakel AI: uma rede de 5 a 20 sites de conteúdo gerados 
 - [Pré-requisitos](#pré-requisitos)
 - [Primeira vez](#primeira-vez)
 - [Comandos](#comandos)
+- [Versão do site-builder e builds](#versão-do-site-builder-e-builds)
 - [Endereços e acessos](#endereços-e-acessos)
 - [Problemas comuns](#problemas-comuns)
 - [Unidades](#unidades)
@@ -137,6 +138,85 @@ Argumentos extras vão para o Playwright.
 | Fumaça da imagem `site-builder`                      | `tooling/build-site/scripts/smoke.sh`                            |
 
 `PLATFORM=linux/amd64` força a arquitetura da VPS (o padrão local é a da máquina).
+
+## Versão do site-builder e builds
+
+O porquê dos nomes e das regras está no
+[ADR 0018](docs/decisions/0018-versao-do-site-builder.md); o funcionamento dos builds no
+ambiente local, em [`local-setup.md`](docs/guides/local-setup.md#builds).
+
+### O que é o `site-builder`
+
+É a imagem Docker que transforma o conteúdo do Backoffice em site: `render` gera o site
+estático, `publish` o envia para o alvo de deploy e `ssr` serve a visualização. Existe **uma
+imagem para todos os sites**; quem a executa é o `build-runner`, uma vez para cada site.
+
+### Imagem × build
+
+- **Versão do site-builder:** a versão do gerador, compartilhada. Vários sites podem estar na
+  mesma versão, e cada site guarda qual usa.
+- **Build:** uma execução da imagem para **um** site. Cada site tem fila própria (um build por
+  vez), histórico próprio (tabela `builds`), deploy próprio e rollback próprio.
+
+Trocar a versão de um site não mexe nos outros; publicar um site não reconstrói os outros.
+
+### As três formas da versão
+
+Uma versão tem sempre o mesmo `X.Y.Z`, escrito de três jeitos:
+
+| Onde aparece             | Forma                                          | Exemplo                                        |
+| ------------------------ | ---------------------------------------------- | ---------------------------------------------- |
+| Tag Git (você cria)      | `site-builder-vX.Y.Z`                          | `site-builder-v1.2.0`                          |
+| Imagem (o CI publica)    | `ghcr.io/orakel-ai-content/site-builder:X.Y.Z` | `ghcr.io/orakel-ai-content/site-builder:1.2.0` |
+| Backoffice (`/releases`) | `X.Y.Z`, igual à tag da imagem, sem prefixo    | `1.2.0`                                        |
+
+O cadastro em `/releases` só aceita `X.Y.Z`: colar a tag Git (`site-builder-v1.2.0`) dá erro.
+
+### Passo a passo de uma versão nova
+
+1. **Crie e envie a tag** num commit da `main`:
+   `git tag site-builder-vX.Y.Z && git push origin site-builder-vX.Y.Z`. Merge na `main` não
+   cria versão; só a tag cria.
+2. **O `release.yml` roda:** confere que o último E2E completo da `main` terminou verde e, só
+   então, publica a imagem `site-builder:X.Y.Z` no GHCR. Se o E2E estiver vermelho (ou não
+   houver run concluído), ele se recusa e nada é publicado: corrija a `main` e rode de novo.
+3. **Leve a imagem ao host** onde o `build-runner` roda (`docker pull …/site-builder:X.Y.Z`).
+   O build não baixa imagens: sem ela no host, o build do site falha.
+4. **Registre a versão** em `/releases` → "Registrar release", com o valor `X.Y.Z`.
+5. **Mova um site primeiro:** em `/sites/<site>`, "Reconstruir na release" e escolha `X.Y.Z`.
+6. **Observe** o resultado do build ("Último build" em `/sites`, logs do `build-runner`) e o
+   site no ar; estando tudo certo, mova os demais, um por um.
+
+### Quando usar cada ação
+
+Todas ficam em `/sites/<site>`.
+
+| Quero…                                                        | Ação                     | O que acontece                                                            |
+| ------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------- |
+| Trocar a versão do gerador de um site, ou voltar a uma antiga | "Reconstruir na release" | Grava a versão no site, retoma o site se pausado e faz um build novo já   |
+| Voltar o site no ar a uma versão publicada antes (rollback)   | "Reverter"               | Reativa um deploy anterior, **sem rebuild**; a versão do gerador não muda |
+| Publicar já o que mudou, sem esperar a janela de agrupamento  | "Publicar agora"         | Antecipa o build na versão atual do site (não aparece com o site pausado) |
+
+Regra prática: o problema veio com a versão nova do gerador → "Reconstruir na release" na
+versão anterior. O problema veio com um conteúdo publicado → "Reverter" enquanto corrige.
+
+### Comandos úteis
+
+| Quero…                                                              | Comando                                                                                                    |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Criar uma versão nova do site-builder (dispara o `release.yml`)     | `git tag site-builder-vX.Y.Z && git push origin site-builder-vX.Y.Z`                                       |
+| Reconstruir as imagens locais depois de mudar o gerador             | `pnpm local:images`                                                                                        |
+| Construir só a imagem `site-builder`, como o CI faz                 | `docker/bake.sh release`                                                                                   |
+| Conferir se a imagem `site-builder` gera e serve um site            | `tooling/build-site/scripts/smoke.sh [imagem]`                                                             |
+| Subir o ambiente local                                              | `pnpm local:up`                                                                                            |
+| Criar os sites de exemplo e os usuários de teste                    | `pnpm local:seed`                                                                                          |
+| Conferir se o ambiente está saudável antes de testar um build       | `pnpm local:check`                                                                                         |
+| Publicar um site direto, sem passar pelo Backoffice                 | `pnpm local:publish <site>`                                                                                |
+| Ver os builds rodando (e por que um falhou)                         | `infra/local/compose.sh logs -f build-runner`                                                              |
+| Testar o "Reconstruir na release" no local, sem publicar uma versão | `docker tag ghcr.io/orakel-ai-content/site-builder:local ghcr.io/orakel-ai-content/site-builder:X.Y.Z` (¹) |
+
+(¹) Cria no host local a imagem `X.Y.Z` a partir da que o `pnpm local:images` construiu; depois
+registre `X.Y.Z` em `/releases` e use "Reconstruir na release" num site. Nada vai para o GHCR.
 
 ## Endereços e acessos
 
