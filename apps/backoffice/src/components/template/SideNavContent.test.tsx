@@ -9,7 +9,8 @@ import SideNavContent from './SideNavContent.tsx';
 
 // Conteúdo da barra (#242), o mesmo da barra fixa e do Drawer: `nav "Principal"` sempre; o
 // seletor e `nav "Áreas do site"` só quando o endereço é de um site que a pessoa vê; o clique
-// num item dos dois menus chega a `onMenuItemClick`.
+// num item dos dois menus chega a `onMenuItemClick`. O selo de Revisão vem da contagem do
+// site do endereço (#583), e some com a fila vazia.
 
 const pathname = vi.hoisted(() => ({ value: '/sites' }));
 vi.mock('next/navigation', () => ({ usePathname: () => pathname.value }));
@@ -23,9 +24,20 @@ const SITES = [
 
 const TREE = filterNavigation(navigationConfig, { email: 'e', roles: ['editor'] });
 
-function renderAt(path: string, onMenuItemClick?: () => void) {
+function renderAt(
+  path: string,
+  onMenuItemClick?: () => void,
+  reviewCounts?: Readonly<Record<string, number>>,
+) {
   pathname.value = path;
-  render(<SideNavContent navigationTree={TREE} sites={SITES} onMenuItemClick={onMenuItemClick} />);
+  render(
+    <SideNavContent
+      navigationTree={TREE}
+      sites={SITES}
+      reviewCounts={reviewCounts}
+      onMenuItemClick={onMenuItemClick}
+    />,
+  );
 }
 
 const principal = () => screen.getByRole('navigation', { name: 'Principal' });
@@ -77,5 +89,16 @@ describe('SideNavContent', () => {
     await user.click(within(areas()!).getByRole('link', { name: 'Mídia' }));
 
     expect(onMenuItemClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('o selo de Revisão é o da fila do site do endereço; com a fila vazia, sem selo', () => {
+    renderAt('/sites/exemplo-a/conteudos', undefined, { 'exemplo-a': 3, 'exemplo-b': 1 });
+    const revisao = within(areas()!).getByRole('link', { name: 'Revisão, 3 aguardando' });
+    expect(revisao.querySelector('.badge')?.textContent).toBe('3');
+    cleanup();
+
+    renderAt('/sites/exemplo-b/conteudos', undefined, { 'exemplo-a': 3 });
+    const vazia = within(areas()!).getByRole('link', { name: 'Revisão' });
+    expect(vazia.querySelector('.badge')).toBeNull();
   });
 });

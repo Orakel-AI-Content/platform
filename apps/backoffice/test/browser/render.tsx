@@ -52,6 +52,8 @@ type FrameOptions = {
   roles?: readonly Role[];
   /** Os sites pausados do aviso no topo do <main> (#511); nenhum por padrão. */
   pausedSites?: readonly PausedSite[];
+  /** O tamanho da fila de revisão por site, o selo do item Revisão (#583); nenhum por padrão. */
+  reviewCounts?: Readonly<Record<string, number>>;
 };
 
 /**
@@ -63,7 +65,12 @@ type FrameOptions = {
  */
 export function renderInFrame(
   ui: ReactNode,
-  { sites = FRAME_SITES, roles = ['editor'], pausedSites = [] }: FrameOptions = {},
+  {
+    sites = FRAME_SITES,
+    roles = ['editor'],
+    pausedSites = [],
+    reviewCounts = {},
+  }: FrameOptions = {},
 ) {
   return renderInApp(
     <div className="min-h-screen">
@@ -76,6 +83,7 @@ export function renderInFrame(
       <CollapsibleSide
         navigationTree={filterNavigation(navigationConfig, { email: FRAME_EMAIL, roles })}
         sites={sites}
+        reviewCounts={reviewCounts}
         headerEnd={
           <>
             <ThemeSwitcher initialMode={undefined} />

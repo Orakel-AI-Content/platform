@@ -21,7 +21,9 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // fica e o botão do celular não. Com os links pelo roteador em memória (#476; antes no E2E,
 // `site-layout.spec.ts` e `header.spec.ts`, #171, #172, #238, #242): a área atual pelo endereço,
 // a barra, a marca e o seletor só com o teclado, a troca de site na mesma área, a barra recolhida
-// entre áreas e o Drawer que fecha ao navegar.
+// entre áreas e o Drawer que fecha ao navegar. O selo da fila de revisão (#583): à vista
+// expandida, com a contagem no nome do link e, recolhida, na dica; sem violação do axe nos dois
+// temas.
 
 const SITE_NAME = 'Exemplo A — Guias';
 const OTHER_SITE = 'Exemplo B — Receitas';
@@ -221,6 +223,24 @@ describe('CollapsibleSide no navegador', () => {
     await expect.element(menuItem(SITE_NAME)).toHaveFocus();
     expect(await audit(sideNav(), page.getByRole('menu'))).toEqual([]);
   });
+
+  it.each(COLOR_SCHEMES)(
+    'o selo de Revisão (%s): à vista, a contagem no nome e, recolhida, na dica; sem violação',
+    async (scheme) => {
+      await setTheme(scheme);
+      await renderInFrame(<p>Conteúdo</p>, { reviewCounts: { 'exemplo-a': 2 } });
+      const revisao = () => areas().getByRole('link', { name: 'Revisão, 2 aguardando' });
+      await expect.element(revisao()).toBeVisible();
+      expect(revisao().element().querySelector('.badge')?.textContent).toBe('2');
+      expect(await audit(sideNav())).toEqual([]);
+
+      await collapse();
+      await userEvent.hover(revisao());
+      await expect
+        .element(page.getByRole('tooltip', { name: 'Revisão, 2 aguardando' }))
+        .toBeVisible();
+    },
+  );
 
   it('recolhida, a barra continua assim entre áreas e volta expandida ao montar de novo', async () => {
     const screen = await renderInFrame(<p>Conteúdo</p>, { roles: ['operacao'] });

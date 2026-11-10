@@ -12,6 +12,8 @@ import UserProfileDropdown from '@/components/template/UserProfileDropdown';
 import classNames from '@/components/ui/utils/classNames';
 import navigationConfig, { filterNavigation } from '@/configs/navigation.config';
 import { parseThemeMode, THEME_COOKIE } from '@/configs/theme.config';
+import { getDb } from '@/db/client.ts';
+import { countReviewQueues } from '@/domain/content/contents.ts';
 
 import { readVisibleSites } from './visible-sites.ts';
 
@@ -20,7 +22,9 @@ import { readVisibleSites } from './visible-sites.ts';
 // CollapsibleSide do Ecme (#237; workspace#46): a árvore de navegação filtrada pelo RBAC e os
 // sites visíveis saem daqui, do servidor, e a barra lateral marca o item pelo endereço. O modo
 // de tema sai do mesmo cookie que o layout raiz lê, para a troca (#240) já vir marcada. Dos
-// mesmos sites visíveis sai o aviso de site pausado no topo de toda tela (#511).
+// mesmos sites visíveis sai o aviso de site pausado no topo de toda tela (#511). O tamanho da
+// fila de revisão de todos os sites sai numa consulta só (#583); a barra, que conhece o site do
+// endereço, escolhe o dele para o selo do item Revisão.
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const actor = await currentActor();
   if (!actor.ok) {
@@ -37,9 +41,13 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </main>
     );
   }
-  const sites = await readVisibleSites();
+  const [sites, reviews] = await Promise.all([
+    readVisibleSites(),
+    countReviewQueues(getDb().db, actor.value),
+  ]);
   const visible = sites?.ok ? sites.value.map((site) => ({ id: site.id, name: site.name })) : [];
   const paused = sites?.ok ? sites.value.filter((site) => site.state === 'pausado') : [];
+  const reviewCounts = reviews.ok ? reviews.value : {};
   const themeMode = parseThemeMode((await cookies()).get(THEME_COOKIE)?.value);
   return (
     <div className="min-h-screen">
@@ -54,6 +62,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       <CollapsibleSide
         navigationTree={filterNavigation(navigationConfig, actor.value)}
         sites={visible}
+        reviewCounts={reviewCounts}
         headerEnd={
           <>
             <ThemeSwitcher initialMode={themeMode} />
