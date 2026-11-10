@@ -133,7 +133,7 @@ test('Configuração do site e Mudanças pendentes ficam atuais nas suas telas',
   for (const [path, area] of [
     ['configuracao', 'Configuração do site'],
     ['pendencias', 'Mudanças pendentes'],
-  ]) {
+  ] as const) {
     await page.goto(`/sites/${SITE}/${path}`);
     await expect(bar.locator('[aria-current="page"]')).toHaveText([area]);
   }
