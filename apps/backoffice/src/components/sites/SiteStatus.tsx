@@ -182,9 +182,41 @@ type ConfirmedSiteAction = {
   body: ReactNode;
 };
 
+/** Confirmação de uma ação que muda o site publicado (#327): `ConfirmDialog` na cor de erro. */
+function ConfirmedSiteActionDialog({
+  siteId,
+  isOpen,
+  onCancel,
+  onConfirm,
+  onAfterClose,
+  copy,
+}: {
+  siteId: string;
+  isOpen: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onAfterClose?: () => void;
+  copy: ConfirmedSiteAction;
+}) {
+  return (
+    <ConfirmDialog
+      isOpen={isOpen}
+      type="danger"
+      title={copy.title(siteId)}
+      confirmText={copy.confirmText}
+      confirmButtonProps={dangerConfirmButtonProps}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      onAfterClose={onAfterClose}
+    >
+      {copy.body}
+    </ConfirmDialog>
+  );
+}
+
 /**
  * Botão de uma ação que muda o site publicado (#327): pede confirmação num `ConfirmDialog`, na
- * cor de erro, e roda com a própria transição (cada linha da lista tem o seu "Enfileirando…");
+ * cor de erro, e roda com a própria transição (o botão mostra o "Enfileirando…");
  * `onResult` é o `report` do `useActionResult` de quem decide onde fica o erro.
  */
 function ConfirmedSiteActionButton({
@@ -212,20 +244,16 @@ function ConfirmedSiteActionButton({
         {pending ? copy.pendingLabel : copy.label}
         <span className="sr-only"> {siteId}</span>
       </Button>
-      <ConfirmDialog
+      <ConfirmedSiteActionDialog
+        siteId={siteId}
         isOpen={confirming}
-        type="danger"
-        title={copy.title(siteId)}
-        confirmText={copy.confirmText}
-        confirmButtonProps={dangerConfirmButtonProps}
+        copy={copy}
         onCancel={() => setConfirming(false)}
         onConfirm={() => {
           setConfirming(false);
           startTransition(async () => onResult(await action(siteId)));
         }}
-      >
-        {copy.body}
-      </ConfirmDialog>
+      />
     </>
   );
 }
@@ -252,7 +280,7 @@ const RESUME_SITE: ConfirmedSiteAction = {
 };
 
 /** Enfileira o build já, sem esperar a janela; muda o site publicado. */
-export function PublishNowButton({
+function PublishNowButton({
   siteId,
   action,
   onResult,
@@ -267,6 +295,39 @@ export function PublishNowButton({
       action={action}
       onResult={onResult}
       copy={PUBLISH_NOW}
+    />
+  );
+}
+
+/** Texto de "Publicar agora" e de quando está na fila, para o item do menu da lista de sites. */
+export const PUBLISH_NOW_LABEL = { idle: PUBLISH_NOW.label, pending: PUBLISH_NOW.pendingLabel };
+
+/**
+ * A confirmação de "Publicar agora" sem o botão (lista de sites, #586): quem a abre guarda o
+ * estado, roda a ação no `onConfirm` e devolve o foco no `onAfterClose`.
+ */
+export function PublishNowDialog({
+  siteId,
+  isOpen,
+  onCancel,
+  onConfirm,
+  onAfterClose,
+}: {
+  siteId: string;
+  isOpen: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  /** Depois de fechar: devolve o foco a quem abriu, quando o item que abriu já não existe. */
+  onAfterClose?: () => void;
+}) {
+  return (
+    <ConfirmedSiteActionDialog
+      siteId={siteId}
+      isOpen={isOpen}
+      copy={PUBLISH_NOW}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      onAfterClose={onAfterClose}
     />
   );
 }

@@ -22,9 +22,8 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // caso de largura fica nos dados: nome e domínio longos, um site pausado com motivo longo e conteúdo culpado e um
 // com último build e versão longa. As ações são as da operação (publicar e configurar). O menu
 // "Mais ações" (#248; antes no E2E, #476) abre pelo mouse e pelo teclado, com o foco no primeiro
-// item e as setas nos outros, e acionar um item fecha o menu e navega. A data do último build
-// fica inteira numa linha, com a versão curta; a 1440 px, com os sites do seed local, nome e
-// `id · domínio` aparecem inteiros (#585).
+// item e as setas nos outros, e acionar um item fecha o menu e navega. "Publicar agora" é o
+// último item do menu (#586), não um botão na linha.
 
 const STAMP = '1761000000000';
 const LONG_NAME = 'Guia completo de receitas regionais brasileiras para o dia a dia';
@@ -135,6 +134,15 @@ describe('SitesTable no navegador', () => {
     await expect
       .element(row(ids[0]!).getByRole('link', { name: `1 mudança pendente em ${ids[0]}` }))
       .toHaveAttribute('href', `/sites/${ids[0]}/pendencias`);
+    // Sem botão de publicar na linha (#586); o domínio abre o site em nova aba.
+    expect(
+      row(ids[0]!)
+        .getByRole('button', { name: /Publicar agora/ })
+        .elements(),
+    ).toHaveLength(0);
+    await expect
+      .element(row(ids[3]!).getByRole('link', { name: `${ids[3]}.example.com (abre em nova aba)` }))
+      .toHaveAttribute('href', `https://${ids[3]}.example.com`);
   });
 
   it('a 1440 px, os sites do seed aparecem inteiros, com a data do último build', async () => {
@@ -172,15 +180,16 @@ describe('SitesTable no navegador', () => {
       await renderInFrame(<Sites />, { roles: ['admin'] });
       expect(await audit()).toEqual([]);
 
-      // "Publicar agora" confirma num diálogo (#327); Cancelar fecha e devolve o foco à linha.
-      const publish = page.getByRole('button', { name: `Publicar agora ${ids[0]}` });
-      await publish.click();
+      // "Publicar agora" é item do menu (#586) e confirma num diálogo (#327); Cancelar fecha e
+      // devolve o foco ao "Mais ações" da linha, já que o item some com o menu.
+      await moreActions().click();
+      await menuItem('Publicar agora').click();
       const dialog = page.getByRole('alertdialog', { name: `Publicar ${ids[0]} agora?` });
       await expect.element(dialog).toBeVisible();
       expect(await audit()).toEqual([]);
       await dialog.getByRole('button', { name: 'Cancelar' }).click();
       await expect.element(dialog).not.toBeInTheDocument();
-      await expect.element(publish).toHaveFocus();
+      await expect.element(moreActions()).toHaveFocus();
     },
   );
 

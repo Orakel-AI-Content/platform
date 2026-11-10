@@ -105,7 +105,7 @@ test.use({ viewport: { width: 1280, height: 800 } });
 
 async function openAsAdmin(page: Page): Promise<void> {
   await asRole(page, 'admin');
-  // O menu e "Publicar agora" só respondem depois da hidratação.
+  // O menu "Mais ações" só responde depois da hidratação.
   await page.waitForLoadState('networkidle');
 }
 
@@ -117,16 +117,17 @@ test(`a lista de sites sem violação do axe`, async ({ page }) => {
 
   await expectNoViolations(page);
 
-  // "Publicar agora" da linha confirma num diálogo (#327), sem violação com ele aberto;
-  // Cancelar não publica e devolve o foco ao botão da linha.
-  const publish = page.getByRole('button', { name: 'Publicar agora exemplo-a' });
-  await publish.click();
+  // "Publicar agora", no menu "Mais ações" da linha (#586), confirma num diálogo (#327), sem
+  // violação com ele aberto; Cancelar não publica e devolve o foco ao gatilho do menu.
+  const moreActions = page.getByRole('button', { name: 'Mais ações: exemplo-a' });
+  await moreActions.click();
+  await page.getByRole('menuitem', { name: 'Publicar agora exemplo-a' }).click();
   const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
   await expect(dialog).toBeVisible();
   await expectNoViolations(page);
   await dialog.getByRole('button', { name: 'Cancelar' }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(publish).toBeFocused();
+  await expect(moreActions).toBeFocused();
 });
 
 // Lista no cartão do template (#364): busca, filtro por estado, ordem e tamanho na URL;
