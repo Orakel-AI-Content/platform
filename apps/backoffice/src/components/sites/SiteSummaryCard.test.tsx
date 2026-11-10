@@ -230,7 +230,7 @@ describe('SiteSummaryCard', () => {
 
   it('"Reconstruir na release" só quando a página passa a ação, ativo ou pausado', () => {
     const rebuild = {
-      releases: ['1.3.0'],
+      releases: [{ tag: '1.3.0', imageStatus: 'disponivel' as const }],
       action: vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' })),
     };
     const { rerender } = render(<SiteSummaryCard site={site} instance={instance} g1Registered />);

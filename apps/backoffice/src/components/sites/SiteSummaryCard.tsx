@@ -14,7 +14,11 @@ import Card from '@/components/ui/Card';
 import type { RollbackVersion } from '@/domain/builds/builds.ts';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
-import { RebuildReleaseDialog, type RebuildOnRelease } from './RebuildReleaseDialog.tsx';
+import {
+  RebuildReleaseDialog,
+  type RebuildOnRelease,
+  type RebuildRelease,
+} from './RebuildReleaseDialog.tsx';
 import { RollbackDialog, type RollbackSite } from './RollbackDialog.tsx';
 import {
   PendingCount,
@@ -105,8 +109,8 @@ export function SiteSummaryCard({
   g1Registered: boolean;
   publish?: PublishNow;
   resume?: ResumeSite;
-  /** Releases registradas e a action de reconstruir, já ligada ao site. */
-  rebuild?: { releases: readonly string[]; action: RebuildOnRelease };
+  /** Releases registradas (com o estado da imagem) e a action de reconstruir, já ligada ao site. */
+  rebuild?: { releases: readonly RebuildRelease[]; action: RebuildOnRelease };
   /** Versões revertíveis (sem a ativa) e a action de reverter, já ligada ao site. */
   rollback?: { versions: readonly RollbackVersion[]; action: RollbackSite };
 }) {

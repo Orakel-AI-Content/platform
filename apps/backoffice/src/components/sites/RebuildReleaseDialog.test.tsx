@@ -9,13 +9,19 @@ import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { toast, ToastProvider } from '@/components/ui/toast';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
-import { RebuildReleaseDialog } from './RebuildReleaseDialog.tsx';
+import { RebuildReleaseDialog, type RebuildRelease } from './RebuildReleaseDialog.tsx';
 
 // Reconstruir na release (#515): o Select das releases registradas começando na atual (ou na
 // mais recente), a action com a tag escolhida e o retorno padrão (sucesso no toast, recusa no
-// Alert). Foco e axe no navegador, em `RebuildReleaseDialog.browser.test.tsx`.
+// Alert). Com a imagem da release escolhida ausente, o Alert de aviso sem travar o confirmar
+// (#574). Foco e axe no navegador, em `RebuildReleaseDialog.browser.test.tsx`.
 
-const RELEASES = ['1.3.0', '1.2.0', '1.1.0'];
+const RELEASES: RebuildRelease[] = [
+  { tag: '1.3.0', imageStatus: 'disponivel' },
+  { tag: '1.2.0', imageStatus: 'disponivel' },
+  { tag: '1.1.0', imageStatus: 'ausente' },
+];
+const MISSING = /A imagem site-builder:1\.1\.0 não estava no host/;
 const NAME = 'Reconstruir o site numa release?';
 
 let app: HTMLElement;
@@ -29,7 +35,7 @@ function Rebuild({
   action: (tag: string) => Promise<ActionResult>;
   current?: string | null;
   paused?: boolean;
-  releases?: readonly string[];
+  releases?: readonly RebuildRelease[];
 }) {
   return (
     <>
@@ -117,6 +123,34 @@ describe('reconstruir na release', () => {
     expect(
       within(dialog).getByRole('button', { name: 'Reconstruir' }).hasAttribute('disabled'),
     ).toBe(true);
+  });
+
+  it('com a imagem da release escolhida ausente, avisa e o Reconstruir continua habilitado', async () => {
+    const action = vi.fn().mockResolvedValue({ ok: true, message: 'ok' });
+    render(<Rebuild action={action} />, { container: app });
+
+    const dialog = await openDialog();
+    expect(within(dialog).queryByText(MISSING)).toBeNull();
+    await userEvent.click(screen.getByRole('combobox', { name: 'Release' }));
+    await userEvent.click(screen.getByText('1.1.0'));
+
+    expect(within(dialog).getByText(MISSING)).toBeTruthy();
+    const confirm = within(dialog).getByRole('button', { name: 'Reconstruir' });
+    expect(confirm.hasAttribute('disabled')).toBe(false);
+    await userEvent.click(confirm);
+
+    await waitFor(() => expect(action).toHaveBeenCalledWith('1.1.0'));
+  });
+
+  it('imagem não conferida não gera aviso', async () => {
+    render(
+      <Rebuild action={vi.fn()} current={null} releases={[{ tag: '2.0.0', imageStatus: null }]} />,
+      { container: app },
+    );
+
+    const dialog = await openDialog();
+    expect(dialog.textContent).toContain('site-builder:2.0.0');
+    expect(dialog.textContent).not.toContain('não estava no host');
   });
 
   it('cancelar fecha sem chamar a action', async () => {
