@@ -46,17 +46,20 @@ function byText(text: (site: SiteSummary) => string) {
     text(a.original).localeCompare(text(b.original), 'pt-BR');
 }
 
+/** Caracteres da versão no último build, como um hash curto; a inteira fica em `title` (#585). */
+const SHORT_VERSION = 8;
+
 /**
- * Último build: a lista mistura fusos, cada linha com a sigla; a data inteira e a versão cortada
- * (#585). O nome e o domínio cortam na largura que sobra (coluna fluida); o resto cabe a 1280 px
- * dentro do cartão do template (#248, #364).
+ * Último build: a lista mistura fusos, cada linha com a sigla; a data inteira e a versão curta
+ * (#585), para o nome e o `id · domínio` caberem a 1440 px na coluna fluida, que corta o que
+ * sobrar. O resto cabe a 1280 px dentro do cartão do template (#248, #364).
  */
 function LastBuildCell({ build, timeZone }: { build: SiteSummary['lastBuild']; timeZone: string }) {
   return (
     <LastBuildSummary
       build={build}
       timeZone={timeZone}
-      details={(text) => <Truncated text={text} className="max-w-24" />}
+      details={(version) => <span title={version}>{version.slice(0, SHORT_VERSION)}</span>}
     />
   );
 }
