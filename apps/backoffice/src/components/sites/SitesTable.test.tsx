@@ -58,6 +58,12 @@ beforeEach(() => {
   Modal.setAppElement(app);
 });
 
+/** Escolhe "Publicar agora" no menu "Mais ações" do site (#586). */
+async function choosePublish(user: ReturnType<typeof userEvent.setup>, siteId: string) {
+  await user.click(screen.getByRole('button', { name: `Mais ações: ${siteId}` }));
+  await user.click(await screen.findByRole('menuitem', { name: `Publicar agora ${siteId}` }));
+}
+
 /** Confirma no diálogo de "Publicar agora". */
 async function confirmPublish(user: ReturnType<typeof userEvent.setup>, siteId: string) {
   const dialog = await screen.findByRole('alertdialog', { name: `Publicar ${siteId} agora?` });
@@ -205,7 +211,20 @@ describe('tabela de sites', () => {
     expect(screen.getByRole('link', { name: 'Exemplo A' }).getAttribute('href')).toBe(
       '/sites/exemplo-a',
     );
-    expect(screen.getByText('exemplo-a · exemplo-a.test')).toBeTruthy();
+    expect(screen.getByTitle('exemplo-a · exemplo-a.test').textContent).toBe(
+      'exemplo-a · exemplo-a.test (abre em nova aba)',
+    );
+  });
+
+  it('o domínio abre o site no ar em nova aba; sem domínio, fica só o ID (#586)', () => {
+    render(<SitesTable rows={[site, { ...site, id: 'exemplo-b', name: 'B', domain: '' }]} />);
+
+    const link = screen.getByRole('link', { name: 'exemplo-a.test (abre em nova aba)' });
+    expect(link.getAttribute('href')).toBe('https://exemplo-a.test');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(screen.getByTitle('exemplo-b').querySelector('a')).toBeNull();
+    expect(screen.getAllByRole('link', { name: /abre em nova aba/ })).toHaveLength(1);
   });
 
   it('pendências > 0 se destacam e levam à tela de pendências; 0 não (#100)', () => {
@@ -243,7 +262,76 @@ describe('tabela de sites', () => {
     ]);
   });
 
-  it('"Publicar agora" fica fora do menu e o sucesso vai para o toast', async () => {
+  it('"Publicar agora" é o último item do menu, com operations.run; sem botão na linha (#586)', async () => {
+    const user = userEvent.setup();
+    const publishNow = vi.fn((): Promise<ActionResult> =>
+      Promise.resolve({ ok: true, message: '' }),
+    );
+    render(<SitesTable rows={[site]} publishNow={publishNow} canConfigure />);
+
+    expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Mais ações: exemplo-a' }));
+    const items = (await screen.findAllByRole('menuitem')).map((item) => item.textContent);
+    expect(items).toEqual([
+      'Conteúdos exemplo-a',
+      'Mídia exemplo-a',
+      'Editar configuração exemplo-a',
+      'Publicar agora exemplo-a',
+    ]);
+  });
+
+  it('Cancelar não publica e devolve o foco ao Mais ações da linha (#586)', async () => {
+    const user = userEvent.setup();
+    const publishNow = vi.fn((): Promise<ActionResult> =>
+      Promise.resolve({ ok: true, message: '' }),
+    );
+    render(<SitesTable rows={[site]} publishNow={publishNow} />);
+
+    await choosePublish(user, 'exemplo-a');
+    const dialog = await screen.findByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(publishNow).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Mais ações: exemplo-a' }),
+      ),
+    );
+  });
+
+  it('enquanto enfileira, o item do site fica desabilitado com "Enfileirando…" (#586)', async () => {
+    const user = userEvent.setup();
+    let resolve: (result: ActionResult) => void = () => {};
+    const publishNow = vi.fn(
+      (): Promise<ActionResult> =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    render(<SitesTable rows={[site, { ...site, id: 'exemplo-b' }]} publishNow={publishNow} />);
+
+    await choosePublish(user, 'exemplo-a');
+    await confirmPublish(user, 'exemplo-a');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+
+    await openMenu('exemplo-a');
+    const item = screen.getByRole('menuitem', { name: 'Enfileirando… exemplo-a' });
+    expect(item.getAttribute('aria-disabled')).toBe('true');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    await openMenu('exemplo-b');
+    expect(screen.getByRole('menuitem', { name: 'Publicar agora exemplo-b' })).toBeTruthy();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+
+    act(() => resolve({ ok: true, message: '' }));
+    await openMenu('exemplo-a');
+    const done = await screen.findByRole('menuitem', { name: 'Publicar agora exemplo-a' });
+    expect(done.getAttribute('aria-disabled')).not.toBe('true');
+  });
+
+  it('"Publicar agora" do menu confirma e o sucesso vai para o toast', async () => {
     const user = userEvent.setup();
     const publishNow = vi.fn((siteId: string): Promise<ActionResult> =>
       Promise.resolve({ ok: true, message: `Build de ${siteId} enfileirado.` }),
@@ -255,7 +343,7 @@ describe('tabela de sites', () => {
       </>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-b' }));
+    await choosePublish(user, 'exemplo-b');
     await confirmPublish(user, 'exemplo-b');
 
     await waitFor(() => expect(toastStatus().textContent).toBe('Build de exemplo-b enfileirado.'));
@@ -271,7 +359,7 @@ describe('tabela de sites', () => {
     render(<SitesTable rows={[site, { ...site, id: 'exemplo-b' }]} publishNow={publishNow} />);
 
     expect(screen.getAllByRole('alert')).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-b' }));
+    await choosePublish(user, 'exemplo-b');
     await confirmPublish(user, 'exemplo-b');
 
     const region = screen.getByRole('alert');
@@ -282,7 +370,7 @@ describe('tabela de sites', () => {
     ).toBeTruthy();
   });
 
-  it('site pausado não tem "Publicar agora"; o ativo tem (#155)', () => {
+  it('site pausado não tem "Publicar agora"; o ativo tem (#155)', async () => {
     const publishNow = vi.fn((): Promise<ActionResult> =>
       Promise.resolve({ ok: true, message: '' }),
     );
@@ -293,8 +381,12 @@ describe('tabela de sites', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Publicar agora exemplo-a' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Publicar agora exemplo-b' })).toBeNull();
+    await openMenu('exemplo-a');
+    expect(screen.getByRole('menuitem', { name: 'Publicar agora exemplo-a' })).toBeTruthy();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    await openMenu('exemplo-b');
+    expect(screen.queryByRole('menuitem', { name: /Publicar agora/ })).toBeNull();
   });
 
   it('acabou de cadastrar: anuncia a confirmação no toast e tira a marca da URL', async () => {
@@ -412,16 +504,5 @@ describe('"Mais ações" do template (#364)', () => {
     expect(toggle.querySelector('button, [role="button"], a, [tabindex]')).toBeNull();
     expect(toggle.querySelector('.button')).not.toBeNull();
     expect(toggle.querySelector('svg')).not.toBeNull();
-  });
-
-  it('"Publicar agora" tem o tamanho da página do site (sm)', () => {
-    const publishNow = vi.fn((): Promise<ActionResult> =>
-      Promise.resolve({ ok: true, message: '' }),
-    );
-    render(<SitesTable rows={[site]} publishNow={publishNow} />);
-
-    expect(screen.getByRole('button', { name: 'Publicar agora exemplo-a' }).className).toMatch(
-      /\btext-sm\b/,
-    );
   });
 });
