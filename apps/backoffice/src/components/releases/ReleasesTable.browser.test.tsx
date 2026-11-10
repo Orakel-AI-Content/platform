@@ -12,20 +12,21 @@ import { ReleasesTable } from './ReleasesTable.tsx';
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 // Registro de releases em Chromium (#509): a 1280 px, na moldura do admin, nada rola na
-// horizontal e nenhuma célula passa de duas linhas; o axe roda nos dois temas.
+// horizontal e nenhuma célula passa de duas linhas; o axe roda nos dois temas. Com o estado da
+// imagem dos três tipos e o "Reconferir" de cada linha (#574).
 
 const ROWS: ReleaseRecord[] = [
   {
     tag: '1.10.0',
     registeredAt: new Date('2026-11-02T15:00Z'),
-    imageStatus: null,
-    imageCheckedAt: null,
+    imageStatus: 'disponivel',
+    imageCheckedAt: new Date('2026-11-03T13:15Z'),
   },
   {
     tag: '1.9.0',
     registeredAt: new Date('2026-10-20T12:30Z'),
-    imageStatus: null,
-    imageCheckedAt: null,
+    imageStatus: 'ausente',
+    imageCheckedAt: new Date('2026-10-21T10:00Z'),
   },
   {
     tag: '0.1.0',
@@ -38,7 +39,11 @@ const ROWS: ReleaseRecord[] = [
 function Releases() {
   return (
     <ListScreen title="Releases">
-      <ReleasesTable rows={ROWS} labelledBy="lista-titulo" />
+      <ReleasesTable
+        rows={ROWS}
+        recheck={() => Promise.resolve({ ok: true, message: 'Conferência enfileirada.' })}
+        labelledBy="lista-titulo"
+      />
     </ListScreen>
   );
 }

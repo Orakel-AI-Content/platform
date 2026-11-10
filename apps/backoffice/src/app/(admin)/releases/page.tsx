@@ -9,6 +9,8 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { getDb } from '@/db/client.ts';
 import { listReleases } from '@/domain/releases/releases.ts';
 
+import { recheckReleaseImageAction } from './actions.ts';
+
 export const dynamic = 'force-dynamic';
 
 export const metadata = { title: 'Releases' };
@@ -16,8 +18,8 @@ export const metadata = { title: 'Releases' };
 type SearchParams = { searchParams: Promise<{ registrada?: string | string[] }> };
 
 /**
- * Registro de versões do site-builder (#509), só para quem promove release (admin e operação): tag e
- * data de registro, com "Registrar release". `?registrada=<tag>` vem do cadastro. Lista no
+ * Registro de versões do site-builder (#509), só para quem promove release (admin e operação): tag,
+ * data de registro e estado da imagem no host com "Reconferir" (#574), e "Registrar release". `?registrada=<tag>` vem do cadastro. Lista no
  * padrão do template, como `/sites`: título, ação, toolbar e tabela no cartão.
  */
 export default async function ReleasesPage({ searchParams }: SearchParams) {
@@ -44,6 +46,7 @@ export default async function ReleasesPage({ searchParams }: SearchParams) {
           <ListHeader id="releases-title" title="Releases" action={register} />
           <ReleasesTable
             rows={releases.value}
+            recheck={recheckReleaseImageAction}
             emptyAction={register}
             created={typeof registrada === 'string' ? registrada : undefined}
             labelledBy="releases-title"
