@@ -29,6 +29,7 @@ import {
   renderOk,
 } from '../../src/domain/builds/fake-runtime.ts';
 import type { BuildSettings } from '../../src/domain/builds/plan.ts';
+import type { ContainerRuntime } from '../../src/domain/builds/runtime.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
 import { createSite, unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { createBuildTask, TransientBuildError } from '../../src/jobs/tasks/build.ts';
@@ -237,9 +238,9 @@ describe('task build', () => {
     const runtime = {
       ...fake.runtime,
       // Outra conexão do pool, no meio do render: a linha já está confirmada.
-      wait: async (id: string) => {
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
         during.push(await db.select().from(builds));
-        return fake.runtime.wait(id);
+        return fake.runtime.wait(...args);
       },
     };
     await createBuildTask({ db, runtime, settings, now: () => Date.UTC(2026, 10, 11, 12) })(
@@ -280,9 +281,9 @@ describe('task build', () => {
     const during: { id: number; status: string }[][] = [];
     const runtime = {
       ...fake.runtime,
-      wait: async (id: string) => {
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
         during.push(await db.select({ id: builds.id, status: builds.status }).from(builds));
-        return fake.runtime.wait(id);
+        return fake.runtime.wait(...args);
       },
     };
     await expect(
