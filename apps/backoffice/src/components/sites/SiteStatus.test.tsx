@@ -1,50 +1,14 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { MotionGlobalConfig } from 'motion/react';
-import Modal from 'react-modal';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import type { ActionResult } from '@/components/shared/actionResult.ts';
-import { toast, ToastProvider } from '@/components/ui/toast';
-import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
+import { LastBuildSummary, PendingCount, SiteStateIndicator } from './SiteStatus.tsx';
 
-import {
-  LastBuildSummary,
-  PendingCount,
-  PublishNowPanel,
-  ResumeSitePanel,
-  SiteStateIndicator,
-} from './SiteStatus.tsx';
+// Estado de publicação compartilhado pela lista de sites e pela página do site (#149). As
+// confirmações de "Publicar agora" e "Retomar" ficam com quem as abre: a lista
+// (`SitesTable.test.tsx`) e o cabeçalho do site (`SiteOperations.test.tsx`, #595).
 
-// Estado de publicação compartilhado pela lista de sites e pela página do site (#149).
-
-beforeAll(() => {
-  MotionGlobalConfig.skipAnimations = true;
-});
-afterAll(() => {
-  MotionGlobalConfig.skipAnimations = false;
-});
-// "Publicar agora" confirma num diálogo (#327), que esconde o contêiner da app.
-let app: HTMLElement;
-beforeEach(() => {
-  app = document.createElement('div');
-  app.id = APP_ELEMENT_ID;
-  document.body.append(app);
-  Modal.setAppElement(app);
-});
-
-/** Confirma no diálogo de "Publicar agora". */
-async function confirmPublish(user: ReturnType<typeof userEvent.setup>, siteId: string) {
-  const dialog = await screen.findByRole('alertdialog', { name: `Publicar ${siteId} agora?` });
-  await user.click(within(dialog).getByRole('button', { name: 'Publicar' }));
-}
-afterEach(async () => {
-  act(() => toast.removeAll());
-  await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
-  cleanup();
-  app.remove();
-});
+afterEach(cleanup);
 
 describe('pendências', () => {
   it('0 fica sem link', () => {
@@ -149,132 +113,5 @@ describe('último build', () => {
     render(<LastBuildSummary build={null} timeZone="UTC" />);
 
     expect(screen.getByText('—')).toBeTruthy();
-  });
-});
-
-describe('Publicar agora de um site', () => {
-  it('mostra o erro num Alert logo abaixo do botão', async () => {
-    const user = userEvent.setup();
-    const publishNow = vi.fn((): Promise<ActionResult> =>
-      Promise.resolve({ ok: false, message: 'Site pausado: não publica.' }),
-    );
-    render(<PublishNowPanel siteId="exemplo-a" action={publishNow} />);
-    const region = screen.getByRole('alert');
-
-    await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-a' }));
-    await confirmPublish(user, 'exemplo-a');
-
-    await waitFor(() => expect(region.textContent).toBe('Site pausado: não publica.'));
-    expect(region.querySelector('.alert')).not.toBeNull();
-    expect(publishNow).toHaveBeenCalledWith('exemplo-a');
-  });
-
-  it('o sucesso vai para o toast, sem Alert', async () => {
-    const user = userEvent.setup();
-    const publishNow = vi.fn((): Promise<ActionResult> =>
-      Promise.resolve({ ok: true, message: 'Build de exemplo-a enfileirado.' }),
-    );
-    render(
-      <>
-        <PublishNowPanel siteId="exemplo-a" action={publishNow} />
-        <ToastProvider />
-      </>,
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Publicar agora exemplo-a' }));
-    await confirmPublish(user, 'exemplo-a');
-
-    await waitFor(() =>
-      expect(screen.getByRole('status').textContent).toBe('Build de exemplo-a enfileirado.'),
-    );
-    expect(screen.getByRole('alert').textContent).toBe('');
-  });
-
-  it('pede confirmação na cor de erro; Cancelar e Esc não publicam e devolvem o foco', async () => {
-    const user = userEvent.setup();
-    const publishNow = vi.fn((): Promise<ActionResult> =>
-      Promise.resolve({ ok: true, message: 'Build de exemplo-a enfileirado.' }),
-    );
-    render(<PublishNowPanel siteId="exemplo-a" action={publishNow} />);
-    const button = screen.getByRole('button', { name: 'Publicar agora exemplo-a' });
-    expect(button.className).toContain('text-error');
-
-    await user.click(button);
-    const dialog = screen.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
-    expect(within(dialog).getByRole('button', { name: 'Publicar' }).className).toContain(
-      'bg-error',
-    );
-    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-    expect(document.activeElement).toBe(button);
-    await user.keyboard('{Enter}');
-    await screen.findByRole('alertdialog');
-    await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-    expect(document.activeElement).toBe(button);
-    expect(publishNow).not.toHaveBeenCalled();
-  });
-});
-
-describe('Retomar um site pausado', () => {
-  it('confirma no diálogo na cor de erro e só então chama a ação; o sucesso vai para o toast', async () => {
-    const user = userEvent.setup();
-    const resume = vi.fn((): Promise<ActionResult> =>
-      Promise.resolve({ ok: true, message: 'exemplo-a retomado; build enfileirado.' }),
-    );
-    render(
-      <>
-        <ResumeSitePanel siteId="exemplo-a" action={resume} />
-        <ToastProvider />
-      </>,
-    );
-    const button = screen.getByRole('button', { name: 'Retomar exemplo-a' });
-    expect(button.className).toContain('text-error');
-
-    await user.click(button);
-    const dialog = screen.getByRole('alertdialog', { name: 'Retomar exemplo-a?' });
-    const confirm = within(dialog).getByRole('button', { name: 'Retomar' });
-    expect(confirm.className).toContain('bg-error');
-    await user.click(confirm);
-
-    await waitFor(() =>
-      expect(screen.getByRole('status').textContent).toBe('exemplo-a retomado; build enfileirado.'),
-    );
-    expect(resume).toHaveBeenCalledWith('exemplo-a');
-    expect(screen.getByRole('alert').textContent).toBe('');
-  });
-
-  it('Cancelar não retoma e devolve o foco ao botão', async () => {
-    const user = userEvent.setup();
-    const resume = vi.fn((): Promise<ActionResult> => Promise.resolve({ ok: true, message: 'ok' }));
-    render(<ResumeSitePanel siteId="exemplo-a" action={resume} />);
-    const button = screen.getByRole('button', { name: 'Retomar exemplo-a' });
-
-    await user.click(button);
-    const dialog = screen.getByRole('alertdialog', { name: 'Retomar exemplo-a?' });
-    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-    expect(document.activeElement).toBe(button);
-    expect(resume).not.toHaveBeenCalled();
-  });
-
-  it('a recusa do domínio fica num Alert logo abaixo do botão', async () => {
-    const user = userEvent.setup();
-    const resume = vi.fn((): Promise<ActionResult> =>
-      Promise.resolve({
-        ok: false,
-        message: 'O site exemplo-a não está pausado; não há o que retomar',
-      }),
-    );
-    render(<ResumeSitePanel siteId="exemplo-a" action={resume} />);
-    const region = screen.getByRole('alert');
-
-    await user.click(screen.getByRole('button', { name: 'Retomar exemplo-a' }));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Retomar exemplo-a?' });
-    await user.click(within(dialog).getByRole('button', { name: 'Retomar' }));
-
-    await waitFor(() =>
-      expect(region.textContent).toBe('O site exemplo-a não está pausado; não há o que retomar'),
-    );
   });
 });

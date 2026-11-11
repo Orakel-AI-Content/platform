@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import {
   BUILD_STATUS_LABEL,
@@ -12,14 +12,9 @@ import {
   SITE_STATE_VARIANT,
   type StateTagColor,
 } from '@/components/shared/siteLabels.ts';
-import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
-import ConfirmDialog, {
-  dangerButtonClass,
-  dangerConfirmButtonProps,
-} from '@/components/shared/ConfirmDialog.tsx';
+import ConfirmDialog, { dangerConfirmButtonProps } from '@/components/shared/ConfirmDialog.tsx';
 import { TwoLines } from '@/components/shared/TwoLines';
-import { Button } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Tag';
 import classNames from '@/components/ui/utils/classNames';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
@@ -216,50 +211,6 @@ function ConfirmedSiteActionDialog({
   );
 }
 
-/**
- * Botão de uma ação que muda o site publicado (#327): pede confirmação num `ConfirmDialog`, na
- * cor de erro, e roda com a própria transição (o botão mostra o "Enfileirando…");
- * `onResult` é o `report` do `useActionResult` de quem decide onde fica o erro.
- */
-function ConfirmedSiteActionButton({
-  siteId,
-  action,
-  onResult,
-  copy,
-}: {
-  siteId: string;
-  action: (siteId: string) => Promise<ActionResult>;
-  onResult: (result: ActionResult) => void;
-  copy: ConfirmedSiteAction;
-}) {
-  const [pending, startTransition] = useTransition();
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <>
-      <Button
-        type="button"
-        size="sm"
-        disabled={pending}
-        customColorClass={dangerButtonClass}
-        onClick={() => setConfirming(true)}
-      >
-        {pending ? copy.pendingLabel : copy.label}
-        <span className="sr-only"> {siteId}</span>
-      </Button>
-      <ConfirmedSiteActionDialog
-        siteId={siteId}
-        isOpen={confirming}
-        copy={copy}
-        onCancel={() => setConfirming(false)}
-        onConfirm={() => {
-          setConfirming(false);
-          startTransition(async () => onResult(await action(siteId)));
-        }}
-      />
-    </>
-  );
-}
-
 const PUBLISH_NOW: ConfirmedSiteAction = {
   label: 'Publicar agora',
   pendingLabel: 'Enfileirando…',
@@ -281,32 +232,12 @@ const RESUME_SITE: ConfirmedSiteAction = {
   ),
 };
 
-/** Enfileira o build já, sem esperar a janela; muda o site publicado. */
-function PublishNowButton({
-  siteId,
-  action,
-  onResult,
-}: {
-  siteId: string;
-  action: PublishNow;
-  onResult: (result: ActionResult) => void;
-}) {
-  return (
-    <ConfirmedSiteActionButton
-      siteId={siteId}
-      action={action}
-      onResult={onResult}
-      copy={PUBLISH_NOW}
-    />
-  );
-}
-
-/** Texto de "Publicar agora" e de quando está na fila, para o item do menu da lista de sites. */
+/** Texto de "Publicar agora" e de quando está na fila (menu da lista, cabeçalho do site). */
 export const PUBLISH_NOW_LABEL = { idle: PUBLISH_NOW.label, pending: PUBLISH_NOW.pendingLabel };
 
 /**
- * A confirmação de "Publicar agora" sem o botão (lista de sites, #586): quem a abre guarda o
- * estado, roda a ação no `onConfirm` e devolve o foco no `onAfterClose`.
+ * A confirmação de "Publicar agora" sem o botão (lista de sites, #586; cabeçalho do site, #595):
+ * quem a abre guarda o estado, roda a ação no `onConfirm` e devolve o foco no `onAfterClose`.
  */
 export function PublishNowDialog({
   siteId,
@@ -334,34 +265,37 @@ export function PublishNowDialog({
   );
 }
 
-/** "Publicar agora" de um site só, com o erro logo abaixo (página do site). */
-export function PublishNowPanel({ siteId, action }: { siteId: string; action: PublishNow }) {
-  const { error, report } = useActionResult();
-  return (
-    <div className="space-y-2">
-      <PublishNowButton siteId={siteId} action={action} onResult={report} />
-      <ActionAlert error={error} />
-    </div>
-  );
-}
-
 export type ResumeSite = (siteId: string) => Promise<ActionResult>;
 
+/** Texto de "Retomar" e de quando está na fila (cabeçalho do site pausado). */
+export const RESUME_SITE_LABEL = { idle: RESUME_SITE.label, pending: RESUME_SITE.pendingLabel };
+
 /**
- * "Retomar" o site pausado (L4), com o erro logo abaixo (página do site): volta a receber
- * builds e enfileira o próximo já.
+ * A confirmação de "Retomar" o site pausado (L4) sem o botão (cabeçalho do site, #595): volta a
+ * receber builds e enfileira o próximo já. Quem a abre guarda o estado, como no
+ * `PublishNowDialog`.
  */
-export function ResumeSitePanel({ siteId, action }: { siteId: string; action: ResumeSite }) {
-  const { error, report } = useActionResult();
+export function ResumeSiteDialog({
+  siteId,
+  isOpen,
+  onCancel,
+  onConfirm,
+  onAfterClose,
+}: {
+  siteId: string;
+  isOpen: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onAfterClose?: () => void;
+}) {
   return (
-    <div className="space-y-2">
-      <ConfirmedSiteActionButton
-        siteId={siteId}
-        action={action}
-        onResult={report}
-        copy={RESUME_SITE}
-      />
-      <ActionAlert error={error} />
-    </div>
+    <ConfirmedSiteActionDialog
+      siteId={siteId}
+      isOpen={isOpen}
+      copy={RESUME_SITE}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      onAfterClose={onAfterClose}
+    />
   );
 }

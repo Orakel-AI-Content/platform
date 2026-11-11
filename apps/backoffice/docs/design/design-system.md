@@ -464,10 +464,11 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   escrita à mão.
 - **Corpo:** `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, e o
   conteúdo à direita num `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de
-  uma seção (na página do site, o `SiteTabs`: Ciclo de vida, G1 e Janela; o nome da aba é o
-  título da seção, e um formulário dentro dela é o `SchemaForm` com `card`, de botões
-  `size: 'sm'`). Abaixo de `xl`, empilha. Largura `list-width` (a versão, sem resumo ao lado,
-  fica em `form-width`) e espaçamento da Moldura. Uma tabela no cartão da direita, mais
+  uma seção (na página do site, o `SiteTabs`: Ciclo de vida, Builds, G1, Janela e Limite; o
+  nome da aba é o título da seção, e um formulário dentro dela é o `SchemaForm` com `card`, de
+  botões `size: 'sm'`; acima dele, na mesma coluna, os cartões de conteúdo, ver "Métricas").
+  Abaixo de `xl`, empilha. Largura `list-width` (a versão, sem resumo ao lado, fica em
+  `form-width`) e espaçamento da Moldura. Uma tabela no cartão da direita, mais
   estreito que a largura de lista, pode rolar na horizontal dentro do próprio contêiner (o
   `overflow-x-auto` do `Table`), como no `CustomerDetails`; a página nunca rola (#371).
 - **Coluna de resumo:** a mesma largura no site, no conteúdo e no painel da revisão (#445):
@@ -483,6 +484,21 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-y-7 gap-x-4`); no diálogo da mídia (uma
   coluna) e nos "Dados" da versão, o padrão do `InfoList` (`gap-4`). Nunca a grade
   `grid-cols-[auto_1fr]`, que estoura a 375 px.
+- **Página do site** (#595): no cabeçalho, além de "Editar configuração", as ações de operação
+  (`SiteOperations`, `src/components/sites/SiteOperations.tsx`, só com operations.run): o botão
+  principal "Publicar agora" (no site pausado, "Retomar") e o `Dropdown` "Mais ações" com
+  "Reconstruir na release" (só com a lista de releases) e "Reverter" (só com a de versões),
+  como o `MoreActions` da lista de sites. Cada gatilho abre o diálogo de confirmação dele,
+  separado do botão (`isOpen`/`onCancel`/`onConfirm`/`onAfterClose`, como o
+  `PublishNowDialog`), e o foco volta ao gatilho. O sucesso vai ao toast e a recusa ao
+  `ActionAlert` logo abaixo do cabeçalho (`SiteOperationsScope`). O resumo
+  (`SiteSummaryCard`) tem só o estado atual, sem botões: o domínio é link para
+  `https://<domínio>` em nova aba, e "Mudanças pendentes" leva à tela de pendências quando
+  passa de zero, com a divisão por origem embaixo, em duas colunas. Com os cartões de conteúdo
+  na coluna da direita, a 1440 × 900 o resumo inteiro cabe na primeira tela. Os últimos builds ficam na aba "Builds", no
+  `SiteBuildsTable` (`src/components/sites/SiteBuildsTable.tsx`): a `Table` do Ecme direto,
+  não o `DataTable` (são 5 linhas, sem busca nem paginação), com Status (`StateTag`), Data (no
+  fuso do site), Release e Versão; sem builds, o `EmptyState` "Nenhum build ainda.".
 - **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
   processo de ordem fixa (ciclo de vida do site), não tag. Usa o `Steps` vertical
   (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
@@ -569,7 +585,8 @@ O padrão do `AnalyticDashboard` do Ecme (#548), na audiência do site
 - **Vazio:** sem dados no período, só o `EmptyState`, no lugar de cartões, gráfico e tabela.
 
 Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
-`SiteContentMetrics` (`src/components/sites/`):
+`SiteContentMetrics` (`src/components/sites/`), na coluna da direita do "Detalhe", acima do
+`SiteTabs` (#595): acima do resumo, ele o empurrava para fora da primeira tela a 1440 × 900.
 
 - **Cabeçalho:** o `h2` "Conteúdos" com os atalhos à direita: "Revisar" (a fila de revisão) e
   "Criar conteúdo" (`variant="solid"`, só com `content.write`), ambos `ButtonLink` `sm`.
@@ -577,7 +594,8 @@ Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
   fluxo (rascunho, em revisão, aprovado, agendado, publicado), mais "Publicações hoje" com o
   limite do dia. Cada cartão de status é um link (`next/link` em volta do `Card`) para
   `conteudos?status=<status>`, e "Em revisão" para a fila; "Publicações hoje" não é link.
-  Em grade: 1 coluna no celular, 2 a partir de `sm`, 3 a partir de `lg`, 6 a partir de `2xl`.
+  Em grade: 1 coluna no celular, 2 a partir de `sm`, 3 a partir de `lg` (na coluna da direita,
+  6 lado a lado ficariam estreitos demais).
 - **Vazio:** site sem conteúdo mostra os cartões com zero, nunca um `EmptyState`: o "Criar
   conteúdo" continua ao alcance.
 
