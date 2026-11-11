@@ -144,8 +144,8 @@ function columnsFor(
         const href = publicUrl(row.original, publicOrigin);
         return (
           <div className="flex items-center justify-end gap-1">
-            {/* Abaixo de md, só o editar (#589): o "Ver no site" alargava a coluna em todas as
-                linhas e cortava o título a 390 px. */}
+            {/* Abaixo de `md`, só o Editar: com o "Ver no site", o título curto não cabia a
+                390 px ao lado do status (#614). */}
             {href !== undefined && (
               <span className="hidden md:inline-flex">
                 <IconButton
