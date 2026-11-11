@@ -168,9 +168,15 @@ function FlagsField({ id, label, value, onChange, invalid, describedBy, ref }: F
   );
 }
 
-/** Escolha entre opções recebidas em tempo de execução (presets e variantes de RESOURCES). */
-export function choiceField(options: readonly string[]): FieldRenderer {
-  const choices = options.map((option) => ({ value: option, label: option }));
+/**
+ * Escolha entre opções recebidas em tempo de execução (presets e variantes de RESOURCES). O
+ * `label` só muda o texto mostrado; o valor gravado é sempre a opção recebida.
+ */
+export function choiceField(
+  options: readonly string[],
+  label: (option: string) => string = (option) => option,
+): FieldRenderer {
+  const choices = options.map((option) => ({ value: option, label: label(option) }));
   function ChoiceField({ name, value, onChange, required, ref }: FieldProps) {
     return (
       <Select<{ value: string; label: string }>

@@ -228,6 +228,60 @@ describe('seções da configuração do site', () => {
   );
 });
 
+describe('legibilidade da configuração (#594)', () => {
+  it('presets e variantes com rótulo legível; o valor gravado continua o da opção', async () => {
+    const user = userEvent.setup();
+    const action = renderEdit({ ok: true, message: '' });
+
+    const home = screen.getByRole('combobox', { name: fieldLabel('Preset da página Home') });
+    const appearance = screen.getByRole('region', { name: 'Aparência' });
+    expect(within(appearance).getByText('Revista')).toBeTruthy();
+    expect(within(appearance).getByText('Horizontal')).toBeTruthy();
+    expect(within(appearance).getAllByText('Padrão')).toHaveLength(3);
+    home.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Padrão',
+      'Revista',
+    ]);
+    await user.click(screen.getByRole('option', { name: 'Padrão' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(action.mock.calls[0]?.[0]).toEqual({
+      ...config,
+      presets: { ...config.presets, home: 'padrao' },
+    });
+  });
+
+  it('índice: uma lista de âncoras, com só a primeira seção marcada antes de rolar', () => {
+    renderEdit({ ok: true, message: '' });
+
+    const nav = screen.getByRole('navigation', { name: 'Seções do formulário' });
+    const links = within(nav).getAllByRole('link');
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(
+      SITE_CONFIG_SECTIONS.map((section) => `#secao-${section.id}`),
+    );
+    expect(links.map((link) => link.getAttribute('aria-current'))).toEqual([
+      'true',
+      ...SITE_CONFIG_SECTIONS.slice(1).map(() => null),
+    ]);
+  });
+
+  it('Integrações sem legenda repetida: o GA4 direto no cartão da seção', () => {
+    renderEdit({ ok: true, message: '' });
+
+    const region = screen.getByRole('region', { name: 'Integrações' });
+    expect(within(region).queryByRole('group', { name: 'Integrações' })).toBeNull();
+    const ga4 = within(region).getByRole('group', { name: 'GA4' });
+    expect(ga4.parentElement?.closest('fieldset')).toBeNull();
+    expect(within(ga4).getByLabelText(fieldLabel('ID de medição do GA4'))).toHaveProperty(
+      'value',
+      'G-ABC123',
+    );
+  });
+});
+
 describe('tema na configuração do site (#163)', () => {
   it('escolhe entre todos os temas de THEME_IDS, pelo nome, sem texto livre nem a dica antiga', () => {
     renderForm('edit', { ok: true, message: '' });

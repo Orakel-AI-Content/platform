@@ -90,6 +90,23 @@ export const SITE_STATE_VARIANT: Record<SiteSummary['state'], StateTagColor> = {
   pausado: 'bg-warning',
 };
 
+/**
+ * Opções de aparência da configuração do site (presets e variantes de `RESOURCES`), como a
+ * operação as lê. Os valores vêm da release em tempo de execução: uma opção nova, ainda sem
+ * rótulo aqui, aparece como está (`choiceLabel`).
+ */
+export const CHOICE_LABEL: Record<string, string> = {
+  padrao: 'Padrão',
+  revista: 'Revista',
+  vertical: 'Vertical',
+  horizontal: 'Horizontal',
+};
+
+/** Rótulo de uma opção de aparência; o próprio valor quando não há rótulo conhecido. */
+export function choiceLabel(value: string): string {
+  return Object.hasOwn(CHOICE_LABEL, value) ? (CHOICE_LABEL[value] as string) : value;
+}
+
 /** Resultado do último build de um site (lista de sites). */
 export const BUILD_STATUS_LABEL: Record<LastBuild['status'], string> = {
   ok: 'Publicado',
