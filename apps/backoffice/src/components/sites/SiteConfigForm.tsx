@@ -21,6 +21,7 @@ import {
   switchField,
   themeField,
 } from '@/components/forms/SiteFields';
+import { choiceLabel } from '@/components/shared/siteLabels.ts';
 import type { SiteFormResult } from '@/components/sites/siteConfigFormValues.ts';
 
 type Options = {
@@ -130,11 +131,14 @@ export function SiteConfigForm({
     ...Object.fromEntries(
       Object.entries(options.presets).map(([type, values]) => [
         `presets.${type}`,
-        choiceField(values),
+        choiceField(values, choiceLabel),
       ]),
     ),
     ...Object.fromEntries(
-      Object.entries(options.variants).map(([c, values]) => [`variants.${c}`, choiceField(values)]),
+      Object.entries(options.variants).map(([c, values]) => [
+        `variants.${c}`,
+        choiceField(values, choiceLabel),
+      ]),
     ),
   };
 
