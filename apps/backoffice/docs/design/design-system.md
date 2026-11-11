@@ -16,7 +16,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   Form, Input, InputGroup, Menu, Notification, Pagination, Progress (linha e círculo, como
   `role="progressbar"`), Radio, Segment, Select, Skeleton, Spinner, Steps (`<ol>` com o estado
   de cada etapa em texto e `aria-current="step"` na atual), Switcher, Table, Tabs, Tag,
-  TimeInput, toast, Tooltip, e o Calendar e o DateTimepicker, em `DatePicker/` como no template, com a prop `timeZone` para mostrar os dias e
+  TimeInput, Timeline (`<ul>` de eventos, marcador e conector `aria-hidden`), toast, Tooltip, e o Calendar e o DateTimepicker, em `DatePicker/` como no template, com a prop `timeZone` para mostrar os dias e
   a hora de parede no fuso do site e devolver o instante; na troca de horário, a hora repetida
   vale a primeira ocorrência e a inexistente avança pelo salto) e as peças compostas em
   `src/components/shared/` (AdaptiveCard,
@@ -500,6 +500,12 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   `SiteBuildsTable` (`src/components/sites/SiteBuildsTable.tsx`): a `Table` do Ecme direto,
   não o `DataTable` (são 5 linhas, sem busca nem paginação), com Status (`StateTag`), Data (no
   fuso do site), Release e Versão; sem builds, o `EmptyState` "Nenhum build ainda.".
+- **Eventos em ordem cronológica:** `Timeline` (`src/components/ui/Timeline`) para uma lista
+  de acontecimentos que cresce com o tempo (o histórico de publicações do site), um
+  `Timeline.Item` por evento. Para etapas de ordem fixa, com estado e atual, é o `Steps`
+  (abaixo). O marcador é decorativo: o que ele indicar (falha, reversão) vai em texto no
+  conteúdo do item, com a cor de estado do `StateTag`; item clicável não, o detalhe abre por
+  um botão no conteúdo.
 - **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
   processo de ordem fixa (ciclo de vida do site), não tag. Usa o `Steps` vertical
   (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
