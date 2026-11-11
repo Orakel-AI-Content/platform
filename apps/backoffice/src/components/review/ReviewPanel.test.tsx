@@ -11,7 +11,8 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 
 // Painel da revisão (#75): erros da release, checklist com os rótulos recebidos, bloqueio,
 // permissão e a mensagem de aprovação (no toast, #325). No Ecme (#277), o conteúdo fica em Cards;
-// o checklist tem o seu, com "Aprovar" no rodapé (#333).
+// o checklist tem o seu, com "Aprovar" no rodapé (#333). "Devolver ao editor" (#598) tem cartão
+// próprio, com o comentário obrigatório.
 
 beforeAll(() => {
   MotionGlobalConfig.skipAnimations = true;
@@ -54,6 +55,7 @@ const renderPanel = (props: Partial<Props> = {}) =>
       checklist={checklist}
       canApprove
       approve={vi.fn()}
+      giveBack={vi.fn()}
       {...props}
     />,
   );
@@ -78,8 +80,9 @@ describe('painel de revisão', () => {
     expect(main?.contains(screen.getByRole('heading', { name: 'Validação da release' }))).toBe(
       true,
     );
-    // O checklist num cartão próprio, com "Aprovar" (solid) no rodapé, sem barra fixa (#333).
-    expect(rest).toHaveLength(1);
+    // O checklist num cartão próprio, com "Aprovar" (solid) no rodapé, sem barra fixa (#333), e a
+    // devolução noutro (#598).
+    expect(rest).toHaveLength(2);
     const checklistCard = rest[0];
     expect(checklistCard?.contains(screen.getByRole('heading', { name: 'Checklist' }))).toBe(true);
     const approve = screen.getByRole('button', { name: 'Aprovar' });
@@ -99,6 +102,7 @@ describe('painel de revisão', () => {
     expect(headings.map((heading) => [heading.tagName, heading.textContent])).toEqual([
       ['H2', 'Validação da release'],
       ['H2', 'Checklist'],
+      ['H2', 'Devolver ao editor'],
     ]);
     for (const heading of panel.querySelectorAll('h3')) {
       expect(heading.className).not.toContain('text-lg');
@@ -133,6 +137,7 @@ describe('painel de revisão', () => {
     renderPanel({ canApprove: false });
 
     expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Devolver ao editor' })).toBeNull();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.getByText(checklist[0]!.label)).toBeTruthy();
   });
@@ -175,6 +180,7 @@ describe('painel de revisão', () => {
         checklist={checklist}
         canApprove
         approve={approve}
+        giveBack={vi.fn()}
       />,
     );
     expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
@@ -196,15 +202,72 @@ describe('painel de revisão', () => {
     }
     await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
 
-    expect((await screen.findByRole('alert')).textContent).toContain('não é a mais recente');
+    // Cada formulário tem o próprio resumo (região viva); a recusa vai ao da aprovação.
+    const refusal = await screen.findByText(/não é a mais recente/);
+    expect(refusal.closest('[role="alert"]')).not.toBeNull();
   });
 
   it('versão fora de em revisão mostra o status, sem formulário', () => {
     renderPanel({ status: 'rascunho' });
 
     expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Devolver ao editor' })).toBeNull();
     expect(
       screen.getByText(/Esta versão está rascunho: só uma versão em revisão pode ser aprovada/),
     ).toBeTruthy();
+  });
+
+  it('devolver exige o comentário: vazio não chama a ação e o erro fica no campo', async () => {
+    const giveBack = vi.fn();
+    renderPanel({ giveBack });
+
+    await userEvent.type(screen.getByRole('textbox', { name: /O que corrigir/ }), '   ');
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver ao editor' }));
+
+    expect(giveBack).not.toHaveBeenCalled();
+    expect(screen.getByText('Escreva o que o editor precisa corrigir.')).toBeTruthy();
+  });
+
+  it('com bloco fora da release, devolver continua disponível', () => {
+    renderPanel({ issues: [{ message: 'O bloco faq não é suportado pela release do site' }] });
+
+    const button = screen.getByRole('button', { name: 'Devolver ao editor' });
+    expect(button.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('devolve com o comentário, anuncia no toast e tira os dois formulários', async () => {
+    const giveBack = vi
+      .fn()
+      .mockResolvedValue({ ok: true, message: 'Versão 2 devolvida ao editor.' });
+    renderPanel({ giveBack });
+    render(<ToastProvider />);
+
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /O que corrigir/ }),
+      'Falta a fonte da tabela.',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver ao editor' }));
+
+    expect(giveBack).toHaveBeenCalledWith('Falta a fonte da tabela.');
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Versão 2 devolvida ao editor.'),
+    );
+    expect(screen.queryByRole('button', { name: 'Devolver ao editor' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+  });
+
+  it('recusa do comentário pelo domínio aparece no campo', async () => {
+    const giveBack = vi.fn().mockResolvedValue({
+      ok: false,
+      message: 'Não foi possível devolver.',
+      issues: [{ path: ['comment'], message: 'Escreva o que o editor precisa corrigir.' }],
+    });
+    renderPanel({ giveBack });
+
+    await userEvent.type(screen.getByRole('textbox', { name: /O que corrigir/ }), 'x');
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver ao editor' }));
+
+    const field = screen.getByRole('textbox', { name: /O que corrigir/ });
+    await waitFor(() => expect(field.getAttribute('aria-invalid')).toBe('true'));
   });
 });
