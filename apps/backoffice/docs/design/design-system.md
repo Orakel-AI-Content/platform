@@ -184,8 +184,9 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
   para o cabeçalho e para a coluna de cartões e o conteúdo da barra (`contentClassName` do
   `SchemaForm`), para o `BottomStickyBar` encostar nas bordas do `main`. `list-width` (largura
   cheia do `main`) para as listas e tabelas: sites, conteúdos, versões, autores, taxonomias,
-  menus e mídia; e para as telas de detalhe com resumo ao lado (página do site, #370), que
-  precisam da largura para pôr o resumo e o conteúdo lado a lado a partir de `xl`. O componente de formulário não define largura; quem define é a página.
+  menus e mídia; para as telas de detalhe com resumo ao lado (página do site, #370); e para o
+  editor de conteúdo (#591), com os blocos e os dados lado a lado. Os dois precisam da
+  largura para pôr duas colunas lado a lado a partir de `xl`. O componente de formulário não define largura; quem define é a página.
 - **Espaçamento:** a `section` (ou `article`) de topo de toda página usa `space-y-4` entre os
   blocos (cabeçalho, cartões, tabelas), o mesmo passo do `gap-4` das colunas e grades; nenhuma
   tela usa outro. Vale também para a coluna `form-width` dos formulários de tela. Fica de fora
@@ -421,6 +422,20 @@ usa o gerador, #47).
   (`useLeaveGuard`); "Descartar" já confirma no diálogo e não pergunta de novo. Os controles de
   cada bloco são `IconButton` (ver "Peças comuns"), e remover bloco se desfaz no toast (ver
   "Retorno das ações").
+  - **Layout** (#591): o do `ProductForm` do Ecme, em `list-width`. A partir de `xl`, duas
+    colunas (`flex-col xl:flex-row-reverse gap-4`): os blocos na coluna larga (`flex-auto`) à
+    esquerda; "Dados do conteúdo" e o cartão "SEO" na coluna de 440 px (500 px a partir de
+    `2xl`) à direita. Abaixo de `xl`, empilha com os dados primeiro. Os dados vêm primeiro no
+    DOM e o `flex-row-reverse` os põe à direita: a ordem de leitura e de Tab é a mesma em
+    todas as larguras.
+  - **SEO recolhível:** cartão próprio, fechado ao abrir a tela. Abre e fecha pelo
+    `IconButton` "Campos de SEO" (`aria-expanded`, `aria-controls`) ao lado do título. Abre
+    sozinho quando a validação ou o servidor recusa um campo dele, antes de o foco ir ao
+    primeiro campo inválido. Fechado, só fica oculto (`hidden`): os campos seguem registrados.
+  - **Inserir bloco:** um "+" (`Dropdown` do Ecme com os tipos da release) antes de cada
+    bloco e outro no fim da lista, o único quando não há blocos. Escolher um tipo insere o
+    bloco naquela posição e leva o foco ao primeiro campo dele. Não há outro caminho (o select
+    de tipo no fim da página saiu).
 
 ### Detalhe
 
