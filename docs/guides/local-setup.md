@@ -239,7 +239,8 @@ backoffice). O site precisa de um contexto editorial (aba Contextos) e de um aut
 
 - **Modo `fixture` (padrão):** os processos do backoffice no compose local sobem com
   `LLM_MODEL=fixture`, mesmo que o `.env.local` aponte para o provedor ou não defina
-  `LLM_MODEL`, e o worker responde sem rede. É o modo do E2E
+  `LLM_MODEL`, e o worker responde sem rede. O `db:migrate` e o `db:seed` que rodam no host
+  (`pnpm local:up` e `pnpm local:seed`) seguem a mesma regra. É o modo do E2E
   (`pnpm local:e2e:area geracao`) e do CI. O tema `fixture-saida-invalida` exercita a falha.
   Para o fixture ter custo na lista, o `LLM_PRICING` do `.env.local` precisa da entrada
   `fixture`, como no `.env.example`.
