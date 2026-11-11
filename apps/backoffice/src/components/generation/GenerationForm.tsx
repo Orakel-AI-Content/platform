@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { TbPlus } from 'react-icons/tb';
 import type { SelectInstance } from 'react-select';
 import * as z from 'zod';
 
@@ -11,6 +12,7 @@ import type { PickerOption } from '@/components/forms/PickerFields';
 import { pushSuccess } from '@/components/shared/ActionFeedback.tsx';
 import { SECTION_HINT_CLASS, SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import Alert from '@/components/ui/Alert';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import Select from '@/components/ui/Select';
 
@@ -18,6 +20,9 @@ import Select from '@/components/ui/Select';
 // aba, como os da página do site (#333), acima da lista das execuções. A versão do contexto
 // editorial é a vigente, só para leitura (o domínio grava sempre ela). Permissão, tema vazio,
 // autor de outro site e site sem contexto: o domínio recusa, e o erro volta no campo.
+// Site sem contexto (#600): o aviso aparece para qualquer papel, e quem tem `content.write`
+// ganha nele a ação seguinte, "Criar contexto editorial". Com contexto, só quem escreve vê o
+// formulário.
 
 const GenerationSchema = z.object({
   topic: z.string().trim().min(1, 'Escreva o tema do artigo'),
@@ -58,11 +63,14 @@ export type CurrentContext = { version: number } | undefined;
 
 export function GenerationForm({
   siteId,
+  canWrite,
   authors,
   context,
   action,
 }: {
   siteId: string;
+  /** `content.write`: sem ela, só o aviso de site sem contexto (sem a ação); senão, nada. */
+  canWrite: boolean;
   /** Autores do site (`readAuthors`), as opções do campo. */
   authors: readonly PickerOption[];
   context: CurrentContext;
@@ -87,13 +95,28 @@ export function GenerationForm({
       <Card bodyClass="space-y-3" aria-labelledby="generation-form-title">
         {title}
         <Alert type="warning" showIcon duration={0}>
-          <p className="text-sm">
-            Cadastre o contexto editorial do site antes de gerar: {contextsLink}.
-          </p>
+          {canWrite ? (
+            <div className="space-y-3">
+              <p className="text-sm">Cadastre o contexto editorial do site antes de gerar.</p>
+              <ButtonLink
+                href={`${contexts}/nova`}
+                size="sm"
+                variant="solid"
+                icon={<TbPlus className="text-xl" aria-hidden />}
+              >
+                Criar contexto editorial
+              </ButtonLink>
+            </div>
+          ) : (
+            <p className="text-sm">
+              O site ainda não tem contexto editorial: sem ele, não dá para gerar artigos.
+            </p>
+          )}
         </Alert>
       </Card>
     );
   }
+  if (!canWrite) return null;
   if (authors.length === 0) {
     return (
       <Card bodyClass="space-y-3" aria-labelledby="generation-form-title">

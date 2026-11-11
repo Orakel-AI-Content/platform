@@ -45,5 +45,5 @@ relevantes e leia-os primeiro.
 - `docs/conventions/testing.md` – unitários, componentes em Chromium, contrato com Postgres, E2E
 - `docs/migration/ecme.md` – registro do porte do Ecme: onde está o template, regras de porte, testes, histórias
 - `docs/design/design-system.md` – padrão de toda tela no Ecme: componentes, cores e contraste, tema, moldura, acessibilidade
-- `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog; 0008: task build; 0010: janela por site; 0011: sites.auto.tfvars.json; 0012: envio e ingestão de imagens; 0013: variantes e registro da mídia; 0014: reprocessamento; 0015: status mutável da versão; 0016: Ecme como design system; 0018: SDK de LLM da geração básica)
+- `docs/decisions/` – por que as escolhas foram feitas (0002: escopo e backlog; 0008: task build; 0010: janela por site; 0011: sites.auto.tfvars.json; 0012: envio e ingestão de imagens; 0013: variantes e registro da mídia; 0014: reprocessamento; 0015: status mutável da versão; 0016: Ecme como design system; 0018: SDK de LLM da geração básica; 0020: devolução ao editor)
 - `docs/project-spec.yaml` – decisões desta unidade (herda as da raiz)

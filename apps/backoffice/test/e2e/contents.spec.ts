@@ -9,6 +9,7 @@ import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
 import { getEnv } from '../../src/env.ts';
 import { asRole } from './auth.ts';
+import { addBlock } from './blocks.ts';
 import { expectNoViolations } from './axe.ts';
 import { removeSites } from './cleanup.ts';
 import { fieldLabel } from './fieldLabel.ts';
@@ -21,11 +22,6 @@ import { createVolumeSite, seedContents, seedMedia } from '../volume.ts';
 
 /** Região dos toasts (#212): o retorno das ações vai para ela, fora do main (#326). */
 const toastRegion = (page: Page) => page.locator('[data-toast-placement="top-end"]');
-
-async function addBlock(page: Page, type: string): Promise<void> {
-  await chooseOption(page.getByRole('combobox', { name: 'Tipo do novo bloco' }), type);
-  await page.getByRole('button', { name: 'Adicionar bloco' }).click();
-}
 
 test(
   'editor cria um artigo com texto, imagem e FAQ e o encontra na lista',
@@ -787,13 +783,8 @@ test.describe('barra de ações do editor (#109)', () => {
     await page.goto(editPath);
     await page.waitForLoadState('networkidle');
 
-    // Todo campo dos metadados e dos blocos dentro de um Card (o tipo do novo bloco é da lista).
-    const newType = await page
-      .getByRole('combobox', { name: 'Tipo do novo bloco' })
-      .getAttribute('id');
-    const controls = page
-      .locator('main form')
-      .locator(`input:not([type=hidden]):not([id="${newType}"]), textarea`);
+    // Todo campo dos metadados, do SEO e dos blocos dentro de um Card.
+    const controls = page.locator('main form').locator('input:not([type=hidden]), textarea');
     for (const control of await controls.all()) {
       expect(await control.evaluate((el) => el.closest('.card') !== null)).toBe(true);
     }

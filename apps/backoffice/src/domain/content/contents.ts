@@ -31,7 +31,7 @@ import {
   redirects,
   reviews,
   taxonomies,
-  type CONTENT_STATUSES,
+  CONTENT_STATUSES,
   type ContentData,
 } from '../../db/schema/index.ts';
 import { allocateId } from '../../db/site-ids.ts';
@@ -600,6 +600,51 @@ export async function countReviewQueues(
   return { ok: true, value: Object.fromEntries(rows.map((row) => [row.siteId, row.total])) };
 }
 
+/** Contagem de conteúdos do site por status da versão mais recente: todos os status, zero quando não há. */
+export type ContentStatusCounts = Record<Status, number>;
+
+/**
+ * Quantos conteúdos do site estão em cada status, pela versão mais recente de cada um (a regra
+ * de `listContents`), para os cartões da Visão geral (#596): um `GROUP BY` no banco, sem ler
+ * título nem blocos. Status sem conteúdo vem com zero.
+ */
+export async function countContentsByStatus(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<ContentStatusCounts>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+
+  const newer = aliasedTable(contentVersions, 'newer');
+  const rows = await db
+    .select({ status: contentVersions.status, total: count() })
+    .from(contentVersions)
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(newer)
+            .where(
+              and(
+                eq(newer.siteId, contentVersions.siteId),
+                eq(newer.contentId, contentVersions.contentId),
+                gt(newer.version, contentVersions.version),
+              ),
+            ),
+        ),
+      ),
+    )
+    .groupBy(contentVersions.status);
+  const counts = Object.fromEntries(
+    CONTENT_STATUSES.map((status) => [status, 0]),
+  ) as ContentStatusCounts;
+  for (const row of rows) counts[row.status] = row.total;
+  return { ok: true, value: counts };
+}
+
 export type ContentVersion = {
   version: number;
   status: Status;
@@ -619,8 +664,8 @@ export async function listContentVersions(
   const allowed = requireRole(actor, 'site.read');
   if (!allowed.ok) return allowed;
 
-  // Uma linha por versão: só a aprovação grava em `reviews`, e a versão aprovada não volta a
-  // ficar em revisão (ADR 0015). Com outras ações (reprovar), vira a aprovação mais recente.
+  // Uma linha por versão: o join só pega a aprovação, e a versão aprovada não volta a ficar em
+  // revisão (ADR 0015). As devoluções da mesma versão ficam de fora (ADR 0020).
   const rows = await db
     .select({
       version: contentVersions.version,
@@ -637,6 +682,7 @@ export async function listContentVersions(
         eq(reviews.siteId, contentVersions.siteId),
         eq(reviews.contentId, contentVersions.contentId),
         eq(reviews.version, contentVersions.version),
+        eq(reviews.decision, 'aprovado'),
       ),
     )
     .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))

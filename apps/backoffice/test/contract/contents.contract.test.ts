@@ -7,6 +7,7 @@ import { contents, contentVersions, reviews } from '../../src/db/schema/index.ts
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
+  countContentsByStatus,
   countReviewQueues,
   createContent,
   listContents,
@@ -635,6 +636,72 @@ describe('tamanho da fila de revisão por site (#583)', () => {
     expect(await countReviewQueues(db, { email: 'x@orakel.local', roles: [] })).toMatchObject({
       issues: [{ code: 'forbidden' }],
     });
+  });
+});
+
+describe('contagem por status da Visão geral (#596)', () => {
+  const counts = async (siteId = SITE) => {
+    const result = await countContentsByStatus(db, SYSTEM_ACTOR, siteId);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value;
+  };
+  // O oráculo: o status da versão mais recente de cada conteúdo, como a lista o mostra.
+  const tally = async () => {
+    const listed = await listContents(db, SYSTEM_ACTOR, SITE);
+    if (!listed.ok) throw new Error(JSON.stringify(listed.issues));
+    const byStatus: Record<string, number> = {};
+    for (const item of listed.value) byStatus[item.status] = (byStatus[item.status] ?? 0) + 1;
+    return byStatus;
+  };
+  const nonZero = (value: Record<string, number>) =>
+    Object.fromEntries(Object.entries(value).filter(([, total]) => total > 0));
+
+  it('conta pela versão mais recente, como a lista, numa consulta só', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await edit(2, { ...(await latest(2)), title: 'Outro guia' });
+    await submit(2);
+
+    const { result, queries } = await profileQueries(db, (traced) =>
+      countContentsByStatus(traced, SYSTEM_ACTOR, SITE),
+    );
+    expect(queries).toBe(1);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(nonZero(result.value)).toEqual(await tally());
+    expect(result.value.em_revisao).toBe(1);
+  });
+
+  it('salvar uma versão nova move o conteúdo de status', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await submit(1);
+    expect((await counts()).em_revisao).toBe(1);
+
+    await edit(1, { ...(await latest(1)), title: 'Guia (3)' });
+
+    const after = await counts();
+    expect(after.em_revisao).toBe(0);
+    expect(nonZero(after)).toEqual(await tally());
+  });
+
+  it('site sem conteúdo devolve todos os status com zero', async () => {
+    await createVolumeSite(db, 'sem-conteudo');
+    expect(await counts('sem-conteudo')).toEqual({
+      rascunho: 0,
+      em_revisao: 0,
+      aprovado: 0,
+      agendado: 0,
+      publicado: 0,
+      despublicado: 0,
+      substituido: 0,
+    });
+  });
+
+  it('editor lê a contagem; sem papel, forbidden', async () => {
+    expect(
+      await countContentsByStatus(db, { email: 'editor@orakel.local', roles: ['editor'] }, SITE),
+    ).toMatchObject({ ok: true });
+    expect(
+      await countContentsByStatus(db, { email: 'x@orakel.local', roles: [] }, SITE),
+    ).toMatchObject({ issues: [{ code: 'forbidden' }] });
   });
 });
 

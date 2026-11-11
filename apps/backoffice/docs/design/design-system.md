@@ -184,8 +184,9 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
   para o cabeçalho e para a coluna de cartões e o conteúdo da barra (`contentClassName` do
   `SchemaForm`), para o `BottomStickyBar` encostar nas bordas do `main`. `list-width` (largura
   cheia do `main`) para as listas e tabelas: sites, conteúdos, versões, autores, taxonomias,
-  menus e mídia; e para as telas de detalhe com resumo ao lado (página do site, #370), que
-  precisam da largura para pôr o resumo e o conteúdo lado a lado a partir de `xl`. O componente de formulário não define largura; quem define é a página.
+  menus e mídia; para as telas de detalhe com resumo ao lado (página do site, #370); e para o
+  editor de conteúdo (#591), com os blocos e os dados lado a lado. Os dois precisam da
+  largura para pôr duas colunas lado a lado a partir de `xl`. O componente de formulário não define largura; quem define é a página.
 - **Espaçamento:** a `section` (ou `article`) de topo de toda página usa `space-y-4` entre os
   blocos (cabeçalho, cartões, tabelas), o mesmo passo do `gap-4` das colunas e grades; nenhuma
   tela usa outro. Vale também para a coluna `form-width` dos formulários de tela. Fica de fora
@@ -435,6 +436,20 @@ usa o gerador, #47).
   (`useLeaveGuard`); "Descartar" já confirma no diálogo e não pergunta de novo. Os controles de
   cada bloco são `IconButton` (ver "Peças comuns"), e remover bloco se desfaz no toast (ver
   "Retorno das ações").
+  - **Layout** (#591): o do `ProductForm` do Ecme, em `list-width`. A partir de `xl`, duas
+    colunas (`flex-col xl:flex-row-reverse gap-4`): os blocos na coluna larga (`flex-auto`) à
+    esquerda; "Dados do conteúdo" e o cartão "SEO" na coluna de 440 px (500 px a partir de
+    `2xl`) à direita. Abaixo de `xl`, empilha com os dados primeiro. Os dados vêm primeiro no
+    DOM e o `flex-row-reverse` os põe à direita: a ordem de leitura e de Tab é a mesma em
+    todas as larguras.
+  - **SEO recolhível:** cartão próprio, fechado ao abrir a tela. Abre e fecha pelo
+    `IconButton` "Campos de SEO" (`aria-expanded`, `aria-controls`) ao lado do título. Abre
+    sozinho quando a validação ou o servidor recusa um campo dele, antes de o foco ir ao
+    primeiro campo inválido. Fechado, só fica oculto (`hidden`): os campos seguem registrados.
+  - **Inserir bloco:** um "+" (`Dropdown` do Ecme com os tipos da release) antes de cada
+    bloco e outro no fim da lista, o único quando não há blocos. Escolher um tipo insere o
+    bloco naquela posição e leva o foco ao primeiro campo dele. Não há outro caminho (o select
+    de tipo no fim da página saiu).
 
 ### Detalhe
 
@@ -557,6 +572,19 @@ O padrão do `AnalyticDashboard` do Ecme (#548), na audiência do site
   enquanto não houver comparação com o período anterior.
 - **Tabela:** `DataTable` com `useListTable` no `AdaptiveCard`, sem toolbar (não há busca).
 - **Vazio:** sem dados no período, só o `EmptyState`, no lugar de cartões e tabela.
+
+Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
+`SiteContentMetrics` (`src/components/sites/`):
+
+- **Cabeçalho:** o `h2` "Conteúdos" com os atalhos à direita: "Revisar" (a fila de revisão) e
+  "Criar conteúdo" (`variant="solid"`, só com `content.write`), ambos `ButtonLink` `sm`.
+- **Cartões:** um por status da versão mais recente (`countContentsByStatus`), na ordem do
+  fluxo (rascunho, em revisão, aprovado, agendado, publicado), mais "Publicações hoje" com o
+  limite do dia. Cada cartão de status é um link (`next/link` em volta do `Card`) para
+  `conteudos?status=<status>`, e "Em revisão" para a fila; "Publicações hoje" não é link.
+  Em grade: 1 coluna no celular, 2 a partir de `sm`, 3 a partir de `lg`, 6 a partir de `2xl`.
+- **Vazio:** site sem conteúdo mostra os cartões com zero, nunca um `EmptyState`: o "Criar
+  conteúdo" continua ao alcance.
 
 ### Retorno das ações
 

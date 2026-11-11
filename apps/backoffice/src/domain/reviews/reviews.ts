@@ -1,5 +1,5 @@
 import type { Issue, Result } from '@orakel/content-model';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, ne } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { contents, contentVersions, reviews } from '../../db/schema/index.ts';
@@ -93,22 +93,17 @@ export async function reviewIssues(
 }
 
 /**
- * Aprova a versão que o revisor viu: precisa ser a mais recente, estar `em_revisao`, ter o
- * checklist completo e passar na validação da release do site. Grava a revisão e leva a
- * versão a `aprovado`, sem mudança pendente (o status não entra no snapshot, ADR 0015). A
- * linha de `contents` fica travada, como na edição e no envio.
+ * Trava a linha de `contents` (como na edição e no envio) e confere que `version` é a mais
+ * recente e está `em_revisao`: a guarda comum de aprovar e devolver. `verb` completa a recusa
+ * ("aprovada", "devolvida").
  */
-export async function approveVersion(
+async function lockVersionInReview(
   tx: Executor,
-  actor: Actor,
   siteId: string,
   contentId: number,
   version: number,
-  checklist: readonly string[],
-): Promise<Result<{ reviewId: number }>> {
-  const allowed = requireRole(actor, 'content.publish');
-  if (!allowed.ok) return allowed;
-
+  verb: string,
+): Promise<Result<NonNullable<Awaited<ReturnType<typeof latestVersion>>>>> {
   const [content] = await tx
     .select({ id: contents.id })
     .from(contents)
@@ -127,9 +122,51 @@ export async function approveVersion(
   if (latest.status !== 'em_revisao') {
     return refused(
       'review.not_in_review',
-      `Só uma versão em revisão pode ser aprovada: a versão ${version} está ${latest.status}`,
+      `Só uma versão em revisão pode ser ${verb}: a versão ${version} está ${latest.status}`,
     );
   }
+  return { ok: true, value: latest };
+}
+
+/** Muda só o status da versão (ADR 0015): sem mudança pendente, o snapshot não o carrega. */
+async function setVersionStatus(
+  tx: Executor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  status: 'aprovado' | 'rascunho',
+): Promise<void> {
+  await tx
+    .update(contentVersions)
+    .set({ status })
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        eq(contentVersions.contentId, contentId),
+        eq(contentVersions.version, version),
+      ),
+    );
+}
+
+/**
+ * Aprova a versão que o revisor viu: precisa ser a mais recente, estar `em_revisao`, ter o
+ * checklist completo e passar na validação da release do site. Grava a revisão e leva a
+ * versão a `aprovado`, sem mudança pendente (o status não entra no snapshot, ADR 0015).
+ */
+export async function approveVersion(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  checklist: readonly string[],
+): Promise<Result<{ reviewId: number }>> {
+  const allowed = requireRole(actor, 'content.publish');
+  if (!allowed.ok) return allowed;
+
+  const locked = await lockVersionInReview(tx, siteId, contentId, version, 'aprovada');
+  if (!locked.ok) return locked;
+  const latest = locked.value;
 
   const keys: readonly string[] = REVIEW_CHECKLIST.map((item) => item.key);
   const missing = REVIEW_CHECKLIST.filter((item) => !checklist.includes(item.key));
@@ -158,15 +195,112 @@ export async function approveVersion(
     })
     .returning({ id: reviews.id });
   if (review === undefined) throw new Error('INSERT em reviews não devolveu o id');
-  await tx
-    .update(contentVersions)
-    .set({ status: 'aprovado' })
+  await setVersionStatus(tx, siteId, contentId, version, 'aprovado');
+  return { ok: true, value: { reviewId: review.id } };
+}
+
+/**
+ * Devolve ao editor a versão que o revisor viu (#598, ADR 0020): a mesma guarda da aprovação,
+ * com comentário obrigatório no lugar do checklist e sem validação da release (devolver não
+ * leva nada ao site). Grava a revisão como `devolvido`, com o comentário, e leva a versão de
+ * volta a `rascunho`: sai da fila e pode ser reenviada como está ou depois de editada.
+ */
+export async function returnVersion(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  comment: string,
+): Promise<Result<{ reviewId: number }>> {
+  const allowed = requireRole(actor, 'content.publish');
+  if (!allowed.ok) return allowed;
+
+  const text = comment.trim();
+  if (text === '') {
+    return refused('review.comment_required', 'Escreva o que o editor precisa corrigir.', [
+      'comment',
+    ]);
+  }
+
+  const locked = await lockVersionInReview(tx, siteId, contentId, version, 'devolvida');
+  if (!locked.ok) return locked;
+
+  const [review] = await tx
+    .insert(reviews)
+    .values({
+      siteId,
+      contentId,
+      version,
+      reviewer: actor.email,
+      checklist: [],
+      decision: 'devolvido',
+      comment: text,
+    })
+    .returning({ id: reviews.id });
+  if (review === undefined) throw new Error('INSERT em reviews não devolveu o id');
+  await setVersionStatus(tx, siteId, contentId, version, 'rascunho');
+  return { ok: true, value: { reviewId: review.id } };
+}
+
+/** Devolução que o editor ainda precisa atender: o que corrigir, quem devolveu e quando. */
+export type PendingReturn = {
+  version: number;
+  reviewer: string;
+  comment: string;
+  returnedAt: Date;
+};
+
+/**
+ * Devolução pendente do conteúdo (ADR 0020): a revisão mais recente, se for uma devolução e
+ * nada tiver sido reenviado desde então, ou seja, a versão devolvida e todas as que vieram
+ * depois continuam em `rascunho`. Continua à vista enquanto o editor salva a correção e some
+ * no reenvio. `null` sem devolução pendente.
+ */
+export async function pendingReturn(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+): Promise<Result<PendingReturn | null>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+
+  const [last] = await db
+    .select({
+      version: reviews.version,
+      reviewer: reviews.reviewer,
+      decision: reviews.decision,
+      comment: reviews.comment,
+      createdAt: reviews.createdAt,
+    })
+    .from(reviews)
+    .where(and(eq(reviews.siteId, siteId), eq(reviews.contentId, contentId)))
+    .orderBy(desc(reviews.id))
+    .limit(1);
+  if (last === undefined || last.decision !== 'devolvido' || last.comment === null) {
+    return { ok: true, value: null };
+  }
+  const [resubmitted] = await db
+    .select({ version: contentVersions.version })
+    .from(contentVersions)
     .where(
       and(
         eq(contentVersions.siteId, siteId),
         eq(contentVersions.contentId, contentId),
-        eq(contentVersions.version, version),
+        gte(contentVersions.version, last.version),
+        ne(contentVersions.status, 'rascunho'),
       ),
-    );
-  return { ok: true, value: { reviewId: review.id } };
+    )
+    .limit(1);
+  if (resubmitted !== undefined) return { ok: true, value: null };
+  return {
+    ok: true,
+    value: {
+      version: last.version,
+      reviewer: last.reviewer,
+      comment: last.comment,
+      returnedAt: last.createdAt,
+    },
+  };
 }

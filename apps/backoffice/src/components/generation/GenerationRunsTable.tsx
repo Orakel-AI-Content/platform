@@ -153,25 +153,35 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
  * Execuções da geração do site (R5), só leitura: quando, tema, status, provedor e modelo, tokens,
  * custo, duração e o link para o conteúdo gerado. No DataTable do template, como a lista de
  * pendências (#365), sem toolbar (busca e filtro ficam fora, #541); o que a execução ainda não
- * tem aparece como "—". Sem execuções, o estado vazio.
+ * tem aparece como "—". Sem execuções, o estado vazio; sem contexto editorial no site (#600), ele
+ * não manda gerar: a ação de criar o contexto fica no aviso acima.
  */
 export function GenerationRunsTable({
   siteId,
   timeZone,
   rows,
+  hasContext,
   labelledBy,
 }: {
   siteId: string;
   /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
   timeZone: string;
   rows: GenerationRunSummary[];
+  /** O site tem contexto editorial vigente: sem ele, ainda não dá para gerar. */
+  hasContext: boolean;
   /** Id do título da lista, que dá nome à tabela. */
   labelledBy?: string;
 }) {
   const columns = useMemo(() => columnsFor(siteId, timeZone), [siteId, timeZone]);
   const { tableProps } = useListTable({ config: LIST, columns, data: rows });
   if (rows.length === 0) {
-    return <EmptyState>Nenhuma execução ainda: gere o primeiro artigo.</EmptyState>;
+    return (
+      <EmptyState>
+        {hasContext
+          ? 'Nenhuma execução ainda: gere o primeiro artigo.'
+          : 'Nenhuma execução ainda: a geração começa depois do contexto editorial do site.'}
+      </EmptyState>
+    );
   }
   return (
     <DataTable

@@ -162,6 +162,7 @@ function ReviewDetail() {
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
             canApprove
             approve={() => Promise.resolve({ ok: true as const, message: 'ok' })}
+            giveBack={() => Promise.resolve({ ok: true as const, message: 'ok' })}
           />
         </div>
       </DetailLayout>
