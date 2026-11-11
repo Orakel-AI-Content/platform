@@ -109,6 +109,8 @@ describe('audiência no navegador', () => {
   });
 
   it('o gráfico tem nome com o período, legenda em texto e as séries em ordem cronológica', async () => {
+    // Sem animação de entrada: ela desenha a linha sólida com `stroke-dasharray`.
+    await setReducedMotion('reduce');
     await renderInFrame(<Audience />, { roles: ['revisor'] });
     await expect
       .element(chart())
@@ -119,8 +121,11 @@ describe('audiência no navegador', () => {
     await expect.element(legend.getByText('Visualizações', { exact: true })).toBeVisible();
     await expect.element(legend.getByText('Sessões', { exact: true })).toBeVisible();
     // Traço diferente por série: a de sessões é tracejada, a de visualizações não.
-    const paths = [...document.querySelectorAll('.apexcharts-series path.apexcharts-line')];
-    expect(paths.map((path) => path.getAttribute('stroke-dasharray'))).toEqual(['0', '6']);
+    const dashes = () =>
+      [...document.querySelectorAll('.apexcharts-series path.apexcharts-line')].map((path) =>
+        path.getAttribute('stroke-dasharray'),
+      );
+    await expect.poll(dashes).toEqual(['0', '6']);
   });
 
   it.each(COLOR_SCHEMES)(
@@ -140,6 +145,7 @@ describe('audiência no navegador', () => {
   );
 
   it('o hover mostra o valor do dia', async () => {
+    await setReducedMotion('reduce');
     await renderInFrame(<Audience />, { roles: ['revisor'] });
     await expect.element(chart()).toBeVisible();
     const grid = document.querySelector('.apexcharts-grid')!.getBoundingClientRect();
