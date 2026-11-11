@@ -67,8 +67,15 @@ const ROWS: GenerationRunSummary[] = [
   },
 ];
 
-function renderTable(rows = ROWS) {
-  render(<GenerationRunsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
+function renderTable(rows = ROWS, hasContext = true) {
+  render(
+    <GenerationRunsTable
+      siteId="exemplo-a"
+      timeZone="America/Sao_Paulo"
+      rows={rows}
+      hasContext={hasContext}
+    />,
+  );
 }
 
 const rowOf = (topic: string) => screen.getAllByText(topic)[0]!.closest('tr') as HTMLElement;
@@ -105,9 +112,16 @@ describe('lista das execuções', () => {
     expect(unpriced.getByText('850 ms')).toBeTruthy();
   });
 
-  it('sem execuções, o estado vazio', () => {
+  it('sem execuções, o estado vazio manda gerar o primeiro artigo', () => {
     renderTable([]);
+    expect(screen.getByText('Nenhuma execução ainda: gere o primeiro artigo.')).toBeTruthy();
+  });
+
+  it('sem execuções nem contexto editorial, o estado vazio não manda gerar', () => {
+    renderTable([], false);
     expect(screen.getByText(/Nenhuma execução ainda/)).toBeTruthy();
+    expect(document.body.textContent).not.toContain('gere o primeiro artigo');
+    expect(document.body.textContent).toContain('contexto editorial');
   });
 });
 
