@@ -966,3 +966,75 @@ describe('SEO recolhível (#591)', () => {
     await waitFor(() => expect(document.activeElement).toBe(canonical()));
   });
 });
+
+describe('título, slug e SEO (#590)', () => {
+  const blank = { ...meta, slug: '', title: '', blocks: [toc(1, 'A')] };
+  const title = () => screen.getByLabelText(fieldLabel('Título'));
+  const slug = () => screen.getByLabelText(fieldLabel('Slug'));
+
+  it('o título vem antes do slug no formulário', () => {
+    renderEditor({ mode: 'create', defaultValues: blank });
+
+    expect(title().compareDocumentPosition(slug()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('na criação, o slug acompanha o título e vai no envio', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor({ mode: 'create', defaultValues: blank });
+
+    await user.type(title(), 'Como começar uma horta');
+    expect(slug()).toHaveProperty('value', 'como-comecar-uma-horta');
+
+    await save(user);
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(action.mock.calls[0]?.[0]).toMatchObject({
+      title: 'Como começar uma horta',
+      slug: 'como-comecar-uma-horta',
+    });
+  });
+
+  it('depois de editar o slug, mudar o título não o altera mais', async () => {
+    const user = userEvent.setup();
+    renderEditor({ mode: 'create', defaultValues: blank });
+
+    await user.type(title(), 'Horta');
+    expect(slug()).toHaveProperty('value', 'horta');
+    await user.clear(slug());
+    await user.type(slug(), 'minha-horta');
+    await user.type(title(), ' em casa');
+
+    expect(slug()).toHaveProperty('value', 'minha-horta');
+  });
+
+  it('na edição, o slug nunca muda sozinho', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.clear(title());
+    await user.type(title(), 'Outro título');
+
+    expect(slug()).toHaveProperty('value', 'guia');
+  });
+
+  it('título e descrição para buscadores mostram a contagem, ligada por aria-describedby', async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      defaultValues: { ...meta, seo: { title: 'Guia', description: '' }, blocks: [toc(1, 'A')] },
+    });
+    const described = (label: string) => {
+      const field = screen.getByLabelText(label);
+      return (field.getAttribute('aria-describedby') ?? '')
+        .split(' ')
+        .map((describedBy) => document.getElementById(describedBy)?.textContent)
+        .join(' | ');
+    };
+
+    // O SEO começa fechado (#591).
+    await user.click(screen.getByRole('button', { name: 'Campos de SEO' }));
+    expect(described('Título para buscadores')).toContain('4 caracteres');
+    expect(described('Descrição para buscadores')).toContain('0 caracteres');
+
+    await user.type(screen.getByLabelText('Descrição para buscadores'), 'A');
+    expect(described('Descrição para buscadores')).toContain('1 caractere');
+  });
+});

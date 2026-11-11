@@ -49,6 +49,7 @@ import { IconButton } from '@/components/shared/IconButton';
 import { Button } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Dropdown from '@/components/ui/Dropdown';
+import Input from '@/components/ui/Input';
 import Notification from '@/components/ui/Notification';
 import toast from '@/components/ui/toast';
 import Tooltip from '@/components/ui/Tooltip';
@@ -497,6 +498,7 @@ export function ContentEditor({
                     schema={ContentMetaSchema.shape.seo}
                     prefix="seo"
                     labels={META_LABELS}
+                    fields={metaFields}
                   />
                 </div>
               </Card>

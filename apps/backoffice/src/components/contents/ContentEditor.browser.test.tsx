@@ -312,3 +312,36 @@ describe('duas colunas e SEO recolhível (#591)', () => {
     expect(await audit()).toEqual([]);
   });
 });
+
+describe('título, slug e SEO no navegador (#590)', () => {
+  it('na criação, o slug acompanha o título; a contagem do SEO é a descrição do campo; sem violações do axe', async () => {
+    await renderInApp(
+      <ContentEditor
+        mode="create"
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        defaultValues={{ ...defaultValues, slug: '', title: '' }}
+        options={options}
+        action={() => Promise.resolve({ ok: true, message: 'Conteúdo criado.', id: 7 })}
+        backHref="/sites/exemplo-a/conteudos"
+      />,
+    );
+    const title = page.getByRole('textbox', { name: 'Título', exact: true });
+    const slug = page.getByRole('textbox', { name: 'Slug', exact: true });
+    const seoTitle = page.getByRole('textbox', { name: 'Título para buscadores' });
+
+    await userEvent.type(title, 'Como começar uma horta');
+    await expect.element(slug).toHaveValue('como-comecar-uma-horta');
+
+    // O SEO começa fechado (#591).
+    await page.getByRole('button', { name: 'Campos de SEO' }).click();
+    await expect.element(seoTitle).toHaveAccessibleDescription('0 caracteres');
+    await userEvent.type(seoTitle, 'Horta');
+    await expect.element(seoTitle).toHaveAccessibleDescription('5 caracteres');
+
+    for (const scheme of COLOR_SCHEMES) {
+      await setTheme(scheme);
+      expect(await audit()).toEqual([]);
+    }
+  });
+});
