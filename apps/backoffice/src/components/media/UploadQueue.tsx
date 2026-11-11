@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
+import { usePolling } from '@/components/shared/usePolling.ts';
 import { Progress } from '@/components/ui/Progress';
 
 // Fila de envio da biblioteca (#188): até 20 imagens por vez, 3 subindo ao mesmo tempo por
@@ -173,44 +174,35 @@ export function useUploadQueue({
     entry.state.kind === 'processando' ? [entry.state.uploadKey] : [],
   );
   const keysKey = processingKeys.join('|');
-  useEffect(() => {
-    if (keysKey === '') return;
-    let busy = false;
-    const timer = setInterval(() => {
-      if (busy) return;
-      busy = true;
-      void status(keysKey.split('|'))
-        .then((states) => {
-          const byKey = new Map((states ?? []).map((state) => [state.uploadKey, state]));
-          setEntries((current) =>
-            current.map((entry) => {
-              if (entry.state.kind !== 'processando') return entry;
-              const found = byKey.get(entry.state.uploadKey);
-              if (found?.status === 'pronta') {
-                return { ...entry, state: { kind: 'pronta' } };
-              }
-              if (found?.status === 'recusada') {
-                return {
-                  ...entry,
-                  state: { kind: 'recusada', reason: found.reason ?? 'recusada' },
-                };
-              }
-              return Date.now() > entry.state.deadline
-                ? { ...entry, state: { kind: 'demorando' } }
-                : entry;
-            }),
-          );
-          // As chaves pedidas eram todas de envios processando: uma pronta é imagem nova.
-          if ((states ?? []).some((state) => state.status === 'pronta')) onReady();
-        })
-        // Falha de rede numa leitura: a próxima tentativa (ou o tempo-limite) resolve.
-        .catch(() => undefined)
-        .finally(() => {
-          busy = false;
-        });
-    }, pollMs);
-    return () => clearInterval(timer);
-  }, [keysKey, status, onReady, pollMs]);
+  const poll = useCallback(
+    () =>
+      status(keysKey.split('|')).then((states) => {
+        const byKey = new Map((states ?? []).map((state) => [state.uploadKey, state]));
+        setEntries((current) =>
+          current.map((entry) => {
+            if (entry.state.kind !== 'processando') return entry;
+            const found = byKey.get(entry.state.uploadKey);
+            if (found?.status === 'pronta') {
+              return { ...entry, state: { kind: 'pronta' } };
+            }
+            if (found?.status === 'recusada') {
+              return {
+                ...entry,
+                state: { kind: 'recusada', reason: found.reason ?? 'recusada' },
+              };
+            }
+            return Date.now() > entry.state.deadline
+              ? { ...entry, state: { kind: 'demorando' } }
+              : entry;
+          }),
+        );
+        // As chaves pedidas eram todas de envios processando: uma pronta é imagem nova.
+        if ((states ?? []).some((state) => state.status === 'pronta')) onReady();
+      }),
+    [keysKey, status, onReady],
+  );
+  // Falha de rede numa leitura: o hook ignora, e a próxima tentativa (ou o tempo-limite) resolve.
+  usePolling(keysKey !== '', poll, pollMs);
 
   return { entries, notice, add };
 }
