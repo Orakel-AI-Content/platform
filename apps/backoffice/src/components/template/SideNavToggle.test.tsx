@@ -12,7 +12,7 @@ import SideNavToggle from './SideNavToggle.tsx';
 
 // Recolher a barra (#238): o toggle alterna `aria-expanded` e a largura (290px ↔ 80px); recolhida,
 // os itens ficam só com o ícone, com o nome da área no link e a dica no hover e no foco; a marca
-// continua "Orakel Backoffice"; o seletor e o rótulo do grupo somem.
+// continua "Orakel Backoffice"; o seletor vira as iniciais e os títulos dos grupos (#582) somem.
 
 const pathname = vi.hoisted(() => ({ value: '/sites/exemplo-a/autores' }));
 vi.mock('next/navigation', () => ({ usePathname: () => pathname.value }));
@@ -84,7 +84,7 @@ describe('SideNav recolhida', () => {
     expect(autores.getAttribute('aria-current')).toBe('page');
     expect(autores.querySelector('.sr-only')?.textContent).toBe('Autores');
     expect(autores.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
-    expect(within(areas()).getAllByRole('link')).toHaveLength(11);
+    expect(within(areas()).getAllByRole('link')).toHaveLength(12);
   });
 
   it('a dica com o nome aparece no hover e no foco, e descreve o link', async () => {
@@ -103,21 +103,24 @@ describe('SideNav recolhida', () => {
     expect(midia.getAttribute('aria-describedby')).toContain(tooltip.id);
   });
 
-  it('a marca continua "Orakel Backoffice"; o seletor vira as iniciais; o rótulo do grupo some e volta', async () => {
+  it('a marca continua "Orakel Backoffice"; o seletor vira as iniciais; os títulos dos grupos somem e voltam', async () => {
     const user = userEvent.setup();
-    const { toggle } = renderFrame();
+    const { toggle, areas } = renderFrame();
+    const titles = () =>
+      Array.from(areas().querySelectorAll('.menu-title')).map((title) => title.textContent);
     expect(screen.getByRole('button', { name: /trocar de site/ })).toBeTruthy();
-    expect(screen.getByText('Áreas do site', { selector: '.menu-title' })).toBeTruthy();
+    expect(titles()).toEqual(['Site', 'Conteúdo', 'Estrutura', 'Geração', 'Análise']);
 
     await user.click(toggle);
     const brand = screen.getByRole('link', { name: 'Orakel Backoffice' });
     expect(brand.getAttribute('href')).toBe('/sites');
     const switcher = screen.getByRole('button', { name: /trocar de site/ });
     expect(switcher.querySelector('[aria-hidden="true"]')?.textContent).toBe('EA');
-    expect(screen.queryByText('Áreas do site', { selector: '.menu-title' })).toBeNull();
+    expect(titles()).toEqual([]);
+    expect(within(areas()).getAllByRole('link')).toHaveLength(12);
 
     await user.click(toggle);
     expect(screen.getByRole('button', { name: /trocar de site/ })).toBeTruthy();
-    expect(screen.getByText('Áreas do site', { selector: '.menu-title' })).toBeTruthy();
+    expect(titles()).toHaveLength(5);
   });
 });

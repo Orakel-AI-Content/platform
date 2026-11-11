@@ -141,13 +141,27 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
   seção da escala tipográfica.
 - **Navegação:** os itens vêm de `src/configs/navigation.config.ts` (`NavigationTree` do Ecme,
   com `authority` como lista de permissões de `rbac.ts`), filtrados no servidor pelo RBAC
-  (`filterNavigation`, com `can()`; Textos institucionais só com `content.write`). A barra marca
-  o item pelo endereço (`activeNavigationKey`, por `usePathname`), com `aria-current="page"`,
-  também nas telas de item; Configuração e Pendências marcam a Visão geral. O seletor
+  (`filterNavigation`, com `can()`; Configuração do site só com `site.configure`, Textos
+  institucionais só com `content.write`). As áreas do site ficam em cinco grupos com título
+  (nós `title`, desenhados pelo `MenuGroup`, cada um uma lista nomeada pelo título), todos no
+  mesmo `nav "Áreas do site"`: **Site** (Visão geral, Configuração do site, Mudanças
+  pendentes), **Conteúdo** (Conteúdos, Revisão, Mídia), **Estrutura** (Autores, Taxonomias,
+  Menus, Textos institucionais), **Geração** (Contextos editoriais, Geração) e **Análise**
+  (Audiência). Grupo sem item visível para o papel não aparece; recolhida, a barra esconde os
+  títulos e fica só com os ícones. A barra marca o item pelo endereço (`activeNavigationKey`,
+  pelo primeiro segmento depois do site, com `usePathname`), com `aria-current="page"`, também
+  nas telas de item. O seletor
   (`SiteSwitcher`, `src/components/template/SiteSwitcher.tsx`) é o `Dropdown` do Ecme com o nome do site,
   listando os sites visíveis (`readVisibleSites`, uma leitura por requisição), cada um levando à
   mesma área (`sameAreaIn`: item, criar e editar caem na lista); o atual com
   `aria-current="true"`. Recolhida, a barra mostra as iniciais, com o nome na dica.
+- **Selo da fila de revisão:** o item Revisão mostra, à direita do título, o `Badge` do Ecme com
+  o número de conteúdos da fila do site do endereço (`countReviewQueues`, uma consulta para
+  todos os sites no layout `(admin)`; o `SideNavContent` escolhe o site). Fila vazia, sem selo.
+  O selo usa `bg-primary` (par "selo da barra lateral" em `ECME_PAIRS`), não o `bg-error`
+  padrão: contagem é informação, não erro. Ele é `aria-hidden`; o link diz a contagem no
+  `aria-label`, começando pelo título ("Revisão, 2 aguardando"), e a barra recolhida, sem o
+  selo, a mantém na dica. A contagem só chega com a navegação, sem atualização em tempo real.
 - **Cabeçalho de página:** `PageHeader` (`src/components/shared/PageHeader.tsx`), nas telas
   de detalhe e de formulário: trilha (`nav` "Trilha de navegação", com `aria-current="page"` no
   item atual; opcional, Sites é a raiz), título (`h1`) à esquerda e a ação principal à direita
@@ -262,7 +276,9 @@ menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo ca
     ("Nenhum autor encontrado.") vai no `customNoDataIcon` do `DataTable`. Só a mensagem: a
     única ação de limpar é a "Limpar filtros" da toolbar.
 - **Células:** no máximo duas linhas por célula, `TwoLines` (`src/components/shared/TwoLines.tsx`)
-  com a principal e a secundária em `text-xs` (ex.: nome com `id · domínio` embaixo); texto
+  com a principal e a secundária em `text-xs` (ex.: nome com `id · domínio` embaixo; na
+  tabela de versões do conteúdo, o título sob "Versão N" e `revisor · data` da aprovação sob a
+  tag do status, em vez de colunas próprias, #588); texto
   longo é cortado pelo `Truncated` com o inteiro em `title`, em vez de quebrar. A coluna
   principal (título, nome) é fluida: `meta: { fluid: true }` na `ColumnDef` dá `w-full max-w-0`
   à célula, ela ocupa a largura que sobra e o `Truncated` sem `className` só corta quando falta

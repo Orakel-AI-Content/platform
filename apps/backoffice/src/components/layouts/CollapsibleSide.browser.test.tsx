@@ -21,18 +21,24 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // fica e o botão do celular não. Com os links pelo roteador em memória (#476; antes no E2E,
 // `site-layout.spec.ts` e `header.spec.ts`, #171, #172, #238, #242): a área atual pelo endereço,
 // a barra, a marca e o seletor só com o teclado, a troca de site na mesma área, a barra recolhida
-// entre áreas e o Drawer que fecha ao navegar.
+// entre áreas e o Drawer que fecha ao navegar. O selo da fila de revisão (#583): à vista
+// expandida, com a contagem no nome do link e, recolhida, na dica; sem violação do axe nos dois
+// temas.
 
 const SITE_NAME = 'Exemplo A — Guias';
 const OTHER_SITE = 'Exemplo B — Receitas';
-const AREAS = [
+/** Áreas da barra, nos grupos (#582); Configuração do site com site.configure. */
+const areaTitles = ({ configure = false, write = false } = {}) => [
   'Visão geral',
+  ...(configure ? ['Configuração do site'] : []),
+  'Mudanças pendentes',
   'Conteúdos',
   'Revisão',
   'Mídia',
   'Autores',
   'Taxonomias',
   'Menus',
+  ...(write ? ['Textos institucionais'] : []),
   'Contextos editoriais',
   'Geração',
   'Audiência',
@@ -97,7 +103,9 @@ describe('CollapsibleSide no navegador', () => {
         .getByRole('link')
         .elements()
         .map((link) => link.textContent),
-    ).toEqual([...AREAS, 'Textos institucionais']);
+    ).toEqual(areaTitles({ write: true }));
+    // Recolhida, sem os títulos dos grupos.
+    expect(areas().element().querySelectorAll('.menu-title')).toHaveLength(0);
     await expect
       .element(areas().getByRole('link', { name: 'Autores' }))
       .toHaveAttribute('aria-current', 'page');
@@ -141,7 +149,8 @@ describe('CollapsibleSide no navegador', () => {
       ['/sites/exemplo-a/conteudos/novo', 'Conteúdos'],
       ['/sites/exemplo-a/conteudos/1/editar', 'Conteúdos'],
       ['/sites/exemplo-a/revisao', 'Revisão'],
-      ['/sites/exemplo-a/configuracao', 'Visão geral'],
+      // Configuração do site (site.configure) fica atual em `site-layout.spec.ts`, com operacao.
+      ['/sites/exemplo-a/pendencias', 'Mudanças pendentes'],
     ] as const) {
       navigation.set(path);
       await expect.poll(current).toBe(area);
@@ -222,6 +231,24 @@ describe('CollapsibleSide no navegador', () => {
     expect(await audit(sideNav(), page.getByRole('menu'))).toEqual([]);
   });
 
+  it.each(COLOR_SCHEMES)(
+    'o selo de Revisão (%s): à vista, a contagem no nome e, recolhida, na dica; sem violação',
+    async (scheme) => {
+      await setTheme(scheme);
+      await renderInFrame(<p>Conteúdo</p>, { reviewCounts: { 'exemplo-a': 2 } });
+      const revisao = () => areas().getByRole('link', { name: 'Revisão, 2 aguardando' });
+      await expect.element(revisao()).toBeVisible();
+      expect(revisao().element().querySelector('.badge')?.textContent).toBe('2');
+      expect(await audit(sideNav())).toEqual([]);
+
+      await collapse();
+      await userEvent.hover(revisao());
+      await expect
+        .element(page.getByRole('tooltip', { name: 'Revisão, 2 aguardando' }))
+        .toBeVisible();
+    },
+  );
+
   it('recolhida, a barra continua assim entre áreas e volta expandida ao montar de novo', async () => {
     const screen = await renderInFrame(<p>Conteúdo</p>, { roles: ['operacao'] });
     await collapse();
@@ -268,7 +295,7 @@ describe('CollapsibleSide no navegador', () => {
           .getByRole('link')
           .elements()
           .map((link) => link.textContent),
-      ).toEqual(AREAS);
+      ).toEqual(areaTitles({ configure: true }));
       expect(drawerAreas.element().querySelector('[aria-current="page"]')?.textContent).toBe(
         'Autores',
       );

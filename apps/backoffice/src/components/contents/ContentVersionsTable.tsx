@@ -32,20 +32,22 @@ export type ContentVersionRow = {
 
 const STATUSES = Object.keys(CONTENT_STATUS_LABEL) as ContentVersionRow['status'][];
 
-/** Busca pelo título, filtro por status, da primeira à mais recente (a ordem do domínio) (#366). */
+/** Busca pelo título, filtro por status, da mais recente à primeira (#366, #588). */
 const LIST: ListConfig = {
   filters: [{ column: 'status', param: 'status', values: STATUSES }],
-  sortable: ['version', 'status', 'title', 'createdAt'],
-  defaultSort: { id: 'version', desc: false },
+  sortable: ['version', 'status', 'createdAt'],
+  defaultSort: { id: 'version', desc: true },
   pageSizes: [10, 25, 50, 100],
 };
 
-/** Ordena pelo texto exibido em pt-BR (rótulo do status, título), não pelo valor. */
+/** Ordena pelo texto exibido em pt-BR (o rótulo do status), não pelo valor. */
 function byText(text: (row: ContentVersionRow) => string) {
   return (a: Row<ContentVersionRow>, b: Row<ContentVersionRow>) =>
     text(a.original).localeCompare(text(b.original), 'pt-BR');
 }
 
+// Três colunas que cabem no cartão a 1440 px (#588): o título vai sob a versão e a aprovação
+// sob o status, como secundárias do `TwoLines`.
 function columnsFor(
   siteId: string,
   contentId: number,
@@ -54,39 +56,48 @@ function columnsFor(
   return [
     {
       header: 'Versão',
-      accessorKey: 'version',
-      enableGlobalFilter: false,
-      sortFn: 'basic',
-      // Número começa descendente no TanStack; a ordem padrão já é a crescente, então o
-      // primeiro clique inverte em vez de voltar ao padrão.
-      sortDescFirst: false,
+      id: 'version',
+      // A busca procura no título; a ordem é pelo número da versão.
+      accessorFn: (row) => row.title,
+      meta: { fluid: true },
+      sortFn: (a, b) => a.original.version - b.original.version,
+      // O acessor é texto, e o TanStack começaria crescente: o padrão (decrescente) seria lido como
+      // fora do ciclo e o primeiro clique voltaria a ele. Começando decrescente, o clique inverte.
+      sortDescFirst: true,
       cell: ({ row }) => (
-        <Link
-          href={`/sites/${siteId}/conteudos/${contentId}/versoes/${row.original.version}`}
-          className={ROW_LINK_CLASS}
-        >
-          Versão {row.original.version}
-        </Link>
+        <TwoLines secondary={<Truncated text={row.original.title} />}>
+          <Link
+            href={`/sites/${siteId}/conteudos/${contentId}/versoes/${row.original.version}`}
+            className={ROW_LINK_CLASS}
+          >
+            Versão {row.original.version}
+          </Link>
+        </TwoLines>
       ),
     },
+    // A tag e, embaixo, quem aprovou e quando; sem aprovação, só a tag.
     {
       header: 'Status',
       accessorKey: 'status',
       enableGlobalFilter: false,
       filterFn: 'equalsString',
       sortFn: byText((row) => CONTENT_STATUS_LABEL[row.status]),
-      cell: ({ row }) => (
-        <StateTag color={CONTENT_STATUS_TAG[row.original.status]}>
-          {CONTENT_STATUS_LABEL[row.original.status]}
-        </StateTag>
-      ),
-    },
-    {
-      header: 'Título',
-      accessorKey: 'title',
-      meta: { fluid: true },
-      sortFn: byText((row) => row.title),
-      cell: ({ row }) => <Truncated text={row.original.title} />,
+      cell: ({ row }) => {
+        const { status, approval } = row.original;
+        return (
+          <TwoLines
+            secondary={
+              approval === null ? undefined : (
+                <NoWrap>
+                  {approval.reviewer} · {formatDateTime(approval.approvedAt, timeZone)}
+                </NoWrap>
+              )
+            }
+          >
+            <StateTag color={CONTENT_STATUS_TAG[status]}>{CONTENT_STATUS_LABEL[status]}</StateTag>
+          </TwoLines>
+        );
+      },
     },
     {
       header: 'Gravada em',
@@ -95,28 +106,12 @@ function columnsFor(
       sortFn: 'datetime',
       cell: ({ row }) => <NoWrap>{formatDateTime(row.original.createdAt, timeZone)}</NoWrap>,
     },
-    // Duas linhas: o revisor e, embaixo, a data; vazia sem aprovação.
-    {
-      header: 'Aprovação',
-      accessorKey: 'approval',
-      enableGlobalFilter: false,
-      enableSorting: false,
-      cell: ({ row }) => {
-        const { approval } = row.original;
-        if (approval === null) return null;
-        return (
-          <TwoLines secondary={<NoWrap>{formatDateTime(approval.approvedAt, timeZone)}</NoWrap>}>
-            {approval.reviewer}
-          </TwoLines>
-        );
-      },
-    },
   ];
 }
 
 /**
  * Versões de um conteúdo, cada uma com link para lê-la. No DataTable do template (#366): busca
- * pelo título, filtro por status, ordem (da primeira à mais recente, por padrão) e paginação no
+ * pelo título, filtro por status, ordem (da mais recente à primeira, por padrão) e paginação no
  * cliente com o estado na URL; toolbar e tabela vão no cartão da página, abaixo do
  * `ListHeader`. Sem versões, o estado vazio.
  */

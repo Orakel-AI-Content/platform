@@ -8,8 +8,9 @@ import type { Actor } from '@/domain/access/rbac.ts';
 import SideNav from './SideNav.tsx';
 
 // Barra lateral da moldura (#237; antes, a SiteNav do #171): a marca, `nav "Principal"` e,
-// dentro de um site visível, o seletor e `nav "Áreas do site"`, na ordem da árvore, com o item
-// atual em aria-current também nas telas de item, criar e editar.
+// dentro de um site visível, o seletor e `nav "Áreas do site"`, com as áreas em cinco grupos com
+// título (#582), na ordem da árvore, e o item atual em aria-current também nas telas de item,
+// criar e editar.
 
 const pathname = vi.hoisted(() => ({ value: '/sites' }));
 vi.mock('next/navigation', () => ({ usePathname: () => pathname.value }));
@@ -21,8 +22,13 @@ const SITES = [
   { id: 'exemplo-b', name: 'Exemplo B' },
 ];
 
+const GROUPS = ['Site', 'Conteúdo', 'Estrutura', 'Geração', 'Análise'];
+
+/** Áreas de operacao (site.read e site.configure), na ordem dos grupos. */
 const AREAS = [
   'Visão geral',
+  'Configuração do site',
+  'Mudanças pendentes',
   'Conteúdos',
   'Revisão',
   'Mídia',
@@ -44,6 +50,8 @@ function renderAt(path: string, role: Actor['roles'][number] = 'operacao') {
 }
 
 const areas = () => screen.queryByRole('navigation', { name: 'Áreas do site' });
+const groupTitles = (nav: HTMLElement) =>
+  Array.from(nav.querySelectorAll('.menu-title')).map((title) => title.textContent);
 const currentLinks = (nav: HTMLElement) =>
   within(nav)
     .getAllByRole('link')
@@ -66,10 +74,13 @@ describe('SideNav', () => {
   it('dentro de um site, as áreas na ordem, com o endereço de cada uma', () => {
     renderAt('/sites/exemplo-a');
 
+    expect(screen.getAllByRole('navigation', { name: 'Áreas do site' })).toHaveLength(1);
     const links = within(areas()!).getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual(AREAS);
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/sites/exemplo-a',
+      '/sites/exemplo-a/configuracao',
+      '/sites/exemplo-a/pendencias',
       '/sites/exemplo-a/conteudos',
       '/sites/exemplo-a/revisao',
       '/sites/exemplo-a/midia',
@@ -83,14 +94,43 @@ describe('SideNav', () => {
     expect(screen.getByRole('button', { name: 'Exemplo A, trocar de site' })).toBeTruthy();
   });
 
-  it('com content.write, também "Textos institucionais"', () => {
+  it('os cinco grupos com o título visível, cada um uma lista nomeada por ele', () => {
+    renderAt('/sites/exemplo-a');
+
+    expect(groupTitles(areas()!)).toEqual(GROUPS);
+    const lists = within(areas()!).getAllByRole('list');
+    expect(lists.map((list) => list.getAttribute('aria-labelledby') !== null)).toEqual(
+      GROUPS.map(() => true),
+    );
+    expect(
+      within(within(areas()!).getByRole('list', { name: 'Site' }))
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Visão geral', 'Configuração do site', 'Mudanças pendentes']);
+  });
+
+  it('editor: sem "Configuração do site" (site.configure), com "Textos institucionais" em Estrutura', () => {
     renderAt('/sites/exemplo-a/midia', 'editor');
 
     expect(
       within(areas()!)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual([...AREAS, 'Textos institucionais']);
+    ).toEqual([
+      'Visão geral',
+      'Mudanças pendentes',
+      'Conteúdos',
+      'Revisão',
+      'Mídia',
+      'Autores',
+      'Taxonomias',
+      'Menus',
+      'Textos institucionais',
+      'Contextos editoriais',
+      'Geração',
+      'Audiência',
+    ]);
+    expect(groupTitles(areas()!)).toEqual(GROUPS);
   });
 
   it.each([
@@ -101,8 +141,8 @@ describe('SideNav', () => {
     ['/sites/exemplo-a/conteudos/7/editar', 'Conteúdos'],
     ['/sites/exemplo-a/revisao/3', 'Revisão'],
     ['/sites/exemplo-a/audiencia', 'Audiência'],
-    ['/sites/exemplo-a/configuracao', 'Visão geral'],
-    ['/sites/exemplo-a/pendencias', 'Visão geral'],
+    ['/sites/exemplo-a/configuracao', 'Configuração do site'],
+    ['/sites/exemplo-a/pendencias', 'Mudanças pendentes'],
   ])('em %s, só "%s" tem aria-current="page" e o destaque do Menu', (path, label) => {
     renderAt(path);
 

@@ -16,7 +16,8 @@ import VerticalMenuContent from './VerticalMenuContent.tsx';
 // Menu da barra (#237, #238), com `VerticalSingleMenuItem` e `VerticalMenuIcon`: o <nav> com o
 // nome recebido, os grupos com o rótulo (some recolhido), os caminhos com o `siteId`, só o
 // `activeKey` em aria-current, recolhido o título em `sr-only` e a dica, o link externo em
-// outra aba, o ícone só até o primeiro nível de grupo e o clique avisado.
+// outra aba, o ícone só até o primeiro nível de grupo e o clique avisado. O selo de um item
+// (#583): o número à vista, fora da árvore de acessibilidade, e por extenso no nome e na dica.
 
 afterEach(cleanup);
 beforeAll(() => {
@@ -53,11 +54,13 @@ const currentLinks = (element: HTMLElement) =>
     .filter((link) => link.getAttribute('aria-current') === 'page');
 
 describe('VerticalMenuContent', () => {
-  it('o <nav> tem o nome recebido; o grupo é uma lista nomeada pelo rótulo', () => {
+  it('o <nav> tem o nome recebido; cada grupo é uma lista nomeada pelo rótulo', () => {
     render(<VerticalMenuContent aria-label="Áreas do site" navigationTree={TREE} siteId="a" />);
 
     const areas = nav('Áreas do site');
-    expect(within(areas).getByRole('list', { name: 'Áreas do site' })).toBeTruthy();
+    for (const title of ['Site', 'Conteúdo', 'Estrutura', 'Geração', 'Análise']) {
+      expect(within(areas).getByRole('list', { name: title })).toBeTruthy();
+    }
     expect(within(areas).getByRole('link', { name: 'Sites' }).getAttribute('href')).toBe('/sites');
   });
 
@@ -70,16 +73,17 @@ describe('VerticalMenuContent', () => {
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/sites',
       '/sites/exemplo%20b',
+      '/sites/exemplo%20b/pendencias',
       '/sites/exemplo%20b/conteudos',
       '/sites/exemplo%20b/revisao',
       '/sites/exemplo%20b/midia',
       '/sites/exemplo%20b/autores',
       '/sites/exemplo%20b/taxonomias',
       '/sites/exemplo%20b/menus',
+      '/sites/exemplo%20b/institucionais',
       '/sites/exemplo%20b/contextos',
       '/sites/exemplo%20b/geracao',
       '/sites/exemplo%20b/audiencia',
-      '/sites/exemplo%20b/institucionais',
     ]);
   });
 
@@ -119,13 +123,54 @@ describe('VerticalMenuContent', () => {
     );
 
     const areas = nav('Áreas do site');
-    expect(within(areas).queryByRole('list', { name: 'Áreas do site' })).toBeNull();
+    expect(within(areas).queryByRole('list', { name: 'Site' })).toBeNull();
+    expect(areas.querySelector('.menu-title')).toBeNull();
     const autores = within(areas).getByRole('link', { name: 'Autores' });
     expect(autores.getAttribute('aria-current')).toBe('page');
     expect(autores.querySelector('.sr-only')?.textContent).toBe('Autores');
 
     autores.focus();
     expect((await screen.findByRole('tooltip')).textContent).toBe('Autores');
+  });
+
+  it('o item com contagem mostra o selo e diz a contagem no nome; os outros, não', () => {
+    render(
+      <VerticalMenuContent
+        aria-label="Áreas do site"
+        navigationTree={TREE}
+        siteId="a"
+        itemCounts={{ 'site.review': { count: 2, label: '2 aguardando' } }}
+      />,
+    );
+
+    const areas = nav('Áreas do site');
+    const revisao = within(areas).getByRole('link', { name: 'Revisão, 2 aguardando' });
+    const badge = revisao.querySelector('.badge');
+    expect(badge?.textContent).toBe('2');
+    expect(badge?.getAttribute('aria-hidden')).toBe('true');
+    expect(
+      within(areas).getByRole('link', { name: 'Conteúdos' }).querySelector('.badge'),
+    ).toBeNull();
+  });
+
+  it('recolhido, o item com contagem fica sem o selo e diz a contagem no nome e na dica', async () => {
+    render(
+      <VerticalMenuContent
+        aria-label="Áreas do site"
+        navigationTree={TREE}
+        siteId="a"
+        itemCounts={{ 'site.review': { count: 2, label: '2 aguardando' } }}
+        collapsed
+      />,
+    );
+
+    const revisao = within(nav('Áreas do site')).getByRole('link', {
+      name: 'Revisão, 2 aguardando',
+    });
+    expect(revisao.querySelector('.badge')).toBeNull();
+
+    revisao.focus();
+    expect((await screen.findByRole('tooltip')).textContent).toBe('Revisão, 2 aguardando');
   });
 
   it('link externo abre em outra aba; o interno, não', () => {

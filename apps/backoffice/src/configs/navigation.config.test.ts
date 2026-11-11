@@ -15,21 +15,19 @@ import navigationConfig, {
 
 const actor = (role: Actor['roles'][number]): Actor => ({ email: `${role}@x`, roles: [role] });
 
-/** Títulos das áreas do site na árvore filtrada. */
-const siteAreas = (tree: NavigationTree[]) =>
-  tree.find((nav) => nav.key === 'site')?.subMenu.map((nav) => nav.title);
+/** Grupos (`title`) da árvore, cada um com os títulos dos seus itens. */
+const siteGroups = (tree: NavigationTree[]) =>
+  tree
+    .filter((nav) => nav.type === NAV_ITEM_TYPE_TITLE)
+    .map((nav) => [nav.title, nav.subMenu.map((area) => area.title)]);
 
-const AREAS = [
-  'Visão geral',
-  'Conteúdos',
-  'Revisão',
-  'Mídia',
-  'Autores',
-  'Taxonomias',
-  'Menus',
-  'Contextos editoriais',
-  'Geração',
-  'Audiência',
+/** Grupos e áreas que todo papel vê (site.read); os outros entram por permissão. */
+const groups = ({ configure = false, write = false } = {}) => [
+  ['Site', ['Visão geral', ...(configure ? ['Configuração do site'] : []), 'Mudanças pendentes']],
+  ['Conteúdo', ['Conteúdos', 'Revisão', 'Mídia']],
+  ['Estrutura', ['Autores', 'Taxonomias', 'Menus', ...(write ? ['Textos institucionais'] : [])]],
+  ['Geração', ['Contextos editoriais', 'Geração']],
+  ['Análise', ['Audiência']],
 ];
 
 const item = (key: string, authority: NavigationTree['authority']): NavigationTree => ({
@@ -43,19 +41,17 @@ const item = (key: string, authority: NavigationTree['authority']): NavigationTr
 });
 
 describe('filterNavigation', () => {
-  it('editor e admin veem as 10 áreas e "Textos institucionais" (content.write)', () => {
-    for (const role of ['editor', 'admin'] as const) {
-      expect(siteAreas(filterNavigation(navigationConfig, actor(role)))).toEqual([
-        ...AREAS,
-        'Textos institucionais',
-      ]);
-    }
+  it('as áreas do site vêm em cinco grupos com título, na ordem', () => {
+    const view = (role: Actor['roles'][number]) =>
+      siteGroups(filterNavigation(navigationConfig, actor(role)));
+    expect(view('admin')).toEqual(groups({ configure: true, write: true }));
+    expect(view('operacao')).toEqual(groups({ configure: true }));
+    expect(view('editor')).toEqual(groups({ write: true }));
+    expect(view('revisor')).toEqual(groups());
   });
 
-  it('operacao e revisor veem só as 10 (site.read), com "Geração" e "Audiência"', () => {
-    for (const role of ['operacao', 'revisor'] as const) {
-      expect(siteAreas(filterNavigation(navigationConfig, actor(role)))).toEqual(AREAS);
-    }
+  it('sem site.read, nenhum grupo das áreas do site', () => {
+    expect(siteGroups(filterNavigation(navigationConfig, { email: 'x', roles: [] }))).toEqual([]);
   });
 
   it('"Sites" aparece para todos os papéis', () => {
@@ -101,19 +97,23 @@ describe('filterNavigation', () => {
 
 describe('navigationPath', () => {
   it('as áreas apontam para os mesmos endereços da antiga SiteNav', () => {
-    const areas = navigationConfig.find((nav) => nav.key === 'site')?.subMenu ?? [];
+    const areas = navigationConfig.flatMap((nav) =>
+      nav.type === NAV_ITEM_TYPE_TITLE ? nav.subMenu : [],
+    );
     expect(areas.map((nav) => navigationPath(nav, 'exemplo-a'))).toEqual([
       '/sites/exemplo-a',
+      '/sites/exemplo-a/configuracao',
+      '/sites/exemplo-a/pendencias',
       '/sites/exemplo-a/conteudos',
       '/sites/exemplo-a/revisao',
       '/sites/exemplo-a/midia',
       '/sites/exemplo-a/autores',
       '/sites/exemplo-a/taxonomias',
       '/sites/exemplo-a/menus',
+      '/sites/exemplo-a/institucionais',
       '/sites/exemplo-a/contextos',
       '/sites/exemplo-a/geracao',
       '/sites/exemplo-a/audiencia',
-      '/sites/exemplo-a/institucionais',
     ]);
   });
 
@@ -133,8 +133,8 @@ describe('activeNavigationKey', () => {
     ['/sites/x/geracao', 'site.generation'],
     ['/sites/x/audiencia', 'site.audience'],
     ['/sites/x', 'site.overview'],
-    ['/sites/x/configuracao', 'site.overview'],
-    ['/sites/x/pendencias', 'site.overview'],
+    ['/sites/x/configuracao', 'site.config'],
+    ['/sites/x/pendencias', 'site.pending'],
     ['/sites', 'sites'],
     ['/sites/novo', 'sites'],
     ['/releases', 'releases'],

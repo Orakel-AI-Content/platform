@@ -7,6 +7,7 @@ import { contents, contentVersions, reviews } from '../../src/db/schema/index.ts
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
+  countReviewQueues,
   createContent,
   listContents,
   listContentVersions,
@@ -589,6 +590,51 @@ describe('leituras de conteúdo', () => {
   it('sem papel, forbidden', async () => {
     const nobody = { email: 'x@orakel.local', roles: [] };
     expect(await listContents(db, nobody, SITE)).toMatchObject({ issues: [{ code: 'forbidden' }] });
+  });
+});
+
+describe('tamanho da fila de revisão por site (#583)', () => {
+  const counts = async (actor = SYSTEM_ACTOR) => {
+    const result = await countReviewQueues(db, actor);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value;
+  };
+
+  it('conta por site os conteúdos com a versão mais recente em revisão, numa consulta só', async () => {
+    const imported = await importSnapshot(db, SYSTEM_ACTOR, await readFixture('exemplo-b'));
+    if (!imported.ok) throw new Error(JSON.stringify(imported.issues));
+    expect(await counts()).toEqual({});
+
+    await edit(3, { ...(await latest(3)), title: 'Quem somos (2)' });
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await edit(2, { ...(await latest(2)), title: 'Outro guia' });
+    await submit(3);
+    await submit(1);
+
+    const { result, queries } = await profileQueries(db, (traced) =>
+      countReviewQueues(traced, SYSTEM_ACTOR),
+    );
+    expect(result).toEqual({ ok: true, value: { [SITE]: 2 } });
+    expect(queries).toBe(1);
+  });
+
+  it('salvar uma versão nova tira o conteúdo da contagem', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await submit(1);
+    expect(await counts()).toEqual({ [SITE]: 1 });
+
+    await edit(1, { ...(await latest(1)), title: 'Guia (3)' });
+
+    expect(await counts()).toEqual({});
+  });
+
+  it('revisor lê a contagem; sem papel, forbidden', async () => {
+    expect(
+      await countReviewQueues(db, { email: 'revisor@orakel.local', roles: ['revisor'] }),
+    ).toMatchObject({ ok: true });
+    expect(await countReviewQueues(db, { email: 'x@orakel.local', roles: [] })).toMatchObject({
+      issues: [{ code: 'forbidden' }],
+    });
   });
 });
 

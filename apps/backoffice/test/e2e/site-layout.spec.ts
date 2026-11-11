@@ -13,14 +13,20 @@ const OPERATOR = 'operacao@orakel.local';
 const SITE = 'exemplo-a';
 const SITE_NAME = 'Exemplo A — Guias';
 
-const AREAS = [
+const GROUPS = ['Site', 'Conteúdo', 'Estrutura', 'Geração', 'Análise'];
+
+/** Áreas da barra, nos grupos (#582); Configuração do site com site.configure. */
+const areas = ({ configure = false, write = false } = {}) => [
   'Visão geral',
+  ...(configure ? ['Configuração do site'] : []),
+  'Mudanças pendentes',
   'Conteúdos',
-  'Revisão',
+  /^Revisão\d*$/,
   'Mídia',
   'Autores',
   'Taxonomias',
   'Menus',
+  ...(write ? ['Textos institucionais'] : []),
   'Contextos editoriais',
   'Geração',
   'Audiência',
@@ -98,13 +104,16 @@ test('entre áreas do mesmo site, o carregamento aparece com o cabeçalho visív
   await expect(page.getByRole('banner')).toContainText(OPERATOR);
 });
 
-test('a barra lateral lista as áreas, sem Textos institucionais para quem não edita', async ({
+test('a barra lateral lista as áreas nos grupos, sem Textos institucionais para quem não edita', async ({
   page,
 }) => {
   await asRole(page, 'operacao');
   await page.goto(`/sites/${SITE}`);
   const bar = page.getByRole('navigation', { name: 'Áreas do site' });
-  await expect(bar.getByRole('link')).toHaveText(AREAS);
+  await expect(bar.getByRole('list')).toHaveCount(GROUPS.length);
+  // Cada grupo é uma lista nomeada pelo título visível (`aria-labelledby` do MenuGroup).
+  for (const group of GROUPS) await expect(bar.getByRole('list', { name: group })).toBeVisible();
+  await expect(bar.getByRole('link')).toHaveText(areas({ configure: true }));
   // A página do site não repete as áreas; "Editar configuração" continua nela.
   await expect(page.getByRole('link', { name: 'Autores', exact: true })).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'Editar configuração' })).toBeVisible();
@@ -115,7 +124,19 @@ test('com content.write, a barra também tem Textos institucionais', async ({ pa
   await page.goto(`/sites/${SITE}/midia`);
   await expect(
     page.getByRole('navigation', { name: 'Áreas do site' }).getByRole('link'),
-  ).toHaveText([...AREAS, 'Textos institucionais']);
+  ).toHaveText(areas({ write: true }));
+});
+
+test('Configuração do site e Mudanças pendentes ficam atuais nas suas telas', async ({ page }) => {
+  await asRole(page, 'operacao');
+  const bar = page.getByRole('navigation', { name: 'Áreas do site' });
+  for (const [path, area] of [
+    ['configuracao', 'Configuração do site'],
+    ['pendencias', 'Mudanças pendentes'],
+  ] as const) {
+    await page.goto(`/sites/${SITE}/${path}`);
+    await expect(bar.locator('[aria-current="page"]')).toHaveText([area]);
+  }
 });
 
 const switcher = (page: Page) => page.getByRole('button', { name: `${SITE_NAME}, trocar de site` });

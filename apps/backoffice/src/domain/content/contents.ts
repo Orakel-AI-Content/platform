@@ -7,7 +7,20 @@ import {
   type Content,
   type Resources,
 } from '@orakel/content-model/v1';
-import { and, asc, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import {
+  aliasedTable,
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  inArray,
+  ne,
+  notExists,
+  or,
+  sql,
+} from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import {
@@ -547,6 +560,44 @@ export async function listReviewQueue(
       .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime() || a.id - b.id)
       .map(({ id, kind, title, version, updatedAt }) => ({ id, kind, title, version, updatedAt })),
   };
+}
+
+/**
+ * Tamanho da fila de revisão de cada site, para o selo do item Revisão da barra lateral
+ * (#583): mesma regra de `listReviewQueue` (a versão mais recente do conteúdo está
+ * `em_revisao`), numa consulta só para todos os sites, sem ler título nem blocos. Site sem
+ * conteúdo na fila não aparece.
+ */
+export async function countReviewQueues(
+  db: Executor,
+  actor: Actor,
+): Promise<Result<Record<string, number>>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+
+  const newer = aliasedTable(contentVersions, 'newer');
+  const rows = await db
+    .select({ siteId: contentVersions.siteId, total: count() })
+    .from(contentVersions)
+    .where(
+      and(
+        eq(contentVersions.status, 'em_revisao'),
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(newer)
+            .where(
+              and(
+                eq(newer.siteId, contentVersions.siteId),
+                eq(newer.contentId, contentVersions.contentId),
+                gt(newer.version, contentVersions.version),
+              ),
+            ),
+        ),
+      ),
+    )
+    .groupBy(contentVersions.siteId);
+  return { ok: true, value: Object.fromEntries(rows.map((row) => [row.siteId, row.total])) };
 }
 
 export type ContentVersion = {

@@ -32,6 +32,8 @@ type SideNavProps = {
   navigationTree: NavigationTree[];
   /** Sites que quem pede pode ver (`listSites`): o seletor e o site atual. */
   sites: readonly SwitcherSite[];
+  /** Tamanho da fila de revisão por site (`countReviewQueues`): o selo do item Revisão. */
+  reviewCounts?: Readonly<Record<string, number>>;
   background?: boolean;
   className?: string;
   contentClass?: string;
@@ -50,6 +52,7 @@ const sideNavCollapseStyle = {
 const SideNav = ({
   navigationTree,
   sites,
+  reviewCounts,
   background = true,
   className,
   contentClass,
@@ -85,7 +88,12 @@ const SideNav = ({
         )}
       </Link>
       <div className={classNames('side-nav-content', contentClass)}>
-        <SideNavContent navigationTree={navigationTree} sites={sites} collapsed={collapsed} />
+        <SideNavContent
+          navigationTree={navigationTree}
+          sites={sites}
+          reviewCounts={reviewCounts}
+          collapsed={collapsed}
+        />
       </div>
     </div>
   );

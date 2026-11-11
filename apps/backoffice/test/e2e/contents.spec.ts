@@ -244,13 +244,8 @@ test('versões e uma versão no cartão, sem violação do axe', async ({ page }
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
   const table = page.getByRole('table', { name: 'Versões', exact: true });
-  await expect(table.getByRole('columnheader')).toHaveText([
-    'Versão',
-    'Status',
-    'Título',
-    'Gravada em',
-    'Aprovação',
-  ]);
+  // Três colunas (#588): o título vai sob a versão e a aprovação sob o status.
+  await expect(table.getByRole('columnheader')).toHaveText(['Versão', 'Status', 'Gravada em']);
   await expect(table.getByRole('link', { name: 'Versão 1', exact: true })).toHaveAttribute(
     'href',
     `${versions}/versoes/1`,
