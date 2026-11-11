@@ -2,8 +2,9 @@
 // worker morto depois de 4 h, e a fila build:<site> deixa o site sem build até lá. Só existe
 // um build-runner por ambiente e o compose para o antigo antes de subir o novo, então toda
 // trava de fila build:% ou de job `build` presente na partida é de um processo que morreu no
-// meio da tentativa: ela vira um build `failed`/`transient` e os donos são destravados.
-import { sql } from 'drizzle-orm';
+// meio da tentativa: a linha `rodando` dela é fechada como `failed`/`transient` e os donos são
+// destravados. Se o processo morreu antes de gravar a linha, ela é inserida já fechada.
+import { and, eq, sql } from 'drizzle-orm';
 
 import type { Db } from '../../db/client.ts';
 import { builds } from '../../db/schema/index.ts';
@@ -27,8 +28,8 @@ type LockedJob = {
 };
 
 /**
- * Registra cada tentativa de build interrompida e libera as travas dos workers donos, numa
- * transação. Devolve as tentativas registradas; travas de outras tasks não são tocadas.
+ * Fecha a linha de cada tentativa de build interrompida (ou a registra, se não havia linha) e
+ * libera as travas dos workers donos, numa transação. Devolve as tentativas registradas; travas de outras tasks não são tocadas.
  */
 export async function recoverInterruptedBuilds(
   db: Db,
@@ -52,17 +53,36 @@ export async function recoverInterruptedBuilds(
       if (job.site_id === null) continue;
       const target = await loadBuildTarget(tx, job.site_id);
       if (target === undefined) continue;
-      await tx.insert(builds).values({
-        siteId: job.site_id,
-        release: target.release ?? defaultTag,
-        jobId: job.id,
-        attempt: job.attempts,
-        status: 'failed',
+      const interrupted = {
+        status: 'failed' as const,
         failedStage: null,
-        failureKind: 'transient',
+        failureKind: 'transient' as const,
         failureMessage: INTERRUPTED_MESSAGE,
-        startedAt: new Date(job.locked_at),
-      });
+        finishedAt: new Date(),
+      };
+      const closed = await tx
+        .update(builds)
+        .set(interrupted)
+        .where(
+          and(
+            eq(builds.kind, 'build'),
+            eq(builds.jobId, job.id),
+            eq(builds.attempt, job.attempts),
+            eq(builds.status, 'rodando'),
+          ),
+        )
+        .returning({ id: builds.id });
+      if (closed.length === 0) {
+        await tx.insert(builds).values({
+          ...interrupted,
+          siteId: job.site_id,
+          release: target.release ?? defaultTag,
+          kind: 'build',
+          jobId: job.id,
+          attempt: job.attempts,
+          startedAt: new Date(job.locked_at),
+        });
+      }
       recorded.push({
         siteId: job.site_id,
         jobId: job.id,

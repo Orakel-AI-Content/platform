@@ -1,12 +1,19 @@
-// Builds no banco (12.0, L3): o que o build-runner precisa antes de começar e o registro do
-// resultado. Com sucesso, a mesma transação grava o build e baixa as mudanças pela lista
-// que o snapshot viu; com falha permanente, pausa o site com o motivo. "Reverter" (L4) escolhe
+// Builds no banco (12.0, L3): o que o build-runner precisa antes de começar e o registro da
+// execução. A tentativa nasce `rodando` e a mesma linha é fechada com o resultado: com sucesso,
+// a transação que a fecha baixa as mudanças pela lista que o snapshot viu; com falha
+// permanente, pausa o site com o motivo. As consultas daqui só leem builds fechados. "Reverter" (L4) escolhe
 // entre as versões dos builds `ok` e enfileira o rollback.
 import type { Result } from '@orakel/content-model';
 import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { builds, pendingChanges, sites } from '../../db/schema/index.ts';
+import {
+  builds,
+  FINISHED_BUILD_STATUSES,
+  pendingChanges,
+  sites,
+  type BuildStatus,
+} from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome } from './run-build.ts';
@@ -27,6 +34,26 @@ export type BuildTarget = {
   massUnpublishDeclaredAt: Date | null;
 };
 
+/** Estado de um build que terminou de rodar. */
+export type FinishedBuildStatus = (typeof FINISHED_BUILD_STATUSES)[number];
+
+/** Só os builds que terminaram de rodar: fora as linhas abertas, canceladas e de rollback. */
+const finishedBuild = and(
+  eq(builds.kind, 'build'),
+  inArray(builds.status, FINISHED_BUILD_STATUSES),
+);
+/** Só os builds que publicaram uma versão. */
+const publishedBuild = and(eq(builds.kind, 'build'), eq(builds.status, 'ok'));
+
+/** Estreita o tipo da linha que `finishedBuild` e `publishedBuild` já filtraram no banco. */
+function isFinished<T extends { status: BuildStatus; finishedAt: Date | null }>(
+  row: T,
+): row is T & { status: FinishedBuildStatus; finishedAt: Date } {
+  return (
+    row.finishedAt !== null && (FINISHED_BUILD_STATUSES as readonly string[]).includes(row.status)
+  );
+}
+
 /** Páginas e arquivos do build que pôs no ar a versão ativa do site. */
 export type ActiveBuild = { pages: number | null; files: number | null };
 
@@ -43,13 +70,7 @@ export async function activeBuild(
   const [row] = await db
     .select({ pages: builds.pages, files: builds.files })
     .from(builds)
-    .where(
-      and(
-        eq(builds.siteId, siteId),
-        eq(builds.status, 'ok'),
-        eq(builds.versionId, activeVersionId),
-      ),
-    )
+    .where(and(eq(builds.siteId, siteId), publishedBuild, eq(builds.versionId, activeVersionId)))
     .orderBy(desc(builds.finishedAt), desc(builds.id))
     .limit(1);
   return row;
@@ -80,39 +101,78 @@ export type BuildRun = {
   jobId: string | undefined;
   attempt: number;
   startedAt: Date;
+};
+
+/**
+ * Abre a tentativa: grava a linha `rodando`. Roda fora da transação do resultado, para a linha
+ * ser vista enquanto a execução acontece; se o processo morrer, a recuperação na partida a
+ * fecha (`recover.ts`).
+ */
+export async function startBuild(db: Executor, run: BuildRun): Promise<number> {
+  const [row] = await db
+    .insert(builds)
+    .values({
+      siteId: run.siteId,
+      release: run.release,
+      kind: 'build',
+      jobId: run.jobId ?? null,
+      attempt: run.attempt,
+      status: 'rodando',
+      startedAt: run.startedAt,
+    })
+    .returning({ id: builds.id });
+  if (row === undefined) throw new Error(`Build de ${run.siteId} não foi registrado`);
+  return row.id;
+}
+
+export type BuildClosing = {
+  /** Linha `rodando` aberta por `startBuild`. */
+  buildId: number;
+  siteId: string;
   /** Declaração de despublicação em massa que o plano usou; o sucesso a consome. */
   massUnpublishDeclaredAt?: Date | null;
 };
 
-/** Registra a tentativa e aplica o efeito no site e nas mudanças pendentes. */
+/** Fecha a linha da tentativa com o resultado e aplica o efeito no site e nas mudanças pendentes. */
 export async function recordBuild(
   tx: Executor,
-  run: BuildRun,
+  run: BuildClosing,
   outcome: BuildOutcome,
 ): Promise<number> {
-  const common = {
-    siteId: run.siteId,
-    release: run.release,
-    jobId: run.jobId ?? null,
-    attempt: run.attempt,
-    startedAt: run.startedAt,
-  };
+  const result =
+    outcome.status === 'ok'
+      ? {
+          status: 'ok' as const,
+          pendingChangeIds: outcome.render.pendingChangeIds,
+          pages: outcome.render.pages,
+          files: outcome.render.files,
+          versionId: outcome.publish.versionId,
+          cacheKey: outcome.publish.cacheKey,
+          renderMs: outcome.renderMs,
+          publishMs: outcome.publishMs,
+        }
+      : {
+          status: 'failed' as const,
+          failedStage: outcome.stage,
+          failureKind: outcome.failure.kind,
+          failureMessage: outcome.failure.message,
+          pendingChangeIds: outcome.render?.pendingChangeIds ?? [],
+          pages: outcome.render?.pages ?? null,
+          files: outcome.render?.files ?? null,
+          renderMs: outcome.renderMs ?? null,
+          publishMs: outcome.publishMs ?? null,
+        };
+  const closed = await tx
+    .update(builds)
+    .set({ ...result, finishedAt: new Date() })
+    .where(and(eq(builds.id, run.buildId), eq(builds.status, 'rodando')))
+    .returning({ id: builds.id });
+  if (closed.length === 0) {
+    throw new Error(`Build ${run.buildId} de ${run.siteId} não está rodando: nada a fechar`);
+  }
+
   if (outcome.status === 'ok') {
     const ids = outcome.render.pendingChangeIds;
-    const [row] = await tx
-      .insert(builds)
-      .values({
-        ...common,
-        status: 'ok',
-        pendingChangeIds: ids,
-        pages: outcome.render.pages,
-        files: outcome.render.files,
-        versionId: outcome.publish.versionId,
-        cacheKey: outcome.publish.cacheKey,
-        renderMs: outcome.renderMs,
-        publishMs: outcome.publishMs,
-      })
-      .returning({ id: builds.id });
     if (ids.length > 0) {
       await tx
         .update(pendingChanges)
@@ -129,25 +189,7 @@ export async function recordBuild(
     await setActiveVersion(tx, run.siteId, outcome.publish.versionId);
     const declaredAt = run.massUnpublishDeclaredAt ?? null;
     if (declaredAt !== null) await clearMassUnpublish(tx, run.siteId, declaredAt);
-    return row?.id ?? 0;
-  }
-
-  const [row] = await tx
-    .insert(builds)
-    .values({
-      ...common,
-      status: 'failed',
-      failedStage: outcome.stage,
-      failureKind: outcome.failure.kind,
-      failureMessage: outcome.failure.message,
-      pendingChangeIds: outcome.render?.pendingChangeIds ?? [],
-      pages: outcome.render?.pages ?? null,
-      files: outcome.render?.files ?? null,
-      renderMs: outcome.renderMs ?? null,
-      publishMs: outcome.publishMs ?? null,
-    })
-    .returning({ id: builds.id });
-  if (outcome.failure.kind === 'permanent') {
+  } else if (outcome.failure.kind === 'permanent') {
     await pauseSite(
       tx,
       run.siteId,
@@ -155,16 +197,16 @@ export async function recordBuild(
       outcome.failure.culprit,
     );
   }
-  return row?.id ?? 0;
+  return run.buildId;
 }
 
 export type LastBuild = {
-  status: (typeof builds.$inferSelect)['status'];
+  status: FinishedBuildStatus;
   versionId: string | null;
   finishedAt: Date;
 };
 
-/** Último build de cada site, para o Registro de instâncias. */
+/** Último build terminado de cada site, para o Registro de instâncias. */
 export async function lastBuilds(db: Executor): Promise<Map<string, LastBuild>> {
   const rows = await db
     .selectDistinctOn([builds.siteId], {
@@ -174,8 +216,9 @@ export async function lastBuilds(db: Executor): Promise<Map<string, LastBuild>> 
       finishedAt: builds.finishedAt,
     })
     .from(builds)
+    .where(finishedBuild)
     .orderBy(builds.siteId, desc(builds.finishedAt), desc(builds.id));
-  return new Map(rows.map(({ siteId, ...last }) => [siteId, last]));
+  return new Map(rows.filter(isFinished).map(({ siteId, ...last }) => [siteId, last]));
 }
 
 /** Um dos últimos builds de um site, como o resumo da página do site os mostra. */
@@ -184,13 +227,13 @@ export type RecentBuild = LastBuild & { id: number; release: string };
 /** Quantos builds o resumo do site mostra. */
 export const RECENT_BUILDS_LIMIT = 5;
 
-/** Os builds mais recentes de um site, do mais novo para o mais antigo. */
+/** Os builds terminados mais recentes de um site, do mais novo para o mais antigo. */
 export async function recentBuilds(
   db: Executor,
   siteId: string,
   limit = RECENT_BUILDS_LIMIT,
 ): Promise<RecentBuild[]> {
-  return db
+  const rows = await db
     .select({
       id: builds.id,
       status: builds.status,
@@ -199,9 +242,10 @@ export async function recentBuilds(
       finishedAt: builds.finishedAt,
     })
     .from(builds)
-    .where(eq(builds.siteId, siteId))
+    .where(and(eq(builds.siteId, siteId), finishedBuild))
     .orderBy(desc(builds.finishedAt), desc(builds.id))
     .limit(limit);
+  return rows.filter(isFinished);
 }
 
 /** "Publicar agora": o build do site roda já, sem esperar a janela. */
@@ -267,12 +311,12 @@ export async function listRollbackVersions(
       finishedAt: builds.finishedAt,
     })
     .from(builds)
-    .where(and(eq(builds.siteId, siteId), eq(builds.status, 'ok'), isNotNull(builds.versionId)))
+    .where(and(eq(builds.siteId, siteId), publishedBuild, isNotNull(builds.versionId)))
     .orderBy(builds.versionId, desc(builds.finishedAt), desc(builds.id));
   const versions = rows
     .filter(
       (row): row is RollbackVersion =>
-        row.versionId !== null && row.versionId !== site.activeVersionId,
+        row.versionId !== null && row.finishedAt !== null && row.versionId !== site.activeVersionId,
     )
     .sort((a, b) => b.finishedAt.getTime() - a.finishedAt.getTime());
   return { ok: true, value: versions };
@@ -311,7 +355,7 @@ export async function requestRollback(
   const [published] = await tx
     .select({ id: builds.id })
     .from(builds)
-    .where(and(eq(builds.siteId, siteId), eq(builds.status, 'ok'), eq(builds.versionId, versionId)))
+    .where(and(eq(builds.siteId, siteId), publishedBuild, eq(builds.versionId, versionId)))
     .limit(1);
   if (published === undefined) {
     return {

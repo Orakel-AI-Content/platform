@@ -8,7 +8,13 @@ import type { Db } from '../../src/db/client.ts';
 import { builds, releases, siteEvents, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
-import { requestBuildNow } from '../../src/domain/builds/builds.ts';
+import {
+  lastBuilds,
+  listRollbackVersions,
+  loadBuildTarget,
+  recentBuilds,
+  requestBuildNow,
+} from '../../src/domain/builds/builds.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
 import {
   rebuildOnRelease,
@@ -23,6 +29,7 @@ import {
   renderOk,
 } from '../../src/domain/builds/fake-runtime.ts';
 import type { BuildSettings } from '../../src/domain/builds/plan.ts';
+import type { ContainerRuntime } from '../../src/domain/builds/runtime.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
 import { createSite, unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { createBuildTask, TransientBuildError } from '../../src/jobs/tasks/build.ts';
@@ -250,6 +257,97 @@ describe('task build', () => {
     });
   });
 
+  it('a tentativa nasce rodando, visível durante a execução, e a mesma linha é fechada', async () => {
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    const during: (typeof builds.$inferSelect)[][] = [];
+    const runtime = {
+      ...fake.runtime,
+      // Outra conexão do pool, no meio do render: a linha já está confirmada.
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
+        during.push(await db.select().from(builds));
+        return fake.runtime.wait(...args);
+      },
+    };
+    await createBuildTask({ db, runtime, settings, now: () => Date.UTC(2026, 10, 11, 12) })(
+      { siteId: 'exemplo-a' },
+      helpers(2),
+    );
+
+    expect(during[0]).toEqual([
+      expect.objectContaining({
+        kind: 'build',
+        status: 'rodando',
+        siteId: 'exemplo-a',
+        release: 'local',
+        jobId: '7',
+        attempt: 2,
+        startedAt: new Date(Date.UTC(2026, 10, 11, 12)),
+        finishedAt: null,
+      }),
+    ]);
+    const after = await db.select().from(builds);
+    expect(after).toHaveLength(1);
+    expect(after[0]).toMatchObject({
+      id: during[0]?.[0]?.id,
+      kind: 'build',
+      status: 'ok',
+      jobId: '7',
+      attempt: 2,
+      startedAt: new Date(Date.UTC(2026, 10, 11, 12)),
+      versionId: '20261001T120000Z-abcdef12',
+    });
+    expect(after[0]?.finishedAt).toBeInstanceOf(Date);
+  });
+
+  it('a falha fecha a mesma linha que nasceu rodando', async () => {
+    const fake = fakeRuntime({
+      render: { exitCode: 20, file: failedFile('transient', 'API fora') },
+    });
+    const during: { id: number; status: string }[][] = [];
+    const runtime = {
+      ...fake.runtime,
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
+        during.push(await db.select({ id: builds.id, status: builds.status }).from(builds));
+        return fake.runtime.wait(...args);
+      },
+    };
+    await expect(
+      createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, helpers()),
+    ).rejects.toBeInstanceOf(TransientBuildError);
+
+    expect(during[0]).toEqual([{ id: expect.any(Number) as number, status: 'rodando' }]);
+    expect(await db.select().from(builds)).toMatchObject([
+      {
+        id: during[0]?.[0]?.id,
+        status: 'failed',
+        failedStage: 'render',
+        failureKind: 'transient',
+        failureMessage: 'API fora',
+      },
+    ]);
+  });
+
+  it('o banco só aceita linha aberta sem fim e linha fechada com fim', async () => {
+    const row = { siteId: 'exemplo-a', release: 'local', attempt: 1, startedAt: new Date() };
+    await expect(
+      db.insert(builds).values({ ...row, status: 'rodando', finishedAt: new Date() }),
+    ).rejects.toThrow();
+    await expect(db.insert(builds).values({ ...row, status: 'ok' })).rejects.toThrow();
+    await db.insert(builds).values({ ...row, status: 'rodando' });
+    await db.insert(builds).values({ ...row, status: 'na_fila', startedAt: null });
+  });
+
+  it('a migração da execução com estado só acrescenta e relaxa, sem reescrever linhas', async () => {
+    const migration = await readFile(
+      new URL('../../drizzle/0019_execucao_com_estado.sql', import.meta.url),
+      'utf8',
+    );
+    const allowed =
+      /^ALTER TABLE "builds" (ADD COLUMN |ALTER COLUMN "\w+" DROP (NOT NULL|DEFAULT);$|ADD CONSTRAINT "\w+" CHECK )/;
+    const statements = migration.split('--> statement-breakpoint').map((s) => s.trim());
+    expect(statements.filter((statement) => !allowed.test(statement))).toEqual([]);
+  });
+
   it('o próximo build recebe as páginas da versão ativa (trava de segurança)', async () => {
     const first = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
     await createBuildTask({ db, runtime: first.runtime, settings })(
@@ -286,6 +384,30 @@ describe('task build', () => {
 
     const next = await buildOk('v-seguinte', 12);
     expect(next.started[0]?.env).toMatchObject({ ACTIVE_PAGE_COUNT: '12' });
+  });
+
+  it('linha aberta não muda a versão ativa, o "Reverter", o último build nem os recentes', async () => {
+    const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+    await buildOk('v-1', 12);
+    await buildOk('v-2', 30);
+    const read = async () => ({
+      target: await loadBuildTarget(db, 'exemplo-a'),
+      rollback: await listRollbackVersions(db, operacao, 'exemplo-a'),
+      last: (await lastBuilds(db)).get('exemplo-a'),
+      recent: await recentBuilds(db, 'exemplo-a'),
+    });
+    const before = await read();
+    expect(before.target).toMatchObject({ activePages: 30 });
+    expect(before.last).toMatchObject({ status: 'ok', versionId: 'v-2' });
+
+    const open = { siteId: 'exemplo-a', release: 'local', attempt: 1 };
+    await db.insert(builds).values([
+      // A versão ativa numa linha aberta, com outra contagem: não pode virar a referência.
+      { ...open, status: 'rodando', startedAt: new Date(), versionId: 'v-2', pages: 999 },
+      { ...open, status: 'na_fila', scheduledFor: new Date(), versionId: 'v-3' },
+    ]);
+
+    expect(await read()).toEqual(before);
   });
 
   it('sem build da versão ativa, a trava fica sem referência', async () => {

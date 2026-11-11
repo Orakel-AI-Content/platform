@@ -1,7 +1,7 @@
 import type { Task } from 'graphile-worker';
 
 import type { Db } from '../../db/client.ts';
-import { loadBuildTarget, recordBuild } from '../../domain/builds/builds.ts';
+import { loadBuildTarget, recordBuild, startBuild } from '../../domain/builds/builds.ts';
 import { planBuild, type BuildSettings } from '../../domain/builds/plan.ts';
 import { runBuild } from '../../domain/builds/run-build.ts';
 import type { ContainerRuntime } from '../../domain/builds/runtime.ts';
@@ -28,8 +28,9 @@ function siteIdOf(payload: unknown): string {
 
 /**
  * Build de um site (build-runner, 12.0 L3). Site pausado não é construído até ser retomado.
- * Cada tentativa é registrada; a transitória lança para o Graphile Worker repetir, a
- * permanente pausa o site (recordBuild) e encerra o job.
+ * Cada tentativa é uma linha em `builds`: nasce `rodando` e é fechada com o resultado. A
+ * transitória lança para o Graphile Worker repetir, a permanente pausa o site (recordBuild) e
+ * encerra o job.
  */
 export function createBuildTask(deps: BuildTaskDeps): Task {
   const now = deps.now ?? Date.now;
@@ -51,6 +52,13 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
     const attempt = helpers.job.attempts;
     const plan = planBuild(target, deps.settings, `${siteId}-${helpers.job.id}-${attempt}`);
     const startedAt = new Date(now());
+    const buildId = await startBuild(deps.db, {
+      siteId,
+      release: plan.release,
+      jobId: helpers.job.id,
+      attempt,
+      startedAt,
+    });
     log.info(`build de ${siteId} na release ${plan.release} (tentativa ${attempt})`);
 
     const outcome = await runBuild(plan, {
@@ -61,14 +69,7 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
     await deps.db.transaction((tx) =>
       recordBuild(
         tx,
-        {
-          siteId,
-          release: plan.release,
-          jobId: helpers.job.id,
-          attempt,
-          startedAt,
-          massUnpublishDeclaredAt: target.massUnpublishDeclaredAt,
-        },
+        { buildId, siteId, massUnpublishDeclaredAt: target.massUnpublishDeclaredAt },
         outcome,
       ),
     );

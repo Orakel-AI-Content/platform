@@ -55,7 +55,73 @@ async function locks(): Promise<{ queue_name: string; locked_by: string | null }
 }
 
 describe('recuperação dos builds interrompidos', () => {
-  it('libera a fila e o job de um worker morto e registra a tentativa como transitória', async () => {
+  it('fecha a linha rodando da tentativa interrompida, sem inserir outra', async () => {
+    await lock('build:exemplo-a', DEAD);
+    const [job] = (await db.execute<{ id: string }>(sql`select id::text from graphile_worker.jobs`))
+      .rows;
+    const startedAt = new Date('2026-10-21T22:04:23Z');
+    const [open] = await db
+      .insert(builds)
+      .values({
+        siteId: 'exemplo-a',
+        release: '1.2.0',
+        jobId: job?.id,
+        attempt: 1,
+        status: 'rodando',
+        startedAt,
+      })
+      .returning({ id: builds.id });
+
+    const recovered = await recoverInterruptedBuilds(db, 'local');
+
+    expect(recovered).toEqual([
+      { siteId: 'exemplo-a', jobId: job?.id, attempt: 1, lockedBy: DEAD },
+    ]);
+    const rows = await db.select().from(builds);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        id: open?.id,
+        kind: 'build',
+        release: '1.2.0',
+        jobId: job?.id,
+        attempt: 1,
+        status: 'failed',
+        failedStage: null,
+        failureKind: 'transient',
+        failureMessage: INTERRUPTED_MESSAGE,
+        startedAt,
+      }),
+    ]);
+    expect(rows[0]?.finishedAt).toBeInstanceOf(Date);
+  });
+
+  it('não fecha a linha rodando de outra tentativa do mesmo job', async () => {
+    await lock('build:exemplo-a', DEAD);
+    const [job] = (await db.execute<{ id: string }>(sql`select id::text from graphile_worker.jobs`))
+      .rows;
+    await db.insert(builds).values({
+      siteId: 'exemplo-a',
+      release: 'local',
+      jobId: job?.id,
+      attempt: 4,
+      status: 'rodando',
+      startedAt: LOCKED_AT,
+    });
+
+    await recoverInterruptedBuilds(db, 'local');
+
+    expect(
+      await db
+        .select({ attempt: builds.attempt, status: builds.status })
+        .from(builds)
+        .orderBy(builds.attempt),
+    ).toEqual([
+      { attempt: 1, status: 'failed' },
+      { attempt: 4, status: 'rodando' },
+    ]);
+  });
+
+  it('sem linha rodando, libera a fila e o job e registra a tentativa como transitória', async () => {
     await lock('build:exemplo-a', DEAD);
 
     const recovered = await recoverInterruptedBuilds(db, 'local');
@@ -73,6 +139,7 @@ describe('recuperação dos builds interrompidos', () => {
       expect.objectContaining({
         siteId: 'exemplo-a',
         release: 'local',
+        kind: 'build',
         jobId: job?.id,
         attempt: 1,
         status: 'failed',
@@ -80,6 +147,7 @@ describe('recuperação dos builds interrompidos', () => {
         failureKind: 'transient',
         failureMessage: INTERRUPTED_MESSAGE,
         startedAt: LOCKED_AT,
+        finishedAt: expect.any(Date) as Date,
       }),
     ]);
     // O site segue ativo: a falha é transitória e o job volta a rodar.
