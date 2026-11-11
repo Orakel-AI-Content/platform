@@ -15,6 +15,9 @@ import {
 // tarefa é `test:browser`. O fuso do navegador é o de São Paulo, como no E2E do DateTimepicker.
 export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('src', import.meta.url)) } },
+  // Dependência só de import dinâmico (`next/dynamic`, #599): fora daqui, o Vite a descobre no
+  // meio do teste, reotimiza e carrega um segundo React.
+  optimizeDeps: { include: ['react-apexcharts'] },
   test: {
     include: ['src/**/*.browser.test.tsx'],
     setupFiles: ['./test/browser/setup.ts'],

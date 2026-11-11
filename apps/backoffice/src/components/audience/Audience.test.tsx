@@ -2,9 +2,10 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { audienceChartData } from './AudienceChart.tsx';
 import AudienceMetrics from './AudienceMetrics.tsx';
 import { AudienceTable } from './AudienceTable.tsx';
-import { formatAudienceDay, formatCount } from './format.ts';
+import { formatAudienceDay, formatAudienceShortDay, formatCount } from './format.ts';
 
 // Cartões e tabela da audiência (#548): números em pt-BR, dia de São Paulo sem andar de fuso
 // e a tabela do dia mais recente para o mais antigo.
@@ -23,6 +24,28 @@ describe('format', () => {
     expect(formatAudienceDay('2026-11-04')).toBe('qua., 04/11/2026');
     // O primeiro dia do mês não volta para o último do anterior (UTC−3).
     expect(formatAudienceDay('2026-11-01')).toBe('dom., 01/11/2026');
+    expect(formatAudienceShortDay('2026-11-01')).toBe('01/11');
+  });
+});
+
+describe('audienceChartData', () => {
+  it('dias em ordem cronológica, uma série por métrica e o nome com o período', () => {
+    const data = audienceChartData(
+      [
+        { day: '2026-11-04', views: 12_345, sessions: 3_210 },
+        { day: '2026-11-01', views: 15, sessions: 9 },
+        { day: '2026-11-03', views: 980, sessions: 400 },
+      ],
+      30,
+    );
+    expect(data.categories).toEqual(['2026-11-01', '2026-11-03', '2026-11-04']);
+    expect(data.series).toEqual([
+      { name: 'Visualizações', data: [15, 980, 12_345] },
+      { name: 'Sessões', data: [9, 400, 3_210] },
+    ]);
+    expect(data.label).toBe(
+      'Visualizações e sessões por dia nos últimos 30 dias, de dom., 01/11/2026 a qua., 04/11/2026. Os valores estão na tabela abaixo.',
+    );
   });
 });
 

@@ -20,3 +20,14 @@ const dayFormat = new Intl.DateTimeFormat('pt-BR', {
 export function formatAudienceDay(day: string): string {
   return dayFormat.format(new Date(`${day}T00:00:00Z`));
 }
+
+const shortDayFormat = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'UTC',
+  day: '2-digit',
+  month: '2-digit',
+});
+
+/** `2026-11-04` → "04/11", no eixo do gráfico (#599). */
+export function formatAudienceShortDay(day: string): string {
+  return shortDayFormat.format(new Date(`${day}T00:00:00Z`));
+}

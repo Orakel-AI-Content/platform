@@ -1,0 +1,43 @@
+/* Ecme v1.3.10 (e5f9a1d): src/assets/styles/vendors/_apex-chart.css
+   Adaptado (#599):
+   - a cor do texto da dica é fixada, porque a que o ApexCharts escreve não chega a 4,5:1 (o
+     título, cinza claro sobre o branco; tudo, no escuro, sobre o gray-600): gray-600 no título
+     claro e gray-100 no escuro (pares em globals-contrast.test.ts; o axe confere com a dica
+     aberta em Audience.browser.test.tsx);
+   - sem as regras de datalabel, menu e legenda, que o Backoffice não usa (o gráfico só de linha
+     tem legenda em texto fora do SVG). */
+@layer components {
+  .apexcharts-tooltip {
+    @apply !shadow-lg;
+
+    &.apexcharts-theme-light {
+      @apply !border !border-gray-200 dark:!border-gray-600 !bg-white dark:!bg-gray-600 dark:!text-gray-100;
+
+      .apexcharts-tooltip-title {
+        @apply !border-b-0 !bg-transparent;
+      }
+    }
+  }
+
+  .apexcharts-canvas {
+    @apply mx-auto;
+  }
+
+  .apexcharts-tooltip-title {
+    @apply !mb-0 !text-gray-600 dark:!text-gray-100;
+  }
+
+  .apexcharts-gridline {
+    @apply stroke-gray-200 dark:stroke-gray-600;
+  }
+
+  .apexcharts-text {
+    tspan {
+      @apply !fill-gray-500 dark:!fill-gray-400;
+    }
+  }
+
+  .apexcharts-xaxistooltip {
+    @apply !opacity-0;
+  }
+}
