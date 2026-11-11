@@ -39,6 +39,7 @@ import classNames from '@/components/ui/utils/classNames';
 import BottomStickyBar from '@/components/template/BottomStickyBar';
 import { PAGE_CONTAINER_GUTTER_X } from '@/components/template/constants';
 
+import { SectionNav } from './SectionNav.tsx';
 import { clean, describe, emptyValue, pattern, type FieldNode } from './schemaWalk.ts';
 
 // Gerador de formulários a partir de um schema Zod de objeto (padrão do Backoffice,
@@ -863,33 +864,35 @@ export function SchemaForm<T>({
             />
           </Card>
         ) : (
-          <div className={classNames('flex flex-col gap-4', contentClassName)}>
-            {sections && (
-              <nav aria-label="Seções do formulário">
-                <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                  {sections.map((section) => (
-                    <li key={section.id}>
-                      <a href={`#secao-${section.id}`} className="underline underline-offset-4">
-                        {section.title}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
+          // Com seções, o índice fica acima dos cartões e, a partir de `xl`, numa coluna ao lado
+          // deles (#594); a coluna dos cartões mantém a largura dada pela página.
+          <div
+            className={classNames(
+              sections ? 'flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-8' : undefined,
             )}
-            {summary}
-            <SchemaFields
-              schema={schema}
-              labels={labels}
-              hints={hints}
-              hidden={hidden}
-              readOnly={readOnly}
-              fields={fields}
-              sections={sections}
-              sideBySide={sideBySide}
-              carded={actionBar !== undefined}
-            />
-            {actionBar === undefined && <div>{submit}</div>}
+          >
+            {sections && <SectionNav sections={sections} />}
+            <div
+              className={classNames(
+                'flex flex-col gap-4',
+                sections && 'min-w-0 flex-1',
+                contentClassName,
+              )}
+            >
+              {summary}
+              <SchemaFields
+                schema={schema}
+                labels={labels}
+                hints={hints}
+                hidden={hidden}
+                readOnly={readOnly}
+                fields={fields}
+                sections={sections}
+                sideBySide={sideBySide}
+                carded={actionBar !== undefined}
+              />
+              {actionBar === undefined && <div>{submit}</div>}
+            </div>
           </div>
         )}
         {actionBar && (

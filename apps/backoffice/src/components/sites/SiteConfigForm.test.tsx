@@ -254,6 +254,20 @@ describe('legibilidade da configuração (#594)', () => {
     });
   });
 
+  it('índice: uma lista de âncoras, com só a primeira seção marcada antes de rolar', () => {
+    renderEdit({ ok: true, message: '' });
+
+    const nav = screen.getByRole('navigation', { name: 'Seções do formulário' });
+    const links = within(nav).getAllByRole('link');
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(
+      SITE_CONFIG_SECTIONS.map((section) => `#secao-${section.id}`),
+    );
+    expect(links.map((link) => link.getAttribute('aria-current'))).toEqual([
+      'true',
+      ...SITE_CONFIG_SECTIONS.slice(1).map(() => null),
+    ]);
+  });
+
   it('Integrações sem legenda repetida: o GA4 direto no cartão da seção', () => {
     renderEdit({ ok: true, message: '' });
 
