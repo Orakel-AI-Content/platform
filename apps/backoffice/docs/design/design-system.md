@@ -450,9 +450,9 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   escrita à mão.
 - **Corpo:** `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, e o
   conteúdo à direita num `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de
-  uma seção (na página do site, o `SiteTabs`: Ciclo de vida, G1 e Janela; o nome da aba é o
-  título da seção, e um formulário dentro dela é o `SchemaForm` com `card`, de botões
-  `size: 'sm'`). Abaixo de `xl`, empilha. Largura `list-width` (a versão, sem resumo ao lado,
+  uma seção (na página do site, o `SiteTabs`: Ciclo de vida, Builds, G1, Janela e Limite; o
+  nome da aba é o título da seção, e um formulário dentro dela é o `SchemaForm` com `card`, de
+  botões `size: 'sm'`). Abaixo de `xl`, empilha. Largura `list-width` (a versão, sem resumo ao lado,
   fica em `form-width`) e espaçamento da Moldura. Uma tabela no cartão da direita, mais
   estreito que a largura de lista, pode rolar na horizontal dentro do próprio contêiner (o
   `overflow-x-auto` do `Table`), como no `CustomerDetails`; a página nunca rola (#371).
@@ -469,6 +469,21 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-y-7 gap-x-4`); no diálogo da mídia (uma
   coluna) e nos "Dados" da versão, o padrão do `InfoList` (`gap-4`). Nunca a grade
   `grid-cols-[auto_1fr]`, que estoura a 375 px.
+- **Página do site** (#595): no cabeçalho, além de "Editar configuração", as ações de operação
+  (`SiteOperations`, `src/components/sites/SiteOperations.tsx`, só com operations.run): o botão
+  principal "Publicar agora" (no site pausado, "Retomar") e o `Dropdown` "Mais ações" com
+  "Reconstruir na release" (só com a lista de releases) e "Reverter" (só com a de versões),
+  como o `MoreActions` da lista de sites. Cada gatilho abre o diálogo de confirmação dele,
+  separado do botão (`isOpen`/`onCancel`/`onConfirm`/`onAfterClose`, como o
+  `PublishNowDialog`), e o foco volta ao gatilho. O sucesso vai ao toast e a recusa ao
+  `ActionAlert` logo abaixo do cabeçalho (`SiteOperationsScope`). O resumo
+  (`SiteSummaryCard`) tem só o estado atual, sem botões: o domínio é link para
+  `https://<domínio>` em nova aba, e "Mudanças pendentes" leva à tela de pendências quando
+  passa de zero, com a divisão por origem embaixo, em duas colunas. Assim, a 1440 × 900, o
+  resumo inteiro cabe na primeira tela. Os últimos builds ficam na aba "Builds", no
+  `SiteBuildsTable` (`src/components/sites/SiteBuildsTable.tsx`): a `Table` do Ecme direto,
+  não o `DataTable` (são 5 linhas, sem busca nem paginação), com Status (`StateTag`), Data (no
+  fuso do site), Release e Versão; sem builds, o `EmptyState` "Nenhum build ainda.".
 - **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
   processo de ordem fixa (ciclo de vida do site), não tag. Usa o `Steps` vertical
   (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
