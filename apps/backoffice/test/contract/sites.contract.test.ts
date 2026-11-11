@@ -1,5 +1,5 @@
 import { RESOURCES } from '@orakel/content-model/v1';
-import { count, eq } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
@@ -7,6 +7,7 @@ import {
   builds,
   pendingChanges,
   siteConfigs,
+  siteEvents,
   sitePolicyTriggers,
   sites,
 } from '../../src/db/schema/index.ts';
@@ -14,7 +15,13 @@ import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
-import { setBuildWindow, setDailyPublishLimit } from '../../src/domain/builds/site-state.ts';
+import {
+  pauseSite,
+  pauseSiteManually,
+  resumeSite,
+  setBuildWindow,
+  setDailyPublishLimit,
+} from '../../src/domain/builds/site-state.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { configureDailyPublishLimit } from '../../src/domain/publications/publish.ts';
 import {
@@ -648,5 +655,146 @@ describe('leitura dos gatilhos de política', () => {
 
     expect(await db.select().from(sitePolicyTriggers)).toEqual([]);
     expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(pending);
+  });
+});
+
+describe('pausa manual com motivo (#644)', () => {
+  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+
+  async function stateOf(siteId: string) {
+    const [row] = await db
+      .select({
+        state: sites.state,
+        pausedReason: sites.pausedReason,
+        pausedCulpritOrigin: sites.pausedCulpritOrigin,
+        pausedCulpritReference: sites.pausedCulpritReference,
+      })
+      .from(sites)
+      .where(eq(sites.id, siteId));
+    return row;
+  }
+
+  async function events() {
+    return db
+      .select({
+        siteId: siteEvents.siteId,
+        kind: siteEvents.kind,
+        requestedBy: siteEvents.requestedBy,
+        reason: siteEvents.reason,
+        culpritOrigin: siteEvents.culpritOrigin,
+        culpritReference: siteEvents.culpritReference,
+      })
+      .from(siteEvents)
+      .orderBy(siteEvents.id);
+  }
+
+  async function buildJobKeys(): Promise<string[]> {
+    const result = await db.execute<{ key: string }>(
+      sql`select key from graphile_worker.jobs where task_identifier = 'build'`,
+    );
+    return result.rows.map((row) => row.key);
+  }
+
+  it('pausa o site ativo com o motivo, sem culpado, e grava o evento com quem pediu', async () => {
+    expect(
+      await db.transaction((tx) =>
+        pauseSiteManually(tx, operacao, 'exemplo-a', '  Migração do DNS  '),
+      ),
+    ).toEqual({ ok: true, value: undefined });
+
+    expect(await stateOf('exemplo-a')).toEqual({
+      state: 'pausado',
+      pausedReason: 'Migração do DNS',
+      pausedCulpritOrigin: null,
+      pausedCulpritReference: null,
+    });
+    expect(await stateOf('exemplo-b')).toMatchObject({ state: 'ativo' });
+    expect(await events()).toEqual([
+      {
+        siteId: 'exemplo-a',
+        kind: 'pausa',
+        requestedBy: 'o@orakel.local',
+        reason: 'Migração do DNS',
+        culpritOrigin: null,
+        culpritReference: null,
+      },
+    ]);
+  });
+
+  it.each(['', '   '])('recusa motivo vazio (%j), sem pausar', async (reason) => {
+    expect(
+      await db.transaction((tx) => pauseSiteManually(tx, operacao, 'exemplo-a', reason)),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.pause_reason_required', path: ['reason'] }],
+    });
+    expect(await stateOf('exemplo-a')).toMatchObject({ state: 'ativo', pausedReason: null });
+    expect(await events()).toEqual([]);
+  });
+
+  it('recusa site já pausado com erro próprio e mantém o motivo e o culpado anteriores', async () => {
+    await db.transaction((tx) =>
+      pauseSite(tx, 'exemplo-a', 'render: Snapshot inválido', {
+        origin: 'content',
+        reference: '42',
+      }),
+    );
+    expect(
+      await db.transaction((tx) => pauseSiteManually(tx, operacao, 'exemplo-a', 'Outro motivo')),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.already_paused' }] });
+
+    expect(await stateOf('exemplo-a')).toEqual({
+      state: 'pausado',
+      pausedReason: 'render: Snapshot inválido',
+      pausedCulpritOrigin: 'content',
+      pausedCulpritReference: '42',
+    });
+    expect(await events()).toMatchObject([{ kind: 'pausa', requestedBy: 'system' }]);
+  });
+
+  it('recusa site inexistente', async () => {
+    expect(
+      await db.transaction((tx) => pauseSiteManually(tx, operacao, 'nao-existe', 'Motivo')),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+  });
+
+  it.each(['editor', 'revisor'] as const)(
+    '%s recebe forbidden e o site continua ativo',
+    async (role) => {
+      const actor = { email: `${role}@orakel.local`, roles: [role] };
+      expect(
+        await db.transaction((tx) => pauseSiteManually(tx, actor, 'exemplo-a', 'Motivo')),
+      ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+      expect(await stateOf('exemplo-a')).toMatchObject({ state: 'ativo' });
+      expect(await events()).toEqual([]);
+    },
+  );
+
+  it('"Retomar" desfaz a pausa manual: volta a ativo e enfileira o build', async () => {
+    await db.transaction((tx) => pauseSiteManually(tx, operacao, 'exemplo-a', 'Manutenção'));
+    await db.execute(sql`delete from graphile_worker._private_jobs`);
+
+    expect(await db.transaction((tx) => resumeSite(tx, operacao, 'exemplo-a'))).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    expect(await stateOf('exemplo-a')).toEqual({
+      state: 'ativo',
+      pausedReason: null,
+      pausedCulpritOrigin: null,
+      pausedCulpritReference: null,
+    });
+    expect(await buildJobKeys()).toEqual(['build:exemplo-a']);
+    expect((await events()).map(({ kind, requestedBy }) => ({ kind, requestedBy }))).toEqual([
+      { kind: 'pausa', requestedBy: 'o@orakel.local' },
+      { kind: 'retomada', requestedBy: 'o@orakel.local' },
+    ]);
+  });
+
+  it('não cria mudança pendente', async () => {
+    const [before] = await db.select({ n: count() }).from(pendingChanges);
+    await db.transaction((tx) => pauseSiteManually(tx, operacao, 'exemplo-a', 'Manutenção'));
+    const [after] = await db.select({ n: count() }).from(pendingChanges);
+    expect(after?.n).toBe(before?.n);
   });
 });
