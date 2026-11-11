@@ -10,6 +10,7 @@ import {
   isClipped,
   pageOverflow,
   tableOverflow,
+  visibleColumns,
 } from '../../../test/browser/layout.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { ListScreen, renderInFrame } from '../../../test/browser/render.tsx';
@@ -108,6 +109,22 @@ describe('ContentsTable no navegador', () => {
     expect(pageOverflow()).toBe(0);
     expect(tableOverflow(table())).toBe(0);
     expect(cellsOverLines(table())).toEqual([]);
+  });
+
+  // Tela estreita (#589): abaixo de md, Tipo, Versão e Última alteração ficam ocultas; a caixa,
+  // o título, o status e o editar cabem sem rolar.
+  it('com seleção, a 390 px, título, status e editar sem rolagem horizontal', async () => {
+    await page.viewport(390, 844);
+    await renderInFrame(<Contents canPublish />);
+
+    expect(visibleColumns(table())).toEqual(['', 'Título', 'Status', 'Ações']);
+    expect(pageOverflow()).toBe(0);
+    expect(tableOverflow(table())).toBe(0);
+    // O título curto ("Receita N") aparece inteiro, e o editar da linha continua ao alcance.
+    const first = page.elementLocator(table().element().querySelector('tbody tr')!);
+    const title = first.getByRole('link', { name: /^Receita \d+ \(ver versões\)$/ });
+    expect(isClipped(title)).toBe(false);
+    await expect.element(first.getByRole('link', { name: /^Editar / })).toBeVisible();
   });
 
   it.each(COLOR_SCHEMES)('com seleção, sem violação do axe (%s)', async (scheme) => {

@@ -10,6 +10,7 @@ import {
   isClipped,
   pageOverflow,
   tableOverflow,
+  visibleColumns,
 } from '../../../test/browser/layout.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { ListScreen, renderInFrame } from '../../../test/browser/render.tsx';
@@ -59,6 +60,19 @@ afterEach(() => {
 });
 
 describe('ReviewQueueTable no navegador', () => {
+  // Tela estreita (#589): a fila não tem status (tudo está em revisão); abaixo de md, Tipo e
+  // Versão ficam ocultas, e o título e a data do envio, que dá a ordem da fila, cabem sem rolar.
+  it('a 390 px, título e Enviado em sem rolagem horizontal', async () => {
+    await page.viewport(390, 844);
+    await renderInFrame(<Queue />, { roles: ['revisor'] });
+
+    expect(visibleColumns(table())).toEqual(['Título', 'Enviado em']);
+    expect(pageOverflow()).toBe(0);
+    expect(tableOverflow(table())).toBe(0);
+    expect(cellsOverLines(table())).toEqual([]);
+    expect(isClipped(table().getByRole('link', { name: 'Artigo 3 (revisar)' }))).toBe(false);
+  });
+
   it('a 1280 px, sem rolagem horizontal e com até duas linhas por célula', async () => {
     await renderInFrame(<Queue />, { roles: ['revisor'] });
     await expect.element(table().getByRole('row', { name: /título longo/ })).toBeVisible();

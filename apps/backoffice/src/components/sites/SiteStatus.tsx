@@ -83,8 +83,10 @@ export function SiteStateIndicator({
     const title = [reason, culprit && `Conteúdo culpado: ${culprit.text}`]
       .filter(Boolean)
       .join(' · ');
+    // `relative`: os `sr-only` (absolutos) ficam presos ao corte do `truncate`; sem ele, escapam
+    // e esticam a página em tela estreita (#589).
     const text = (
-      <span title={title} className="block max-w-24 truncate">
+      <span title={title} className="relative block max-w-24 truncate">
         {shown}
         {reason && culprit && <span className="sr-only"> · {culprit.text}</span>}
         {culpritLabel}

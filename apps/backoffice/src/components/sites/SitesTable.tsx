@@ -136,8 +136,10 @@ function MoreActions({
  */
 function SiteIdAndDomain({ site }: { site: SiteSummary }) {
   const text = site.domain ? `${site.id} · ${site.domain}` : site.id;
+  // `relative`: o "(abre em nova aba)" é `sr-only` (absoluto) e, sem um ancestral posicionado,
+  // escapa do corte do `truncate` e estica a página em tela estreita (#589).
   return (
-    <span title={text} className="block truncate">
+    <span title={text} className="relative block truncate">
       {site.id}
       {site.domain && (
         <>
@@ -187,6 +189,7 @@ function columnsFor(
     {
       header: 'Ciclo de vida',
       accessorKey: 'lifecycle',
+      meta: { hideBelow: 'md' },
       enableGlobalFilter: false,
       enableSorting: false,
       cell: ({ row }) => {
@@ -209,6 +212,7 @@ function columnsFor(
     {
       header: 'Indexável',
       accessorKey: 'indexavel',
+      meta: { hideBelow: 'md' },
       enableGlobalFilter: false,
       enableSorting: false,
       cell: ({ row }) => (row.original.indexavel ? 'Sim' : 'Não'),
@@ -216,6 +220,7 @@ function columnsFor(
     {
       header: 'Mudanças pendentes',
       accessorKey: 'pendingChanges',
+      meta: { hideBelow: 'md' },
       enableGlobalFilter: false,
       enableSorting: false,
       cell: ({ row }) => (
@@ -225,6 +230,7 @@ function columnsFor(
     {
       header: 'Último build',
       accessorKey: 'lastBuild',
+      meta: { hideBelow: 'md' },
       enableGlobalFilter: false,
       enableSorting: false,
       cell: ({ row }) => (
