@@ -19,6 +19,7 @@ import { ROW_LINK_CLASS } from '@/components/shared/rowLink';
 import StickyFooter from '@/components/shared/StickyFooter';
 import { NoWrap } from '@/components/shared/NoWrap';
 import { Truncated } from '@/components/shared/Truncated';
+import { TwoLines } from '@/components/shared/TwoLines';
 import { useListTable } from '@/components/shared/useListTable';
 import type { ListConfig } from '@/components/shared/useListState.ts';
 
@@ -84,23 +85,21 @@ function columnsFor(
       accessorKey: 'title',
       meta: { fluid: true },
       sortFn: byText((item) => item.title),
+      // Embaixo do título, quem assina (#587): numa coluna própria, não cabia a 1280 px.
       cell: ({ row }) => (
-        <Link href={`/sites/${siteId}/conteudos/${row.original.id}`} className={ROW_LINK_CLASS}>
-          <Truncated text={row.original.title} />
-          <span className="sr-only"> (ver versões)</span>
-        </Link>
+        <TwoLines
+          secondary={
+            row.original.authors.length > 0 ? (
+              <Truncated text={row.original.authors.join(', ')} />
+            ) : undefined
+          }
+        >
+          <Link href={`/sites/${siteId}/conteudos/${row.original.id}`} className={ROW_LINK_CLASS}>
+            <Truncated text={row.original.title} />
+            <span className="sr-only"> (ver versões)</span>
+          </Link>
+        </TwoLines>
       ),
-    },
-    {
-      id: 'authors',
-      header: 'Autores',
-      accessorFn: (item) => item.authors.join(', '),
-      enableGlobalFilter: false,
-      enableSorting: false,
-      cell: ({ row }) =>
-        row.original.authors.length > 0 ? (
-          <Truncated text={row.original.authors.join(', ')} className="max-w-40" />
-        ) : null,
     },
     {
       header: 'Status',
@@ -251,7 +250,7 @@ function ContentsSelected({
  * (content.publish) e a ação, os conteúdos no ar da página ganham caixa de seleção e a barra dos
  * selecionados despublica em massa (#495); a seleção vale para a página visível e zera quando
  * ela muda (página, busca, filtro) e depois do sucesso. Os fora do ar têm a caixa desabilitada,
- * com o motivo; a lista mostra os autores, e o conteúdo no ar ganha "Ver no site" (#587).
+ * com o motivo; a lista mostra os autores embaixo do título, e o conteúdo no ar ganha "Ver no site" (#587).
  */
 export function ContentsTable({
   siteId,

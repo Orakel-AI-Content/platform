@@ -143,11 +143,15 @@ describe('tabela de conteúdos', () => {
     expect(edit.getAttribute('aria-describedby')).toBeNull();
   });
 
-  it('mostra os autores de cada conteúdo, cortados com o nome inteiro em title (#587)', () => {
+  it('mostra os autores embaixo do título, cortados com o nome inteiro em title (#587)', () => {
     render(<ContentsTable siteId="exemplo-a" timeZone="America/Sao_Paulo" rows={rows} />);
 
-    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).toContain('Autores');
+    // Sem coluna própria: a segunda linha da célula do título.
+    expect(screen.getAllByRole('columnheader').map((th) => th.textContent)).not.toContain(
+      'Autores',
+    );
     const authors = screen.getByText('Ana Souza, Bruno Lima');
+    expect(authors.closest('td')?.textContent).toContain('Guia de uso');
     expect(authors.getAttribute('title')).toBe('Ana Souza, Bruno Lima');
     expect(authors.className).toContain('truncate');
   });
@@ -329,7 +333,7 @@ describe('busca, filtros, ordem e paginação (#107)', () => {
     const statuses = screen
       .getAllByRole('row')
       .slice(1)
-      .map((row) => within(row).getAllByRole('cell')[3]?.textContent);
+      .map((row) => within(row).getAllByRole('cell')[2]?.textContent);
     expect(statuses[0]).toBe('Publicado');
     expect(statuses.at(-1)).toBe('Rascunho');
   });

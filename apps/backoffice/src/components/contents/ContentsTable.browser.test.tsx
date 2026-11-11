@@ -20,22 +20,23 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // Lista de conteúdos cheia em Chromium (#460; antes no E2E, `contents.spec.ts`, #273): com 30
 // conteúdos e a página de 25, a 1280 px, na moldura do admin, nada rola na horizontal e nenhuma
 // célula passa de duas linhas de texto; o axe roda nos dois temas. Os títulos são os do seed do
-// E2E (`Receita N`), mais um de 45 caracteres e um longo demais: o título usa a largura que
+// E2E (`Receita N`), mais um de 41 caracteres e um longo demais: o título usa a largura que
 // sobra e corta só quando falta espaço, sem a tabela passar da janela, e a data fica numa linha.
-// A 1440 px, o de 45 aparece inteiro; sobram 352 px de texto, e o de 50 fica no limite (#585).
-// A coluna de autores e o "Ver no site" (#587) entram nas mesmas medidas.
+// A 1440 px, o de 41 aparece inteiro (#585). Os autores vão embaixo do título, sem coluna
+// própria, e o "Ver no site" ao lado do Editar (#587): sobram 316 px de texto a 1440 px, e um
+// título de 45 caracteres (323 px) já fica no limite.
 
 const SITE = 'exemplo-a';
 const STATUSES = ['rascunho', 'em_revisao', 'aprovado', 'agendado', 'publicado', 'despublicado'];
 
-const TITLE_45 = 'Como montar uma horta vertical na sua varanda';
+const TITLE_41 = 'Como montar uma horta vertical na varanda';
 const TOO_LONG =
   'Como montar uma horta vertical na varanda do apartamento em dez passos, com a lista de materiais, o substrato e a rega de cada espécie';
 
 const ROWS: ContentListItem[] = Array.from({ length: 30 }, (_, index) => ({
   id: 1000 + index,
   kind: index % 2 === 0 ? 'article' : 'page',
-  title: index === 4 ? TITLE_45 : index === 5 ? TOO_LONG : `Receita ${index + 1}`,
+  title: index === 4 ? TITLE_41 : index === 5 ? TOO_LONG : `Receita ${index + 1}`,
   slug: `conteudo-${index + 1}`,
   status: STATUSES[index % STATUSES.length] as ContentListItem['status'],
   version: index + 1,
@@ -85,12 +86,12 @@ describe('ContentsTable no navegador', () => {
     expect(isClipped(table().getByTitle(TOO_LONG, { exact: true }))).toBe(true);
   });
 
-  it('a 1440 px, o título de 45 caracteres aparece inteiro', async () => {
+  it('a 1440 px, o título de 41 caracteres aparece inteiro', async () => {
     await page.viewport(1440, 900);
     await renderInFrame(<Contents />);
 
-    expect(TITLE_45).toHaveLength(45);
-    expect(isClipped(table().getByTitle(TITLE_45, { exact: true }))).toBe(false);
+    expect(TITLE_41).toHaveLength(41);
+    expect(isClipped(table().getByTitle(TITLE_41, { exact: true }))).toBe(false);
     expect(new Set(columnLines(table(), 'Última alteração'))).toEqual(new Set([1]));
     expect(tableOverflow(table())).toBe(0);
   });
@@ -141,7 +142,7 @@ describe('ContentsTable no navegador', () => {
       .toHaveAccessibleDescription('Só conteúdo no ar pode ser despublicado');
 
     const button = page.getByRole('button', { name: 'Despublicar em massa' });
-    for (let step = 0; step < 80 && document.activeElement !== button.element(); step++) {
+    for (let step = 0; step < 120 && document.activeElement !== button.element(); step++) {
       await userEvent.keyboard('{Tab}');
     }
     expect(document.activeElement).toBe(button.element());
