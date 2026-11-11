@@ -1,11 +1,11 @@
+import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
 import { appElementWarnings, appRoot, expectFocusTrapped } from '../../../test/browser/dialog.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
-import type { ActionResult } from '@/components/shared/actionResult.ts';
-import { toast } from '@/components/ui/toast';
+import { Button } from '@/components/ui/Button';
 
 import { RebuildReleaseDialog, type RebuildRelease } from './RebuildReleaseDialog.tsx';
 
@@ -19,19 +19,39 @@ const RELEASES: RebuildRelease[] = [
 ];
 const NAME = 'Reconstruir o site numa release?';
 
-function Rebuild({ action }: { action: (tag: string) => Promise<ActionResult> }) {
-  return <RebuildReleaseDialog current="1.2.0" paused releases={RELEASES} action={action} />;
+/** O diálogo aberto por um botão, como o "Mais ações" faz na página do site (#595). */
+function Rebuild({ onConfirm }: { onConfirm: (tag: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <Button ref={trigger} type="button" size="sm" onClick={() => setOpen(true)}>
+        Reconstruir na release
+      </Button>
+      <RebuildReleaseDialog
+        current="1.2.0"
+        paused
+        releases={RELEASES}
+        isOpen={open}
+        onCancel={() => setOpen(false)}
+        onConfirm={(tag) => {
+          setOpen(false);
+          onConfirm(tag);
+        }}
+        onAfterClose={() => trigger.current?.focus()}
+      />
+    </>
+  );
 }
 
 afterEach(() => {
-  toast.removeAll();
   vi.restoreAllMocks();
 });
 
 describe('Reconstruir na release no navegador', () => {
   it('foco preso; Esc e Cancelar fecham e devolvem o foco ao gatilho', async () => {
     const warnings = appElementWarnings();
-    const screen = await renderInApp(<Rebuild action={vi.fn()} />);
+    const screen = await renderInApp(<Rebuild onConfirm={vi.fn()} />);
     const trigger = screen.getByRole('button', { name: 'Reconstruir na release' });
 
     (trigger.element() as HTMLElement).focus();
@@ -53,9 +73,9 @@ describe('Reconstruir na release no navegador', () => {
     expect(warnings()).toEqual([]);
   });
 
-  it('escolher outra release e confirmar chama a action e devolve o foco ao gatilho', async () => {
-    const action = vi.fn().mockResolvedValue({ ok: false, message: 'Recusado.' });
-    const screen = await renderInApp(<Rebuild action={action} />);
+  it('escolher outra release e confirmar chama o onConfirm e devolve o foco ao gatilho', async () => {
+    const action = vi.fn();
+    const screen = await renderInApp(<Rebuild onConfirm={action} />);
     const trigger = screen.getByRole('button', { name: 'Reconstruir na release' });
 
     await trigger.click();
@@ -74,7 +94,6 @@ describe('Reconstruir na release no navegador', () => {
     await expect.element(dialog).not.toBeInTheDocument();
     expect(action).toHaveBeenCalledWith('1.3.0');
     await expect.element(trigger).toHaveFocus();
-    await expect.element(page.getByRole('alert')).toHaveTextContent('Recusado.');
   });
 });
 
@@ -82,7 +101,7 @@ describe.each(COLOR_SCHEMES)('Reconstruir na release no navegador (%s)', (scheme
   it('sem violação do axe com o diálogo e com o seletor abertos', async () => {
     await setTheme(scheme);
     await setReducedMotion('reduce');
-    const screen = await renderInApp(<Rebuild action={vi.fn()} />);
+    const screen = await renderInApp(<Rebuild onConfirm={vi.fn()} />);
     expect(await audit()).toEqual([]);
 
     await screen.getByRole('button', { name: 'Reconstruir na release' }).click();

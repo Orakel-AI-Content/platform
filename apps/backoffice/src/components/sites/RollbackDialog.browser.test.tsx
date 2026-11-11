@@ -1,11 +1,11 @@
+import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
 import { appElementWarnings, appRoot, expectFocusTrapped } from '../../../test/browser/dialog.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
-import type { ActionResult } from '@/components/shared/actionResult.ts';
-import { toast } from '@/components/ui/toast';
+import { Button } from '@/components/ui/Button';
 import type { RollbackVersion } from '@/domain/builds/builds.ts';
 
 import { RollbackDialog } from './RollbackDialog.tsx';
@@ -30,19 +30,38 @@ const VERSIONS: RollbackVersion[] = [
 ];
 const NAME = 'Reverter o site para uma versão anterior?';
 
-function Rollback({ action }: { action: (versionId: string) => Promise<ActionResult> }) {
-  return <RollbackDialog versions={VERSIONS} timeZone="America/Sao_Paulo" action={action} />;
+/** O diálogo aberto por um botão, como o "Mais ações" faz na página do site (#595). */
+function Rollback({ onConfirm }: { onConfirm: (versionId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <Button ref={trigger} type="button" size="sm" onClick={() => setOpen(true)}>
+        Reverter
+      </Button>
+      <RollbackDialog
+        versions={VERSIONS}
+        timeZone="America/Sao_Paulo"
+        isOpen={open}
+        onCancel={() => setOpen(false)}
+        onConfirm={(versionId) => {
+          setOpen(false);
+          onConfirm(versionId);
+        }}
+        onAfterClose={() => trigger.current?.focus()}
+      />
+    </>
+  );
 }
 
 afterEach(() => {
-  toast.removeAll();
   vi.restoreAllMocks();
 });
 
 describe('Reverter no navegador', () => {
   it('foco preso; Esc e Cancelar fecham e devolvem o foco ao gatilho', async () => {
     const warnings = appElementWarnings();
-    const screen = await renderInApp(<Rollback action={vi.fn()} />);
+    const screen = await renderInApp(<Rollback onConfirm={vi.fn()} />);
     const trigger = screen.getByRole('button', { name: 'Reverter' });
 
     (trigger.element() as HTMLElement).focus();
@@ -64,9 +83,9 @@ describe('Reverter no navegador', () => {
     expect(warnings()).toEqual([]);
   });
 
-  it('escolher outra versão e confirmar chama a action e devolve o foco ao gatilho', async () => {
-    const action = vi.fn().mockResolvedValue({ ok: false, message: 'Recusado.' });
-    const screen = await renderInApp(<Rollback action={action} />);
+  it('escolher outra versão e confirmar chama o onConfirm e devolve o foco ao gatilho', async () => {
+    const action = vi.fn();
+    const screen = await renderInApp(<Rollback onConfirm={action} />);
     const trigger = screen.getByRole('button', { name: 'Reverter' });
 
     await trigger.click();
@@ -81,7 +100,6 @@ describe('Reverter no navegador', () => {
     await expect.element(dialog).not.toBeInTheDocument();
     expect(action).toHaveBeenCalledWith('20261001T120000Z-abcdef12');
     await expect.element(trigger).toHaveFocus();
-    await expect.element(page.getByRole('alert')).toHaveTextContent('Recusado.');
   });
 });
 
@@ -89,7 +107,7 @@ describe.each(COLOR_SCHEMES)('Reverter no navegador (%s)', (scheme) => {
   it('sem violação do axe com o diálogo e com o seletor abertos', async () => {
     await setTheme(scheme);
     await setReducedMotion('reduce');
-    const screen = await renderInApp(<Rollback action={vi.fn()} />);
+    const screen = await renderInApp(<Rollback onConfirm={vi.fn()} />);
     expect(await audit()).toEqual([]);
 
     await screen.getByRole('button', { name: 'Reverter' }).click();

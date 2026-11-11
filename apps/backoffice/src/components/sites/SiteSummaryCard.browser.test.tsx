@@ -11,9 +11,10 @@ import { SiteSummaryCard } from './SiteSummaryCard.tsx';
 
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
-// Resumo do site em Chromium (#516): o estado da instância (versão no ar com os arquivos,
-// pendências por origem e últimos builds) e os estados vazios, na moldura do admin, sem rolagem
-// horizontal e sem violação do axe (WCAG 2.2 AA) nos dois temas.
+// Resumo do site em Chromium (#516): o estado da instância (domínio como link, versão no ar com
+// os arquivos e pendências por origem) e os estados vazios, na moldura do admin, sem rolagem
+// horizontal e sem violação do axe (WCAG 2.2 AA) nos dois temas. Os últimos builds ficam na aba
+// "Builds" (`SiteBuildsTable.browser.test.tsx`, #595).
 
 const SITE: SiteSummary = {
   id: 'exemplo-a',
@@ -62,7 +63,11 @@ const EMPTY: SiteInstance = { recentBuilds: [], activeFiles: null, pendingByOrig
 
 const SCENARIOS = [
   ['com builds e pendências', { ...SITE }, INSTANCE],
-  ['vazio', { ...SITE, activeVersionId: null, pendingChanges: 0, lastBuild: null }, EMPTY],
+  [
+    'vazio',
+    { ...SITE, domain: '', activeVersionId: null, pendingChanges: 0, lastBuild: null },
+    EMPTY,
+  ],
 ] as const;
 
 beforeEach(() => {
@@ -93,7 +98,7 @@ describe.each(SCENARIOS)('SiteSummaryCard no navegador (%s)', (_, site, instance
         <SiteSummaryCard site={site} instance={instance} g1Registered />
       </section>,
     );
-    await expect.element(page.getByText('Últimos builds')).toBeVisible();
+    await expect.element(page.getByText('Versão no ar')).toBeVisible();
     expect(await audit()).toEqual([]);
   });
 });

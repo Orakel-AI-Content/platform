@@ -4,31 +4,27 @@ import {
 } from '@/components/shared/detailSummary.ts';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { InfoField, InfoList } from '@/components/shared/InfoList';
-import {
-  BUILD_STATUS_LABEL,
-  BUILD_STATUS_VARIANT,
-  PENDING_ORIGIN_LABEL,
-  formatDateTime,
-} from '@/components/shared/siteLabels.ts';
+import { PENDING_ORIGIN_LABEL } from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
-import type { RollbackVersion } from '@/domain/builds/builds.ts';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
-import {
-  RebuildReleaseDialog,
-  type RebuildOnRelease,
-  type RebuildRelease,
-} from './RebuildReleaseDialog.tsx';
-import { RollbackDialog, type RollbackSite } from './RollbackDialog.tsx';
-import {
-  PendingCount,
-  PublishNowPanel,
-  ResumeSitePanel,
-  SiteStateIndicator,
-  StateTag,
-  type PublishNow,
-  type ResumeSite,
-} from './SiteStatus.tsx';
+import { PendingCount, SiteStateIndicator } from './SiteStatus.tsx';
+
+/** O domínio abre o site no ar em nova aba, como na lista de sites (#586); sem domínio, "—". */
+function DomainLink({ domain }: { domain: string }) {
+  if (!domain) return <span>—</span>;
+  return (
+    <a
+      href={`https://${domain}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline underline-offset-4 hover:text-primary"
+    >
+      {domain}
+      <span className="sr-only"> (abre em nova aba)</span>
+    </a>
+  );
+}
 
 /** Versão no ar e, abaixo, os arquivos do build que a publicou. */
 function ActiveVersion({ versionId, files }: { versionId: string | null; files: number | null }) {
@@ -60,65 +56,27 @@ function PendingByOrigin({ counts }: { counts: SiteInstance['pendingByOrigin'] }
   );
 }
 
-/** Os últimos builds, do mais novo para o mais antigo: resultado e, abaixo, data, release e versão. */
-function RecentBuilds({
-  builds,
-  timeZone,
-}: {
-  builds: SiteInstance['recentBuilds'];
-  timeZone: string;
-}) {
-  if (builds.length === 0) return <EmptyState>Nenhum build ainda.</EmptyState>;
-  return (
-    <ol className="space-y-3">
-      {builds.map((build) => (
-        <li key={build.id} className="flex flex-col items-start gap-0.5">
-          <StateTag color={BUILD_STATUS_VARIANT[build.status]}>
-            {BUILD_STATUS_LABEL[build.status]}
-          </StateTag>
-          <span className="text-xs">
-            {[formatDateTime(new Date(build.finishedAt), timeZone), build.release, build.versionId]
-              .filter((part) => part !== null)
-              .join(' · ')}
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 /**
- * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: os dados do
- * site no `InfoList` (com o uso do limite diário de hoje) e, ao pé, "Publicar agora" ou, com o
- * site pausado, "Retomar", e "Reconstruir na release" (#515) e "Reverter" (#514) nos dois
- * estados. `publish`, `resume`, `rebuild` e `rollback` só vêm de quem tem `operations.run`; publicar e retomar aparecem só no estado
- * deles (publicar com o site não pausado, retomar com ele pausado). Sem estado próprio: os
- * painéis são os únicos Client Components dentro dele.
+ * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: só o estado
+ * atual do site no `InfoList` (com o uso do limite diário de hoje), sem botões (#595): as ações
+ * de operação ficam no cabeçalho (`SiteOperations`) e os últimos builds na aba "Builds". Sem
+ * estado: serve ao Server Component da página.
  */
 export function SiteSummaryCard({
   site,
   instance,
   g1Registered,
-  publish,
-  resume,
-  rebuild,
-  rollback,
 }: {
   site: SiteSummary;
   instance: SiteInstance;
   g1Registered: boolean;
-  publish?: PublishNow;
-  resume?: ResumeSite;
-  /** Releases registradas (com o estado da imagem) e a action de reconstruir, já ligada ao site. */
-  rebuild?: { releases: readonly RebuildRelease[]; action: RebuildOnRelease };
-  /** Versões revertíveis (sem a ativa) e a action de reverter, já ligada ao site. */
-  rollback?: { versions: readonly RollbackVersion[]; action: RollbackSite };
 }) {
-  const paused = site.state === 'pausado';
   return (
-    <Card className={DETAIL_SUMMARY_CLASS} bodyClass="flex flex-col gap-6">
+    <Card className={DETAIL_SUMMARY_CLASS}>
       <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
-        <InfoField label="Domínio">{site.domain}</InfoField>
+        <InfoField label="Domínio">
+          <DomainLink domain={site.domain} />
+        </InfoField>
         <InfoField label="Indexável">{site.indexavel ? 'Sim' : 'Não'}</InfoField>
         <InfoField label="Status">
           <SiteStateIndicator site={site} />
@@ -133,9 +91,6 @@ export function SiteSummaryCard({
         <InfoField label="Pendências por origem">
           <PendingByOrigin counts={instance.pendingByOrigin} />
         </InfoField>
-        <InfoField label="Últimos builds">
-          <RecentBuilds builds={instance.recentBuilds} timeZone={site.timeZone} />
-        </InfoField>
         <InfoField label="G1">{g1Registered ? 'Registrado' : 'Não registrado'}</InfoField>
         <InfoField label="Publicações hoje" className="tabular-nums">
           {site.publishedToday} de {site.effectiveDailyPublishLimit}
@@ -144,23 +99,6 @@ export function SiteSummaryCard({
           )}
         </InfoField>
       </InfoList>
-      {publish && !paused && <PublishNowPanel siteId={site.id} action={publish} />}
-      {resume && paused && <ResumeSitePanel siteId={site.id} action={resume} />}
-      {rebuild && (
-        <RebuildReleaseDialog
-          current={site.release}
-          paused={paused}
-          releases={rebuild.releases}
-          action={rebuild.action}
-        />
-      )}
-      {rollback && (
-        <RollbackDialog
-          versions={rollback.versions}
-          timeZone={site.timeZone}
-          action={rollback.action}
-        />
-      )}
     </Card>
   );
 }
