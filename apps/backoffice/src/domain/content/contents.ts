@@ -430,6 +430,13 @@ export type ContentListItem = {
    * do ar, e o `status` acima, o da mais recente, não diz isso.
    */
   live: boolean;
+  /** Nomes dos autores da versão mais recente, na ordem de `authorIds`. */
+  authors: string[];
+  /**
+   * Slug da versão no ar (mesma regra de `live`), ou nulo fora do ar: um rascunho com slug novo
+   * não aponta para um endereço que ainda não existe. O `slug` acima é o da mais recente.
+   */
+  liveSlug: string | null;
 };
 
 /** `live` da linha externa de `content_versions`, sem ler os blocos (`liveVersion`). */
@@ -440,9 +447,26 @@ const isLive = sql<boolean>`coalesce((
   order by v.version desc limit 1
 ), false)`;
 
+/** Slug da versão no ar da linha externa, pela regra de `isLive`; nulo fora do ar. */
+const liveSlugOf = sql<string | null>`(
+  select case when v.status = 'publicado' then v.data->>'slug' end from ${contentVersions} v
+  where v.site_id = ${contentVersions.siteId} and v.content_id = ${contentVersions.contentId}
+    and v.status in ('publicado', 'despublicado')
+  order by v.version desc limit 1
+)`;
+
+/** Nomes dos autores da linha externa, na ordem de `authorIds`, pela chave do autor no site. */
+const authorNames = sql<string[]>`coalesce((
+  select array_agg(a.name order by ref.ord) from jsonb_array_elements_text(
+    ${contentVersions.data}->'authorIds'
+  ) with ordinality as ref(id, ord)
+  join ${authors} a on a.site_id = ${contentVersions.siteId} and a.id = ref.id::integer
+), '{}')`;
+
 /**
- * Conteúdos do site com a versão mais recente de cada um, em ordem de ID. Lê só o título e o
- * slug do JSONB (nunca os blocos) e o tipo de `contents`: a lista abre com milhares de itens.
+ * Conteúdos do site com a versão mais recente de cada um, em ordem de ID. Lê só o título, o
+ * slug e os `authorIds` do JSONB (nunca os blocos), o tipo de `contents` e os nomes de `authors`,
+ * tudo na mesma consulta: a lista abre com milhares de itens.
  */
 export async function listContents(
   db: Executor,
@@ -462,6 +486,8 @@ export async function listContents(
       version: contentVersions.version,
       updatedAt: contentVersions.createdAt,
       live: isLive,
+      authors: authorNames,
+      liveSlug: liveSlugOf,
     })
     .from(contentVersions)
     .innerJoin(
@@ -510,7 +536,10 @@ export async function listLiveContents(
   };
 }
 
-export type ReviewQueueItem = Omit<ContentListItem, 'slug' | 'status' | 'live'>;
+export type ReviewQueueItem = Omit<
+  ContentListItem,
+  'slug' | 'status' | 'live' | 'authors' | 'liveSlug'
+>;
 
 /**
  * Fila de revisão do site: conteúdos cuja versão mais recente está `em_revisao`, da versão
