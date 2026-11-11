@@ -2,32 +2,23 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { ContentVersionsTable } from '@/components/contents/ContentVersionsTable';
-import {
-  CONTENT_KIND_LABEL,
-  CONTENT_STATUS_LABEL,
-  CONTENT_STATUS_TAG,
-} from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { ContentActionScope } from '@/components/contents/ContentActionScope';
-import { ReturnNotice } from '@/components/review/ReturnNotice';
+import { ContentSummary } from '@/components/contents/ContentSummary';
+import { ContentViewLinks } from '@/components/contents/ContentViewLinks';
 import { PublishActions } from '@/components/contents/PublishActions';
 import { SubmitForReview } from '@/components/contents/SubmitForReview';
 import { UnpublishDialog } from '@/components/contents/UnpublishDialog';
+import { ReturnNotice } from '@/components/review/ReturnNotice';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { LIVE_STATUSES, listLiveContents } from '@/domain/content/contents.ts';
 import { scheduledPublicationAt } from '@/domain/publications/schedule.ts';
 import { pendingReturn } from '@/domain/reviews/reviews.ts';
-import {
-  DETAIL_SUMMARY_CLASS,
-  DETAIL_SUMMARY_LIST_CLASS,
-} from '@/components/shared/detailSummary.ts';
-import { InfoField, InfoList } from '@/components/shared/InfoList';
 import { DetailLayout } from '@/components/shared/DetailLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import { siteTrail } from '@/components/shared/trail.ts';
-import { StateTag } from '@/components/sites/SiteStatus';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 
@@ -39,7 +30,10 @@ import {
   submitForReviewAction,
   unpublishContentAction,
 } from '../actions.ts';
+import { previewUrl, publicUrl } from '../content-urls.ts';
 import { readContentVersions } from '../content-versions.ts';
+import { contentReferences } from '../editor-options.ts';
+import { referenceLabels } from '../version-references.ts';
 import { positiveInt } from '../params.ts';
 
 export const dynamic = 'force-dynamic';
@@ -71,8 +65,10 @@ function liveOf<V extends { status: string }>(versions: readonly V[]): V | undef
  * "Despublicar" (#494), com o destino do 301 entre os conteúdos no ar do site; o revisor tem
  * content.publish sem content.write. O domínio confere de novo. Abaixo, o resumo à esquerda e as versões,
  * da primeira à mais recente, à direita (empilham abaixo de `xl`). A recusa das ações vai ao
- * Alert do escopo, logo abaixo da linha do título. Com uma devolução pendente (#598), o aviso
- * dela fica logo abaixo do cabeçalho.
+ * Alert do escopo, logo abaixo da linha do título. Para todo leitor (#597), "Ver prévia" da versão
+ * mais recente e, com o conteúdo no ar, "Ver no site"; no resumo, autores e taxonomias pelo nome
+ * (as leituras do editor) e as datas de publicação e da última alteração. Com uma devolução
+ * pendente (#598), o aviso dela fica logo abaixo do cabeçalho.
  */
 export default async function ContentVersionsPage({ params }: Params) {
   const { site: siteId, id } = await params;
@@ -93,10 +89,13 @@ export default async function ContentVersionsPage({ params }: Params) {
     canPublish && latest.status === 'agendado'
       ? await scheduledPublicationAt(getDb().db, actor, siteId, contentId, version)
       : undefined;
-  const live = canPublish ? liveOf(versions.value) : undefined;
-  const returned = await pendingReturn(getDb().db, actor, siteId, contentId);
-  const targets =
-    live === undefined ? undefined : await listLiveContents(getDb().db, actor, siteId);
+  const live = liveOf(versions.value);
+  const [references, targets, returned] = await Promise.all([
+    contentReferences(getDb().db, actor, siteId),
+    canPublish && live !== undefined ? listLiveContents(getDb().db, actor, siteId) : undefined,
+    pendingReturn(getDb().db, actor, siteId, contentId),
+  ]);
+  if (references === undefined) return noRead;
   const unpublish =
     live !== undefined && targets?.ok ? (
       <UnpublishDialog
@@ -115,35 +114,37 @@ export default async function ContentVersionsPage({ params }: Params) {
       ])}
       title={latest.data.title}
       action={
-        canWrite || canPublish ? (
-          <>
-            {canPublish && (
-              <PublishActions
-                status={latest.status}
-                scheduledAt={scheduled?.ok ? scheduled.value : null}
-                publish={publishVersionAction.bind(null, siteId, contentId, version)}
-                schedule={schedulePublicationAction.bind(null, siteId, contentId, version)}
-                cancel={cancelScheduledPublicationAction.bind(null, siteId, contentId, version)}
+        <>
+          <ContentViewLinks
+            previewUrl={previewUrl(siteId, latest.data)}
+            publicUrl={live === undefined ? undefined : publicUrl(site.domain, live.data)}
+          />
+          {canPublish && (
+            <PublishActions
+              status={latest.status}
+              scheduledAt={scheduled?.ok ? scheduled.value : null}
+              publish={publishVersionAction.bind(null, siteId, contentId, version)}
+              schedule={schedulePublicationAction.bind(null, siteId, contentId, version)}
+              cancel={cancelScheduledPublicationAction.bind(null, siteId, contentId, version)}
+            />
+          )}
+          {canWrite && (
+            <>
+              <ButtonLink
+                href={`/sites/${siteId}/conteudos/${contentId}/editar`}
+                variant="solid"
+                size="sm"
+              >
+                Editar
+              </ButtonLink>
+              <SubmitForReview
+                available={latest.status === 'rascunho'}
+                action={submitForReviewAction.bind(null, siteId, contentId)}
               />
-            )}
-            {canWrite && (
-              <>
-                <ButtonLink
-                  href={`/sites/${siteId}/conteudos/${contentId}/editar`}
-                  variant="solid"
-                  size="sm"
-                >
-                  Editar
-                </ButtonLink>
-                <SubmitForReview
-                  available={latest.status === 'rascunho'}
-                  action={submitForReviewAction.bind(null, siteId, contentId)}
-                />
-              </>
-            )}
-            {unpublish}
-          </>
-        ) : undefined
+            </>
+          )}
+          {unpublish}
+        </>
       }
     />
   );
@@ -155,20 +156,14 @@ export default async function ContentVersionsPage({ params }: Params) {
         <ReturnNotice pending={returned.value} timeZone={timeZone} />
       )}
       <DetailLayout>
-        <Card className={DETAIL_SUMMARY_CLASS}>
-          <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
-            <InfoField label="Tipo">{CONTENT_KIND_LABEL[latest.data.kind]}</InfoField>
-            <InfoField label="ID" className="tabular-nums">
-              {contentId}
-            </InfoField>
-            <InfoField label="Slug">/{latest.data.slug}</InfoField>
-            <InfoField label="Status">
-              <StateTag color={CONTENT_STATUS_TAG[latest.status]}>
-                {CONTENT_STATUS_LABEL[latest.status]}
-              </StateTag>
-            </InfoField>
-          </InfoList>
-        </Card>
+        <ContentSummary
+          contentId={contentId}
+          data={latest.data}
+          status={latest.status}
+          updatedAt={latest.createdAt}
+          timeZone={timeZone}
+          references={referenceLabels(references)}
+        />
         <Card className="w-full min-w-0" bodyClass="flex flex-col gap-4">
           <h2 id="versions-title" className={SECTION_TITLE_CLASS}>
             Versões

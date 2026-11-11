@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Executor } from '@/db/client.ts';
 import type { ContentData } from '@/db/schema/index.ts';
 
-import { readVersionReferences, versionMediaIds } from './version-references.ts';
+import { readVersionReferences, referenceLabels, versionMediaIds } from './version-references.ts';
 
 // Nomes e miniaturas da leitura de uma versão (#593): as leituras do editor, mídias em lotes.
 
@@ -84,5 +84,17 @@ describe('referências da leitura de uma versão', () => {
     mocks.mediaByIdsAction.mockResolvedValue(null);
 
     expect(await readVersionReferences(db, actor, 'exemplo-a', data)).toBeUndefined();
+  });
+});
+
+describe('rótulos das referências por ID', () => {
+  it('autores e taxonomias em mapas de ID para rótulo, como o resumo do conteúdo lê (#597)', () => {
+    const labels = referenceLabels({
+      authors: [{ id: 1, label: 'Ana Souza' }],
+      taxonomies: [{ id: 6, label: 'Hortas (categoria)' }],
+    });
+
+    expect([...labels.authors]).toEqual([[1, 'Ana Souza']]);
+    expect([...labels.taxonomies]).toEqual([[6, 'Hortas (categoria)']]);
   });
 });

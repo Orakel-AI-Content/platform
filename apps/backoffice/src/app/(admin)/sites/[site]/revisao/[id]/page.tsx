@@ -1,4 +1,3 @@
-import { contentPath } from '@orakel/core/v1';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
@@ -8,7 +7,6 @@ import { CONTENT_STATUS_LABEL, CONTENT_STATUS_TAG } from '@/components/shared/si
 import { StateTag } from '@/components/sites/SiteStatus';
 import { can } from '@/domain/access/rbac.ts';
 import { REVIEW_CHECKLIST, reviewIssues } from '@/domain/reviews/reviews.ts';
-import { getEnv } from '@/env.ts';
 import { DETAIL_SUMMARY_CLASS } from '@/components/shared/detailSummary.ts';
 import { DetailLayout } from '@/components/shared/DetailLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -18,6 +16,7 @@ import { Button } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 
 import { itemTitle } from '../../item-title.ts';
+import { previewUrl } from '../../conteudos/content-urls.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { sitePageContext } from '../../editorial-page.tsx';
@@ -62,7 +61,7 @@ export default async function ReviewPage({ params }: Params) {
   const validation = await reviewIssues(db, actor, siteId, contentId);
   if (!validation.ok) return noRead;
   const latest = versions.value.at(-1)!;
-  const previewUrl = `${getEnv().PREVIEW_BASE_URL}/${site.id}${contentPath(latest.data)}`;
+  const preview = previewUrl(site.id, latest.data);
 
   return (
     <section aria-labelledby="review-title" className="list-width space-y-4">
@@ -75,13 +74,7 @@ export default async function ReviewPage({ params }: Params) {
         action={
           // O mesmo `Button` e variante do "Ver prévia" do editor, em `sm` como as ações de
           // cabeçalho do guia.
-          <Button
-            asElement="a"
-            href={previewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            size="sm"
-          >
+          <Button asElement="a" href={preview} target="_blank" rel="noopener noreferrer" size="sm">
             Abrir prévia<span className="sr-only"> (abre em nova aba)</span>
           </Button>
         }
@@ -98,7 +91,7 @@ export default async function ReviewPage({ params }: Params) {
       <DetailLayout>
         <Card className="w-full min-w-0">
           <iframe
-            src={previewUrl}
+            src={preview}
             title={`Visualização de “${latest.data.title}” no site`}
             className="h-[75vh] w-full rounded-md border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
           />

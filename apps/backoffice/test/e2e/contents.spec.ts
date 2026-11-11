@@ -354,8 +354,17 @@ test.describe('tela do conteúdo no detalhe (#371)', () => {
     // fica em `DetailLayout.browser.test.tsx`, #460).
     const summary = page.locator('.card').filter({ has: page.locator('dl') });
     await expect(summary.getByText(`/${slug}`)).toBeVisible();
-    await expect(summary.locator('dt')).toHaveText(['Tipo', 'ID', 'Slug', 'Status']);
-    await expect(summary.locator('dd').last()).toHaveText('Rascunho');
+    await expect(summary.locator('dt')).toHaveText([
+      'Tipo',
+      'ID',
+      'Slug',
+      'Status',
+      'Autores',
+      'Taxonomias',
+      'Data de publicação',
+      'Última alteração',
+    ]);
+    await expect(summary.locator('dd').nth(3)).toHaveText('Rascunho');
 
     const reviewer = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
     await asRole(reviewer, 'revisor');

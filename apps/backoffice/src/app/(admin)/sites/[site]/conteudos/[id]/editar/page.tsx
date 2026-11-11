@@ -1,4 +1,3 @@
-import { contentPath } from '@orakel/core/v1';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
@@ -8,7 +7,6 @@ import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { pendingReturn } from '@/domain/reviews/reviews.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
-import { getEnv } from '@/env.ts';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
@@ -16,6 +14,7 @@ import { siteTrail } from '@/components/shared/trail.ts';
 import { noWrite } from '../../../editorial-page.tsx';
 import { itemTitle } from '../../../item-title.ts';
 import { updateContentAction } from '../../actions.ts';
+import { previewUrl } from '../../content-urls.ts';
 import { readContentVersions } from '../../content-versions.ts';
 import { editorOptions } from '../../editor-options.ts';
 import { positiveInt } from '../../params.ts';
@@ -99,7 +98,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
         options={options}
         action={updateContentAction.bind(null, siteId, contentId)}
         created={criado === '1'}
-        previewUrl={`${getEnv().PREVIEW_BASE_URL}/${siteId}${contentPath(latest.data)}`}
+        previewUrl={previewUrl(siteId, latest.data)}
       />
     </section>
   );
