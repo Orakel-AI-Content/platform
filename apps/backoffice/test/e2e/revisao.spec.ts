@@ -193,6 +193,63 @@ test(
   },
 );
 
+// Devolver ao editor (#598): o revisor devolve com um comentário, o artigo sai da fila e o
+// comentário aparece para o editor no conteúdo e no editor, com "Enviar para revisão" de volta.
+test('devolver ao editor com comentário; o editor vê o comentário e pode reenviar', async ({
+  page,
+  browser,
+}) => {
+  const slug = `e2e-devolver-${Date.now()}`;
+  const title = `Artigo ${slug}`;
+  const comment = 'Falta a fonte da tabela de plantio.';
+  await asRole(page, 'editor');
+  const contentPath = await createDraft(page, title, slug);
+  await page.getByRole('button', { name: 'Enviar para revisão' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Enviado para revisão.' })).toBeVisible();
+
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const reviewer = await context.newPage();
+  await asRole(reviewer, 'revisor');
+  await reviewer.goto(queueFor(slug));
+  await reviewer.getByRole('link', { name: `${title} (revisar)` }).click();
+  await expect(
+    reviewer.getByRole('heading', { level: 1, name: `Revisão de “${title}”` }),
+  ).toBeVisible();
+
+  // Sem comentário, o erro fica no campo e nada é devolvido.
+  const devolver = reviewer.getByRole('button', { name: 'Devolver ao editor' });
+  await devolver.click();
+  await expect(
+    reviewer.getByText('Escreva o que o editor precisa corrigir.', { exact: true }),
+  ).toBeVisible();
+  await reviewer.getByRole('textbox', { name: /O que corrigir/ }).fill(comment);
+  await devolver.click();
+  await expect(
+    reviewer.getByRole('status').filter({ hasText: 'Versão 1 devolvida ao editor.' }),
+  ).toBeVisible();
+  await expect(devolver).toHaveCount(0);
+  await expect(reviewer.getByRole('button', { name: 'Aprovar' })).toHaveCount(0);
+
+  await reviewer.goto(queueFor(slug));
+  await expect(reviewer.getByRole('heading', { level: 1, name: /Revisão/ })).toBeVisible();
+  await expect(reviewer.getByRole('row', { name: new RegExp(title) })).toHaveCount(0);
+  await context.close();
+
+  // O editor vê o comentário, quem devolveu e quando; a versão volta a rascunho.
+  await page.goto(contentPath);
+  await expect(page.getByText('Versão 1 devolvida ao editor')).toBeVisible();
+  await expect(page.getByText(comment)).toBeVisible();
+  await expect(
+    page.getByText(/revisor@orakel\.local · \d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}/),
+  ).toBeVisible();
+  await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Rascunho');
+  await expect(page.getByRole('button', { name: 'Enviar para revisão' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Editar', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: `Editar “${title}”` })).toBeVisible();
+  await expect(page.getByText(comment)).toBeVisible();
+});
+
 // Tela de revisão no Ecme (#277): o painel junto da visualização, com checklist e "Aprovar", e
 // o axe sem violação nos dois temas (fora o iframe, que é o site).
 test(`tela de revisão sem violação do axe`, { tag: '@stack' }, async ({ page, browser }) => {

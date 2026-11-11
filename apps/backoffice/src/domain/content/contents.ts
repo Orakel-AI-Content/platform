@@ -664,8 +664,8 @@ export async function listContentVersions(
   const allowed = requireRole(actor, 'site.read');
   if (!allowed.ok) return allowed;
 
-  // Uma linha por versão: só a aprovação grava em `reviews`, e a versão aprovada não volta a
-  // ficar em revisão (ADR 0015). Com outras ações (reprovar), vira a aprovação mais recente.
+  // Uma linha por versão: o join só pega a aprovação, e a versão aprovada não volta a ficar em
+  // revisão (ADR 0015). As devoluções da mesma versão ficam de fora (ADR 0020).
   const rows = await db
     .select({
       version: contentVersions.version,
@@ -682,6 +682,7 @@ export async function listContentVersions(
         eq(reviews.siteId, contentVersions.siteId),
         eq(reviews.contentId, contentVersions.contentId),
         eq(reviews.version, contentVersions.version),
+        eq(reviews.decision, 'aprovado'),
       ),
     )
     .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))
