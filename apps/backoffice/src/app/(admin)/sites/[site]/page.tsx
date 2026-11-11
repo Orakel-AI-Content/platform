@@ -179,64 +179,70 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         header(edit)
       )}
       {redirects.ok && redirects.value.alert && <RedirectUsageAlert usage={redirects.value} />}
-      <SiteContentMetrics
-        siteId={site.id}
-        counts={contentCounts.value}
-        publishedToday={site.publishedToday}
-        dailyLimit={site.effectiveDailyPublishLimit}
-        canWrite={canWrite}
-      />
       <DetailLayout>
         <SiteSummaryCard site={site} instance={instance.value} g1Registered={g1 !== undefined} />
-        <SiteTabs
-          lifecycle={
-            canConfigure ? (
-              <LifecycleActionScope>
-                <LifecycleSteps
-                  current={site.lifecycle}
-                  action={
-                    <LifecycleAction
-                      lifecycle={site.lifecycle}
-                      action={advanceLifecycleAction.bind(null, site.id)}
-                    />
-                  }
+        {/* Os cartões de conteúdo (#596) ficam na coluna da direita, acima das abas: em cima de
+            tudo, empurravam o resumo para fora da primeira tela a 1440 × 900 (#595). */}
+        <div className="flex w-full min-w-0 flex-col gap-4">
+          <SiteContentMetrics
+            siteId={site.id}
+            counts={contentCounts.value}
+            publishedToday={site.publishedToday}
+            dailyLimit={site.effectiveDailyPublishLimit}
+            canWrite={canWrite}
+          />
+          <SiteTabs
+            lifecycle={
+              canConfigure ? (
+                <LifecycleActionScope>
+                  <LifecycleSteps
+                    current={site.lifecycle}
+                    action={
+                      <LifecycleAction
+                        lifecycle={site.lifecycle}
+                        action={advanceLifecycleAction.bind(null, site.id)}
+                      />
+                    }
+                  />
+                </LifecycleActionScope>
+              ) : (
+                <LifecycleSteps current={site.lifecycle} />
+              )
+            }
+            builds={
+              <SiteBuildsTable builds={instance.value.recentBuilds} timeZone={site.timeZone} />
+            }
+            g1={
+              !g1 && canConfigure ? (
+                <RegisterG1Form intro={g1Intro} action={registerG1Action.bind(null, site.id)} />
+              ) : (
+                <Card bodyClass="space-y-3">{g1Intro}</Card>
+              )
+            }
+            buildWindow={
+              canConfigure ? (
+                <BuildWindowForm
+                  intro={windowIntro}
+                  own={site.buildWindowSeconds}
+                  action={setBuildWindowAction.bind(null, site.id)}
                 />
-              </LifecycleActionScope>
-            ) : (
-              <LifecycleSteps current={site.lifecycle} />
-            )
-          }
-          builds={<SiteBuildsTable builds={instance.value.recentBuilds} timeZone={site.timeZone} />}
-          g1={
-            !g1 && canConfigure ? (
-              <RegisterG1Form intro={g1Intro} action={registerG1Action.bind(null, site.id)} />
-            ) : (
-              <Card bodyClass="space-y-3">{g1Intro}</Card>
-            )
-          }
-          buildWindow={
-            canConfigure ? (
-              <BuildWindowForm
-                intro={windowIntro}
-                own={site.buildWindowSeconds}
-                action={setBuildWindowAction.bind(null, site.id)}
-              />
-            ) : (
-              <Card bodyClass="space-y-3">{windowIntro}</Card>
-            )
-          }
-          dailyLimit={
-            canConfigure ? (
-              <DailyPublishLimitForm
-                intro={limitIntro}
-                own={site.dailyPublishLimit}
-                action={setDailyPublishLimitAction.bind(null, site.id)}
-              />
-            ) : (
-              <Card bodyClass="space-y-3">{limitIntro}</Card>
-            )
-          }
-        />
+              ) : (
+                <Card bodyClass="space-y-3">{windowIntro}</Card>
+              )
+            }
+            dailyLimit={
+              canConfigure ? (
+                <DailyPublishLimitForm
+                  intro={limitIntro}
+                  own={site.dailyPublishLimit}
+                  action={setDailyPublishLimitAction.bind(null, site.id)}
+                />
+              ) : (
+                <Card bodyClass="space-y-3">{limitIntro}</Card>
+              )
+            }
+          />
+        </div>
       </DetailLayout>
     </section>
   );

@@ -5,6 +5,7 @@ import {
 import { InfoField, InfoList } from '@/components/shared/InfoList';
 import { PENDING_ORIGIN_LABEL } from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
+import classNames from '@/components/ui/utils/classNames';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
 import { PendingCount, SiteStateIndicator } from './SiteStatus.tsx';
@@ -87,7 +88,9 @@ export function SiteSummaryCard({
   g1Registered: boolean;
 }) {
   return (
-    <Card className={DETAIL_SUMMARY_CLASS}>
+    // `xl:self-start`: lado a lado, o cartão não estica até a altura da coluna da direita
+    // (cartões de conteúdo e abas) e termina com o conteúdo, na primeira tela (#595).
+    <Card className={classNames(DETAIL_SUMMARY_CLASS, 'xl:self-start')}>
       <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
         <InfoField label="Domínio">
           <DomainLink domain={site.domain} />
