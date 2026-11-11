@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, ne } from 'drizzle-orm';
 import type { JobHelpers } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -158,7 +158,10 @@ describe('a declaração e o build', () => {
 
     await runBuild(failedFile('permanent', 'Orçamento de JS: artigo 18 kB', SITE));
 
-    expect(await db.select({ status: builds.status }).from(builds)).toEqual([{ status: 'failed' }]);
+    // Fora a linha `na_fila` do job real do cadastro: a task aqui roda um job avulso.
+    expect(
+      await db.select({ status: builds.status }).from(builds).where(ne(builds.status, 'na_fila')),
+    ).toEqual([{ status: 'failed' }]);
     expect(await declaration()).toEqual({
       by: 'revisor@orakel.local',
       at: result.value.declaredAt,
