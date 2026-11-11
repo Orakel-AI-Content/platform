@@ -28,7 +28,8 @@ export type VersionReferences = {
 
 const removed = (id: number) => `removido (ID ${id})`;
 
-function names(ids: readonly number[], labels: ReadonlyMap<number, string>) {
+/** Nomes dos IDs, separados por vírgula; o que não existe mais vira "removido (ID n)", nada, "—". */
+export function referenceNames(ids: readonly number[], labels: ReadonlyMap<number, string>) {
   return ids.length > 0 ? ids.map((id) => labels.get(id) ?? removed(id)).join(', ') : '—';
 }
 
@@ -177,8 +178,8 @@ export function ContentVersionView({
     ['Título', data.title],
     ['Slug', data.slug],
     ['Descrição', data.description ?? '—'],
-    ['Autores', names(data.authorIds, references.authors)],
-    ['Taxonomias', names(data.taxonomyIds, references.taxonomies)],
+    ['Autores', referenceNames(data.authorIds, references.authors)],
+    ['Taxonomias', referenceNames(data.taxonomyIds, references.taxonomies)],
     [
       'Capa',
       cover === undefined ? '—' : <MediaPreview id={cover} item={references.media.get(cover)} />,

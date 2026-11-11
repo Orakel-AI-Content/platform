@@ -6,7 +6,7 @@ import type { Actor } from '@/domain/access/rbac.ts';
 import { MAX_MEDIA_PAGE_SIZE } from '@/domain/content/media.ts';
 
 import { mediaByIdsAction } from '../midia/actions.ts';
-import { contentReferences } from './editor-options.ts';
+import { contentReferences, type ContentReferences } from './editor-options.ts';
 
 /** IDs únicos das mídias de uma versão: a capa e as imagens dos blocos, na ordem em que aparecem. */
 export function versionMediaIds(data: ContentData): number[] {
@@ -15,6 +15,16 @@ export function versionMediaIds(data: ContentData): number[] {
     ...data.blocks.flatMap((block) => (block.type === 'image' ? [block.mediaId] : [])),
   ];
   return [...new Set(ids)];
+}
+
+/** Os rótulos de `contentReferences` por ID, como a leitura de uma versão e o resumo os leem. */
+export function referenceLabels(
+  references: ContentReferences,
+): Pick<VersionReferences, 'authors' | 'taxonomies'> {
+  return {
+    authors: new Map(references.authors.map((author) => [author.id, author.label])),
+    taxonomies: new Map(references.taxonomies.map((taxonomy) => [taxonomy.id, taxonomy.label])),
+  };
 }
 
 /**
@@ -39,8 +49,7 @@ export async function readVersionReferences(
   ]);
   if (references === undefined || found.some((items) => items === null)) return undefined;
   return {
-    authors: new Map(references.authors.map((author) => [author.id, author.label])),
-    taxonomies: new Map(references.taxonomies.map((taxonomy) => [taxonomy.id, taxonomy.label])),
+    ...referenceLabels(references),
     media: new Map(
       found.flatMap((items) => items ?? []).map((item): [number, MediaItem] => [item.id, item]),
     ),
