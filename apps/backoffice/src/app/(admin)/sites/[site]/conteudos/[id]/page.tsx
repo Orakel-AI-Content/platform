@@ -9,6 +9,7 @@ import {
 } from '@/components/shared/siteLabels.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { ContentActionScope } from '@/components/contents/ContentActionScope';
+import { ReturnNotice } from '@/components/review/ReturnNotice';
 import { PublishActions } from '@/components/contents/PublishActions';
 import { SubmitForReview } from '@/components/contents/SubmitForReview';
 import { UnpublishDialog } from '@/components/contents/UnpublishDialog';
@@ -16,6 +17,7 @@ import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { LIVE_STATUSES, listLiveContents } from '@/domain/content/contents.ts';
 import { scheduledPublicationAt } from '@/domain/publications/schedule.ts';
+import { pendingReturn } from '@/domain/reviews/reviews.ts';
 import {
   DETAIL_SUMMARY_CLASS,
   DETAIL_SUMMARY_LIST_CLASS,
@@ -69,7 +71,8 @@ function liveOf<V extends { status: string }>(versions: readonly V[]): V | undef
  * "Despublicar" (#494), com o destino do 301 entre os conteúdos no ar do site; o revisor tem
  * content.publish sem content.write. O domínio confere de novo. Abaixo, o resumo à esquerda e as versões,
  * da primeira à mais recente, à direita (empilham abaixo de `xl`). A recusa das ações vai ao
- * Alert do escopo, logo abaixo da linha do título.
+ * Alert do escopo, logo abaixo da linha do título. Com uma devolução pendente (#598), o aviso
+ * dela fica logo abaixo do cabeçalho.
  */
 export default async function ContentVersionsPage({ params }: Params) {
   const { site: siteId, id } = await params;
@@ -91,6 +94,7 @@ export default async function ContentVersionsPage({ params }: Params) {
       ? await scheduledPublicationAt(getDb().db, actor, siteId, contentId, version)
       : undefined;
   const live = canPublish ? liveOf(versions.value) : undefined;
+  const returned = await pendingReturn(getDb().db, actor, siteId, contentId);
   const targets =
     live === undefined ? undefined : await listLiveContents(getDb().db, actor, siteId);
   const unpublish =
@@ -147,6 +151,9 @@ export default async function ContentVersionsPage({ params }: Params) {
   return (
     <section aria-labelledby="content-title" className="list-width space-y-4">
       {canWrite || canPublish ? <ContentActionScope>{header}</ContentActionScope> : header}
+      {returned.ok && returned.value !== null && (
+        <ReturnNotice pending={returned.value} timeZone={timeZone} />
+      )}
       <DetailLayout>
         <Card className={DETAIL_SUMMARY_CLASS}>
           <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>

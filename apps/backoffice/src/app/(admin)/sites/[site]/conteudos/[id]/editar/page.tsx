@@ -3,8 +3,10 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { ContentEditor } from '@/components/contents/ContentEditor';
+import { ReturnNotice } from '@/components/review/ReturnNotice';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
+import { pendingReturn } from '@/domain/reviews/reviews.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { getEnv } from '@/env.ts';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -38,7 +40,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * editor (e o domínio recusa). Sem `key` pela versão: depois de salvar, o editor recomeça da
  * versão salva (`reset`) e o `router.refresh` só atualiza o cabeçalho, sem remontar e perder a
  * confirmação (#109). `?criado=1` vem da criação: o editor anuncia "Conteúdo criado.". A prévia
- * (#110) é a da última versão salva, no host de visualização (`PREVIEW_BASE_URL`).
+ * (#110) é a da última versão salva, no host de visualização (`PREVIEW_BASE_URL`). Com uma
+ * devolução pendente (#598), o comentário do revisor fica acima do editor.
  */
 export default async function EditContentPage({ params, searchParams }: Params & SearchParams) {
   const { site: siteId, id } = await params;
@@ -60,6 +63,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
   if (options === undefined) return noRead;
   const latest = versions.value.at(-1);
   if (latest === undefined) notFound();
+  const returned = await pendingReturn(db, actor, siteId, contentId);
   // "Voltar" vai ao nível anterior da trilha: o conteúdo.
   const back = `/sites/${siteId}/conteudos/${contentId}`;
 
@@ -81,6 +85,9 @@ export default async function EditContentPage({ params, searchParams }: Params &
             `Salvar grava a versão ${latest.version + 1} em rascunho`,
           ]}
         />
+        {returned.ok && returned.value !== null && (
+          <ReturnNotice pending={returned.value} timeZone={timeZone} />
+        )}
       </div>
       <ContentEditor
         mode="edit"
