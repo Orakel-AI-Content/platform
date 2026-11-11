@@ -23,6 +23,7 @@ import {
   isBlockType,
   newBlock,
   savedFormValues,
+  slugFromTitle,
   type ContentFormResult,
 } from '@/components/contents/contentEditorValues.ts';
 import {
@@ -49,6 +50,7 @@ import { Button } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Dropdown from '@/components/ui/Dropdown';
 import { FormItem } from '@/components/ui/Form';
+import Input from '@/components/ui/Input';
 import Notification from '@/components/ui/Notification';
 import Select from '@/components/ui/Select';
 import toast from '@/components/ui/toast';
@@ -68,6 +70,8 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 // (`FormActionBar`) com "Descartar" (criação) ou "Voltar" (edição), "Ver prévia" e o envio.
 // Na edição sem alteração (#525), "Salvar" fica indisponível (`aria-disabled`, focável) e a
 // nota ligada a ele diz por quê; o formulário não envia, nem pelo Enter num campo.
+// Na criação (#590), o slug acompanha o título até a pessoa editar o slug; o título e a descrição
+// para buscadores mostram quantos caracteres têm.
 
 const META_LABELS: Record<string, string> = {
   kind: 'Tipo',
@@ -125,6 +129,44 @@ export const UNDO_MS = 10_000;
 
 /** Campo que recebe o foco no bloco devolvido; sem ele (texto rico), o próprio bloco. */
 const FOCUSABLE_FIELD = 'input:not([type="hidden"]), textarea, select, [contenteditable="true"]';
+
+/** Contagem de caracteres em pt-BR: "1 caractere", "0 caracteres". */
+const characters = (count: number) => `${count} ${count === 1 ? 'caractere' : 'caracteres'}`;
+
+/**
+ * Campo de texto com a contagem de caracteres sob ele (#590), ligada pelo `aria-describedby`; o
+ * `Input` soma a ela a dica e o erro do `FormItem`. Só conta: o tamanho não tem limite rígido.
+ */
+const countedTextField: FieldRenderer = ({
+  id,
+  name,
+  value,
+  onChange,
+  invalid,
+  required,
+  ref,
+  readOnly,
+}) => {
+  const text = typeof value === 'string' ? value : '';
+  return (
+    <>
+      <Input
+        id={id}
+        name={name}
+        ref={(element) => ref(element instanceof HTMLElement ? element : null)}
+        value={text}
+        readOnly={readOnly}
+        aria-invalid={invalid}
+        aria-required={required || undefined}
+        aria-describedby={`${id}-count`}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <div id={`${id}-count`} className="form-hint">
+        {characters(text.length)}
+      </div>
+    </>
+  );
+};
 
 /** Mensagem de erro sob um caminho (para os erros de lista, como "ao menos um bloco"). */
 const errorAt = (errors: FieldValues, path: string): string | undefined => {
@@ -190,6 +232,22 @@ export function ContentEditor({
     defaultValues,
   });
   const blocks = useFieldArray({ control: form.control, name: 'blocks' });
+  // Slug do título (#590): só na criação e enquanto o slug não foi editado à mão. O valor
+  // automático entra como o padrão do campo (`resetField`), não por `setValue`: o
+  // react-hook-form recalcula os `dirtyFields` comparando valor e padrão, e um `setValue` sem
+  // `shouldDirty` deixaria o slug "alterado" já na primeira tecla do título.
+  useEffect(() => {
+    if (mode !== 'create') return;
+    const subscription = form.watch((values, { name }) => {
+      if (name !== 'title' || form.getFieldState('slug').isDirty) return;
+      const title: unknown = values.title;
+      form.resetField('slug', {
+        defaultValue: slugFromTitle(typeof title === 'string' ? title : ''),
+      });
+      if (form.formState.isSubmitted) void form.trigger('slug');
+    });
+    return () => subscription.unsubscribe();
+  }, [form, mode]);
   // Blocos recolhidos (#135), pelo `field.id`, só enquanto a tela está aberta.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const toggleBlock = (fieldId: string) =>
@@ -237,6 +295,8 @@ export function ContentEditor({
     taxonomyIds: entityField(options.taxonomies, 'Nenhuma taxonomia cadastrada neste site.'),
     coverMediaId: mediaField(options.media, { optional: true }),
     publishedAt: zonedDateTimeField(timeZone),
+    'seo.title': countedTextField,
+    'seo.description': countedTextField,
   };
 
   useCreatedAnnouncement(created ? 'Conteúdo criado.' : undefined, pushSuccess);
