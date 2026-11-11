@@ -65,8 +65,8 @@ export default async function EditContentPage({ params, searchParams }: Params &
 
   return (
     <section aria-labelledby="edit-content-title" className="space-y-4">
-      {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
-      <div className="form-width space-y-4">
+      {/* Largura na coluna (barra nas bordas do main); duas colunas a partir de `xl` (#591). */}
+      <div className="list-width space-y-4">
         <PageHeader
           id="edit-content-title"
           trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
@@ -86,7 +86,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
         mode="edit"
         siteId={siteId}
         backHref={back}
-        contentClassName="form-width"
+        contentClassName="list-width"
         timeZone={timeZone}
         defaultValues={latest.data}
         options={options}
