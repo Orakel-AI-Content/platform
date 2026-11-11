@@ -285,7 +285,17 @@ menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo ca
   espaço (#585). Nas outras colunas, o corte usa um `max-w-*` de quem usa. Datas ficam numa
   linha (`NoWrap`, `src/components/shared/NoWrap.tsx`). O link principal da linha usa
   `ROW_LINK_CLASS` (`src/components/shared/rowLink.ts`). Nenhuma lista rola na horizontal a
-  1280px, nem no contêiner da tabela.
+  1280px, nem no contêiner da tabela. Texto cortado com `sr-only` dentro leva `relative` junto
+  do `truncate`: o `sr-only` é absoluto e, sem um ancestral posicionado, escapa do corte e
+  estica a página em tela estreita (#589).
+- **Tela estreita (abaixo de `md`):** cada lista mostra, sem rolar, a coluna principal, o status
+  e a ação da linha; as demais levam `meta: { hideBelow: 'md' }` na `ColumnDef`, e o `DataTable`
+  dá `hidden md:table-cell` ao cabeçalho e às células (por classe, não por `columnVisibility`:
+  o HTML é o mesmo em toda largura). Abaixo de `md`, as células têm `px-2` (`px-6` a partir
+  dele) e a largura do `getSize()` só vale a partir de `md` (#589). Conteúdos: caixa, Título,
+  Status e editar; sites: Site, Status e Mais ações; revisão, que não tem status: Título e
+  Enviado em. Cada lista confere a 390 px no teste em Chromium (`visibleColumns`,
+  `pageOverflow` e `tableOverflow` de `test/browser/layout.ts`). A partir de `md`, nada muda.
 - **Ações da linha:** a principal fica visível; editar é o botão de ícone do `CustomerListTable`
   (#441): `IconButton` como link (`asElement={Link}`, `href`) com `TbPencil` e o nome com o
   item ("Editar Guia de uso"), numa coluna `actions` de cabeçalho `sr-only` ("Ações") e
