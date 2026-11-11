@@ -1,5 +1,5 @@
 {
-  "id": "d36c8c23-64b4-4c5e-bf8e-de4cf16ba2cb",
+  "id": "d4cd9976-6dc4-471c-b849-6179fcc4357e",
   "prevId": "52506ade-7b53-4903-b316-7d736057ba9e",
   "version": "7",
   "dialect": "postgresql",
@@ -1177,13 +1177,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'build'"
-        },
         "job_id": {
           "name": "job_id",
           "type": "text",
@@ -1201,24 +1194,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "current_stage": {
-          "name": "current_stage",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requested_by": {
-          "name": "requested_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "scheduled_for": {
-          "name": "scheduled_for",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         },
         "failed_stage": {
           "name": "failed_stage",
@@ -1281,23 +1256,18 @@
           "primaryKey": false,
           "notNull": false
         },
-        "log_tail": {
-          "name": "log_tail",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "started_at": {
           "name": "started_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "finished_at": {
           "name": "finished_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -1337,12 +1307,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "builds_finished_check": {
-          "name": "builds_finished_check",
-          "value": "(\"builds\".\"status\" in ('na_fila', 'rodando')) = (\"builds\".\"finished_at\" is null)"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.pending_changes": {
@@ -1392,6 +1357,112 @@
         "pending_changes_site_id_sites_id_fk": {
           "name": "pending_changes_site_id_sites_id_fk",
           "tableFrom": "pending_changes",
+          "tableTo": "sites",
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.site_events": {
+      "name": "site_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "culprit_origin": {
+          "name": "culprit_origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "culprit_reference": {
+          "name": "culprit_reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "previous_release": {
+          "name": "previous_release",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "release": {
+          "name": "release",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "site_events_site_id_created_at_index": {
+          "name": "site_events_site_id_created_at_index",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "site_events_site_id_sites_id_fk": {
+          "name": "site_events_site_id_sites_id_fk",
+          "tableFrom": "site_events",
           "tableTo": "sites",
           "columnsFrom": ["site_id"],
           "columnsTo": ["id"],

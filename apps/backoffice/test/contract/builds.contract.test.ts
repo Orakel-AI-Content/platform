@@ -339,7 +339,7 @@ describe('task build', () => {
 
   it('a migração da execução com estado só acrescenta e relaxa, sem reescrever linhas', async () => {
     const migration = await readFile(
-      new URL('../../drizzle/0018_execucao_com_estado.sql', import.meta.url),
+      new URL('../../drizzle/0019_execucao_com_estado.sql', import.meta.url),
       'utf8',
     );
     const allowed =
