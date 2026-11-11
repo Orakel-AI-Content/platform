@@ -9,10 +9,12 @@ import { ContentViewLinks } from '@/components/contents/ContentViewLinks';
 import { PublishActions } from '@/components/contents/PublishActions';
 import { SubmitForReview } from '@/components/contents/SubmitForReview';
 import { UnpublishDialog } from '@/components/contents/UnpublishDialog';
+import { ReturnNotice } from '@/components/review/ReturnNotice';
 import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 import { LIVE_STATUSES, listLiveContents } from '@/domain/content/contents.ts';
 import { scheduledPublicationAt } from '@/domain/publications/schedule.ts';
+import { pendingReturn } from '@/domain/reviews/reviews.ts';
 import { DetailLayout } from '@/components/shared/DetailLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
@@ -65,7 +67,8 @@ function liveOf<V extends { status: string }>(versions: readonly V[]): V | undef
  * da primeira à mais recente, à direita (empilham abaixo de `xl`). A recusa das ações vai ao
  * Alert do escopo, logo abaixo da linha do título. Para todo leitor (#597), "Ver prévia" da versão
  * mais recente e, com o conteúdo no ar, "Ver no site"; no resumo, autores e taxonomias pelo nome
- * (as leituras do editor) e as datas de publicação e da última alteração.
+ * (as leituras do editor) e as datas de publicação e da última alteração. Com uma devolução
+ * pendente (#598), o aviso dela fica logo abaixo do cabeçalho.
  */
 export default async function ContentVersionsPage({ params }: Params) {
   const { site: siteId, id } = await params;
@@ -87,9 +90,10 @@ export default async function ContentVersionsPage({ params }: Params) {
       ? await scheduledPublicationAt(getDb().db, actor, siteId, contentId, version)
       : undefined;
   const live = liveOf(versions.value);
-  const [references, targets] = await Promise.all([
+  const [references, targets, returned] = await Promise.all([
     contentReferences(getDb().db, actor, siteId),
     canPublish && live !== undefined ? listLiveContents(getDb().db, actor, siteId) : undefined,
+    pendingReturn(getDb().db, actor, siteId, contentId),
   ]);
   if (references === undefined) return noRead;
   const unpublish =
