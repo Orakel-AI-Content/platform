@@ -1,6 +1,6 @@
 import type { Block } from '@orakel/content-model/v1';
 
-import type { LastBuild } from '@/domain/builds/builds.ts';
+import type { BuildStatus } from '@/db/schema/operations.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { PendingOrigin } from '@/domain/pending-changes/record.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
@@ -107,16 +107,22 @@ export function choiceLabel(value: string): string {
   return Object.hasOwn(CHOICE_LABEL, value) ? (CHOICE_LABEL[value] as string) : value;
 }
 
-/** Resultado do último build de um site (lista de sites). */
-export const BUILD_STATUS_LABEL: Record<LastBuild['status'], string> = {
+/** Estado de uma execução de build: na fila e rodando são as abertas; as demais, o resultado. */
+export const BUILD_STATUS_LABEL: Record<BuildStatus, string> = {
+  na_fila: 'Na fila',
+  rodando: 'Rodando',
   ok: 'Publicado',
   failed: 'Falhou',
+  cancelado: 'Cancelado',
 };
 
-/** Cor da tag de cada resultado de build. */
-export const BUILD_STATUS_VARIANT: Record<LastBuild['status'], StateTagColor> = {
+/** Cor da tag de cada estado de build. */
+export const BUILD_STATUS_VARIANT: Record<BuildStatus, StateTagColor> = {
+  na_fila: 'bg-gray-400',
+  rodando: 'bg-info',
   ok: 'bg-success',
   failed: 'bg-error',
+  cancelado: 'bg-gray-600',
 };
 
 const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();

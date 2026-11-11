@@ -6,7 +6,7 @@ import type { Db } from '../../src/db/client.ts';
 import { builds, contentVersions, redirects, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
-import { loadBuildTarget, recordBuild } from '../../src/domain/builds/builds.ts';
+import { loadBuildTarget, recordBuild, startBuild } from '../../src/domain/builds/builds.ts';
 import {
   failedFile,
   fakeRuntime,
@@ -169,25 +169,21 @@ describe('a declaração e o build', () => {
     const seen = await declareMassUnpublish(db, SITE, 'a@orakel.local', new Date(1_000));
     const newer = await declareMassUnpublish(db, SITE, 'b@orakel.local', new Date(2_000));
 
+    const buildId = await startBuild(db, {
+      siteId: SITE,
+      release: 'local',
+      jobId: undefined,
+      attempt: 1,
+      startedAt: new Date(),
+    });
     await db.transaction((tx) =>
-      recordBuild(
-        tx,
-        {
-          siteId: SITE,
-          release: 'local',
-          jobId: undefined,
-          attempt: 1,
-          startedAt: new Date(),
-          massUnpublishDeclaredAt: seen,
-        },
-        {
-          status: 'ok',
-          render: renderOk(SITE, []),
-          publish: publishOk(SITE),
-          renderMs: 1,
-          publishMs: 1,
-        } as BuildOutcome,
-      ),
+      recordBuild(tx, { buildId, siteId: SITE, massUnpublishDeclaredAt: seen }, {
+        status: 'ok',
+        render: renderOk(SITE, []),
+        publish: publishOk(SITE),
+        renderMs: 1,
+        publishMs: 1,
+      } as BuildOutcome),
     );
 
     expect(await declaration()).toEqual({ by: 'b@orakel.local', at: newer });
