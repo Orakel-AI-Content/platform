@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { asRole } from './auth.ts';
+import { addBlock } from './blocks.ts';
 import { expectNoViolations } from './axe.ts';
 import { fieldLabel } from './fieldLabel.ts';
 import { chooseOption } from './select.ts';
@@ -19,8 +20,7 @@ async function createDraft(page: Page, title: string, slug: string): Promise<str
   await page.getByLabel(fieldLabel('Título')).fill(title);
   await page.getByLabel('Slug').fill(slug);
   await chooseOption(page.getByRole('combobox', { name: fieldLabel('Autores') }), 'Ana Souza');
-  await chooseOption(page.getByRole('combobox', { name: 'Tipo do novo bloco' }), 'Texto');
-  await page.getByRole('button', { name: 'Adicionar bloco' }).click();
+  await addBlock(page, 'Texto');
   await page.getByRole('textbox', { name: 'Texto', exact: true }).click();
   await page.keyboard.type('Parágrafo para revisão.');
   await page.getByRole('button', { name: 'Criar', exact: true }).click();
