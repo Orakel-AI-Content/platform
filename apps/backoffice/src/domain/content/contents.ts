@@ -31,7 +31,7 @@ import {
   redirects,
   reviews,
   taxonomies,
-  type CONTENT_STATUSES,
+  CONTENT_STATUSES,
   type ContentData,
 } from '../../db/schema/index.ts';
 import { allocateId } from '../../db/site-ids.ts';
@@ -598,6 +598,51 @@ export async function countReviewQueues(
     )
     .groupBy(contentVersions.siteId);
   return { ok: true, value: Object.fromEntries(rows.map((row) => [row.siteId, row.total])) };
+}
+
+/** Contagem de conteúdos do site por status da versão mais recente: todos os status, zero quando não há. */
+export type ContentStatusCounts = Record<Status, number>;
+
+/**
+ * Quantos conteúdos do site estão em cada status, pela versão mais recente de cada um (a regra
+ * de `listContents`), para os cartões da Visão geral (#596): um `GROUP BY` no banco, sem ler
+ * título nem blocos. Status sem conteúdo vem com zero.
+ */
+export async function countContentsByStatus(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<ContentStatusCounts>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+
+  const newer = aliasedTable(contentVersions, 'newer');
+  const rows = await db
+    .select({ status: contentVersions.status, total: count() })
+    .from(contentVersions)
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(newer)
+            .where(
+              and(
+                eq(newer.siteId, contentVersions.siteId),
+                eq(newer.contentId, contentVersions.contentId),
+                gt(newer.version, contentVersions.version),
+              ),
+            ),
+        ),
+      ),
+    )
+    .groupBy(contentVersions.status);
+  const counts = Object.fromEntries(
+    CONTENT_STATUSES.map((status) => [status, 0]),
+  ) as ContentStatusCounts;
+  for (const row of rows) counts[row.status] = row.total;
+  return { ok: true, value: counts };
 }
 
 export type ContentVersion = {

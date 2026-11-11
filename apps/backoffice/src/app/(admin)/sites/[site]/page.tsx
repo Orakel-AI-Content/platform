@@ -1,5 +1,6 @@
 import { LifecycleSteps } from '@/components/sites/LifecycleSteps';
 import { RedirectUsageAlert } from '@/components/sites/RedirectUsageAlert';
+import { SiteContentMetrics } from '@/components/sites/SiteContentMetrics';
 import {
   BuildWindowForm,
   DailyPublishLimitForm,
@@ -14,6 +15,7 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
 import { listRollbackVersions } from '@/domain/builds/builds.ts';
+import { countContentsByStatus } from '@/domain/content/contents.ts';
 import { listReleases } from '@/domain/releases/releases.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
 import { readSiteInstance, redirectUsageFor } from '@/domain/sites/sites.ts';
@@ -38,7 +40,9 @@ import { sitePageContext } from './editorial-page.tsx';
 export const dynamic = 'force-dynamic';
 
 /**
- * Página do site na tela de detalhe do guia (#370): o resumo à esquerda (dados de publicação e
+ * Página do site na tela de detalhe do guia (#370): no topo, os cartões de conteúdo por status,
+ * com as publicações de hoje e os atalhos "Criar conteúdo" (com content.write) e "Revisar"
+ * (#596); abaixo, o resumo à esquerda (dados de publicação e
  * "Publicar agora" ou, pausado, "Retomar", "Reconstruir na release" e "Reverter", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1,
  * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo sitePageContext (a mesma
  * busca do layout), os gatilhos e o uso de redirects, que vira um aviso acima do resumo quando
@@ -49,12 +53,14 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const { site: siteId } = await params;
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
-  const { actor, db, site } = context.value;
+  const { actor, db, site, canWrite } = context.value;
   const triggers = await listPolicyTriggers(db, actor, siteId);
   const g1 = triggers.ok ? triggers.value.find((record) => record.trigger === 'G1') : undefined;
   const redirects = await redirectUsageFor(db, actor, siteId);
   const instance = await readSiteInstance(db, actor, siteId);
   if (!instance.ok) return noRead;
+  const contentCounts = await countContentsByStatus(db, actor, siteId);
+  if (!contentCounts.ok) return noRead;
   const canConfigure = can(actor, 'site.configure');
   const canOperate = can(actor, 'operations.run');
   // As releases do "Reconstruir" (#515): listá-las exige release.promote, que a operação e o
@@ -136,6 +142,13 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         }
       />
       {redirects.ok && redirects.value.alert && <RedirectUsageAlert usage={redirects.value} />}
+      <SiteContentMetrics
+        siteId={site.id}
+        counts={contentCounts.value}
+        publishedToday={site.publishedToday}
+        dailyLimit={site.effectiveDailyPublishLimit}
+        canWrite={canWrite}
+      />
       <DetailLayout>
         <SiteSummaryCard
           site={site}

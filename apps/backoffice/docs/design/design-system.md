@@ -558,6 +558,19 @@ O padrão do `AnalyticDashboard` do Ecme (#548), na audiência do site
 - **Tabela:** `DataTable` com `useListTable` no `AdaptiveCard`, sem toolbar (não há busca).
 - **Vazio:** sem dados no período, só o `EmptyState`, no lugar de cartões e tabela.
 
+Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
+`SiteContentMetrics` (`src/components/sites/`):
+
+- **Cabeçalho:** o `h2` "Conteúdos" com os atalhos à direita: "Revisar" (a fila de revisão) e
+  "Criar conteúdo" (`variant="solid"`, só com `content.write`), ambos `ButtonLink` `sm`.
+- **Cartões:** um por status da versão mais recente (`countContentsByStatus`), na ordem do
+  fluxo (rascunho, em revisão, aprovado, agendado, publicado), mais "Publicações hoje" com o
+  limite do dia. Cada cartão de status é um link (`next/link` em volta do `Card`) para
+  `conteudos?status=<status>`, e "Em revisão" para a fila; "Publicações hoje" não é link.
+  Em grade: 1 coluna no celular, 2 a partir de `sm`, 3 a partir de `lg`, 6 a partir de `2xl`.
+- **Vazio:** site sem conteúdo mostra os cartões com zero, nunca um `EmptyState`: o "Criar
+  conteúdo" continua ao alcance.
+
 ### Retorno das ações
 
 - **Retorno:** o resultado de uma ação é um `ActionResult` (`{ ok, message }`,
