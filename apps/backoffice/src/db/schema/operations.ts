@@ -1,4 +1,14 @@
-import { index, integer, pgTable, primaryKey, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import {
+  check,
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  serial,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core';
 
 import { sites } from './sites.ts';
 
@@ -18,13 +28,25 @@ export const pendingChanges = pgTable('pending_changes', {
   resolvedAt: timestamp({ withTimezone: true }),
 });
 
-export const BUILD_STATUSES = ['ok', 'failed'] as const;
+/** Tipo da execução: o build do site ou a reversão para uma versão já publicada. */
+export const BUILD_KINDS = ['build', 'rollback'] as const;
+/**
+ * Estados da execução. `na_fila` e `rodando` são linhas abertas (sem `finishedAt`); `ok`,
+ * `failed` e `cancelado` são fechadas. `ok` e `failed` são os valores gravados desde a L3.
+ */
+export const BUILD_STATUSES = ['na_fila', 'rodando', 'ok', 'failed', 'cancelado'] as const;
+export type BuildStatus = (typeof BUILD_STATUSES)[number];
+/** Estados de linha aberta: a execução ainda não terminou. */
+export const OPEN_BUILD_STATUSES = ['na_fila', 'rodando'] as const satisfies readonly BuildStatus[];
+/** Estados em que uma execução termina de rodar: os que as consultas de build fechado leem. */
+export const FINISHED_BUILD_STATUSES = ['ok', 'failed'] as const satisfies readonly BuildStatus[];
 export const BUILD_STAGES = ['image', 'render', 'publish'] as const;
 export const FAILURE_KINDS = ['permanent', 'transient'] as const;
 
 /**
- * Uma execução da task `build` (12.0, L3): cada tentativa vira uma linha. A de sucesso mais
- * recente é a versão ativa do site — referência da trava de segurança e do rollback (L4).
+ * Uma execução da task `build` (12.0, L3): cada tentativa vira uma linha, gravada `rodando` ao
+ * começar e fechada com o resultado. A de sucesso mais recente é a versão ativa do site —
+ * referência da trava de segurança e do rollback (L4).
  */
 export const builds = pgTable(
   'builds',
@@ -35,10 +57,17 @@ export const builds = pgTable(
       .references(() => sites.id),
     /** Versão do site-builder usada (X.Y.Z, a tag da imagem site-builder). */
     release: text().notNull(),
+    kind: text({ enum: BUILD_KINDS }).notNull().default('build'),
     /** Job do Graphile Worker e tentativa (1 a 5). */
     jobId: text(),
     attempt: integer().notNull(),
     status: text({ enum: BUILD_STATUSES }).notNull(),
+    /** Etapa em andamento, enquanto a linha está `rodando`. */
+    currentStage: text({ enum: BUILD_STAGES }),
+    /** Quem pediu a execução: e-mail de quem clicou ou `system`. */
+    requestedBy: text(),
+    /** Horário previsto para começar, enquanto a linha está `na_fila`. */
+    scheduledFor: timestamp({ withTimezone: true }),
     /** Etapa em que falhou. */
     failedStage: text({ enum: BUILD_STAGES }),
     failureKind: text({ enum: FAILURE_KINDS }),
@@ -53,10 +82,20 @@ export const builds = pgTable(
     cacheKey: text(),
     renderMs: integer(),
     publishMs: integer(),
-    startedAt: timestamp({ withTimezone: true }).notNull(),
-    finishedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Trecho final do log do container, quando a execução falha. */
+    logTail: text(),
+    /** Nulo enquanto a linha está `na_fila`. */
+    startedAt: timestamp({ withTimezone: true }),
+    /** Nulo enquanto a linha está aberta (`builds_finished_check`). */
+    finishedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [index().on(t.siteId, t.finishedAt)],
+  (t) => [
+    index().on(t.siteId, t.finishedAt),
+    check(
+      'builds_finished_check',
+      sql`(${t.status} in ('na_fila', 'rodando')) = (${t.finishedAt} is null)`,
+    ),
+  ],
 );
 
 export const ROLES = ['admin', 'editor', 'revisor', 'operacao'] as const;
