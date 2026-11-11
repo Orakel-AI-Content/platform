@@ -300,6 +300,29 @@ test('editor não cadastra nem edita a configuração', async ({ page }) => {
 /** O resumo do site (#370): o único cartão da página com a lista de dados. */
 const siteSummary = (page: Page) => page.locator('.card').filter({ has: page.locator('dl') });
 
+/** Rótulos do resumo do site, na ordem (#516; sem os últimos builds, que têm aba, #595). */
+const SUMMARY_TERMS = [
+  'Domínio',
+  'Indexável',
+  'Status',
+  'Release',
+  'Versão no ar',
+  'Mudanças pendentes',
+  'G1',
+  'Publicações hoje',
+];
+
+/** Linha do título da página do site, com as ações do cabeçalho (#595). */
+const siteHeader = (page: Page) =>
+  page
+    .locator('div')
+    .filter({ has: page.getByRole('heading', { level: 1 }) })
+    .last();
+
+/** Alert das ações do cabeçalho do site: o `role="alert"` filho da seção da página (#595). */
+const operationsAlert = (page: Page) =>
+  page.locator('section[aria-labelledby="site-title"] > [role="alert"]');
+
 /** Abre a aba `name` da página do site e devolve o painel dela. */
 async function openTab(page: Page, name: string): Promise<Locator> {
   await page.getByRole('tab', { name }).click();
@@ -409,39 +432,45 @@ test(
   async ({ page }) => {
     await asRole(page, 'operacao');
     await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
-    // O resumo ao lado das abas (#370): os dados de publicação e "Publicar agora".
+    // O resumo ao lado das abas (#370), só com o estado atual (#595): sem builds nem botões.
     const publication = siteSummary(page);
-    const terms = [
-      'Domínio',
-      'Indexável',
-      'Status',
-      'Release',
-      'Versão no ar',
-      'Mudanças pendentes',
-      'Pendências por origem',
-      'Últimos builds',
-      'G1',
-      'Publicações hoje',
-    ];
-    const value = (term: string) => publication.getByRole('definition').nth(terms.indexOf(term));
-    await expect(publication.getByRole('term')).toHaveText(terms);
-    await expect(value('Domínio')).not.toBeEmpty();
+    const value = (term: string) =>
+      publication.getByRole('definition').nth(SUMMARY_TERMS.indexOf(term));
+    await expect(publication.getByRole('term')).toHaveText(SUMMARY_TERMS);
+    await expect(publication.getByRole('button')).toHaveCount(0);
+    // O domínio abre o site no ar em nova aba (#595).
+    const domain = value('Domínio').getByRole('link', { name: /\(abre em nova aba\)$/ });
+    await expect(domain).toHaveAttribute('href', /^https:\/\/.+/);
+    await expect(domain).toHaveAttribute('target', '_blank');
+    await expect(domain).toHaveAttribute('rel', 'noopener noreferrer');
     await expect(value('Indexável')).toHaveText(/^(Sim|Não)$/);
     await expect(value('Status')).toHaveText('Ativo');
     await expect(value('Release')).not.toBeEmpty();
     await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
     // Estado da instância (#516): cada campo com o valor ou o estado vazio dele.
     await expect(value('Versão no ar')).not.toBeEmpty();
-    await expect(value('Pendências por origem')).not.toBeEmpty();
-    await expect(value('Últimos builds')).toHaveText(/^(Nenhum build ainda\.|Publicado|Falhou)/);
     await expect(value('G1')).toHaveText(/^(Registrado|Não registrado)$/);
     // Uso do limite diário de hoje (dia de São Paulo), padrão de 10.
     await expect(value('Publicações hoje')).toHaveText(/^\d+ de 10/);
 
-    // Mesma ação da lista; o sucesso vai para o toast e a seção fica sem erro (#324).
+    // Os últimos builds na aba "Builds" (#595): a tabela, ou o vazio sem nenhum.
+    const builds = await openTab(page, 'Builds');
+    const buildsTable = builds.getByRole('table', { name: 'Últimos builds' });
+    await expect(buildsTable.or(builds.getByText('Nenhum build ainda.'))).toBeVisible();
+    if (await buildsTable.isVisible()) {
+      await expect(buildsTable.getByRole('columnheader')).toHaveText([
+        'Status',
+        'Data',
+        'Release',
+        'Versão',
+      ]);
+    }
+
+    // Mesma ação da lista, no cabeçalho (#595); o sucesso vai para o toast e o Alert logo
+    // abaixo do cabeçalho fica vazio (#324).
     await page.waitForLoadState('networkidle');
     // Confirma num diálogo (#327): Esc e Cancelar não publicam e devolvem o foco ao botão.
-    const publish = publication.getByRole('button', { name: 'Publicar agora exemplo-a' });
+    const publish = siteHeader(page).getByRole('button', { name: 'Publicar agora exemplo-a' });
     const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
     await publish.click();
     await expect(dialog).toBeVisible();
@@ -458,10 +487,46 @@ test(
     await expect(
       page.getByRole('status').filter({ hasText: 'Build de exemplo-a enfileirado.' }),
     ).toBeVisible();
-    await expect(publish.locator('xpath=..').getByRole('alert')).toBeEmpty();
+    await expect(operationsAlert(page)).toBeEmpty();
     await expectNoViolations(page);
   },
 );
+
+// Primeira tela a 1440 px (#595): numa janela de 1440 × 900, o resumo inteiro aparece sem rolar,
+// com as ações de operação no cabeçalho e "Reconstruir na release" e "Reverter" no "Mais ações".
+test('operação vê o resumo e as ações do site na primeira tela a 1440 × 900', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await asRole(page, 'operacao');
+  await page.goto('/sites/exemplo-a');
+  const summary = siteSummary(page);
+  await expect(summary.getByRole('term')).toHaveText(SUMMARY_TERMS);
+  const box = await summary.boundingBox();
+  expect(box).not.toBeNull();
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect((box?.y ?? Infinity) + (box?.height ?? 0)).toBeLessThanOrEqual(900);
+
+  const header = siteHeader(page);
+  await expect(header.getByRole('button', { name: 'Publicar agora exemplo-a' })).toBeInViewport();
+  await page.waitForLoadState('networkidle');
+  await header.getByRole('button', { name: 'Mais ações: exemplo-a' }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText([
+    'Reconstruir na release',
+    'Reverter',
+  ]);
+  // O menu entra com transição de opacidade; o axe audita depois dela. As guardas de foco do
+  // floating-ui (`aria-hidden` e `tabindex=0`, repassam o foco na hora) ficam de fora, como em
+  // contents.spec.ts.
+  await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+  await expectNoViolations(page, { exclude: ['[data-floating-ui-focus-guard]'] });
+  await page.getByRole('menuitem', { name: 'Reverter' }).click();
+  const dialog = page.getByRole('alertdialog', {
+    name: 'Reverter o site para uma versão anterior?',
+  });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(header.getByRole('button', { name: 'Mais ações: exemplo-a' })).toBeFocused();
+});
 
 /**
  * Site pausado gravado pelo domínio (#155): a tela não pausa site, e um site pausado no seed
@@ -502,18 +567,24 @@ test('operação vê o site pausado com o motivo e sem Publicar agora', async ({
   await expect(publication.getByText(reason, { exact: true })).toBeVisible();
   await page.waitForLoadState('networkidle');
   await expect(page.getByRole('button', { name: /^Publicar agora/ })).toHaveCount(0);
+  // "Retomar" no lugar dele, no cabeçalho (#595).
+  await expect(siteHeader(page).getByRole('button', { name: `Retomar ${siteId}` })).toBeVisible();
   await expectNoViolations(page);
 });
 
 test('editor vê a página do site sem as ações', async ({ page }) => {
   await asRole(page, 'editor');
   await page.getByRole('link', { name: 'Exemplo A — Guias' }).click();
-  await expect(siteSummary(page).getByRole('term')).toHaveCount(10);
-  // Cada aba mostra o mesmo que para a operação, só de leitura (#370).
+  await expect(siteSummary(page).getByRole('term')).toHaveText(SUMMARY_TERMS);
+  // Cada aba mostra o mesmo que para a operação, só de leitura (#370); sem as ações de operação
+  // do cabeçalho, nem o "Mais ações" (#595).
   const noActions = async () => {
     for (const name of [
       /^Marcar/,
       /^Publicar agora/,
+      /^Retomar/,
+      /^Mais ações/,
+      'Reconstruir na release',
       'Reverter',
       'Registrar G1',
       /^Salvar$/,
@@ -535,17 +606,22 @@ test('editor vê a página do site sem as ações', async ({ page }) => {
   const buildWindow = await openTab(page, 'Janela de agrupamento');
   await expect(buildWindow.getByText(/^Janela efetiva: /)).toBeVisible();
   await noActions();
+  await openTab(page, 'Builds');
+  await noActions();
   await expect(page.getByRole('link', { name: 'Editar configuração' })).toHaveCount(0);
 });
 
-// Visão geral do site em Card e nos campos do Ecme (#246), com as ações da operação, em cada
-// aba (#370), nos dois temas.
+// Visão geral do site em Card e nos campos do Ecme (#246), com as ações da operação no
+// cabeçalho (#595), em cada aba (#370), nos dois temas.
 test(`página do site sem violação do axe`, async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await asRole(page, 'operacao');
   await page.goto('/sites/exemplo-a');
-  await expect(siteSummary(page).getByRole('term')).toHaveCount(10);
+  await expect(siteSummary(page).getByRole('term')).toHaveText(SUMMARY_TERMS);
   await expect(page.getByRole('tabpanel', { name: 'Ciclo de vida' })).toBeVisible();
+  await expectNoViolations(page);
+  // A aba dos últimos builds (#595).
+  await openTab(page, 'Builds');
   await expectNoViolations(page);
 
   // As ações da tela são todas `sm`, e a do cabeçalho, solid (#370). A grade resumo × abas por

@@ -3,6 +3,7 @@ import { page } from 'vitest/browser';
 
 import { ContentVersionsTable } from '@/components/contents/ContentVersionsTable';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
+import { SiteBuildsTable } from '@/components/sites/SiteBuildsTable';
 import { SiteSummaryCard } from '@/components/sites/SiteSummaryCard';
 import { SiteTabs } from '@/components/sites/SiteTabs';
 import Card from '@/components/ui/Card';
@@ -86,14 +87,10 @@ function SiteDetail() {
   return (
     <section className="list-width space-y-4">
       <DetailLayout>
-        <SiteSummaryCard
-          site={SITE}
-          instance={INSTANCE}
-          g1Registered
-          publish={() => Promise.resolve({ ok: true as const, message: 'ok' })}
-        />
+        <SiteSummaryCard site={SITE} instance={INSTANCE} g1Registered />
         <SiteTabs
           lifecycle={<p>Etapas do ciclo de vida.</p>}
+          builds={<SiteBuildsTable builds={INSTANCE.recentBuilds} timeZone={SITE.timeZone} />}
           g1={<p>Registro no G1.</p>}
           buildWindow={<p>Janela de agrupamento.</p>}
           dailyLimit={<p>Limite diário.</p>}

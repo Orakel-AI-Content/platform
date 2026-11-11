@@ -2,33 +2,29 @@ import {
   DETAIL_SUMMARY_CLASS,
   DETAIL_SUMMARY_LIST_CLASS,
 } from '@/components/shared/detailSummary.ts';
-import { EmptyState } from '@/components/shared/EmptyState';
 import { InfoField, InfoList } from '@/components/shared/InfoList';
-import {
-  BUILD_STATUS_LABEL,
-  BUILD_STATUS_VARIANT,
-  PENDING_ORIGIN_LABEL,
-  formatDateTime,
-} from '@/components/shared/siteLabels.ts';
+import { PENDING_ORIGIN_LABEL } from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
-import type { RollbackVersion } from '@/domain/builds/builds.ts';
+import classNames from '@/components/ui/utils/classNames';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
-import {
-  RebuildReleaseDialog,
-  type RebuildOnRelease,
-  type RebuildRelease,
-} from './RebuildReleaseDialog.tsx';
-import { RollbackDialog, type RollbackSite } from './RollbackDialog.tsx';
-import {
-  PendingCount,
-  PublishNowPanel,
-  ResumeSitePanel,
-  SiteStateIndicator,
-  StateTag,
-  type PublishNow,
-  type ResumeSite,
-} from './SiteStatus.tsx';
+import { PendingCount, SiteStateIndicator } from './SiteStatus.tsx';
+
+/** O domínio abre o site no ar em nova aba, como na lista de sites (#586); sem domínio, "—". */
+function DomainLink({ domain }: { domain: string }) {
+  if (!domain) return <span>—</span>;
+  return (
+    <a
+      href={`https://${domain}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline underline-offset-4 hover:text-primary"
+    >
+      {domain}
+      <span className="sr-only"> (abre em nova aba)</span>
+    </a>
+  );
+}
 
 /** Versão no ar e, abaixo, os arquivos do build que a publicou. */
 function ActiveVersion({ versionId, files }: { versionId: string | null; files: number | null }) {
@@ -45,80 +41,60 @@ function ActiveVersion({ versionId, files }: { versionId: string | null; files: 
   );
 }
 
-/** Mudanças pendentes agrupadas por origem, com a contagem de cada uma. */
-function PendingByOrigin({ counts }: { counts: SiteInstance['pendingByOrigin'] }) {
-  if (counts.length === 0) return <EmptyState>Nenhuma mudança pendente.</EmptyState>;
-  return (
-    <ul className="space-y-1">
-      {counts.map(({ origin, count }) => (
-        <li key={origin} className="flex justify-between gap-4">
-          <span>{PENDING_ORIGIN_LABEL[origin]}</span>
-          <span className="tabular-nums">{count}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** Os últimos builds, do mais novo para o mais antigo: resultado e, abaixo, data, release e versão. */
-function RecentBuilds({
-  builds,
-  timeZone,
+/**
+ * Mudanças pendentes: o total (link para a tela de pendências quando > 0) e, abaixo, a divisão
+ * por origem em duas colunas. Num campo só e em duas colunas, o resumo cabe na primeira tela a
+ * 1440 × 900 com todas as origens (#595).
+ */
+function PendingChanges({
+  siteId,
+  count,
+  byOrigin,
 }: {
-  builds: SiteInstance['recentBuilds'];
-  timeZone: string;
+  siteId: string;
+  count: number;
+  byOrigin: SiteInstance['pendingByOrigin'];
 }) {
-  if (builds.length === 0) return <EmptyState>Nenhum build ainda.</EmptyState>;
   return (
-    <ol className="space-y-3">
-      {builds.map((build) => (
-        <li key={build.id} className="flex flex-col items-start gap-0.5">
-          <StateTag color={BUILD_STATUS_VARIANT[build.status]}>
-            {BUILD_STATUS_LABEL[build.status]}
-          </StateTag>
-          <span className="text-xs">
-            {[formatDateTime(new Date(build.finishedAt), timeZone), build.release, build.versionId]
-              .filter((part) => part !== null)
-              .join(' · ')}
-          </span>
-        </li>
-      ))}
-    </ol>
+    <span className="flex flex-col items-start gap-1">
+      <PendingCount siteId={siteId} count={count} />
+      {byOrigin.length > 0 && (
+        <ul aria-label="Por origem" className="grid w-full grid-cols-2 gap-x-4 gap-y-1 font-normal">
+          {byOrigin.map(({ origin, count: originCount }) => (
+            <li key={origin} className="flex justify-between gap-2">
+              <span>{PENDING_ORIGIN_LABEL[origin]}</span>
+              <span className="tabular-nums">{originCount}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </span>
   );
 }
 
 /**
- * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: os dados do
- * site no `InfoList` (com o uso do limite diário de hoje) e, ao pé, "Publicar agora" ou, com o
- * site pausado, "Retomar", e "Reconstruir na release" (#515) e "Reverter" (#514) nos dois
- * estados. `publish`, `resume`, `rebuild` e `rollback` só vêm de quem tem `operations.run`; publicar e retomar aparecem só no estado
- * deles (publicar com o site não pausado, retomar com ele pausado). Sem estado próprio: os
- * painéis são os únicos Client Components dentro dele.
+ * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: só o estado
+ * atual do site no `InfoList` (com o uso do limite diário de hoje), sem botões (#595): as ações
+ * de operação ficam no cabeçalho (`SiteOperations`) e os últimos builds na aba "Builds". Sem
+ * estado: serve ao Server Component da página.
  */
 export function SiteSummaryCard({
   site,
   instance,
   g1Registered,
-  publish,
-  resume,
-  rebuild,
-  rollback,
 }: {
   site: SiteSummary;
   instance: SiteInstance;
   g1Registered: boolean;
-  publish?: PublishNow;
-  resume?: ResumeSite;
-  /** Releases registradas (com o estado da imagem) e a action de reconstruir, já ligada ao site. */
-  rebuild?: { releases: readonly RebuildRelease[]; action: RebuildOnRelease };
-  /** Versões revertíveis (sem a ativa) e a action de reverter, já ligada ao site. */
-  rollback?: { versions: readonly RollbackVersion[]; action: RollbackSite };
 }) {
-  const paused = site.state === 'pausado';
   return (
-    <Card className={DETAIL_SUMMARY_CLASS} bodyClass="flex flex-col gap-6">
+    // `xl:self-start`: lado a lado, o cartão não estica até a altura da coluna da direita
+    // (cartões de conteúdo e abas) e termina com o conteúdo, na primeira tela (#595).
+    <Card className={classNames(DETAIL_SUMMARY_CLASS, 'xl:self-start')}>
       <InfoList className={DETAIL_SUMMARY_LIST_CLASS}>
-        <InfoField label="Domínio">{site.domain}</InfoField>
+        <InfoField label="Domínio">
+          <DomainLink domain={site.domain} />
+        </InfoField>
         <InfoField label="Indexável">{site.indexavel ? 'Sim' : 'Não'}</InfoField>
         <InfoField label="Status">
           <SiteStateIndicator site={site} />
@@ -127,14 +103,12 @@ export function SiteSummaryCard({
         <InfoField label="Versão no ar">
           <ActiveVersion versionId={site.activeVersionId} files={instance.activeFiles} />
         </InfoField>
-        <InfoField label="Mudanças pendentes" className="tabular-nums">
-          <PendingCount siteId={site.id} count={site.pendingChanges} />
-        </InfoField>
-        <InfoField label="Pendências por origem">
-          <PendingByOrigin counts={instance.pendingByOrigin} />
-        </InfoField>
-        <InfoField label="Últimos builds">
-          <RecentBuilds builds={instance.recentBuilds} timeZone={site.timeZone} />
+        <InfoField label="Mudanças pendentes">
+          <PendingChanges
+            siteId={site.id}
+            count={site.pendingChanges}
+            byOrigin={instance.pendingByOrigin}
+          />
         </InfoField>
         <InfoField label="G1">{g1Registered ? 'Registrado' : 'Não registrado'}</InfoField>
         <InfoField label="Publicações hoje" className="tabular-nums">
@@ -144,23 +118,6 @@ export function SiteSummaryCard({
           )}
         </InfoField>
       </InfoList>
-      {publish && !paused && <PublishNowPanel siteId={site.id} action={publish} />}
-      {resume && paused && <ResumeSitePanel siteId={site.id} action={resume} />}
-      {rebuild && (
-        <RebuildReleaseDialog
-          current={site.release}
-          paused={paused}
-          releases={rebuild.releases}
-          action={rebuild.action}
-        />
-      )}
-      {rollback && (
-        <RollbackDialog
-          versions={rollback.versions}
-          timeZone={site.timeZone}
-          action={rollback.action}
-        />
-      )}
     </Card>
   );
 }

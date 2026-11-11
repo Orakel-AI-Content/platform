@@ -1,20 +1,21 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
 import Modal from 'react-modal';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ActionResult } from '@/components/shared/actionResult.ts';
-import { toast, ToastProvider } from '@/components/ui/toast';
+import { useRef, useState } from 'react';
+
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 import type { RollbackVersion } from '@/domain/builds/builds.ts';
 
 import { RollbackDialog } from './RollbackDialog.tsx';
 
 // Reverter (#514): o Select das versões revertíveis (a página já entrega sem a ativa) começando
-// na mais recente, a action com a versão escolhida e o retorno padrão (sucesso no toast, recusa
-// no Alert). Foco e axe no navegador, em `RollbackDialog.browser.test.tsx`.
+// na mais recente a cada abertura e o `onConfirm` com a versão escolhida. O diálogo não tem
+// gatilho (#595): aqui, um botão de teste o abre; a action e o retorno ficam no
+// `SiteOperations`. Foco e axe no navegador, em `RollbackDialog.browser.test.tsx`.
 
 const VERSIONS: RollbackVersion[] = [
   {
@@ -34,17 +35,32 @@ const NAME = 'Reverter o site para uma versão anterior?';
 
 let app: HTMLElement;
 
+/** O diálogo aberto por um botão, como o "Mais ações" faz na página do site. */
 function Rollback({
-  action,
+  onConfirm,
   versions = VERSIONS,
 }: {
-  action: (versionId: string) => Promise<ActionResult>;
+  onConfirm: (versionId: string) => void;
   versions?: readonly RollbackVersion[];
 }) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <>
-      <RollbackDialog versions={versions} timeZone="America/Sao_Paulo" action={action} />
-      <ToastProvider />
+      <button ref={trigger} type="button" onClick={() => setOpen(true)}>
+        Reverter
+      </button>
+      <RollbackDialog
+        versions={versions}
+        timeZone="America/Sao_Paulo"
+        isOpen={open}
+        onCancel={() => setOpen(false)}
+        onConfirm={(versionId) => {
+          setOpen(false);
+          onConfirm(versionId);
+        }}
+        onAfterClose={() => trigger.current?.focus()}
+      />
     </>
   );
 }
@@ -62,7 +78,6 @@ beforeEach(() => {
   Modal.setAppElement(app);
 });
 afterEach(async () => {
-  act(() => toast.removeAll());
   cleanup();
   await waitFor(() => expect(document.querySelector('.dialog-portal')).toBeNull());
   app.remove();
@@ -74,24 +89,21 @@ async function openDialog() {
 }
 
 describe('reverter', () => {
-  it('começa na versão mais recente e chama a action com ela; o sucesso vai ao toast', async () => {
-    const action = vi.fn().mockResolvedValue({ ok: true, message: 'Rollback enfileirado.' });
-    render(<Rollback action={action} />, { container: app });
+  it('começa na versão mais recente e confirma com ela', async () => {
+    const action = vi.fn();
+    render(<Rollback onConfirm={action} />, { container: app });
 
     const dialog = await openDialog();
     expect(dialog.textContent).toContain('volta para a versão 20261010T120000Z-bbbbbbbb');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reverter' }));
 
-    await waitFor(() => expect(action).toHaveBeenCalledWith('20261010T120000Z-bbbbbbbb'));
-    await waitFor(() =>
-      expect(screen.getByRole('status').textContent).toBe('Rollback enfileirado.'),
-    );
-    expect(screen.getByRole('alert').textContent).toBe('');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(action).toHaveBeenCalledWith('20261010T120000Z-bbbbbbbb');
   });
 
-  it('lista só as versões recebidas, com data, release e versão; a escolhida vai à action', async () => {
-    const action = vi.fn().mockResolvedValue({ ok: true, message: 'ok' });
-    render(<Rollback action={action} />, { container: app });
+  it('lista só as versões recebidas, com data, release e versão; a escolhida vai ao onConfirm', async () => {
+    const action = vi.fn();
+    render(<Rollback onConfirm={action} />, { container: app });
 
     const dialog = await openDialog();
     await userEvent.click(screen.getByRole('combobox', { name: 'Versão' }));
@@ -108,7 +120,7 @@ describe('reverter', () => {
 
   it('sem versão anterior, o Reverter do diálogo fica desabilitado', async () => {
     const action = vi.fn();
-    render(<Rollback action={action} versions={[]} />, { container: app });
+    render(<Rollback onConfirm={action} versions={[]} />, { container: app });
 
     const dialog = await openDialog();
     expect(dialog.textContent).toContain('Nenhuma versão anterior publicada');
@@ -117,27 +129,14 @@ describe('reverter', () => {
     );
   });
 
-  it('cancelar fecha sem chamar a action', async () => {
+  it('cancelar fecha sem confirmar', async () => {
     const action = vi.fn();
-    render(<Rollback action={action} />, { container: app });
+    render(<Rollback onConfirm={action} />, { container: app });
 
     await openDialog();
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
 
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(action).not.toHaveBeenCalled();
-  });
-
-  it('a recusa do domínio vai ao Alert, sem toast de sucesso', async () => {
-    const action = vi.fn().mockResolvedValue({ ok: false, message: 'A versão já está no ar' });
-    render(<Rollback action={action} />, { container: app });
-
-    const dialog = await openDialog();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Reverter' }));
-
-    await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toBe('A versão já está no ar'),
-    );
-    expect(screen.queryByRole('status')?.textContent ?? '').toBe('');
   });
 });

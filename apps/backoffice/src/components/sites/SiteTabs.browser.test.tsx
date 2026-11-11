@@ -31,6 +31,7 @@ async function openLimitTab(dailyLimit: ReactNode) {
     <main>
       <SiteTabs
         lifecycle={<p>Etapas</p>}
+        builds={<p>Tabela</p>}
         g1={<p>Registro</p>}
         buildWindow={<p>Janela</p>}
         dailyLimit={dailyLimit}

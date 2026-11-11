@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { LifecycleSteps } from '@/components/sites/LifecycleSteps';
 import { RedirectUsageAlert } from '@/components/sites/RedirectUsageAlert';
 import { SiteContentMetrics } from '@/components/sites/SiteContentMetrics';
@@ -9,6 +11,8 @@ import {
   RegisterG1Form,
 } from '@/components/sites/SiteActions';
 import { formatDateTime, formatDuration } from '@/components/shared/siteLabels.ts';
+import { SiteBuildsTable } from '@/components/sites/SiteBuildsTable';
+import { SiteOperations, SiteOperationsScope } from '@/components/sites/SiteOperations';
 import { SiteSummaryCard } from '@/components/sites/SiteSummaryCard';
 import { SiteTabs } from '@/components/sites/SiteTabs';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
@@ -40,14 +44,15 @@ import { sitePageContext } from './editorial-page.tsx';
 export const dynamic = 'force-dynamic';
 
 /**
- * Página do site na tela de detalhe do guia (#370): no topo, os cartões de conteúdo por status,
- * com as publicações de hoje e os atalhos "Criar conteúdo" (com content.write) e "Revisar"
- * (#596); abaixo, o resumo à esquerda (dados de publicação e
- * "Publicar agora" ou, pausado, "Retomar", "Reconstruir na release" e "Reverter", com operations.run) e, à direita, o `Card` com as abas Ciclo de vida, G1,
- * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo sitePageContext (a mesma
- * busca do layout), os gatilhos e o uso de redirects, que vira um aviso acima do resumo quando
- * o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do limite e "Editar
- * configuração" só aparecem com site.configure, e o domínio confere de novo.
+ * Página do site na tela de detalhe do guia (#370), no layout do `CustomerDetails` do Ecme
+ * (#595): no cabeçalho, "Editar configuração" (site.configure) e as ações de operação
+ * (operations.run): "Publicar agora" ou, pausado, "Retomar", e o "Mais ações" com "Reconstruir
+ * na release" e "Reverter", com o erro logo abaixo do cabeçalho. Embaixo, o resumo só com o
+ * estado atual à esquerda e, à direita, o `Card` com as abas Ciclo de vida, Builds, G1, Janela
+ * de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo
+ * sitePageContext (a mesma busca do layout), os gatilhos e o uso de redirects, que vira um aviso
+ * acima do resumo quando o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do
+ * limite só aparecem com site.configure, e o domínio confere de novo.
  */
 export default async function SitePage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
@@ -127,97 +132,117 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
     </>
   );
 
+  const edit = canConfigure ? (
+    <ButtonLink href={`/sites/${site.id}/configuracao`} variant="solid" size="sm">
+      Editar configuração
+    </ButtonLink>
+  ) : undefined;
+  const header = (action?: ReactNode) => (
+    <PageHeader id="site-title" trail={siteTrail(site)} title={site.name} action={action} />
+  );
+
   return (
     <section aria-labelledby="site-title" className="list-width space-y-4">
-      <PageHeader
-        id="site-title"
-        trail={siteTrail(site)}
-        title={site.name}
-        action={
-          canConfigure ? (
-            <ButtonLink href={`/sites/${site.id}/configuracao`} variant="solid" size="sm">
-              Editar configuração
-            </ButtonLink>
-          ) : undefined
-        }
-      />
-      {redirects.ok && redirects.value.alert && <RedirectUsageAlert usage={redirects.value} />}
-      <SiteContentMetrics
-        siteId={site.id}
-        counts={contentCounts.value}
-        publishedToday={site.publishedToday}
-        dailyLimit={site.effectiveDailyPublishLimit}
-        canWrite={canWrite}
-      />
-      <DetailLayout>
-        <SiteSummaryCard
-          site={site}
-          instance={instance.value}
-          g1Registered={g1 !== undefined}
-          publish={canOperate ? publishNow : undefined}
-          resume={canOperate ? resumeSiteAction : undefined}
-          rebuild={
-            releases?.ok
-              ? {
-                  releases: releases.value.map(({ tag, imageStatus }) => ({ tag, imageStatus })),
-                  action: rebuildOnReleaseAction.bind(null, site.id),
+      {canOperate ? (
+        <SiteOperationsScope>
+          {header(
+            <>
+              {edit}
+              <SiteOperations
+                siteId={site.id}
+                paused={site.state === 'pausado'}
+                release={site.release}
+                timeZone={site.timeZone}
+                publish={publishNow}
+                resume={resumeSiteAction}
+                rebuild={
+                  releases?.ok
+                    ? {
+                        releases: releases.value.map(({ tag, imageStatus }) => ({
+                          tag,
+                          imageStatus,
+                        })),
+                        action: rebuildOnReleaseAction.bind(null, site.id),
+                      }
+                    : undefined
                 }
-              : undefined
-          }
-          rollback={
-            versions?.ok
-              ? { versions: versions.value, action: rollbackSiteAction.bind(null, site.id) }
-              : undefined
-          }
-        />
-        <SiteTabs
-          lifecycle={
-            canConfigure ? (
-              <LifecycleActionScope>
-                <LifecycleSteps
-                  current={site.lifecycle}
-                  action={
-                    <LifecycleAction
-                      lifecycle={site.lifecycle}
-                      action={advanceLifecycleAction.bind(null, site.id)}
-                    />
-                  }
+                rollback={
+                  versions?.ok
+                    ? { versions: versions.value, action: rollbackSiteAction.bind(null, site.id) }
+                    : undefined
+                }
+              />
+            </>,
+          )}
+        </SiteOperationsScope>
+      ) : (
+        header(edit)
+      )}
+      {redirects.ok && redirects.value.alert && <RedirectUsageAlert usage={redirects.value} />}
+      <DetailLayout>
+        <SiteSummaryCard site={site} instance={instance.value} g1Registered={g1 !== undefined} />
+        {/* Os cartões de conteúdo (#596) ficam na coluna da direita, acima das abas: em cima de
+            tudo, empurravam o resumo para fora da primeira tela a 1440 × 900 (#595). */}
+        <div className="flex w-full min-w-0 flex-col gap-4">
+          <SiteContentMetrics
+            siteId={site.id}
+            counts={contentCounts.value}
+            publishedToday={site.publishedToday}
+            dailyLimit={site.effectiveDailyPublishLimit}
+            canWrite={canWrite}
+          />
+          <SiteTabs
+            lifecycle={
+              canConfigure ? (
+                <LifecycleActionScope>
+                  <LifecycleSteps
+                    current={site.lifecycle}
+                    action={
+                      <LifecycleAction
+                        lifecycle={site.lifecycle}
+                        action={advanceLifecycleAction.bind(null, site.id)}
+                      />
+                    }
+                  />
+                </LifecycleActionScope>
+              ) : (
+                <LifecycleSteps current={site.lifecycle} />
+              )
+            }
+            builds={
+              <SiteBuildsTable builds={instance.value.recentBuilds} timeZone={site.timeZone} />
+            }
+            g1={
+              !g1 && canConfigure ? (
+                <RegisterG1Form intro={g1Intro} action={registerG1Action.bind(null, site.id)} />
+              ) : (
+                <Card bodyClass="space-y-3">{g1Intro}</Card>
+              )
+            }
+            buildWindow={
+              canConfigure ? (
+                <BuildWindowForm
+                  intro={windowIntro}
+                  own={site.buildWindowSeconds}
+                  action={setBuildWindowAction.bind(null, site.id)}
                 />
-              </LifecycleActionScope>
-            ) : (
-              <LifecycleSteps current={site.lifecycle} />
-            )
-          }
-          g1={
-            !g1 && canConfigure ? (
-              <RegisterG1Form intro={g1Intro} action={registerG1Action.bind(null, site.id)} />
-            ) : (
-              <Card bodyClass="space-y-3">{g1Intro}</Card>
-            )
-          }
-          buildWindow={
-            canConfigure ? (
-              <BuildWindowForm
-                intro={windowIntro}
-                own={site.buildWindowSeconds}
-                action={setBuildWindowAction.bind(null, site.id)}
-              />
-            ) : (
-              <Card bodyClass="space-y-3">{windowIntro}</Card>
-            )
-          }
-          dailyLimit={
-            canConfigure ? (
-              <DailyPublishLimitForm
-                intro={limitIntro}
-                own={site.dailyPublishLimit}
-                action={setDailyPublishLimitAction.bind(null, site.id)}
-              />
-            ) : (
-              <Card bodyClass="space-y-3">{limitIntro}</Card>
-            )
-          }
-        />
+              ) : (
+                <Card bodyClass="space-y-3">{windowIntro}</Card>
+              )
+            }
+            dailyLimit={
+              canConfigure ? (
+                <DailyPublishLimitForm
+                  intro={limitIntro}
+                  own={site.dailyPublishLimit}
+                  action={setDailyPublishLimitAction.bind(null, site.id)}
+                />
+              ) : (
+                <Card bodyClass="space-y-3">{limitIntro}</Card>
+              )
+            }
+          />
+        </div>
       </DetailLayout>
     </section>
   );
