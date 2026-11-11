@@ -323,7 +323,11 @@ usa o gerador, #47).
   validação é só a do schema. Visual do Ecme: cada campo num `FormItem` (rótulo e erro ligados
   ao controle), texto e número no `Input`, booleano no `Checkbox`, enum no `Select`, botões no
   `Button` e as seções em `Card`. O gerador desenha texto, número, booleano, enum, objeto
-  (`fieldset`) e lista de objetos (adicionar e remover). Rótulos e dicas por caminho
+  (`fieldset`) e lista de objetos (adicionar, mover e remover). Cada item da lista tem no
+  cabeçalho, como os blocos do editor, os `IconButton` "Mover <item> N para cima", "Mover
+  <item> N para baixo" e "Remover <item> N" (#592): mover usa o `move` do `useFieldArray`
+  (valores e erros vão junto), nas pontas o botão fica `aria-disabled` e o foco fica nele;
+  remover confirma no `ConfirmDialog`. Rótulos e dicas por caminho
   (`items.*.question`); `hidden` para o que é do servidor (`n`, `type`). O que o schema sozinho
   não descreve (rich text, seletor de mídia ou de entidade) entra por `fields`, um campo
   registrado por caminho, com `*` no lugar dos índices, que recebe `id`, `label`, `value`,
