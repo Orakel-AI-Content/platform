@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { page } from 'vitest/browser';
 
 import Container from '@/components/shared/Container';
 import EllipsisButton from '@/components/shared/EllipsisButton';
@@ -20,9 +19,8 @@ import { renderUi } from '../../../test/browser/render.tsx';
 import BottomStickyBar from './BottomStickyBar.tsx';
 import { PAGE_CONTAINER_GUTTER_X, PAGE_CONTAINER_GUTTER_Y } from './constants.ts';
 
-// BottomStickyBar em Chromium (#459; da vitrine, #322): a barra de ações do formulário presa ao
-// fim da janela, encostada nas bordas do `main` (margem negativa igual ao gutter) em cada
-// breakpoint, com alvo de 24 px e foco de 2px. O `main` é o do layout `(admin)`, com os
+// BottomStickyBar em Chromium (#459; da vitrine, #322): a barra de ações do formulário, com alvo de
+// 24 px, foco de 2px e axe nos dois temas. O `main` é o do layout `(admin)`, com os
 // mesmos gutters.
 
 function FormWithBar() {
@@ -80,30 +78,4 @@ describe.each(COLOR_SCHEMES)('BottomStickyBar no navegador (%s)', (scheme) => {
     expect(more.element().querySelectorAll('[aria-hidden="true"] svg')).toHaveLength(1);
     expect(await audit(screen.container)).toEqual([]);
   });
-});
-
-// Larguras dos três gutters do `main` (`px-4 sm:px-6 md:px-8`): abaixo de `sm`, entre `sm` e
-// `md` e acima de `md`.
-describe('BottomStickyBar no navegador', () => {
-  it.each([375, 700, 1280])(
-    'presa ao fim da janela e encostada nas bordas do main (%i px)',
-    async (width) => {
-      await page.viewport(width, 800);
-      const screen = await renderUi(<FormWithBar />);
-      const publish = screen.getByRole('button', { name: 'Publicar' });
-      const bar = publish.element().closest('.sticky')!;
-
-      // No meio do formulário longo, o fim da seção está abaixo da janela: a barra gruda embaixo.
-      screen.container.querySelector('[data-rolagem-barra]')!.scrollIntoView({ block: 'center' });
-      await expect.element(publish).toBeInViewport();
-      await expect
-        .poll(() => Math.abs(bar.getBoundingClientRect().bottom - window.innerHeight))
-        .toBeLessThanOrEqual(1);
-
-      const barBox = bar.getBoundingClientRect();
-      const mainBox = screen.container.querySelector('main#conteudo')!.getBoundingClientRect();
-      expect(Math.abs(barBox.x - mainBox.x)).toBeLessThanOrEqual(1);
-      expect(Math.abs(barBox.width - mainBox.width)).toBeLessThanOrEqual(1);
-    },
-  );
 });

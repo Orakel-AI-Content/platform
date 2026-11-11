@@ -3,14 +3,6 @@ import { page, userEvent } from 'vitest/browser';
 
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
-import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
-import {
-  cellsOverLines,
-  isClipped,
-  pageOverflow,
-  tableOverflow,
-  visibleColumns,
-} from '../../../test/browser/layout.ts';
 import { followLinks, navigation } from '../../../test/browser/navigation.ts';
 import { ListScreen, renderInFrame } from '../../../test/browser/render.tsx';
 import { SitesTable } from './SitesTable.tsx';
@@ -69,14 +61,6 @@ function Sites() {
   );
 }
 
-const table = () => page.getByRole('table', { name: 'Sites', exact: true });
-
-/** A linha do site: `-1` também casaria com `-10`…`-19`, então vai o ID com o separador. */
-const row = (id: string) =>
-  table()
-    .getByRole('row')
-    .filter({ hasText: `${id} · ` });
-
 let unfollow: () => void;
 
 beforeEach(() => {
@@ -95,119 +79,6 @@ const menu = () => page.getByRole('menu');
 const menuItem = (name: string) => menu().getByRole('menuitem', { name: `${name} ${ids[0]}` });
 
 describe('SitesTable no navegador', () => {
-  // Tela estreita (#589): abaixo de md, Ciclo de vida, Indexável, Mudanças pendentes e Último
-  // build ficam ocultas; o site, o status e o Mais ações cabem sem rolar.
-  it('a 390 px, site, status e Mais ações sem rolagem horizontal', async () => {
-    await page.viewport(390, 844);
-    await renderInFrame(<Sites />, { roles: ['admin'] });
-
-    expect(visibleColumns(table())).toEqual(['Site', 'Status', 'Ações']);
-    expect(pageOverflow()).toBe(0);
-    expect(tableOverflow(table())).toBe(0);
-    expect(cellsOverLines(table())).toEqual([]);
-    await expect.element(row(ids[0]!).getByRole('link', { name: LONG_NAME })).toBeVisible();
-    await expect.element(moreActions()).toBeVisible();
-  });
-
-  it('com 20 sites a 1280 px, sem rolagem horizontal e com até duas linhas por célula', async () => {
-    await renderInFrame(<Sites />, { roles: ['admin'] });
-    expect(table().getByRole('row').elements()).toHaveLength(21);
-
-    expect(pageOverflow()).toBe(0);
-    expect(tableOverflow(table())).toBe(0);
-    expect(cellsOverLines(table())).toEqual([]);
-
-    // Tudo continua na linha; o nome longo fica cortado, inteiro no `title`.
-    await expect
-      .element(row(ids[0]!).getByRole('link', { name: LONG_NAME }))
-      .toHaveAttribute('title', LONG_NAME);
-    for (const text of ['Cadastrado', 'Sem release', 'Ativo', 'Não']) {
-      await expect.element(row(ids[0]!).getByText(text, { exact: true })).toBeVisible();
-    }
-    // O pior caso, cortado, com o texto inteiro em `title` (#153).
-    await expect.element(row(ids[1]!).getByText('Pausado', { exact: true })).toBeVisible();
-    await expect
-      .element(
-        row(ids[1]!).getByTitle(`render: ${LONG_FAILURE} · Conteúdo culpado: Conteúdo 12345`),
-      )
-      .toBeVisible();
-    // O motivo cortado leva ao conteúdo culpado (#511).
-    await expect
-      .element(row(ids[1]!).getByRole('link', { name: /Conteúdo 12345 culpado pela pausa/ }))
-      .toHaveAttribute('href', `/sites/${ids[1]}/conteudos/12345`);
-    await expect
-      .element(row(ids[2]!).getByTitle(LONG_VERSION, { exact: true }))
-      .toHaveTextContent('3f9c2a7e');
-    // A data do build fica inteira numa linha; só a versão corta.
-    const when = row(ids[2]!)
-      .getByText(/^20\/10\/2026, 09:00 BRT ·\s*$/)
-      .element();
-    expect(when.getBoundingClientRect().height).toBeLessThan(24);
-    expect(when.getBoundingClientRect().right).toBeLessThanOrEqual(
-      when.closest('td')!.getBoundingClientRect().right,
-    );
-    await expect
-      .element(row(ids[0]!).getByRole('link', { name: `1 mudança pendente em ${ids[0]}` }))
-      .toHaveAttribute('href', `/sites/${ids[0]}/pendencias`);
-    // Sem botão de publicar na linha (#586); o domínio abre o site em nova aba.
-    expect(
-      row(ids[0]!)
-        .getByRole('button', { name: /Publicar agora/ })
-        .elements(),
-    ).toHaveLength(0);
-    await expect
-      .element(row(ids[3]!).getByRole('link', { name: `${ids[3]}.example.com (abre em nova aba)` }))
-      .toHaveAttribute('href', `https://${ids[3]}.example.com`);
-  });
-
-  it('a 1440 px, os sites do seed aparecem inteiros, com a data do último build', async () => {
-    await page.viewport(1440, 900);
-    const seed = [
-      ['exemplo-a', 'Exemplo A'],
-      ['exemplo-b', 'Exemplo B'],
-      ['horta-em-casa', 'Horta em Casa'],
-    ].map(([id, name]) => ({ ...SITES[2]!, id: id!, name: name!, domain: `${id}.localhost` }));
-    await renderInFrame(
-      <ListScreen title="Sites">
-        <SitesTable rows={seed} publishNow={publishNow} canConfigure labelledBy="lista-titulo" />
-      </ListScreen>,
-      { roles: ['admin'] },
-    );
-
-    for (const site of seed) {
-      const line = row(site.id);
-      expect(isClipped(line.getByRole('link', { name: site.name, exact: true }))).toBe(false);
-      const domain = line.getByTitle(`${site.id} · ${site.domain}`, { exact: true });
-      expect(isClipped(domain)).toBe(false);
-      const when = line.getByText(/^20\/10\/2026, 09:00 BRT ·\s*$/).element();
-      expect(when.getBoundingClientRect().right).toBeLessThanOrEqual(
-        when.closest('td')!.getBoundingClientRect().right,
-      );
-    }
-    expect(tableOverflow(table())).toBe(0);
-  });
-
-  it.each(COLOR_SCHEMES)(
-    'sem violação do axe, também com a confirmação de publicar (%s)',
-    async (scheme) => {
-      await setTheme(scheme);
-      await setReducedMotion('reduce');
-      await renderInFrame(<Sites />, { roles: ['admin'] });
-      expect(await audit()).toEqual([]);
-
-      // "Publicar agora" é item do menu (#586) e confirma num diálogo (#327); Cancelar fecha e
-      // devolve o foco ao "Mais ações" da linha, já que o item some com o menu.
-      await moreActions().click();
-      await menuItem('Publicar agora').click();
-      const dialog = page.getByRole('alertdialog', { name: `Publicar ${ids[0]} agora?` });
-      await expect.element(dialog).toBeVisible();
-      expect(await audit()).toEqual([]);
-      await dialog.getByRole('button', { name: 'Cancelar' }).click();
-      await expect.element(dialog).not.toBeInTheDocument();
-      await expect.element(moreActions()).toHaveFocus();
-    },
-  );
-
   it('o menu Mais ações abre e fecha pelo mouse e pelo teclado; Esc devolve o foco', async () => {
     await renderInFrame(<Sites />, { roles: ['admin'] });
 

@@ -120,7 +120,8 @@ ThemeConfigurator completo.
     botão de origem; `react-select`: rótulo associado; Dropdown e Tooltip acessíveis por teclado.
 - **Testes:** cada história migra os testes de componente das telas que toca (`*.test.tsx` e
   `*.browser.test.tsx`). Tela portada não ganha E2E nem axe no E2E: o E2E é só de fluxos
-  críticos (ADR 0019 da raiz). Seletor por role e nome; nada de `data-testid`. Asserção de
+  críticos (ADR 0019 da raiz). Axe só nos componentes de base, e nenhuma medida de layout em
+  pixels (ADR 0020 da raiz). Seletor por role e nome; nada de `data-testid`. Asserção de
   classe só para cor de estado, com os nomes novos.
 
 ## Matriz de testes

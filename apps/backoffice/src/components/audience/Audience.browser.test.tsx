@@ -5,14 +5,7 @@ import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { EmptyState } from '@/components/shared/EmptyState';
 import type { AudienceDay, AudiencePeriod } from '@/domain/audience/read.ts';
 
-import {
-  audit,
-  COLOR_SCHEMES,
-  setReducedMotion,
-  setTheme,
-  tabTo,
-} from '../../../test/browser/a11y.ts';
-import { pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
+import { setReducedMotion, tabTo } from '../../../test/browser/a11y.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInFrame } from '../../../test/browser/render.tsx';
 import AudienceChart from './AudienceChart.tsx';
@@ -22,8 +15,7 @@ import { AudienceTable } from './AudienceTable.tsx';
 
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
-// Audiência do site em Chromium (#548): o período trocado só pelo teclado vai para a URL, a
-// tela a 1280 px sem rolagem horizontal e o axe nos dois temas, com dados e vazia. O gráfico
+// Audiência do site em Chromium (#548): o período trocado só pelo teclado vai para a URL. O gráfico
 // por dia (#599): nome com o período, legenda em texto, valor do dia no foco e no hover, e
 // nenhum gráfico sem dados.
 
@@ -60,7 +52,6 @@ function Audience({ period = 7, days = DAYS }: { period?: AudiencePeriod; days?:
 }
 
 const period = () => page.getByRole('combobox', { name: 'Período:' });
-const table = () => page.getByRole('table', { name: 'Audiência por dia' });
 const chart = () => page.getByRole('application', { name: /^Visualizações e sessões por dia/ });
 const tooltip = () => document.querySelector<HTMLElement>('.apexcharts-tooltip.apexcharts-active');
 
@@ -98,16 +89,6 @@ describe('audiência no navegador', () => {
     expect(navigation.get()).toBe(PATH);
   });
 
-  it('a 1280 px, cartões, gráfico e tabela sem rolagem horizontal', async () => {
-    await renderInFrame(<Audience />, { roles: ['revisor'] });
-    await expect.element(table().getByRole('cell', { name: '12.345' })).toBeVisible();
-    await expect.element(page.getByText('13.340', { exact: true })).toBeVisible();
-    await expect.element(chart()).toBeVisible();
-
-    expect(pageOverflow()).toBe(0);
-    expect(tableOverflow(table())).toBe(0);
-  });
-
   it('o gráfico tem nome com o período, legenda em texto e as séries em ordem cronológica', async () => {
     // Sem animação de entrada: ela desenha a linha sólida com `stroke-dasharray`.
     await setReducedMotion('reduce');
@@ -128,21 +109,16 @@ describe('audiência no navegador', () => {
     await expect.poll(dashes).toEqual(['0', '6']);
   });
 
-  it.each(COLOR_SCHEMES)(
-    'o foco pelo teclado mostra o valor do dia e as setas andam pelos dias, sem violação do axe na dica (%s)',
-    async (scheme) => {
-      await setTheme(scheme);
-      await setReducedMotion('reduce');
-      await renderInFrame(<Audience />, { roles: ['revisor'] });
-      await tabTo(chart().element());
-      await expect.poll(() => tooltip()?.textContent ?? '').toContain('dom., 01/11/2026');
-      expect(tooltip()?.textContent).toContain('15');
-      await userEvent.keyboard('{End}');
-      await expect.poll(() => tooltip()?.textContent ?? '').toContain('12.345');
-      expect(tooltip()?.textContent).toContain('qua., 04/11/2026');
-      expect(await audit()).toEqual([]);
-    },
-  );
+  it('o foco pelo teclado mostra o valor do dia e as setas andam pelos dias', async () => {
+    await setReducedMotion('reduce');
+    await renderInFrame(<Audience />, { roles: ['revisor'] });
+    await tabTo(chart().element());
+    await expect.poll(() => tooltip()?.textContent ?? '').toContain('dom., 01/11/2026');
+    expect(tooltip()?.textContent).toContain('15');
+    await userEvent.keyboard('{End}');
+    await expect.poll(() => tooltip()?.textContent ?? '').toContain('12.345');
+    expect(tooltip()?.textContent).toContain('qua., 04/11/2026');
+  });
 
   it('o hover mostra o valor do dia', async () => {
     await setReducedMotion('reduce');
@@ -167,24 +143,5 @@ describe('audiência no navegador', () => {
     expect(
       page.getByRole('heading', { name: 'Visualizações e sessões por dia' }).query(),
     ).toBeNull();
-  });
-
-  it.each(COLOR_SCHEMES)('com dados, sem violação do axe (%s)', async (scheme) => {
-    await setTheme(scheme);
-    await setReducedMotion('reduce');
-    await renderInFrame(<Audience />, { roles: ['revisor'] });
-    await expect.element(table()).toBeVisible();
-    await expect.element(chart()).toBeVisible();
-    expect(await audit()).toEqual([]);
-  });
-
-  it.each(COLOR_SCHEMES)('vazia, sem violação do axe (%s)', async (scheme) => {
-    await setTheme(scheme);
-    await setReducedMotion('reduce');
-    await renderInFrame(<Audience days={[]} />, { roles: ['revisor'] });
-    await expect
-      .element(page.getByText('Nenhuma visualização consolidada nos últimos 7 dias.'))
-      .toBeVisible();
-    expect(await audit()).toEqual([]);
   });
 });

@@ -3,13 +3,7 @@ import { page, userEvent } from 'vitest/browser';
 
 import { MediaShowcase } from '@/app/(admin)/teste-de-componentes/media-showcase.tsx';
 
-import {
-  audit,
-  COLOR_SCHEMES,
-  setReducedMotion,
-  setTheme,
-  tabTo,
-} from '../../../test/browser/a11y.ts';
+import { setReducedMotion, tabTo } from '../../../test/browser/a11y.ts';
 import { expectFocusTrapped } from '../../../test/browser/dialog.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 
@@ -17,14 +11,11 @@ import { renderInApp } from '../../../test/browser/render.tsx';
 // prende o foco, pagina, escolhe, fecha com Esc e devolve o foco a quem abriu. A fixture é a
 // seção da própria vitrine, com as páginas numa lista local.
 
-describe.each(COLOR_SCHEMES)('MediaPicker no navegador (%s)', (scheme) => {
-  it('abre por teclado, pagina, escolhe, Esc fecha e sem violação do axe', async () => {
-    await setTheme(scheme);
+describe('MediaPicker no navegador', () => {
+  it('abre por teclado, pagina, escolhe, Esc fecha', async () => {
     await setReducedMotion('reduce');
     const screen = await renderInApp(<MediaShowcase />);
     const picker = screen.getByRole('region', { name: 'MediaPicker' });
-
-    expect(await audit(picker)).toEqual([]);
 
     const opener = picker.getByRole('button', { name: 'Escolher imagem' });
     await tabTo(opener);
@@ -35,8 +26,6 @@ describe.each(COLOR_SCHEMES)('MediaPicker no navegador (%s)', (scheme) => {
     const grid = dialog.getByRole('list', { name: 'Imagens da biblioteca' });
     await expect.poll(() => grid.getByRole('listitem').elements()).toHaveLength(12);
     await expectFocusTrapped(dialog);
-
-    expect(await audit()).toEqual([]);
 
     await tabTo(dialog.getByRole('button', { name: 'Próxima página' }));
     await userEvent.keyboard('{Enter}');

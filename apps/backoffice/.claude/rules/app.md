@@ -12,6 +12,7 @@ paths:
 - Telas e rotas são finas: leem request/env, chamam o domínio, traduzem `Result` (`problem()` nas rotas).
 - A área `(admin)` confere o Access no layout, mas cada página e rota confere de novo pelo domínio.
 - Interface: o Ecme (`Orakel-AI-Content/design-reference`) é a referência de design e de código. Porte a peça equivalente do template pelas regras de `docs/migration/ecme.md` (`'use client'`, `next/link`, `usePathname`, tema em cookie, só tokens do `@theme`); TanStack Table 9 (`useTable`). Toda tela, nova ou alterada, segue `docs/design/design-system.md`.
-- Acessibilidade WCAG 2.2 AA: rótulos, foco visível, contraste; o axe roda nos testes de componente (`*.browser.test.tsx`).
+- Acessibilidade WCAG 2.2 AA: rótulos, foco visível, contraste; o axe roda nos testes de componente da base (`ui/`, `shared/`, `template/`, `layouts/`; ADR 0020 da raiz).
+- Componente de domínio só ganha `*.browser.test.tsx` para teclado, foco, URL ou envio: sem axe, sem tema e sem medida de layout em pixels (ADR 0020 da raiz).
 - Tela nova ou alterada ganha teste de componente, não E2E: o E2E é só de fluxos críticos (ADR 0019 da raiz).
   Detalhes: `docs/migration/ecme.md`, `docs/design/design-system.md`, `docs/architecture/code-design.md`

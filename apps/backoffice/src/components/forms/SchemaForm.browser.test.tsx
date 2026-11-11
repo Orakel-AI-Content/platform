@@ -4,7 +4,7 @@ import { userEvent } from 'vitest/browser';
 import { FormsShowcase } from '@/app/(admin)/teste-de-componentes/forms-showcase.tsx';
 import { toast } from '@/components/ui/toast';
 
-import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
+import { setReducedMotion } from '../../../test/browser/a11y.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
@@ -21,9 +21,8 @@ afterEach(() => {
   toast.removeAll();
 });
 
-describe.each(COLOR_SCHEMES)('SchemaForm no navegador (%s)', (scheme) => {
-  it('de tela e em cartão pelo teclado: erro no campo, resumo e toast, sem violação do axe', async () => {
-    await setTheme(scheme);
+describe('SchemaForm no navegador', () => {
+  it('de tela e em cartão pelo teclado: erro no campo, resumo e toast', async () => {
     await setReducedMotion('reduce');
     const screen = await renderInApp(<FormsShowcase />);
     const forms = screen.getByRole('region', { name: 'SchemaForm' });
@@ -42,8 +41,6 @@ describe.each(COLOR_SCHEMES)('SchemaForm no navegador (%s)', (scheme) => {
     (summary.element() as HTMLElement).focus();
     await userEvent.keyboard('{Enter}');
     await expect.element(title).toHaveFocus();
-
-    expect(await audit(forms)).toEqual([]);
 
     await userEvent.keyboard('Nova matéria');
     (create.element() as HTMLElement).focus();

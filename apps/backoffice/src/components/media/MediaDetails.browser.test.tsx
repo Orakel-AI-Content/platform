@@ -3,13 +3,7 @@ import { page, userEvent } from 'vitest/browser';
 
 import { MediaShowcase } from '@/app/(admin)/teste-de-componentes/media-showcase.tsx';
 
-import {
-  audit,
-  COLOR_SCHEMES,
-  setReducedMotion,
-  setTheme,
-  tabTo,
-} from '../../../test/browser/a11y.ts';
+import { setReducedMotion, tabTo } from '../../../test/browser/a11y.ts';
 import { expectFocusTrapped } from '../../../test/browser/dialog.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 
@@ -19,14 +13,11 @@ import { renderInApp } from '../../../test/browser/render.tsx';
 
 const NAME = 'capa-da-materia-sobre-o-festival-de-inverno-de-2026-na-serra.jpg';
 
-describe.each(COLOR_SCHEMES)('MediaDetails no navegador (%s)', (scheme) => {
-  it('a miniatura abre os dados por teclado, Esc devolve o foco e sem violação do axe', async () => {
-    await setTheme(scheme);
+describe('MediaDetails no navegador', () => {
+  it('a miniatura abre os dados por teclado, Esc devolve o foco', async () => {
     await setReducedMotion('reduce');
     const screen = await renderInApp(<MediaShowcase />);
     const details = screen.getByRole('region', { name: 'MediaDetails' });
-
-    expect(await audit(details)).toEqual([]);
 
     const tile = details.getByRole('button', { name: new RegExp(`^${NAME} · `) });
     await expect.element(tile).toHaveAttribute('aria-haspopup', 'dialog');
@@ -37,8 +28,6 @@ describe.each(COLOR_SCHEMES)('MediaDetails no navegador (%s)', (scheme) => {
     await expect.element(dialog.getByText('1200×800 px')).toBeVisible();
     await expect.element(dialog.getByText('AVIF, JPEG, WebP')).toBeVisible();
     await expectFocusTrapped(dialog);
-
-    expect(await audit()).toEqual([]);
 
     await userEvent.keyboard('{Escape}');
     await expect.element(dialog).not.toBeInTheDocument();
