@@ -45,8 +45,8 @@ export const BUILD_STAGES = ['image', 'render', 'publish'] as const;
 export const FAILURE_KINDS = ['permanent', 'transient'] as const;
 
 /**
- * Uma execução da task `build` (12.0, L3): cada tentativa vira uma linha, gravada `rodando` ao
- * começar e fechada com o resultado. A de sucesso mais recente é a versão ativa do site —
+ * Uma execução da task `build` (12.0, L3): cada tentativa vira uma linha, gravada `na_fila` ao
+ * enfileirar, promovida a `rodando` ao começar e fechada com o resultado. A de sucesso mais recente é a versão ativa do site —
  * referência da trava de segurança e do rollback (L4).
  */
 export const builds = pgTable(
