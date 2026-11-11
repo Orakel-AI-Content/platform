@@ -555,8 +555,19 @@ O padrão do `AnalyticDashboard` do Ecme (#548), na audiência do site
   (`p.h3`, `tabular-nums`, `Intl.NumberFormat('pt-BR')`), a linha do período e o ícone num
   círculo `*-subtle` (`aria-hidden`), lado a lado a partir de `md`. Sem `GrowShrinkValue`
   enquanto não houver comparação com o período anterior.
-- **Tabela:** `DataTable` com `useListTable` no `AdaptiveCard`, sem toolbar (não há busca).
-- **Vazio:** sem dados no período, só o `EmptyState`, no lugar de cartões e tabela.
+- **Gráfico:** `AudienceChart` (do `AnalyticChart`, #599), entre os cartões e a tabela: um
+  `Card` com o título em `h2` (`.h4`), a legenda em texto à direita e o `Chart` de
+  `src/components/shared/` (porte do Ecme, ApexCharts, só `line`). O `Chart` entra só por
+  `next/dynamic` com `ssr: false` num componente cliente: o `react-apexcharts` lê `window` ao
+  ser importado, e assim fica num chunk só da tela que o usa. Cada série tem cor
+  (`primary`, `success`; não o `COLORS` do Ecme), marcador e traço próprios, repetidos na
+  legenda, para não depender só da cor. O nome acessível resume o período e diz que os valores
+  estão na tabela; o foco pelo teclado (setas, `Home`, `End`) e o hover mostram a dica do dia.
+  As cores do eixo e da dica estão em `src/app/styles/apex-chart.css`, conferidas por
+  `globals-contrast.test.ts` e pelo axe com a dica aberta.
+- **Tabela:** `DataTable` com `useListTable` no `AdaptiveCard`, sem toolbar (não há busca). É
+  a alternativa em texto do gráfico e fica sempre na tela.
+- **Vazio:** sem dados no período, só o `EmptyState`, no lugar de cartões, gráfico e tabela.
 
 Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
 `SiteContentMetrics` (`src/components/sites/`):
