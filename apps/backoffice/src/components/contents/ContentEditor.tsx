@@ -232,21 +232,26 @@ export function ContentEditor({
     defaultValues,
   });
   const blocks = useFieldArray({ control: form.control, name: 'blocks' });
-  // Slug do título (#590): só na criação e enquanto o slug não foi editado à mão. O valor
-  // automático entra como o padrão do campo (`resetField`), não por `setValue`: o
-  // react-hook-form recalcula os `dirtyFields` comparando valor e padrão, e um `setValue` sem
-  // `shouldDirty` deixaria o slug "alterado" já na primeira tecla do título.
+  // Slug do título (#590): só na criação e enquanto o slug não foi editado à mão. Pelo
+  // `subscribe`, não pelo `watch`, que tira o editor do React Compiler. O valor automático
+  // entra como o padrão do campo (`resetField`), não por `setValue`: o react-hook-form
+  // recalcula os `dirtyFields` comparando valor e padrão, e um `setValue` sem `shouldDirty`
+  // deixaria o slug "alterado" já na primeira tecla do título.
   useEffect(() => {
     if (mode !== 'create') return;
-    const subscription = form.watch((values, { name }) => {
-      if (name !== 'title' || form.getFieldState('slug').isDirty) return;
-      const title: unknown = values.title;
-      form.resetField('slug', {
-        defaultValue: slugFromTitle(typeof title === 'string' ? title : ''),
-      });
-      if (form.formState.isSubmitted) void form.trigger('slug');
+    return form.subscribe({
+      name: 'title',
+      exact: true,
+      formState: { values: true },
+      callback: ({ values }) => {
+        if (form.getFieldState('slug').isDirty) return;
+        const title: unknown = values.title;
+        const slug = slugFromTitle(typeof title === 'string' ? title : '');
+        if (slug === form.getValues('slug')) return;
+        form.resetField('slug', { defaultValue: slug });
+        if (form.formState.isSubmitted) void form.trigger('slug');
+      },
     });
-    return () => subscription.unsubscribe();
   }, [form, mode]);
   // Blocos recolhidos (#135), pelo `field.id`, só enquanto a tela está aberta.
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
