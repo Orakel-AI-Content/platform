@@ -127,6 +127,13 @@
       "when": 1794360050010,
       "tag": "0017_devolucao_na_revisao",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794435879562,
+      "tag": "0018_eventos_do_site",
+      "breakpoints": true
     }
   ]
 }

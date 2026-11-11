@@ -60,6 +60,7 @@ const TABLES = [
   'audience_daily_article',
   'audience_daily_site',
   'builds',
+  'site_events',
   'pending_changes',
   'reviews',
   'publications',
