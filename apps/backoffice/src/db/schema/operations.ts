@@ -98,6 +98,36 @@ export const builds = pgTable(
   ],
 );
 
+export const SITE_EVENT_KINDS = ['pausa', 'retomada', 'troca_de_versao'] as const;
+export type SiteEventKind = (typeof SITE_EVENT_KINDS)[number];
+
+/**
+ * Mudanças de estado do site que só sobrescrevem colunas de `sites` (pausa, retomada, troca
+ * de versão do site-builder), só de inserção, gravadas na mesma transação da mudança. `builds`
+ * guarda as execuções; o histórico do site une as duas.
+ */
+export const siteEvents = pgTable(
+  'site_events',
+  {
+    id: serial().primaryKey(),
+    siteId: text()
+      .notNull()
+      .references(() => sites.id),
+    kind: text({ enum: SITE_EVENT_KINDS }).notNull(),
+    /** E-mail de quem pediu, ou `system` na pausa automática por falha permanente. */
+    requestedBy: text().notNull(),
+    /** Pausa: motivo e culpado. */
+    reason: text(),
+    culpritOrigin: text(),
+    culpritReference: text(),
+    /** Troca de versão: release anterior (nula se não havia) e nova. */
+    previousRelease: text(),
+    release: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.siteId, t.createdAt)],
+);
+
 export const ROLES = ['admin', 'editor', 'revisor', 'operacao'] as const;
 export type Role = (typeof ROLES)[number];
 

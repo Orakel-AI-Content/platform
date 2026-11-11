@@ -5,7 +5,7 @@ import type { JobHelpers } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { builds, releases, sites } from '../../src/db/schema/index.ts';
+import { builds, releases, siteEvents, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
@@ -71,6 +71,31 @@ async function site() {
   const [row] = await db.select().from(sites).where(eq(sites.id, 'exemplo-a'));
   return row;
 }
+
+/** Eventos do site, na ordem em que foram gravados, sem id nem horário. */
+async function events() {
+  return db
+    .select({
+      siteId: siteEvents.siteId,
+      kind: siteEvents.kind,
+      requestedBy: siteEvents.requestedBy,
+      reason: siteEvents.reason,
+      culpritOrigin: siteEvents.culpritOrigin,
+      culpritReference: siteEvents.culpritReference,
+      previousRelease: siteEvents.previousRelease,
+      release: siteEvents.release,
+    })
+    .from(siteEvents)
+    .orderBy(siteEvents.id);
+}
+
+const noDetail = {
+  reason: null,
+  culpritOrigin: null,
+  culpritReference: null,
+  previousRelease: null,
+  release: null,
+};
 
 describe('agendamento', () => {
   it('toda mudança pendente agenda o build do site, na mesma transação', async () => {
@@ -438,6 +463,15 @@ describe('task build', () => {
       { status: 'failed', failedStage: 'render', failureKind: 'permanent' },
     ]);
     expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(before);
+    expect(await events()).toEqual([
+      {
+        ...noDetail,
+        siteId: 'exemplo-a',
+        kind: 'pausa',
+        requestedBy: 'system',
+        reason: 'render: Orçamento de JS: artigo 18 kB',
+      },
+    ]);
 
     // Pausado: o próximo build nem cria containers.
     const next = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
@@ -469,6 +503,15 @@ describe('task build', () => {
       pausedCulpritOrigin: 'content',
       pausedCulpritReference: '42',
     });
+    expect(await events()).toMatchObject([
+      {
+        kind: 'pausa',
+        requestedBy: 'system',
+        reason: 'render: Snapshot inválido',
+        culpritOrigin: 'content',
+        culpritReference: '42',
+      },
+    ]);
   });
 
   it('falha permanente sem culpado limpa o culpado de uma pausa anterior', async () => {
@@ -508,6 +551,7 @@ describe('task build', () => {
       { status: 'failed', failureKind: 'transient', attempt: 3 },
     ]);
     expect(await site()).toMatchObject({ state: 'ativo' });
+    expect(await events()).toEqual([]);
   });
 
   it('falha transitória não mexe na versão ativa nem no culpado', async () => {
@@ -538,6 +582,8 @@ describe('task build', () => {
 });
 
 describe('retomar', () => {
+  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+
   /** Falha permanente com culpado: o site pausa e as mudanças ficam represadas. */
   async function pauseByCulprit(): Promise<void> {
     const fake = fakeRuntime({
@@ -566,7 +612,7 @@ describe('retomar', () => {
   it('volta o site a ativo, limpa motivo e culpado e enfileira o build já', async () => {
     await pauseByCulprit();
     const before = Date.now();
-    expect(await db.transaction((tx) => resumeSite(tx, SYSTEM_ACTOR, 'exemplo-a'))).toEqual({
+    expect(await db.transaction((tx) => resumeSite(tx, operacao, 'exemplo-a'))).toEqual({
       ok: true,
       value: undefined,
     });
@@ -581,6 +627,23 @@ describe('retomar', () => {
     expect(jobs.map((job) => job.key)).toEqual(['build:exemplo-a']);
     expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeLessThanOrEqual(Date.now());
     expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(await events()).toMatchObject([
+      { kind: 'pausa', requestedBy: 'system' },
+      { ...noDetail, siteId: 'exemplo-a', kind: 'retomada', requestedBy: 'o@orakel.local' },
+    ]);
+  });
+
+  it('a retomada é gravada na transação dela: se a transação falha, nenhum evento fica', async () => {
+    await pauseByCulprit();
+    await expect(
+      db.transaction(async (tx) => {
+        await resumeSite(tx, operacao, 'exemplo-a');
+        throw new Error('falha depois da retomada');
+      }),
+    ).rejects.toThrow('falha depois da retomada');
+
+    expect(await site()).toMatchObject({ state: 'pausado' });
+    expect((await events()).map((event) => event.kind)).toEqual(['pausa']);
   });
 
   it('com o culpado corrigido, o build seguinte publica as mudanças represadas', async () => {
@@ -623,6 +686,7 @@ describe('retomar', () => {
       issues: [{ code: 'site.not_paused' }],
     });
     expect(await buildJobs()).toEqual([]);
+    expect(await events()).toEqual([]);
   });
 
   it('recusa site inexistente', async () => {
@@ -643,11 +707,11 @@ describe('retomar', () => {
     }
     expect(await site()).toMatchObject({ state: 'pausado', pausedCulpritReference: '42' });
     expect(await buildJobs()).toEqual([]);
+    expect((await events()).map((event) => event.kind)).toEqual(['pausa']);
   });
 
-  it('de dois "Retomar" seguidos, só o primeiro passa', async () => {
+  it('de dois "Retomar" seguidos, só o primeiro passa e grava evento', async () => {
     await pauseByCulprit();
-    const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
     expect(await db.transaction((tx) => resumeSite(tx, operacao, 'exemplo-a'))).toMatchObject({
       ok: true,
     });
@@ -655,6 +719,7 @@ describe('retomar', () => {
       ok: false,
       issues: [{ code: 'site.not_paused' }],
     });
+    expect((await events()).map((event) => event.kind)).toEqual(['pausa', 'retomada']);
   });
 });
 
@@ -703,6 +768,16 @@ describe('reconstruir na release', () => {
     expect(jobs.map((job) => job.key)).toEqual(['build:exemplo-a']);
     expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeLessThanOrEqual(Date.now());
     expect(new Date(jobs[0]?.run_at ?? 0).getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(await events()).toEqual([
+      {
+        ...noDetail,
+        siteId: 'exemplo-a',
+        kind: 'troca_de_versao',
+        requestedBy: 'o@orakel.local',
+        release: '1.2.0',
+      },
+      { ...noDetail, siteId: 'exemplo-a', kind: 'retomada', requestedBy: 'o@orakel.local' },
+    ]);
   });
 
   it('site ativo também é reconstruído, sem recusa de site não pausado', async () => {
@@ -711,6 +786,36 @@ describe('reconstruir na release', () => {
     ).toEqual({ ok: true, value: undefined });
     expect(await site()).toMatchObject({ release: '1.3.0', state: 'ativo' });
     expect((await buildJobs()).map((job) => job.key)).toEqual(['build:exemplo-a']);
+    expect(await events()).toMatchObject([
+      { kind: 'troca_de_versao', previousRelease: null, release: '1.3.0' },
+    ]);
+  });
+
+  it('a troca seguinte registra a release anterior e a nova', async () => {
+    await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', '1.2.0'));
+    await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', '1.3.0'));
+    expect(await events()).toMatchObject([
+      { kind: 'troca_de_versao', previousRelease: null, release: '1.2.0' },
+      {
+        kind: 'troca_de_versao',
+        requestedBy: 'o@orakel.local',
+        previousRelease: '1.2.0',
+        release: '1.3.0',
+      },
+    ]);
+  });
+
+  it('se a transação da troca falha, nenhum evento fica', async () => {
+    await pause();
+    await expect(
+      db.transaction(async (tx) => {
+        await rebuildOnRelease(tx, operacao, 'exemplo-a', '1.2.0');
+        throw new Error('falha depois da troca');
+      }),
+    ).rejects.toThrow('falha depois da troca');
+
+    expect(await site()).toMatchObject({ release: null, state: 'pausado' });
+    expect(await events()).toEqual([]);
   });
 
   it('o build seguinte publica com a imagem site-builder:<release> e registra a release', async () => {
@@ -737,6 +842,7 @@ describe('reconstruir na release', () => {
     ).toMatchObject({ ok: false, issues: [{ code: 'release.not_registered', path: ['release'] }] });
     expect(await site()).toMatchObject({ release: null, state: 'pausado' });
     expect(await buildJobs()).toEqual([]);
+    expect(await events()).toEqual([]);
   });
 
   it('recusa site inexistente, sem enfileirar', async () => {
@@ -756,5 +862,6 @@ describe('reconstruir na release', () => {
     }
     expect(await site()).toMatchObject({ release: null, state: 'pausado' });
     expect(await buildJobs()).toEqual([]);
+    expect(await events()).toEqual([]);
   });
 });

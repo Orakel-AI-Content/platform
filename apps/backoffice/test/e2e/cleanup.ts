@@ -13,6 +13,7 @@ import { getDatabaseUrl } from '../../src/env.ts';
  */
 export const SITE_TABLES = [
   'builds',
+  'site_events',
   'reviews',
   'publications',
   'pending_changes',
