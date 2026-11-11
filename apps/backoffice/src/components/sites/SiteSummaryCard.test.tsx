@@ -88,7 +88,7 @@ describe('SiteSummaryCard', () => {
     expect(field('Publicações hoje').textContent).toBe('0 de 10');
   });
 
-  it('mostra a versão no ar com os arquivos e as pendências por origem', () => {
+  it('mostra a versão no ar com os arquivos e as mudanças pendentes por origem', () => {
     render(
       <SiteSummaryCard
         site={{ ...site, activeVersionId: 'v7' }}
@@ -98,7 +98,7 @@ describe('SiteSummaryCard', () => {
     );
 
     expect(field('Versão no ar').textContent).toBe('v7120 arquivos');
-    const origins = within(field('Pendências por origem')).getAllByRole('listitem');
+    const origins = within(field('Mudanças pendentes')).getAllByRole('listitem');
     expect(origins.map((item) => item.textContent)).toEqual(['Conteúdo2', 'Configuração1']);
   });
 
@@ -115,11 +115,18 @@ describe('SiteSummaryCard', () => {
   });
 
   it('sem domínio, versão no ar e pendências, cada bloco mostra o estado vazio', () => {
-    render(<SiteSummaryCard site={{ ...site, domain: '' }} instance={empty} g1Registered />);
+    render(
+      <SiteSummaryCard
+        site={{ ...site, domain: '', pendingChanges: 0 }}
+        instance={empty}
+        g1Registered
+      />,
+    );
 
     expect(field('Domínio').textContent).toBe('—');
     expect(field('Versão no ar').textContent).toBe('Nenhuma versão no ar');
-    expect(field('Pendências por origem').textContent).toBe('Nenhuma mudança pendente.');
+    expect(field('Mudanças pendentes').textContent).toBe('0');
+    expect(within(field('Mudanças pendentes')).queryByRole('list')).toBeNull();
   });
 
   it('com o limite do dia ocupado, diz que foi atingido', () => {
@@ -133,7 +140,7 @@ describe('SiteSummaryCard', () => {
   it('sem release, sem build e sem G1, diz o que falta', () => {
     render(
       <SiteSummaryCard
-        instance={instance}
+        instance={empty}
         site={{ ...site, release: null, lastBuild: null, indexavel: false, pendingChanges: 0 }}
         g1Registered={false}
       />,

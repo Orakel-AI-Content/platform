@@ -308,7 +308,6 @@ const SUMMARY_TERMS = [
   'Release',
   'Versão no ar',
   'Mudanças pendentes',
-  'Pendências por origem',
   'G1',
   'Publicações hoje',
 ];
@@ -450,7 +449,6 @@ test(
     await expect(value('Mudanças pendentes')).toHaveText(/^\d+/);
     // Estado da instância (#516): cada campo com o valor ou o estado vazio dele.
     await expect(value('Versão no ar')).not.toBeEmpty();
-    await expect(value('Pendências por origem')).not.toBeEmpty();
     await expect(value('G1')).toHaveText(/^(Registrado|Não registrado)$/);
     // Uso do limite diário de hoje (dia de São Paulo), padrão de 10.
     await expect(value('Publicações hoje')).toHaveText(/^\d+ de 10/);
@@ -515,7 +513,11 @@ test('operação vê o resumo e as ações do site na primeira tela a 1440 × 90
     'Reconstruir na release',
     'Reverter',
   ]);
-  await expectNoViolations(page);
+  // O menu entra com transição de opacidade; o axe audita depois dela. As guardas de foco do
+  // floating-ui (`aria-hidden` e `tabindex=0`, repassam o foco na hora) ficam de fora, como em
+  // contents.spec.ts.
+  await expect(page.locator('.dropdown-menu')).toHaveCSS('opacity', '1');
+  await expectNoViolations(page, { exclude: ['[data-floating-ui-focus-guard]'] });
   await page.getByRole('menuitem', { name: 'Reverter' }).click();
   const dialog = page.getByRole('alertdialog', {
     name: 'Reverter o site para uma versão anterior?',

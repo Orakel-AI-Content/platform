@@ -2,7 +2,6 @@ import {
   DETAIL_SUMMARY_CLASS,
   DETAIL_SUMMARY_LIST_CLASS,
 } from '@/components/shared/detailSummary.ts';
-import { EmptyState } from '@/components/shared/EmptyState';
 import { InfoField, InfoList } from '@/components/shared/InfoList';
 import { PENDING_ORIGIN_LABEL } from '@/components/shared/siteLabels.ts';
 import Card from '@/components/ui/Card';
@@ -41,18 +40,34 @@ function ActiveVersion({ versionId, files }: { versionId: string | null; files: 
   );
 }
 
-/** Mudanças pendentes agrupadas por origem, com a contagem de cada uma. */
-function PendingByOrigin({ counts }: { counts: SiteInstance['pendingByOrigin'] }) {
-  if (counts.length === 0) return <EmptyState>Nenhuma mudança pendente.</EmptyState>;
+/**
+ * Mudanças pendentes: o total (link para a tela de pendências quando > 0) e, abaixo, a divisão
+ * por origem em duas colunas. Num campo só e em duas colunas, o resumo cabe na primeira tela a
+ * 1440 × 900 com todas as origens (#595).
+ */
+function PendingChanges({
+  siteId,
+  count,
+  byOrigin,
+}: {
+  siteId: string;
+  count: number;
+  byOrigin: SiteInstance['pendingByOrigin'];
+}) {
   return (
-    <ul className="space-y-1">
-      {counts.map(({ origin, count }) => (
-        <li key={origin} className="flex justify-between gap-4">
-          <span>{PENDING_ORIGIN_LABEL[origin]}</span>
-          <span className="tabular-nums">{count}</span>
-        </li>
-      ))}
-    </ul>
+    <span className="flex flex-col items-start gap-1">
+      <PendingCount siteId={siteId} count={count} />
+      {byOrigin.length > 0 && (
+        <ul aria-label="Por origem" className="grid w-full grid-cols-2 gap-x-4 gap-y-1 font-normal">
+          {byOrigin.map(({ origin, count: originCount }) => (
+            <li key={origin} className="flex justify-between gap-2">
+              <span>{PENDING_ORIGIN_LABEL[origin]}</span>
+              <span className="tabular-nums">{originCount}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </span>
   );
 }
 
@@ -85,11 +100,12 @@ export function SiteSummaryCard({
         <InfoField label="Versão no ar">
           <ActiveVersion versionId={site.activeVersionId} files={instance.activeFiles} />
         </InfoField>
-        <InfoField label="Mudanças pendentes" className="tabular-nums">
-          <PendingCount siteId={site.id} count={site.pendingChanges} />
-        </InfoField>
-        <InfoField label="Pendências por origem">
-          <PendingByOrigin counts={instance.pendingByOrigin} />
+        <InfoField label="Mudanças pendentes">
+          <PendingChanges
+            siteId={site.id}
+            count={site.pendingChanges}
+            byOrigin={instance.pendingByOrigin}
+          />
         </InfoField>
         <InfoField label="G1">{g1Registered ? 'Registrado' : 'Não registrado'}</InfoField>
         <InfoField label="Publicações hoje" className="tabular-nums">

@@ -12,7 +12,7 @@ import { SiteSummaryCard } from './SiteSummaryCard.tsx';
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 // Resumo do site em Chromium (#516): o estado da instância (domínio como link, versão no ar com
-// os arquivos e pendências por origem) e os estados vazios, na moldura do admin, sem rolagem
+// os arquivos e as mudanças pendentes por origem) e os estados vazios, na moldura do admin, sem rolagem
 // horizontal e sem violação do axe (WCAG 2.2 AA) nos dois temas. Os últimos builds ficam na aba
 // "Builds" (`SiteBuildsTable.browser.test.tsx`, #595).
 
