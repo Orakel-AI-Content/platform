@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useState, type HTMLAttributes, type ReactNode } from 'react';
+import { PiArrowDown, PiArrowUp, PiTrash } from 'react-icons/pi';
 import { TbArrowNarrowLeft, TbTrash } from 'react-icons/tb';
 import {
   Controller,
@@ -27,6 +28,7 @@ import ConfirmDialog, {
   dangerConfirmButtonProps,
 } from '@/components/shared/ConfirmDialog.tsx';
 import { ErrorSummary } from '@/components/shared/ErrorSummary.tsx';
+import { IconButton } from '@/components/shared/IconButton';
 import Alert from '@/components/ui/Alert';
 import Button, { type ButtonProps } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -567,7 +569,10 @@ function GroupElement({ as: Element = 'fieldset', ...props }: Omit<FieldGroupPro
   return <Element aria-describedby={errorId} {...props} />;
 }
 
-/** Lista de objetos: um fieldset por item, com adicionar e remover. */
+/**
+ * Lista de objetos: um fieldset por item, com adicionar, mover e remover (#592). Os controles
+ * de cada item ficam no cabeçalho, como os dos blocos do `ContentEditor`.
+ */
 function ArrayField({
   ctx,
   element,
@@ -579,7 +584,7 @@ function ArrayField({
   path: string;
   label: string;
 }) {
-  const { fields, append, remove } = useFieldArray({ control: ctx.control, name: path });
+  const { fields, append, move, remove } = useFieldArray({ control: ctx.control, name: path });
   // Remover pede confirmação (#327). O índice fica depois de fechar: o título não muda
   // durante a saída do diálogo.
   const [removing, setRemoving] = useState({ index: 0, open: false });
@@ -597,20 +602,43 @@ function ArrayField({
       className={classNames(groupClass, 'space-y-4 p-4')}
     >
       <legend className="px-1 font-semibold text-gray-900 dark:text-gray-100">{label}</legend>
-      {fields.map((item, index) => (
-        <fieldset key={item.id} className={classNames(groupClass, 'p-4')}>
-          <legend className="px-1 text-sm font-semibold">{`${itemLabel} ${index + 1}`}</legend>
-          <Children ctx={ctx} shape={itemNode.shape} prefix={`${path}.${index}`} />
-          <Button
-            type="button"
-            size="sm"
-            customColorClass={dangerButtonClass}
-            onClick={() => setRemoving({ index, open: true })}
-          >
-            {`Remover ${itemLabel} ${index + 1}`}
-          </Button>
-        </fieldset>
-      ))}
+      {fields.map((item, index) => {
+        const name = `${itemLabel} ${index + 1}`;
+        const last = index === fields.length - 1;
+        return (
+          // `key` pelo `id` do item: ao mover, o DOM (e o botão com o foco) vai junto.
+          <fieldset key={item.id} className={classNames(groupClass, 'p-4')}>
+            {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
+            <legend className="sr-only">{name}</legend>
+            <div className="mb-2 flex items-center gap-2">
+              <span aria-hidden="true" className="px-1 text-sm font-semibold">
+                {name}
+              </span>
+              <div className="ml-auto flex shrink-0 gap-1">
+                <IconButton
+                  label={`Mover ${name} para cima`}
+                  icon={<PiArrowUp />}
+                  // aria-disabled (não disabled): o foco fica no botão depois de mover.
+                  aria-disabled={index === 0}
+                  onClick={() => index > 0 && move(index, index - 1)}
+                />
+                <IconButton
+                  label={`Mover ${name} para baixo`}
+                  icon={<PiArrowDown />}
+                  aria-disabled={last}
+                  onClick={() => !last && move(index, index + 1)}
+                />
+                <IconButton
+                  label={`Remover ${name}`}
+                  icon={<PiTrash />}
+                  onClick={() => setRemoving({ index, open: true })}
+                />
+              </div>
+            </div>
+            <Children ctx={ctx} shape={itemNode.shape} prefix={`${path}.${index}`} />
+          </fieldset>
+        );
+      })}
       <ConfirmDialog
         isOpen={removing.open}
         type="danger"
