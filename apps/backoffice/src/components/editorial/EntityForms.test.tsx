@@ -144,6 +144,38 @@ describe('formulários de entidades', () => {
     expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/menus');
   });
 
+  it('menu: salvar depois de mover um item grava a nova ordem (#592)', async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<(value: unknown) => Promise<EntityFormResult>>(() => Promise.resolve(ok));
+    render(
+      <EntityForm
+        kind="menu"
+        mode="edit"
+        siteId="exemplo-a"
+        defaultValues={{
+          key: 'principal',
+          items: [
+            { label: 'Início', href: '/' },
+            { label: 'Sobre', href: '/sobre' },
+          ],
+        }}
+        action={action}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Mover item 2 para cima' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(action.mock.calls[0]?.[0]).toEqual({
+      key: 'principal',
+      items: [
+        { label: 'Sobre', href: '/sobre' },
+        { label: 'Início', href: '/' },
+      ],
+    });
+  });
+
   it('criar: "Criando…" até a resposta; o sucesso vai para o toast antes de voltar', async () => {
     const user = userEvent.setup();
     let finish: (result: EntityFormResult) => void = () => undefined;

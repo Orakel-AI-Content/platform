@@ -130,6 +130,8 @@ describe('ContentsTable no navegador', () => {
     const title = first.getByRole('link', { name: /^Receita \d+ \(ver versões\)$/ });
     expect(isClipped(title)).toBe(false);
     await expect.element(first.getByRole('link', { name: /^Editar / })).toBeVisible();
+    // O "Ver no site" fica para a partir de `md`: a 390 px, nenhuma linha o mostra.
+    expect(page.getByRole('link', { name: /^Ver .* no site$/ }).elements()).toEqual([]);
   });
 
   it.each(COLOR_SCHEMES)('com seleção, sem violação do axe (%s)', async (scheme) => {

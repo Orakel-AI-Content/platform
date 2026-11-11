@@ -144,15 +144,19 @@ function columnsFor(
         const href = publicUrl(row.original, publicOrigin);
         return (
           <div className="flex items-center justify-end gap-1">
+            {/* Abaixo de `md`, só o Editar: com o "Ver no site", o título curto não cabia a
+                390 px ao lado do status (#614). */}
             {href !== undefined && (
-              <IconButton
-                asElement="a"
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                label={`Ver ${row.original.title} no site`}
-                icon={<TbExternalLink />}
-              />
+              <span className="hidden md:inline-flex">
+                <IconButton
+                  asElement="a"
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  label={`Ver ${row.original.title} no site`}
+                  icon={<TbExternalLink />}
+                />
+              </span>
             )}
             {canWrite && (
               <IconButton

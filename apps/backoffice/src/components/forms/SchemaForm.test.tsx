@@ -120,8 +120,14 @@ describe('SchemaForm', () => {
     await user.keyboard('{Enter}');
     expect(screen.getAllByLabelText(fieldLabel('Pergunta'))).toHaveLength(2);
 
-    // Preenche a nova pergunta só com Tab e digitação.
+    // Preenche a nova pergunta só com Tab e digitação: depois da resposta 1 vêm os controles do
+    // cabeçalho da pergunta 2 (mover para cima, para baixo e remover; #592).
     await user.click(screen.getAllByLabelText(fieldLabel('Pergunta'))[0] as HTMLElement);
+    await user.tab();
+    await user.tab();
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Mover pergunta 2 para cima' }),
+    );
     await user.tab();
     await user.tab();
     await user.tab();
@@ -131,8 +137,11 @@ describe('SchemaForm', () => {
     await user.keyboard('R2');
 
     // Remover confirma num diálogo: Esc e Cancelar não removem e devolvem o foco ao botão.
+    // O remover é um botão de ícone no cabeçalho do item (#592), não mais o botão vermelho.
     const removeFirst = screen.getByRole('button', { name: 'Remover pergunta 1' });
-    expect(removeFirst.className).toContain('text-error');
+    expect(removeFirst.className).not.toContain('text-error');
+    expect(removeFirst.className).toContain('h-8');
+    expect(removeFirst.className).toContain('w-8');
     removeFirst.focus();
     await user.keyboard('{Enter}');
     expect(screen.getByRole('alertdialog', { name: 'Remover pergunta 1?' })).toBeTruthy();
@@ -161,6 +170,96 @@ describe('SchemaForm', () => {
       n: 3,
       type: 'faq',
       items: [{ question: 'P2', answer: inline('R2') }],
+    });
+  });
+
+  it('lista: mover troca a posição com valores e erros, e o foco fica no botão usado (#592)', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <SchemaForm
+        schema={FaqBlockSchema}
+        defaultValues={{
+          n: 3,
+          type: 'faq',
+          items: [
+            { question: '', answer: inline('R1') },
+            { question: 'P2', answer: inline('R2') },
+            { question: 'P3', answer: inline('R3') },
+          ],
+        }}
+        labels={{
+          items: 'Perguntas',
+          'items.*': 'pergunta',
+          'items.*.question': 'Pergunta',
+          'items.*.answer': 'Resposta',
+        }}
+        hidden={['n', 'type']}
+        fields={{ 'items.*.answer': PlainInlines }}
+        submitLabel="Salvar"
+        onSubmit={onSubmit}
+      />,
+    );
+    const questions = () =>
+      screen.getAllByLabelText(fieldLabel('Pergunta')).map((input) => input as HTMLInputElement);
+    const button = (name: string) => screen.getByRole('button', { name });
+
+    // Cada item tem os três controles no cabeçalho, nomeados pela posição.
+    for (const n of [1, 2, 3]) {
+      const group = screen.getByRole('group', { name: `pergunta ${n}` });
+      for (const name of [
+        `Mover pergunta ${n} para cima`,
+        `Mover pergunta ${n} para baixo`,
+        `Remover pergunta ${n}`,
+      ]) {
+        expect(within(group).getByRole('button', { name }).className).toContain('h-8');
+      }
+    }
+    // Nas pontas o botão fica indisponível, mas focável; o clique não move.
+    expect(button('Mover pergunta 1 para cima').getAttribute('aria-disabled')).toBe('true');
+    expect(button('Mover pergunta 3 para baixo').getAttribute('aria-disabled')).toBe('true');
+    expect(button('Mover pergunta 2 para cima').getAttribute('aria-disabled')).toBe('false');
+    button('Mover pergunta 1 para cima').focus();
+    await user.keyboard('{Enter}');
+    expect(questions().map((input) => input.value)).toEqual(['', 'P2', 'P3']);
+
+    // A pergunta 1, vazia, fica com erro ao enviar.
+    button('Salvar').focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(questions()[0]?.getAttribute('aria-invalid')).toBe('true'));
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // Mover para baixo leva valor e erro juntos, e o foco fica no mesmo botão, agora o do item 2.
+    const down = button('Mover pergunta 1 para baixo');
+    down.focus();
+    await user.keyboard('{Enter}');
+    expect(questions().map((input) => input.value)).toEqual(['P2', '', 'P3']);
+    expect(questions().map((input) => input.getAttribute('aria-invalid'))).toEqual([
+      'false',
+      'true',
+      'false',
+    ]);
+    expect(document.activeElement).toBe(down);
+    expect(down.getAttribute('aria-label')).toBe('Mover pergunta 2 para baixo');
+    await user.keyboard('{Enter}');
+    expect(questions().map((input) => input.value)).toEqual(['P2', 'P3', '']);
+    expect(document.activeElement).toBe(button('Mover pergunta 3 para baixo'));
+    expect(down.getAttribute('aria-disabled')).toBe('true');
+
+    // Para cima devolve; o envio grava a nova ordem.
+    await user.click(button('Mover pergunta 3 para cima'));
+    expect(questions().map((input) => input.value)).toEqual(['P2', '', 'P3']);
+    await user.type(questions()[1] as HTMLElement, 'P1');
+    await user.click(button('Salvar'));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith({
+      n: 3,
+      type: 'faq',
+      items: [
+        { question: 'P2', answer: inline('R2') },
+        { question: 'P1', answer: inline('R1') },
+        { question: 'P3', answer: inline('R3') },
+      ],
     });
   });
 
