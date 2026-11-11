@@ -79,7 +79,13 @@ function Generation({ action }: { action: (value: unknown) => Promise<EntityForm
   return (
     <section aria-labelledby="generation-title" className="list-width space-y-4">
       <PageHeader id="generation-title" title="Geração" />
-      <GenerationForm siteId={SITE} authors={AUTHORS} context={{ version: 4 }} action={action} />
+      <GenerationForm
+        siteId={SITE}
+        canWrite
+        authors={AUTHORS}
+        context={{ version: 4 }}
+        action={action}
+      />
       <AdaptiveCard>
         <section aria-labelledby="runs-title" className="flex flex-col gap-4">
           <h2 id="runs-title">Execuções</h2>
@@ -87,6 +93,7 @@ function Generation({ action }: { action: (value: unknown) => Promise<EntityForm
             siteId={SITE}
             timeZone="America/Sao_Paulo"
             rows={ROWS}
+            hasContext
             labelledBy="runs-title"
           />
         </section>
@@ -169,11 +176,17 @@ describe('aba Geração no navegador', () => {
       await setTheme(scheme);
       await setReducedMotion('reduce');
       await renderInFrame(
-        <GenerationForm siteId={SITE} authors={AUTHORS} context={undefined} action={ok()} />,
+        <GenerationForm
+          siteId={SITE}
+          canWrite
+          authors={AUTHORS}
+          context={undefined}
+          action={ok()}
+        />,
         { roles: ['editor'] },
       );
       await expect
-        .element(page.getByRole('main').getByRole('link', { name: 'Contextos editoriais' }))
+        .element(page.getByRole('main').getByRole('link', { name: 'Criar contexto editorial' }))
         .toBeVisible();
       expect(await audit()).toEqual([]);
     },

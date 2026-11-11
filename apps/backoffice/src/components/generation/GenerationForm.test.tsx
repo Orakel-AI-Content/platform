@@ -37,13 +37,14 @@ const ok = () =>
 
 function renderForm(
   action: (value: unknown) => Promise<EntityFormResult>,
-  options: { context?: CurrentContext; authors?: typeof AUTHORS } = {},
+  options: { context?: CurrentContext; authors?: typeof AUTHORS; canWrite?: boolean } = {},
 ) {
   // `context: undefined` é o site sem contexto: o padrão só vale sem a chave.
   const context = 'context' in options ? options.context : { version: 4 };
   render(
     <GenerationForm
       siteId="exemplo-a"
+      canWrite={options.canWrite ?? true}
       authors={options.authors ?? AUTHORS}
       context={context}
       action={action}
@@ -114,14 +115,38 @@ describe('formulário da geração', () => {
     expect(screen.getAllByText('Escreva o tema do artigo').length).toBeGreaterThan(0);
   });
 
-  it('sem contexto editorial, o aviso com o link e nenhum formulário', () => {
+  it('sem contexto editorial e com content.write, o aviso com o botão de criar', () => {
     renderForm(ok(), { context: undefined });
 
     expect(document.body.textContent).toContain(
       'Cadastre o contexto editorial do site antes de gerar',
     );
-    expect(screen.getByRole('link', { name: 'Contextos editoriais' })).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Criar contexto editorial' }).getAttribute('href'),
+    ).toBe('/sites/exemplo-a/contextos/nova');
     expect(screen.queryByRole('button', { name: 'Gerar artigo' })).toBeNull();
+  });
+
+  it('sem contexto editorial e sem content.write, o aviso sem ação', () => {
+    renderForm(ok(), { context: undefined, canWrite: false });
+
+    expect(document.body.textContent).toContain('O site ainda não tem contexto editorial');
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('com contexto e sem content.write, nada do formulário', () => {
+    const { container } = render(
+      <GenerationForm
+        siteId="exemplo-a"
+        canWrite={false}
+        authors={AUTHORS}
+        context={{ version: 4 }}
+        action={ok()}
+      />,
+    );
+
+    expect(container.innerHTML).toBe('');
   });
 
   it('sem autores no site, o aviso com o link para Autores', () => {
