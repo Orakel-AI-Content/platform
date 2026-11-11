@@ -17,8 +17,8 @@
     "test:contract": "vitest run --config vitest.contract.config.ts",
     "test:e2e": "E2E_STACK=1 playwright test",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file-if-exists=../../.env.local src/bin/migrate.ts",
-    "db:seed": "node --env-file-if-exists=../../.env.local src/bin/seed.ts",
+    "db:migrate": "LLM_MODEL=${LOCAL_LLM_MODEL:-fixture} node --env-file-if-exists=../../.env.local src/bin/migrate.ts",
+    "db:seed": "LLM_MODEL=${LOCAL_LLM_MODEL:-fixture} node --env-file-if-exists=../../.env.local src/bin/seed.ts",
     "media:reprocess": "node --env-file-if-exists=../../.env.local src/bin/reprocess-media.ts",
     "audience:aggregate": "node --env-file-if-exists=../../.env.local src/bin/aggregate-audience.ts"
   },
