@@ -112,11 +112,20 @@ function renderEditor({
   return action;
 }
 
-/** Escolhe o tipo do novo bloco só com teclado: digita para filtrar e confirma. */
-async function chooseNewType(user: ReturnType<typeof userEvent.setup>, label: string) {
-  screen.getByRole('combobox', { name: 'Tipo do novo bloco' }).focus();
-  await user.keyboard(label);
+/** Gatilhos "+" de inserir bloco, na ordem da tela; o último é o do fim da lista (#591). */
+const insertTriggers = () => screen.getAllByRole('button', { name: /^Inserir bloco na posição/ });
+
+/** Abre o menu do "+" do fim pelo teclado e devolve o menu. */
+async function openEndMenu(user: ReturnType<typeof userEvent.setup>) {
+  insertTriggers().at(-1)?.focus();
   await user.keyboard('{Enter}');
+  return screen.findByRole('menu');
+}
+
+/** Insere um bloco do tipo no fim da lista, pelo "+" do fim. */
+async function insertAtEnd(user: ReturnType<typeof userEvent.setup>, label: string) {
+  const menu = await openEndMenu(user);
+  await user.click(within(menu).getByRole('menuitem', { name: label }));
 }
 
 const save = (user: ReturnType<typeof userEvent.setup>) =>
@@ -127,16 +136,16 @@ const touch = (user: ReturnType<typeof userEvent.setup>) =>
   user.type(screen.getByLabelText(fieldLabel('Título')), '!');
 
 describe('editor de conteúdo', () => {
-  it('o tipo de bloco novo só oferece os tipos da release', async () => {
+  it('o "+" do fim só oferece os tipos da release', async () => {
+    const user = userEvent.setup();
     renderEditor({ blockTypes: ['text', 'toc', 'image'] });
 
-    screen.getByRole('combobox', { name: 'Tipo do novo bloco' }).focus();
-    await userEvent.keyboard('{ArrowDown}');
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'Texto',
-      'Sumário',
-      'Imagem',
-    ]);
+    const menu = await openEndMenu(user);
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Texto', 'Sumário', 'Imagem']);
   });
 
   it('autores e taxonomias são escolhidos no Select múltiplo e vão como os mesmos IDs', async () => {
@@ -189,8 +198,7 @@ describe('editor de conteúdo', () => {
     const user = userEvent.setup();
     const action = renderEditor({ mode: 'create', defaultValues: { ...meta, blocks: [] } });
 
-    await chooseNewType(user, 'Sumário');
-    await user.click(screen.getByRole('button', { name: 'Adicionar bloco' }));
+    await insertAtEnd(user, 'Sumário');
     await user.type(screen.getByLabelText(fieldLabel('Título do sumário')), 'Neste guia');
     await save(user);
 
@@ -361,8 +369,7 @@ describe('barra de ações e continuar no editor (#109)', () => {
       result: { ok: true, message: 'Versão 2 salva.', id: 7, saved: saved as never },
     });
 
-    await chooseNewType(user, 'Sumário');
-    await user.click(screen.getByRole('button', { name: 'Adicionar bloco' }));
+    await insertAtEnd(user, 'Sumário');
     const titles = screen.getAllByLabelText(fieldLabel('Título do sumário'));
     await user.type(titles[titles.length - 1] as HTMLElement, 'Novo');
     await save(user);
@@ -671,7 +678,7 @@ describe('inserir bloco em qualquer posição (#134)', () => {
     return screen.findByRole('menu');
   };
 
-  it('há um ponto antes de cada bloco, com a posição no nome e os tipos da release', async () => {
+  it('há um ponto antes de cada bloco e um no fim, com a posição no nome e os tipos da release', async () => {
     const user = userEvent.setup();
     renderEditor({ defaultValues: three, blockTypes: ['text', 'toc', 'image'] });
 
@@ -680,6 +687,7 @@ describe('inserir bloco em qualquer posição (#134)', () => {
       'Inserir bloco na posição 1',
       'Inserir bloco na posição 2',
       'Inserir bloco na posição 3',
+      'Inserir bloco na posição 4',
     ]);
     // A dica é só visual: o nome não se repete como descrição.
     expect(triggers[1]?.hasAttribute('aria-describedby')).toBe(false);
@@ -717,11 +725,26 @@ describe('inserir bloco em qualquer posição (#134)', () => {
     ]);
   });
 
-  it('sem blocos, só o "Adicionar bloco"', () => {
+  it('sem blocos, só o "+" da posição 1, sem o select de tipo (#591)', () => {
     renderEditor({ mode: 'create', defaultValues: { ...meta, blocks: [] } });
 
-    expect(screen.queryByRole('button', { name: /^Inserir bloco/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Adicionar bloco' })).toBeTruthy();
+    expect(insertTriggers().map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Inserir bloco na posição 1',
+    ]);
+    expect(screen.queryByRole('combobox', { name: 'Tipo do novo bloco' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Adicionar bloco' })).toBeNull();
+  });
+
+  it('o "+" do fim acrescenta o bloco depois do último e leva o foco a ele', async () => {
+    const user = userEvent.setup();
+    renderEditor({ defaultValues: three });
+
+    await insertAtEnd(user, 'Sumário');
+
+    expect(screen.getByRole('group', { name: 'Bloco 4: Sumário' })).toBeTruthy();
+    const titles = screen.getAllByLabelText<HTMLInputElement>(fieldLabel('Título do sumário'));
+    expect(titles.map((input) => input.value)).toEqual(['A', 'B', 'C', '']);
+    await waitFor(() => expect(document.activeElement).toBe(titles[3]));
   });
 });
 
@@ -880,6 +903,70 @@ describe('recolher e expandir blocos (#135)', () => {
   });
 });
 
+describe('SEO recolhível (#591)', () => {
+  const toggle = () => screen.getByRole('button', { name: 'Campos de SEO' });
+  const canonical = () =>
+    screen.getByLabelText<HTMLInputElement>(fieldLabel('Endereço canônico'), {
+      selector: 'input',
+    });
+
+  it('começa fechado, abre e fecha pelo botão, e os campos seguem no formulário', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor({
+      defaultValues: { ...meta, seo: { title: 'Guia completo' }, blocks: [toc(1, 'A')] },
+    });
+
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    expect(document.getElementById(toggle().getAttribute('aria-controls') ?? '')?.hidden).toBe(
+      true,
+    );
+    await user.click(toggle());
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    expect(canonical().closest('[hidden]')).toBeNull();
+    await user.click(toggle());
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+
+    // Fechado, o valor vai junto no envio.
+    await touch(user);
+    await save(user);
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(action.mock.calls[0]?.[0].seo).toEqual({ title: 'Guia completo' });
+  });
+
+  it('abre sozinho e foca o campo quando a validação recusa um campo de SEO', async () => {
+    const user = userEvent.setup();
+    const action = renderEditor({
+      defaultValues: { ...meta, seo: { canonical: 'sem-barra' }, blocks: [toc(1, 'A')] },
+    });
+
+    await touch(user);
+    await save(user);
+
+    await waitFor(() => expect(toggle().getAttribute('aria-expanded')).toBe('true'));
+    await waitFor(() => expect(document.activeElement).toBe(canonical()));
+    expect(canonical().getAttribute('aria-invalid')).toBe('true');
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it('abre sozinho quando o servidor recusa um campo de SEO', async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      result: {
+        ok: false,
+        message: 'Não foi possível salvar o conteúdo.',
+        issues: [{ path: ['seo', 'canonical'], message: 'Endereço recusado' }],
+      },
+    });
+
+    await touch(user);
+    await save(user);
+
+    await waitFor(() => expect(toggle().getAttribute('aria-expanded')).toBe('true'));
+    expect(await screen.findByText('Endereço recusado')).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(canonical()));
+  });
+});
+
 describe('título, slug e SEO (#590)', () => {
   const blank = { ...meta, slug: '', title: '', blocks: [toc(1, 'A')] };
   const title = () => screen.getByLabelText(fieldLabel('Título'));
@@ -942,6 +1029,8 @@ describe('título, slug e SEO (#590)', () => {
         .join(' | ');
     };
 
+    // O SEO começa fechado (#591).
+    await user.click(screen.getByRole('button', { name: 'Campos de SEO' }));
     expect(described('Título para buscadores')).toContain('4 caracteres');
     expect(described('Descrição para buscadores')).toContain('0 caracteres');
 

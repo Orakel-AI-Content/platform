@@ -265,6 +265,54 @@ describe('salvar sem alteração (#525)', () => {
   });
 });
 
+describe('duas colunas e SEO recolhível (#591)', () => {
+  const section = (name: string) => page.getByRole('region', { name, exact: true }).element();
+  const box = (name: string) => section(name).getBoundingClientRect();
+
+  afterEach(async () => {
+    await page.viewport(1280, 720);
+  });
+
+  it('a 1440 px, blocos à esquerda e dados e SEO na coluna à direita', async () => {
+    await page.viewport(1440, 900);
+    await renderEditor();
+
+    const blocksBox = box('Blocos');
+    const meta = box('Dados do conteúdo');
+    const seo = box('SEO');
+    expect(meta.left).toBeGreaterThanOrEqual(blocksBox.right);
+    expect(meta.top).toBeLessThan(blocksBox.bottom);
+    expect(seo.left).toBe(meta.left);
+    expect(seo.top).toBeGreaterThanOrEqual(meta.bottom);
+  });
+
+  it('a 390 px, empilha com os dados primeiro, na largura da janela', async () => {
+    await page.viewport(390, 800);
+    await renderEditor();
+
+    const blocksBox = box('Blocos');
+    const meta = box('Dados do conteúdo');
+    expect(meta.bottom).toBeLessThanOrEqual(box('SEO').top);
+    expect(box('SEO').bottom).toBeLessThanOrEqual(blocksBox.top);
+    // As colunas cabem na largura da janela.
+    for (const name of ['Dados do conteúdo', 'SEO', 'Blocos']) {
+      expect(box(name).right).toBeLessThanOrEqual(window.innerWidth);
+    }
+  });
+
+  it.each(COLOR_SCHEMES)('a 1440 px com o SEO aberto, sem violação do axe (%s)', async (scheme) => {
+    await page.viewport(1440, 900);
+    await setTheme(scheme);
+    await renderEditor();
+    const toggle = page.getByRole('button', { name: 'Campos de SEO' });
+
+    await toggle.click();
+    await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect.element(page.getByRole('textbox', { name: /Endereço canônico/ })).toBeVisible();
+    expect(await audit()).toEqual([]);
+  });
+});
+
 describe('título, slug e SEO no navegador (#590)', () => {
   it('na criação, o slug acompanha o título; a contagem do SEO é a descrição do campo; sem violações do axe', async () => {
     await renderInApp(
@@ -285,6 +333,8 @@ describe('título, slug e SEO no navegador (#590)', () => {
     await userEvent.type(title, 'Como começar uma horta');
     await expect.element(slug).toHaveValue('como-comecar-uma-horta');
 
+    // O SEO começa fechado (#591).
+    await page.getByRole('button', { name: 'Campos de SEO' }).click();
     await expect.element(seoTitle).toHaveAccessibleDescription('0 caracteres');
     await userEvent.type(seoTitle, 'Horta');
     await expect.element(seoTitle).toHaveAccessibleDescription('5 caracteres');

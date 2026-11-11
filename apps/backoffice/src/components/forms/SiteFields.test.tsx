@@ -10,6 +10,7 @@ import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { SchemaForm, type SchemaFormIssue } from './SchemaForm.tsx';
 import { choiceField, flagsField, linesField, switchField, themeField } from './SiteFields.tsx';
+import { choiceLabel } from '@/components/shared/siteLabels.ts';
 import { fieldLabel } from '@/test/fieldLabel.ts';
 
 // Campos da configuração do site no gerador (#47): linhas ↔ lista, flags ↔ registro,
@@ -52,7 +53,7 @@ function renderForm(defaultValues: Record<string, unknown>, onSubmit = vi.fn()) 
       fields={{
         domains: linesField(),
         featureFlags: flagsField(),
-        preset: choiceField(['padrao', 'revista']),
+        preset: choiceField(['padrao', 'revista', 'nova'], choiceLabel),
       }}
       submitLabel="Salvar"
       onSubmit={onSubmit}
@@ -132,17 +133,19 @@ describe('campos da configuração do site', () => {
     expect((await submitted(onSubmit)).featureFlags).toEqual({ comentarios: true, busca: true });
   });
 
-  it('escolha: só as opções recebidas, com o valor atual selecionado', async () => {
+  it('escolha: só as opções recebidas, com rótulo legível e o valor atual selecionado', async () => {
     const user = userEvent.setup();
     const onSubmit = renderForm({ domains: ['a.example.com'], featureFlags: {}, preset: 'padrao' });
 
     const preset = screen.getByRole('combobox', { name: fieldLabel('Preset') });
-    expect(screen.getByText('padrao')).toBeTruthy();
+    expect(screen.getByText('Padrão')).toBeTruthy();
     preset.focus();
     await user.keyboard('{ArrowDown}');
+    // Opção sem rótulo conhecido (de uma release mais nova) aparece como está.
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
-      'padrao',
-      'revista',
+      'Padrão',
+      'Revista',
+      'nova',
     ]);
     await user.keyboard('{ArrowDown}{Enter}');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));

@@ -148,6 +148,9 @@ export default async function ContentVersionsPage({ params }: Params) {
   return (
     <section aria-labelledby="content-title" className="list-width space-y-4">
       {canWrite || canPublish ? <ContentActionScope>{header}</ContentActionScope> : header}
+      {returned.ok && returned.value !== null && (
+        <ReturnNotice pending={returned.value} timeZone={timeZone} />
+      )}
       <DetailLayout>
         <ContentSummary
           contentId={contentId}

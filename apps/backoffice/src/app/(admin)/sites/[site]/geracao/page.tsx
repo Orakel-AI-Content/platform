@@ -18,7 +18,8 @@ export const metadata = { title: 'Geração' };
 /**
  * Geração de artigos do site (R1, R5): o disparo, um tema por vez, acima da lista das
  * execuções com o custo. Ver exige site.read; disparar, content.write (o formulário só aparece
- * com ela, e o domínio confere de novo). A lista não se atualiza sozinha: quem dispara recarrega.
+ * com ela, e o domínio confere de novo; sem contexto editorial, o aviso aparece para todos). A
+ * lista não se atualiza sozinha: quem dispara recarrega.
  */
 export default async function GenerationPage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
@@ -28,23 +29,23 @@ export default async function GenerationPage({ params }: { params: Promise<{ sit
   const runs = await listGenerationRuns(db, actor, site.id);
   if (!runs.ok) return noRead;
 
-  let form = null;
-  if (canWrite) {
-    const [authors, current] = await Promise.all([
-      readAuthors(site.id),
-      currentEditorialContext(db, site.id),
-    ]);
-    form = (
-      <GenerationForm
-        siteId={site.id}
-        authors={
-          authors?.ok ? authors.value.map((author) => ({ id: author.id, label: author.name })) : []
-        }
-        context={current && { version: current.version }}
-        action={enqueueGenerationAction.bind(null, site.id)}
-      />
-    );
-  }
+  // O contexto vale para qualquer papel (#600): sem ele, o aviso aparece também para quem só
+  // lê, e o estado vazio das execuções não manda gerar. Os autores, só para quem dispara.
+  const [authors, current] = await Promise.all([
+    canWrite ? readAuthors(site.id) : undefined,
+    currentEditorialContext(db, site.id),
+  ]);
+  const form = (
+    <GenerationForm
+      siteId={site.id}
+      canWrite={canWrite}
+      authors={
+        authors?.ok ? authors.value.map((author) => ({ id: author.id, label: author.name })) : []
+      }
+      context={current && { version: current.version }}
+      action={enqueueGenerationAction.bind(null, site.id)}
+    />
+  );
 
   return (
     <section aria-labelledby="generation-title" className="list-width space-y-4">
@@ -59,6 +60,7 @@ export default async function GenerationPage({ params }: { params: Promise<{ sit
             siteId={site.id}
             timeZone={site.timeZone}
             rows={runs.value}
+            hasContext={current !== undefined}
             labelledBy="generation-runs-title"
           />
         </section>

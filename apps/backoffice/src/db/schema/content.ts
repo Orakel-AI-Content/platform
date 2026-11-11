@@ -166,9 +166,12 @@ export const contentVersions = pgTable(
   (t) => [primaryKey({ columns: [t.siteId, t.contentId, t.version] })],
 );
 
+/** Decisão de uma revisão: aprovar ou devolver ao editor (#598, ADR 0020). */
+export const REVIEW_DECISIONS = ['aprovado', 'devolvido'] as const;
+
 /**
- * Revisões das versões: quem aprovou, qual versão, o checklist marcado e quando. Uma linha
- * por ação; a aprovação também leva a versão a `aprovado` (ADR 0015).
+ * Revisões das versões: quem revisou, qual versão, a decisão e quando. Uma linha por ação; a
+ * aprovação leva a versão a `aprovado` e a devolução a `rascunho` (ADR 0015 e 0020).
  */
 export const reviews = pgTable('reviews', {
   id: serial().primaryKey(),
@@ -177,8 +180,11 @@ export const reviews = pgTable('reviews', {
   version: integer().notNull(),
   /** E-mail de quem revisou. */
   reviewer: text().notNull(),
-  /** Chaves de `REVIEW_CHECKLIST` marcadas. */
+  /** Chaves de `REVIEW_CHECKLIST` marcadas; vazio na devolução. */
   checklist: jsonb().$type<string[]>().notNull(),
+  decision: text({ enum: REVIEW_DECISIONS }).notNull().default('aprovado'),
+  /** O que corrigir, na devolução; nulo na aprovação. */
+  comment: text(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

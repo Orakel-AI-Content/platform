@@ -20,7 +20,7 @@ import { previewUrl } from '../../conteudos/content-urls.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { sitePageContext } from '../../editorial-page.tsx';
-import { approveAction } from '../actions.ts';
+import { approveAction, returnAction } from '../actions.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 /**
  * Tela de revisão (#75): a versão mais recente na visualização do site (iframe) e, ao lado, os
- * erros de validação da release, o checklist e a aprovação. Ler exige site.read; aprovar só
+ * erros de validação da release, o checklist, a aprovação e a devolução ao editor (#598). Ler exige site.read; aprovar só
  * aparece com content.publish, e o domínio confere tudo de novo. Tela de detalhe do guia (#373),
  * na ordem invertida do `CustomerDetails`: a prévia é o conteúdo principal, com a largura do
  * `main`, e o painel fica abaixo dela até `xl` e ao lado a partir dele.
@@ -104,6 +104,7 @@ export default async function ReviewPage({ params }: Params) {
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
             canApprove={can(actor, 'content.publish')}
             approve={approveAction.bind(null, site.id, contentId, latest.version)}
+            giveBack={returnAction.bind(null, site.id, contentId, latest.version)}
           />
         </div>
       </DetailLayout>
