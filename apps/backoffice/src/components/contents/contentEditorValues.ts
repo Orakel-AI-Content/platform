@@ -18,8 +18,24 @@ import type { FormActionResult } from '@/components/shared/actionResult.ts';
 // Valores do editor de conteúdo (#45): metadados pelo schema do conteúdo e cada bloco pelo
 // schema do seu tipo. Bloco novo vai com `new: true` e sem `n` (o servidor numera).
 
-/** Metadados: o conteúdo sem ID e sem blocos. */
-export const ContentMetaSchema = ContentSchema.omit({ id: true, blocks: true });
+/**
+ * Metadados: o conteúdo sem ID e sem blocos. O título vem antes do slug (#590): a ordem das
+ * chaves é a ordem da tela, e o slug nasce do título.
+ */
+const { kind, title, slug, ...meta } = ContentSchema.omit({ id: true, blocks: true }).shape;
+export const ContentMetaSchema = z.object({ kind, title, slug, ...meta });
+
+/**
+ * Slug a partir do título (#590), na regra do `SlugSchema`: sem acentos (NFD sem as marcas),
+ * minúsculas, cada trecho fora de `a-z0-9` vira um hífen e as pontas ficam sem hífen.
+ */
+export const slugFromTitle = (value: string): string =>
+  value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 export const BLOCK_SCHEMAS: Record<Block['type'], z.ZodType> = {
   text: TextBlockSchema,

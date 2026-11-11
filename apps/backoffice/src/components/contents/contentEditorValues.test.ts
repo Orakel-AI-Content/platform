@@ -1,6 +1,7 @@
+import { SlugSchema } from '@orakel/content-model/v1';
 import { describe, expect, it } from 'vitest';
 
-import { savedFormValues } from './contentEditorValues.ts';
+import { ContentMetaSchema, savedFormValues, slugFromTitle } from './contentEditorValues.ts';
 
 // Reiniciar o editor com a versão salva (#110): os vazios do envio ficam, o resto vem do
 // servidor.
@@ -67,5 +68,32 @@ describe('savedFormValues', () => {
     expect(savedFormValues({ blocks: [{ n: 1 }] }, { blocks: [{ n: 1 }, { n: 2 }] })).toEqual({
       blocks: [{ n: 1 }],
     });
+  });
+});
+
+describe('slugFromTitle (#590)', () => {
+  it.each([
+    ['Como começar uma horta', 'como-comecar-uma-horta'],
+    ['ÁGUA E SOL', 'agua-e-sol'],
+    ['  Horta: 10 dicas, já!  ', 'horta-10-dicas-ja'],
+    ['Pão--de--ló', 'pao-de-lo'],
+    ['', ''],
+  ])('%j vira %j', (title, slug) => {
+    expect(slugFromTitle(title)).toBe(slug);
+  });
+
+  it('o resultado não vazio passa no SlugSchema', () => {
+    for (const title of ['Como começar uma horta', ' Ação & Reação ', 'Ç ã õ ü ñ']) {
+      expect(SlugSchema.safeParse(slugFromTitle(title)).success).toBe(true);
+    }
+  });
+});
+
+describe('ContentMetaSchema (#590)', () => {
+  it('o título vem antes do slug', () => {
+    const keys = Object.keys(ContentMetaSchema.shape);
+    expect(keys.indexOf('title')).toBeLessThan(keys.indexOf('slug'));
+    expect(keys).not.toContain('id');
+    expect(keys).not.toContain('blocks');
   });
 });
