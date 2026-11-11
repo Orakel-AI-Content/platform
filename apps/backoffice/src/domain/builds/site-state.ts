@@ -1,15 +1,24 @@
 // Colunas operacionais do site (estado, motivo e culpado da pausa, versão ativa, release, ciclo de
 // vida, janela dos builds, limite diário de publicações, despublicação em massa declarada),
-// gravadas pelo build e pela operação. Não vão para o snapshot: gravar aqui não gera mudança pendente — senão cada build agendaria outro. Único
+// gravadas pelo build e pela operação; pausa, retomada e troca de versão também viram uma linha
+// de `site_events`, na mesma transação. Não vão para o snapshot: gravar aqui não gera mudança pendente — senão cada build agendaria outro. Único
 // módulo fora de pending-changes liberado no teste de varredura.
 import type { Culprit } from '@orakel/build-contract';
 import type { Result } from '@orakel/content-model';
 import { and, eq, ne } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { releases, sites } from '../../db/schema/index.ts';
-import { requireRole, type Actor } from '../access/rbac.ts';
+import { releases, siteEvents, sites } from '../../db/schema/index.ts';
+import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { buildNow } from './schedule.ts';
+
+/** Registra uma mudança de estado do site (só inserção), na transação de quem a fez. */
+async function recordSiteEvent(
+  tx: Executor,
+  event: Omit<typeof siteEvents.$inferInsert, 'id' | 'createdAt'>,
+): Promise<void> {
+  await tx.insert(siteEvents).values(event);
+}
 
 /**
  * Falha permanente: o site para de receber builds até ser retomado (L4). Grava o culpado
@@ -30,13 +39,22 @@ export async function pauseSite(
       pausedCulpritReference: culprit?.reference ?? null,
     })
     .where(eq(sites.id, siteId));
+  await recordSiteEvent(tx, {
+    siteId,
+    kind: 'pausa',
+    requestedBy: SYSTEM_ACTOR.email,
+    reason,
+    culpritOrigin: culprit?.origin ?? null,
+    culpritReference: culprit?.reference ?? null,
+  });
 }
 
 /**
- * Tira o site da pausa: volta a `ativo`, sem motivo nem culpado. O update condicional decide
- * a corrida; devolve se o site estava pausado.
+ * Tira o site da pausa: volta a `ativo`, sem motivo nem culpado, e registra a retomada em nome
+ * de quem pediu. O update condicional decide a corrida (de duas retomadas, um evento); devolve
+ * se o site estava pausado.
  */
-async function unpause(tx: Executor, siteId: string): Promise<boolean> {
+async function unpause(tx: Executor, siteId: string, requestedBy: string): Promise<boolean> {
   const updated = await tx
     .update(sites)
     .set({
@@ -47,7 +65,9 @@ async function unpause(tx: Executor, siteId: string): Promise<boolean> {
     })
     .where(and(eq(sites.id, siteId), eq(sites.state, 'pausado')))
     .returning({ id: sites.id });
-  return updated.length > 0;
+  if (updated.length === 0) return false;
+  await recordSiteEvent(tx, { siteId, kind: 'retomada', requestedBy });
+  return true;
 }
 
 /**
@@ -63,7 +83,7 @@ export async function resumeSite(
   const allowed = requireRole(actor, 'operations.run');
   if (!allowed.ok) return allowed;
 
-  if (await unpause(tx, siteId)) {
+  if (await unpause(tx, siteId, actor.email)) {
     await buildNow(tx, siteId);
     return { ok: true, value: undefined };
   }
@@ -119,18 +139,28 @@ export async function rebuildOnRelease(
     };
   }
 
-  const updated = await tx
-    .update(sites)
-    .set({ release: registered.tag })
+  // A linha travada até o fim da transação: de duas trocas simultâneas, cada evento vê a
+  // release que a outra deixou.
+  const [current] = await tx
+    .select({ release: sites.release })
+    .from(sites)
     .where(eq(sites.id, siteId))
-    .returning({ id: sites.id });
-  if (updated.length === 0) {
+    .for('update');
+  if (current === undefined) {
     return {
       ok: false,
       issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
     };
   }
-  await unpause(tx, siteId);
+  await tx.update(sites).set({ release: registered.tag }).where(eq(sites.id, siteId));
+  await recordSiteEvent(tx, {
+    siteId,
+    kind: 'troca_de_versao',
+    requestedBy: actor.email,
+    previousRelease: current.release,
+    release: registered.tag,
+  });
+  await unpause(tx, siteId, actor.email);
   await buildNow(tx, siteId);
   return { ok: true, value: undefined };
 }
