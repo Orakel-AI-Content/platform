@@ -1,3 +1,4 @@
+import AudienceChart from '@/components/audience/AudienceChart';
 import AudienceHeader from '@/components/audience/AudienceHeader';
 import AudienceMetrics from '@/components/audience/AudienceMetrics';
 import { AudienceTable } from '@/components/audience/AudienceTable';
@@ -19,8 +20,9 @@ type SearchParams = { searchParams: Promise<Record<string, string | string[] | u
 /**
  * Audiência do site (#548): totais e tabela por dia de São Paulo, lidos das tabelas diárias
  * consolidadas. O período vem de `?periodo=` (7 ou 30 dias; outro valor, 7). No padrão do
- * `AnalyticDashboard` do template: cabeçalho com o seletor, cartões (`Metrics`) e a tabela.
- * Sem linhas no período, o estado vazio no lugar dos cartões e da tabela.
+ * `AnalyticDashboard` do template: cabeçalho com o seletor, cartões (`Metrics`), o gráfico por
+ * dia (`AnalyticChart`, #599) e a tabela, que é a alternativa em texto do gráfico. Sem linhas
+ * no período, o estado vazio no lugar de cartões, gráfico e tabela.
  */
 export default async function AudiencePage({
   params,
@@ -44,6 +46,7 @@ export default async function AudiencePage({
       ) : (
         <>
           <AudienceMetrics totals={totals} selectedPeriod={period} />
+          <AudienceChart days={days} selectedPeriod={period} />
           <AdaptiveCard>
             <AudienceTable rows={days} />
           </AdaptiveCard>

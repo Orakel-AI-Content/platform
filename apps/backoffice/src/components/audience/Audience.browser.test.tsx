@@ -15,6 +15,7 @@ import {
 import { pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInFrame } from '../../../test/browser/render.tsx';
+import AudienceChart from './AudienceChart.tsx';
 import AudienceHeader from './AudienceHeader.tsx';
 import AudienceMetrics from './AudienceMetrics.tsx';
 import { AudienceTable } from './AudienceTable.tsx';
@@ -22,7 +23,9 @@ import { AudienceTable } from './AudienceTable.tsx';
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 // Audiência do site em Chromium (#548): o período trocado só pelo teclado vai para a URL, a
-// tela a 1280 px sem rolagem horizontal e o axe nos dois temas, com dados e vazia.
+// tela a 1280 px sem rolagem horizontal e o axe nos dois temas, com dados e vazia. O gráfico
+// por dia (#599): nome com o período, legenda em texto, valor do dia no foco e no hover, e
+// nenhum gráfico sem dados.
 
 const PATH = '/sites/exemplo-a/audiencia';
 
@@ -46,6 +49,7 @@ function Audience({ period = 7, days = DAYS }: { period?: AudiencePeriod; days?:
       ) : (
         <>
           <AudienceMetrics totals={totals} selectedPeriod={period} />
+          <AudienceChart days={days} selectedPeriod={period} />
           <AdaptiveCard>
             <AudienceTable rows={days} />
           </AdaptiveCard>
@@ -57,6 +61,8 @@ function Audience({ period = 7, days = DAYS }: { period?: AudiencePeriod; days?:
 
 const period = () => page.getByRole('combobox', { name: 'Período:' });
 const table = () => page.getByRole('table', { name: 'Audiência por dia' });
+const chart = () => page.getByRole('application', { name: /^Visualizações e sessões por dia/ });
+const tooltip = () => document.querySelector<HTMLElement>('.apexcharts-tooltip.apexcharts-active');
 
 beforeEach(() => {
   navigation.set(PATH);
@@ -92,13 +98,69 @@ describe('audiência no navegador', () => {
     expect(navigation.get()).toBe(PATH);
   });
 
-  it('a 1280 px, cartões e tabela sem rolagem horizontal', async () => {
+  it('a 1280 px, cartões, gráfico e tabela sem rolagem horizontal', async () => {
     await renderInFrame(<Audience />, { roles: ['revisor'] });
     await expect.element(table().getByRole('cell', { name: '12.345' })).toBeVisible();
     await expect.element(page.getByText('13.340', { exact: true })).toBeVisible();
+    await expect.element(chart()).toBeVisible();
 
     expect(pageOverflow()).toBe(0);
     expect(tableOverflow(table())).toBe(0);
+  });
+
+  it('o gráfico tem nome com o período, legenda em texto e as séries em ordem cronológica', async () => {
+    await renderInFrame(<Audience />, { roles: ['revisor'] });
+    await expect
+      .element(chart())
+      .toHaveAccessibleName(
+        'Visualizações e sessões por dia nos últimos 7 dias, de dom., 01/11/2026 a qua., 04/11/2026. Os valores estão na tabela abaixo.',
+      );
+    const legend = page.getByRole('list', { name: 'Legenda' });
+    await expect.element(legend.getByText('Visualizações', { exact: true })).toBeVisible();
+    await expect.element(legend.getByText('Sessões', { exact: true })).toBeVisible();
+    // Traço diferente por série: a de sessões é tracejada, a de visualizações não.
+    const paths = [...document.querySelectorAll('.apexcharts-series path.apexcharts-line')];
+    expect(paths.map((path) => path.getAttribute('stroke-dasharray'))).toEqual(['0', '6']);
+  });
+
+  it.each(COLOR_SCHEMES)(
+    'o foco pelo teclado mostra o valor do dia e as setas andam pelos dias, sem violação do axe na dica (%s)',
+    async (scheme) => {
+      await setTheme(scheme);
+      await setReducedMotion('reduce');
+      await renderInFrame(<Audience />, { roles: ['revisor'] });
+      await tabTo(chart().element());
+      await expect.poll(() => tooltip()?.textContent ?? '').toContain('dom., 01/11/2026');
+      expect(tooltip()?.textContent).toContain('15');
+      await userEvent.keyboard('{End}');
+      await expect.poll(() => tooltip()?.textContent ?? '').toContain('12.345');
+      expect(tooltip()?.textContent).toContain('qua., 04/11/2026');
+      expect(await audit()).toEqual([]);
+    },
+  );
+
+  it('o hover mostra o valor do dia', async () => {
+    await renderInFrame(<Audience />, { roles: ['revisor'] });
+    await expect.element(chart()).toBeVisible();
+    const grid = document.querySelector('.apexcharts-grid')!.getBoundingClientRect();
+    await userEvent.hover(chart(), {
+      position: {
+        x: grid.right - 5 - chart().element().getBoundingClientRect().left,
+        y: grid.height / 2,
+      },
+    });
+    await expect.poll(() => tooltip()?.textContent ?? '').toContain('12.345');
+  });
+
+  it('sem dados, nenhum gráfico', async () => {
+    await renderInFrame(<Audience days={[]} />, { roles: ['revisor'] });
+    await expect
+      .element(page.getByText('Nenhuma visualização consolidada nos últimos 7 dias.'))
+      .toBeVisible();
+    expect(document.querySelector('.apexcharts-canvas')).toBeNull();
+    expect(
+      page.getByRole('heading', { name: 'Visualizações e sessões por dia' }).query(),
+    ).toBeNull();
   });
 
   it.each(COLOR_SCHEMES)('com dados, sem violação do axe (%s)', async (scheme) => {
@@ -106,6 +168,7 @@ describe('audiência no navegador', () => {
     await setReducedMotion('reduce');
     await renderInFrame(<Audience />, { roles: ['revisor'] });
     await expect.element(table()).toBeVisible();
+    await expect.element(chart()).toBeVisible();
     expect(await audit()).toEqual([]);
   });
 
