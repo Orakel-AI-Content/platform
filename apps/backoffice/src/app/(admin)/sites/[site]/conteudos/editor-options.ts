@@ -21,25 +21,42 @@ export function mediaSource(siteId: string): MediaSource {
   };
 }
 
-/** Opções do editor: tipos da release e as referências que existem no site. */
-export async function editorOptions(
+/** Autores e taxonomias do site como opções (rótulo da taxonomia com o tipo). */
+export type ContentReferences = Pick<ContentEditorOptions, 'authors' | 'taxonomies'>;
+
+/**
+ * Autores e taxonomias do site, já com o rótulo de cada um: as opções do editor e os nomes na
+ * leitura de uma versão (#593). `undefined` se alguma leitura foi recusada.
+ */
+export async function contentReferences(
   db: Executor,
   actor: Actor,
   siteId: string,
-): Promise<ContentEditorOptions | undefined> {
-  const [authors, taxonomies, resources] = await Promise.all([
+): Promise<ContentReferences | undefined> {
+  const [authors, taxonomies] = await Promise.all([
     listAuthors(db, actor, siteId),
     listTaxonomies(db, actor, siteId),
-    resourcesFor(db, siteId),
   ]);
   if (!authors.ok || !taxonomies.ok) return undefined;
   return {
-    blockTypes: resources.blockTypes,
-    media: mediaSource(siteId),
     authors: authors.value.map((author) => ({ id: author.id, label: author.name })),
     taxonomies: taxonomies.value.map((taxonomy) => ({
       id: taxonomy.id,
       label: `${taxonomy.name} (${TAXONOMY_KIND_LABEL[taxonomy.kind]})`,
     })),
   };
+}
+
+/** Opções do editor: tipos da release e as referências que existem no site. */
+export async function editorOptions(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<ContentEditorOptions | undefined> {
+  const [references, resources] = await Promise.all([
+    contentReferences(db, actor, siteId),
+    resourcesFor(db, siteId),
+  ]);
+  if (references === undefined) return undefined;
+  return { blockTypes: resources.blockTypes, media: mediaSource(siteId), ...references };
 }

@@ -9,7 +9,8 @@ import { zonedDateTimeField } from '@/components/forms/ZonedDatetimeField';
 import { SiteSwitcher, type SwitcherSite } from '@/components/template/SiteSwitcher';
 
 // Seções de formulário e moldura na vitrine (#390): o `SchemaForm` de tela (cartão e barra fixa,
-// como o `CustomerCreate` do Ecme) e em cartão (dentro de outra tela), o rich text com o popover
+// como o `CustomerCreate` do Ecme), em cartão (dentro de outra tela) e com lista de objetos (mover
+// e remover por ícone no cabeçalho de cada item, #592), o rich text com o popover
 // de link e a data no fuso do site, ambos registrados pelo `fields` como nas telas, e o
 // `SiteSwitcher` aberto e recolhido. Tudo com dados fixos: o envio fica no cliente e devolve o
 // sucesso do toast; os sites do seletor levam a `/sites/<id>`, que o E2E não segue.
@@ -21,6 +22,27 @@ const MateriaSchema = z.object({
 });
 
 const MATERIA_LABELS = { titulo: 'Título', resumo: 'Resumo', destaque: 'Destaque na capa' };
+
+const LinksSchema = z.object({
+  itens: z.array(
+    z.object({ rotulo: z.string().trim().min(1, 'Informe o rótulo'), link: z.string() }),
+  ),
+});
+
+const LINKS = {
+  itens: [
+    { rotulo: 'Início', link: '/' },
+    { rotulo: 'Receitas', link: '/receitas' },
+    { rotulo: 'Sobre', link: '/sobre' },
+  ],
+};
+
+const LINKS_LABELS = {
+  itens: 'Links',
+  'itens.*': 'link',
+  'itens.*.rotulo': 'Rótulo',
+  'itens.*.link': 'Caminho',
+};
 
 const TextoSchema = z.object({ corpo: RichTextSchema });
 
@@ -65,6 +87,16 @@ export function FormsShowcase() {
           card={{ intro: <p className="text-sm">Edição rápida, dentro de outra tela.</p> }}
           submitLabel="Salvar matéria"
           onSubmit={salvo('Matéria salva.')}
+        />
+        <h3 className="font-semibold">Lista de objetos</h3>
+        <SchemaForm
+          schema={LinksSchema}
+          defaultValues={LINKS}
+          labels={LINKS_LABELS}
+          sideBySide={[['itens.*.rotulo', 'itens.*.link']]}
+          card={{}}
+          submitLabel="Salvar links"
+          onSubmit={salvo('Links salvos.')}
         />
       </section>
 
