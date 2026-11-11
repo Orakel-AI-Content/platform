@@ -14,11 +14,13 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
+import { getDb } from '@/db/client.ts';
 import { can } from '@/domain/access/rbac.ts';
 
 import { itemTitle } from '../../../../item-title.ts';
 import { readContentVersions } from '../../../content-versions.ts';
 import { positiveInt } from '../../../params.ts';
+import { readVersionReferences } from '../../../version-references.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +43,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 /**
  * Uma versão de um conteúdo, só para leitura: nenhum controle de edição na versão. No
  * cabeçalho, "Voltar às versões" e, com content.write, "Editar" (a edição atual), como a tela de
- * detalhe do guia (#372).
+ * detalhe do guia (#372). Autores, taxonomias e mídias aparecem pelo nome e pela miniatura, com
+ * as leituras do editor (#593); leitura recusada responde como a versão recusada.
  */
 export default async function ContentVersionPage({ params }: Params) {
   const { site: siteId, id, versao } = await params;
@@ -57,6 +60,8 @@ export default async function ContentVersionPage({ params }: Params) {
   }
   const version = versions.value.find((item) => item.version === number);
   if (version === undefined) notFound();
+  const references = await readVersionReferences(getDb().db, actor, siteId, version.data);
+  if (references === undefined) return noRead;
   const latestVersion = versions.value.at(-1)!;
   const latest = latestVersion.version;
   const contentHref = `/sites/${siteId}/conteudos/${contentId}`;
@@ -99,7 +104,7 @@ export default async function ContentVersionPage({ params }: Params) {
           version.version === latest ? 'Versão mais recente' : `Mais recente: ${latest}`,
         ]}
       />
-      <ContentVersionView data={version.data} timeZone={timeZone} />
+      <ContentVersionView data={version.data} timeZone={timeZone} references={references} />
     </article>
   );
 }
