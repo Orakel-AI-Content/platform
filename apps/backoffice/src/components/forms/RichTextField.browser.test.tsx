@@ -5,7 +5,7 @@ import { userEvent } from 'vitest/browser';
 import { FormsShowcase } from '@/app/(admin)/teste-de-componentes/forms-showcase.tsx';
 import { toast } from '@/components/ui/toast';
 
-import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
+import { setReducedMotion } from '../../../test/browser/a11y.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
@@ -21,9 +21,8 @@ afterEach(() => {
   toast.removeAll();
 });
 
-describe.each(COLOR_SCHEMES)('rich text no navegador (%s)', (scheme) => {
-  it('o popover de link aplica o endereço pelo teclado e o Esc volta ao editor, sem violação do axe', async () => {
-    await setTheme(scheme);
+describe('rich text no navegador', () => {
+  it('o popover de link aplica o endereço pelo teclado e o Esc volta ao editor', async () => {
     await setReducedMotion('reduce');
     const screen = await renderInApp(<FormsShowcase />);
     const rich = screen.getByRole('region', { name: 'Rich text e link' });
@@ -65,7 +64,6 @@ describe.each(COLOR_SCHEMES)('rich text no navegador (%s)', (scheme) => {
     await userEvent.keyboard('exemplo{Enter}');
     await expect.element(address).toHaveAttribute('aria-invalid', 'true');
     await expect.element(address).toBeVisible();
-    expect(await audit(rich)).toEqual([]);
 
     await userEvent.keyboard('{ControlOrMeta>}a{/ControlOrMeta}https://exemplo.com/guia{Enter}');
     await expect.poll(popoverOpen).toBe(false);
@@ -81,7 +79,6 @@ describe.each(COLOR_SCHEMES)('rich text no navegador (%s)', (scheme) => {
     await userEvent.keyboard('{Enter}');
     await expect.element(address).toHaveValue('https://exemplo.com/guia');
     await expect.element(rich.getByRole('button', { name: 'Remover link' })).toBeVisible();
-    expect(await audit(rich)).toEqual([]);
     await userEvent.keyboard('{Escape}');
     await expect.poll(popoverOpen).toBe(false);
     await expect.element(editor).toHaveFocus();

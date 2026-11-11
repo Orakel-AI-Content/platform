@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
 
 import { ContentVersionsTable } from '@/components/contents/ContentVersionsTable';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
@@ -11,7 +10,6 @@ import { REVIEW_CHECKLIST } from '@/domain/reviews/reviews.ts';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
-import { pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInFrame } from '../../../test/browser/render.tsx';
 import { DETAIL_SUMMARY_CLASS, DETAIL_SUMMARY_LIST_CLASS } from './detailSummary.ts';
@@ -21,9 +19,9 @@ import { InfoField, InfoList } from './InfoList.tsx';
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 // Grade das telas de detalhe em Chromium (#460; antes no E2E: `sites.spec.ts`, `contents.spec.ts`
-// e `revisao.spec.ts`, #370, #371, #373): na moldura do admin, o resumo e o corpo lado a lado a
-// 1280 px e um sobre o outro a 1024 e a 375 px, sem rolagem horizontal. As três telas montam a
-// grade com o componente, cada uma com as peças dela; o axe roda nos dois temas.
+// e `revisao.spec.ts`, #370, #371, #373): na moldura do admin, as três telas montam a grade com o
+// componente, cada uma com as peças dela, e o axe roda nos dois temas. As medidas por largura
+// saíram (ADR 0020).
 
 const SITE: SiteSummary = {
   id: 'exemplo-a',
@@ -79,8 +77,6 @@ const SLUG = `/detalhe${'x'.repeat(90)}1761000000000`;
 
 /** Título longo de versão (#588): vai cortado sob a versão, sem empurrar a tabela para fora. */
 const LONG_TITLE = `Como montar uma horta vertical em apartamento pequeno ${'com pouca luz '.repeat(6)}`;
-
-const box = (element: Element) => element.getBoundingClientRect();
 
 /** A tela do site: o resumo à esquerda das abas. */
 function SiteDetail() {
@@ -170,30 +166,6 @@ function ReviewDetail() {
   );
 }
 
-/** Os dois cartões da grade, na ordem do DOM. */
-function columns(): [Element, Element] {
-  const grid = document.querySelector('main section > div')!;
-  const [first, second] = [...grid.children];
-  return [first!, second!];
-}
-
-/** Lado a lado (o segundo à direita do primeiro, no mesmo topo) ou empilhados. */
-function expectSideBySide(sideBySide: boolean) {
-  const [first, second] = columns().map(box) as [DOMRect, DOMRect];
-  if (sideBySide) {
-    expect(second.x).toBeGreaterThanOrEqual(first.right);
-    expect(Math.abs(second.y - first.y)).toBeLessThan(1);
-  } else {
-    expect(second.y).toBeGreaterThanOrEqual(first.bottom);
-  }
-}
-
-const WIDTHS = [
-  [1280, true],
-  [1024, false],
-  [375, false],
-] as const;
-
 beforeEach(() => {
   navigation.set('/sites/exemplo-a');
 });
@@ -203,51 +175,6 @@ afterEach(() => {
 });
 
 describe('DetailLayout no navegador', () => {
-  it.each(WIDTHS)('tela do site a %i px: lado a lado só a partir de xl', async (width, side) => {
-    await page.viewport(width, 800);
-    await renderInFrame(<SiteDetail />, { roles: ['operacao'] });
-    expectSideBySide(side);
-    expect(pageOverflow()).toBe(0);
-  });
-
-  it.each(WIDTHS)('tela do conteúdo a %i px: o slug quebra no cartão', async (width, side) => {
-    await page.viewport(width, 800);
-    const screen = await renderInFrame(<ContentDetail />);
-    expectSideBySide(side);
-    expect(pageOverflow()).toBe(0);
-    const slug = screen.getByText(SLUG, { exact: true }).element();
-    expect(box(slug).right).toBeLessThanOrEqual(box(columns()[0]).right);
-  });
-
-  it('tela do conteúdo a 1440 px: as versões cabem no cartão sem rolagem (#588)', async () => {
-    await page.viewport(1440, 800);
-    const screen = await renderInFrame(<ContentDetail />);
-    expectSideBySide(true);
-    expect(pageOverflow()).toBe(0);
-    const table = screen.getByRole('table', { name: 'Versões' });
-    expect(tableOverflow(table)).toBeLessThanOrEqual(0);
-    expect(
-      [...table.element().querySelectorAll('thead th')].map((th) => th.textContent?.trim()),
-    ).toEqual(['Versão', 'Status', 'Gravada em']);
-    // A aprovação aparece inteira sob o status, e o título longo é cortado sob a versão.
-    expect(screen.getByText(/revisora\.editorial@orakel\.local/).element()).toBeVisible();
-    expect(box(screen.getByTitle(LONG_TITLE).element()).right).toBeLessThanOrEqual(
-      box(table.element()).right,
-    );
-  });
-
-  it.each(WIDTHS)('tela de revisão a %i px: o painel com 330 px ao lado', async (width, side) => {
-    await page.viewport(width, 900);
-    await renderInFrame(<ReviewDetail />, { roles: ['revisor'] });
-    expectSideBySide(side);
-    expect(pageOverflow()).toBe(0);
-    const [card, panel] = columns().map(box) as [DOMRect, DOMRect];
-    if (side) expect(panel.width).toBeGreaterThanOrEqual(330);
-    // Empilhada, a prévia ocupa a largura útil do main (a da seção).
-    const section = box(document.querySelector('main section')!);
-    if (!side) expect(Math.abs(card.width - section.width)).toBeLessThanOrEqual(1);
-  });
-
   it.each(COLOR_SCHEMES)('as três telas sem violação do axe (%s)', async (scheme) => {
     await setTheme(scheme);
     await setReducedMotion('reduce');

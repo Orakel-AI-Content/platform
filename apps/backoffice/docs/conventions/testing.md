@@ -28,6 +28,12 @@ CLICKHOUSE_PASSWORD=orakel-ci -p 127.0.0.1:58123:8123 clickhouse/clickhouse-serv
 - **Componente em Chromium** (`src/**/*.browser.test.tsx`, ao lado do componente; #457): teclado,
   foco, axe, tema e movimento no navegador de verdade, com o CSS de `globals.css`, sem servidor
   nem banco. É onde ficam os testes de acessibilidade do Backoffice: o E2E não roda axe (ADR 0019 da raiz).
+  O que entra (ADR 0020 da raiz): axe, foco de 2px, alvo de 24 px e tema só nos componentes de
+  base (`ui/`, `shared/`, `template/`, `layouts/` e a moldura), nos dois temas; componente de
+  domínio só ganha arquivo para comportamento que precisa do navegador (teclado, foco, estado
+  na URL, envio), sem axe e sem repetir por tema; nada de medida de layout (rolagem horizontal,
+  linhas por célula, posição ou tamanho em pixels por largura); arquivo entra por
+  `userEvent.upload`, nunca pelo seletor nativo.
   Render com `renderUi` (`test/browser/render.tsx`, com o `MotionProvider` do layout) ou, para
   Dialog, Drawer, ConfirmDialog e toast, `renderInApp` (o corpo do layout: `#app-root` com o
   `appElement` do react-modal e o `ToastProvider` fora dele; #458), com `appRoot`,
@@ -79,7 +85,7 @@ CLICKHOUSE_PASSWORD=orakel-ci -p 127.0.0.1:58123:8123 clickhouse/clickhouse-serv
   2 semanas sem uso.
 - **Quando escrever E2E** (ADR 0019 da raiz): só para um fluxo crítico novo (gravação pela
   tela, permissão por papel, publicação), nunca por tela nova ou alterada. Teclado, foco, menus,
-  Drawer, tema, layout por largura e axe ficam nos testes de componente; para um link navegar no
+  Drawer, tema e axe ficam nos testes de componente (ADR 0020 da raiz); para um link navegar no
   roteador em memória, `followLinks()` (`test/browser/navigation.ts`). No teste de fluxo não vai
   asserção de aparência (classe, tamanho, posição, título da aba, ordem de colunas) nem axe. O
   tempo com volume é medido no contrato, não no navegador.

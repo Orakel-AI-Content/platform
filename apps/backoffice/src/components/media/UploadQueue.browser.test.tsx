@@ -2,16 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { MediaShowcase } from '@/app/(admin)/teste-de-componentes/media-showcase.tsx';
 
-import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
+import { setReducedMotion } from '../../../test/browser/a11y.ts';
 import { renderUi } from '../../../test/browser/render.tsx';
 
 // Fila de envio em Chromium (#459; da vitrine, #389): um estado por arquivo em texto, a barra de
 // progresso só no envio e um anúncio só. A fixture é a seção da própria vitrine, com uma
 // entrada em cada estado.
 
-describe.each(COLOR_SCHEMES)('fila de envio no navegador (%s)', (scheme) => {
-  it('um estado por arquivo, barra só no envio, um anúncio e sem violação do axe', async () => {
-    await setTheme(scheme);
+describe('fila de envio no navegador', () => {
+  it('um estado por arquivo, barra só no envio, um anúncio', async () => {
     await setReducedMotion('reduce');
     const screen = await renderUi(<MediaShowcase />);
     const queue = screen.getByRole('region', { name: 'Fila de envio' });
@@ -34,7 +33,5 @@ describe.each(COLOR_SCHEMES)('fila de envio no navegador (%s)', (scheme) => {
     expect(bar.elements()).toHaveLength(1);
     await expect.element(bar).toHaveAccessibleName('Envio de galeria-01.png');
     await expect.element(bar).toHaveAttribute('aria-valuenow', '42');
-
-    expect(await audit(queue)).toEqual([]);
   });
 });

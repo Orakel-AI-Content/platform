@@ -3,7 +3,6 @@ import { page, userEvent } from 'vitest/browser';
 
 import type { ContentEdit } from '@/domain/content/contents.ts';
 
-import { audit, COLOR_SCHEMES, setTheme } from '../../../test/browser/a11y.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 import { ContentEditor, type ContentEditorOptions } from './ContentEditor.tsx';
@@ -103,7 +102,7 @@ describe('blocos do editor no navegador', () => {
       .toBeInTheDocument();
   });
 
-  it('recolhe e expande blocos só pelo teclado; recolhido, o bloco ocupa uma linha (#135)', async () => {
+  it('recolhe e expande blocos só pelo teclado (#135)', async () => {
     await renderEditor();
     const toggle = page.getByRole('button', { name: 'Conteúdo do bloco 1', exact: true });
     const group = page.getByRole('group', { name: 'Bloco 1: Sumário', exact: true });
@@ -116,8 +115,6 @@ describe('blocos do editor no navegador', () => {
       .element(group.getByText('Seção 1', { exact: true }))
       .toHaveAttribute('title', 'Seção 1');
     await expect.element(group.getByLabelText('Título do sumário')).not.toBeVisible();
-    // Uma linha: a altura do bloco é a do cabeçalho (botões de 32 px) mais o espaçamento.
-    expect(group.element().getBoundingClientRect().height).toBeLessThanOrEqual(72);
 
     await userEvent.keyboard('{Enter}');
     await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -186,11 +183,6 @@ describe('salvar sem alteração (#525)', () => {
     (title().element() as HTMLElement).focus();
     await userEvent.keyboard('{Enter}');
     expect(action).not.toHaveBeenCalled();
-
-    for (const scheme of COLOR_SCHEMES) {
-      await setTheme(scheme);
-      expect(await audit()).toEqual([]);
-    }
   });
 
   it('alterar um campo libera o envio; desfazer volta a "sem alteração"', async () => {
@@ -265,56 +257,8 @@ describe('salvar sem alteração (#525)', () => {
   });
 });
 
-describe('duas colunas e SEO recolhível (#591)', () => {
-  const section = (name: string) => page.getByRole('region', { name, exact: true }).element();
-  const box = (name: string) => section(name).getBoundingClientRect();
-
-  afterEach(async () => {
-    await page.viewport(1280, 720);
-  });
-
-  it('a 1440 px, blocos à esquerda e dados e SEO na coluna à direita', async () => {
-    await page.viewport(1440, 900);
-    await renderEditor();
-
-    const blocksBox = box('Blocos');
-    const meta = box('Dados do conteúdo');
-    const seo = box('SEO');
-    expect(meta.left).toBeGreaterThanOrEqual(blocksBox.right);
-    expect(meta.top).toBeLessThan(blocksBox.bottom);
-    expect(seo.left).toBe(meta.left);
-    expect(seo.top).toBeGreaterThanOrEqual(meta.bottom);
-  });
-
-  it('a 390 px, empilha com os dados primeiro, na largura da janela', async () => {
-    await page.viewport(390, 800);
-    await renderEditor();
-
-    const blocksBox = box('Blocos');
-    const meta = box('Dados do conteúdo');
-    expect(meta.bottom).toBeLessThanOrEqual(box('SEO').top);
-    expect(box('SEO').bottom).toBeLessThanOrEqual(blocksBox.top);
-    // As colunas cabem na largura da janela.
-    for (const name of ['Dados do conteúdo', 'SEO', 'Blocos']) {
-      expect(box(name).right).toBeLessThanOrEqual(window.innerWidth);
-    }
-  });
-
-  it.each(COLOR_SCHEMES)('a 1440 px com o SEO aberto, sem violação do axe (%s)', async (scheme) => {
-    await page.viewport(1440, 900);
-    await setTheme(scheme);
-    await renderEditor();
-    const toggle = page.getByRole('button', { name: 'Campos de SEO' });
-
-    await toggle.click();
-    await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect.element(page.getByRole('textbox', { name: /Endereço canônico/ })).toBeVisible();
-    expect(await audit()).toEqual([]);
-  });
-});
-
 describe('título, slug e SEO no navegador (#590)', () => {
-  it('na criação, o slug acompanha o título; a contagem do SEO é a descrição do campo; sem violações do axe', async () => {
+  it('na criação, o slug acompanha o título; a contagem do SEO é a descrição do campo', async () => {
     await renderInApp(
       <ContentEditor
         mode="create"
@@ -338,10 +282,5 @@ describe('título, slug e SEO no navegador (#590)', () => {
     await expect.element(seoTitle).toHaveAccessibleDescription('0 caracteres');
     await userEvent.type(seoTitle, 'Horta');
     await expect.element(seoTitle).toHaveAccessibleDescription('5 caracteres');
-
-    for (const scheme of COLOR_SCHEMES) {
-      await setTheme(scheme);
-      expect(await audit()).toEqual([]);
-    }
   });
 });

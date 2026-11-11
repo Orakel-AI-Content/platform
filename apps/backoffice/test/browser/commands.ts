@@ -1,5 +1,5 @@
 import { defineBrowserCommand } from '@vitest/browser-playwright';
-import type { CDPSession, FileChooser, Page } from 'playwright';
+import type { CDPSession, Page } from 'playwright';
 
 // Comandos do Browser Mode que rodam no Node, com a `Page` do Playwright: o que a página de
 // teste não alcança sozinha. Os tipos do lado do navegador estão em `a11y.ts`.
@@ -11,8 +11,6 @@ export type MediaOptions = {
 
 /** Fuso padrão do navegador nos testes, como no E2E do DateTimepicker. */
 export const TIMEZONE = 'America/Sao_Paulo';
-
-export type ChosenFile = { name: string; mimeType: string; base64: string };
 
 /** `prefers-color-scheme` e `prefers-reduced-motion` de verdade, sem mock de `matchMedia`. */
 export const emulateMedia = defineBrowserCommand<[MediaOptions]>(async (context, options) => {
@@ -47,40 +45,3 @@ export const resetPointer = defineBrowserCommand<[]>(async (context) => {
   const box = await frame.boundingBox();
   if (box) await context.page.mouse.move(box.x + box.width - 2, box.y + box.height - 2);
 });
-
-/**
- * Aperta a tecla com o foco onde está e responde ao seletor de arquivos nativo que ela abre.
- * Devolve se o seletor aceita vários arquivos. Falha se a tecla não abrir o seletor.
- *
- * O Playwright liga a interceptação do seletor sem esperar o navegador confirmar: com a máquina
- * ocupada, a primeira tecla pode chegar antes e o seletor (sem interceptação, cancelado no
- * headless) não vira evento. Por isso, até três tentativas, com um ouvinte fixo durante o
- * comando: o `waitForEvent` sozinho tira o ouvinte ao estourar o tempo, o que desliga a
- * interceptação e faz cada tentativa recomeçar a mesma corrida.
- */
-export const pressAndChooseFiles = defineBrowserCommand<[string, ChosenFile[]]>(
-  async (context, key, files) => {
-    const keepIntercepting = () => {};
-    context.page.on('filechooser', keepIntercepting);
-    let chooser: FileChooser | null = null;
-    try {
-      for (let attempt = 0; attempt < 3 && !chooser; attempt += 1) {
-        [chooser] = await Promise.all([
-          context.page.waitForEvent('filechooser', { timeout: 2000 }).catch(() => null),
-          context.page.keyboard.press(key),
-        ]);
-      }
-    } finally {
-      context.page.off('filechooser', keepIntercepting);
-    }
-    if (!chooser) throw new Error(`A tecla ${key} não abriu o seletor de arquivos`);
-    await chooser.setFiles(
-      files.map(({ name, mimeType, base64 }) => ({
-        name,
-        mimeType,
-        buffer: Buffer.from(base64, 'base64'),
-      })),
-    );
-    return chooser.isMultiple();
-  },
-);

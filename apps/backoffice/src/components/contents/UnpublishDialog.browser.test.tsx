@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
 import { appElementWarnings, appRoot, expectFocusTrapped } from '../../../test/browser/dialog.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
@@ -11,8 +10,7 @@ import { ContentActionScope } from './ContentActionScope.tsx';
 import { UnpublishDialog, type UnpublishTarget } from './UnpublishDialog.tsx';
 
 // Despublicar em Chromium (#494): foco preso no alertdialog, o foco volta ao gatilho ao
-// fechar (Esc, Cancelar e confirmar) e o axe (WCAG 2.2 AA) com o diálogo e o seletor abertos,
-// nos dois temas.
+// fechar (Esc, Cancelar e confirmar).
 
 const TARGETS: UnpublishTarget[] = [
   { id: 1, title: 'Guia completo', slug: 'guia-completo' },
@@ -80,26 +78,5 @@ describe('Despublicar no navegador', () => {
     expect(action).toHaveBeenCalledWith(2);
     await expect.element(trigger).toHaveFocus();
     await expect.element(page.getByRole('alert')).toHaveTextContent('Recusado.');
-  });
-});
-
-describe.each(COLOR_SCHEMES)('Despublicar no navegador (%s)', (scheme) => {
-  it('sem violação do axe com o diálogo e com o seletor abertos', async () => {
-    await setTheme(scheme);
-    await setReducedMotion('reduce');
-    const screen = await renderInApp(<Unpublish action={vi.fn()} />);
-    expect(await audit()).toEqual([]);
-
-    await screen.getByRole('button', { name: 'Despublicar' }).click();
-    const dialog = page.getByRole('alertdialog', { name: NAME });
-    await expect.element(dialog.getByRole('heading', { name: NAME })).toBeVisible();
-    expect(await audit()).toEqual([]);
-
-    await dialog.getByRole('combobox', { name: 'Redirecionar para (opcional)' }).click();
-    await expect.element(page.getByRole('option').first()).toBeVisible();
-    expect(await audit()).toEqual([]);
-
-    await userEvent.keyboard('{Escape}{Escape}');
-    await expect.element(dialog).not.toBeInTheDocument();
   });
 });

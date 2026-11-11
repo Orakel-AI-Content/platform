@@ -58,7 +58,16 @@ export default mergeConfig(baseConfig, withCoverageThreshold(90)); // só nos pa
 - Tela nova ou alterada não ganha E2E: ganha teste de componente (`test:browser`). Só um fluxo
   crítico novo entra no E2E.
 - No teste de fluxo, nada de aparência: classe, tamanho, posição, título da aba, ordem de
-  colunas e axe ficam nos testes de componente.
+  colunas e axe não entram.
+
+## Testes de componente do Backoffice (ADR 0020)
+
+- Axe, foco de 2px, alvo de 24 px e tema ficam nos componentes de base (`ui/`, `shared/`,
+  `template/`, `layouts/` e a moldura), nos dois temas.
+- Componente de domínio só ganha `*.browser.test.tsx` para comportamento que precisa do
+  navegador (teclado, foco, estado na URL, envio), sem axe e sem repetir por tema.
+- Nada de medida de layout: rolagem horizontal, linhas por célula, posição ou tamanho em
+  pixels por largura de janela.
 
 ## Definição de pronto
 

@@ -4,7 +4,7 @@ import { commands, page, userEvent } from 'vitest/browser';
 import { FormsShowcase } from '@/app/(admin)/teste-de-componentes/forms-showcase.tsx';
 import { toast } from '@/components/ui/toast';
 
-import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
+import { setReducedMotion } from '../../../test/browser/a11y.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
@@ -21,11 +21,10 @@ afterEach(async () => {
   await commands.emulateTimezone();
 });
 
-describe.each(COLOR_SCHEMES)('data com fuso no navegador (%s)', (scheme) => {
-  it('pelo teclado, sem violação do axe com o painel aberto', async () => {
+describe('data com fuso no navegador', () => {
+  it('pelo teclado com o painel aberto', async () => {
     await commands.emulateTimezone('UTC');
     expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe('UTC');
-    await setTheme(scheme);
     await setReducedMotion('reduce');
     const screen = await renderInApp(<FormsShowcase />);
     const agenda = screen.getByRole('region', { name: 'Data com fuso' });
@@ -42,7 +41,6 @@ describe.each(COLOR_SCHEMES)('data com fuso no navegador (%s)', (scheme) => {
     await expect
       .element(panel.getByRole('button', { name: '15 de julho de 2026', pressed: true }))
       .toBeVisible();
-    expect(await audit(agenda, panel)).toEqual([]);
 
     await userEvent.keyboard('{Escape}');
     await expect.element(panel).not.toBeInTheDocument();

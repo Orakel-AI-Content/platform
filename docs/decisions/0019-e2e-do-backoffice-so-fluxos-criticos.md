@@ -1,7 +1,8 @@
 # 0019 – E2E do Backoffice só com fluxos críticos
 
 - Status: aceito (substitui em parte o 0016 e o 0017: o que o E2E cobre, o axe no E2E e o
-  projeto `perf`; as três camadas, os gatilhos e a trava do release continuam)
+  projeto `perf`; as três camadas, os gatilhos e a trava do release continuam); o que os testes
+  de componente cobrem (layout por largura, axe por tela) foi reduzido pelo 0020
 - Data: 2026-11-11
 
 ## Contexto

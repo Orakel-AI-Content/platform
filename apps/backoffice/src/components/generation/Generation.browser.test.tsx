@@ -7,14 +7,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { toast } from '@/components/ui/toast';
 import type { GenerationRunSummary } from '@/domain/generation/runs.ts';
 
-import {
-  audit,
-  COLOR_SCHEMES,
-  setReducedMotion,
-  setTheme,
-  tabTo,
-} from '../../../test/browser/a11y.ts';
-import { cellsOverLines, pageOverflow, tableOverflow } from '../../../test/browser/layout.ts';
+import { tabTo } from '../../../test/browser/a11y.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInFrame } from '../../../test/browser/render.tsx';
 import { GenerationForm } from './GenerationForm.tsx';
@@ -23,8 +16,7 @@ import { GenerationRunsTable } from './GenerationRunsTable.tsx';
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 // Aba Geração em Chromium, na moldura do admin a 1280 px: o disparo só pelo teclado (tema,
-// autor no combobox, envio), o foco no campo recusado, a lista com as oito colunas sem rolagem
-// horizontal e com até duas linhas por célula, e o axe nos dois temas.
+// autor no combobox, envio) e o foco no campo recusado.
 
 const SITE = 'exemplo-a';
 
@@ -105,8 +97,6 @@ function Generation({ action }: { action: (value: unknown) => Promise<EntityForm
 const ok = () =>
   vi.fn(() => Promise.resolve<EntityFormResult>({ ok: true, message: 'Geração enfileirada.' }));
 
-const table = () => page.getByRole('table', { name: 'Execuções', exact: true });
-
 beforeEach(() => {
   navigation.set(`/sites/${SITE}/geracao`);
 });
@@ -117,17 +107,6 @@ afterEach(() => {
 });
 
 describe('aba Geração no navegador', () => {
-  it('a 1280 px, a lista sem rolagem horizontal e com até duas linhas por célula', async () => {
-    await renderInFrame(<Generation action={ok()} />, { roles: ['editor'] });
-    await expect
-      .element(table().getByRole('link', { name: 'Conteúdo #1042 (abrir)' }))
-      .toBeVisible();
-
-    expect(pageOverflow()).toBe(0);
-    expect(tableOverflow(table())).toBe(0);
-    expect(cellsOverLines(table())).toEqual([]);
-  });
-
   it('dispara só pelo teclado: tema, autor no combobox e Enter no envio', async () => {
     const action = ok();
     await renderInFrame(<Generation action={action} />, { roles: ['editor'] });
@@ -161,34 +140,4 @@ describe('aba Geração no navegador', () => {
     await expect.element(topic).toHaveAccessibleDescription(/Escreva o tema do artigo/);
     expect(action).not.toHaveBeenCalled();
   });
-
-  it.each(COLOR_SCHEMES)('formulário e lista sem violação do axe (%s)', async (scheme) => {
-    await setTheme(scheme);
-    await setReducedMotion('reduce');
-    await renderInFrame(<Generation action={ok()} />, { roles: ['editor'] });
-    await expect.element(table()).toBeVisible();
-    expect(await audit()).toEqual([]);
-  });
-
-  it.each(COLOR_SCHEMES)(
-    'aviso sem contexto editorial sem violação do axe (%s)',
-    async (scheme) => {
-      await setTheme(scheme);
-      await setReducedMotion('reduce');
-      await renderInFrame(
-        <GenerationForm
-          siteId={SITE}
-          canWrite
-          authors={AUTHORS}
-          context={undefined}
-          action={ok()}
-        />,
-        { roles: ['editor'] },
-      );
-      await expect
-        .element(page.getByRole('main').getByRole('link', { name: 'Criar contexto editorial' }))
-        .toBeVisible();
-      expect(await audit()).toEqual([]);
-    },
-  );
 });

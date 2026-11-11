@@ -1,17 +1,16 @@
 import axe from 'axe-core';
 import { commands, userEvent, type Locator } from 'vitest/browser';
 
-import type { ChosenFile, MediaOptions } from './commands.ts';
+import type { MediaOptions } from './commands.ts';
 
-// Helpers de acessibilidade dos testes de componente (#457), com a mesma régua do E2E
-// (`test/e2e/axe.ts` e `vitrine.spec.ts`): axe nas tags WCAG 2.2 AA, contorno de foco de 2px,
+// Helpers de acessibilidade dos testes de componente (#457), a única verificação de WCAG do
+// Backoffice no CI (ADRs 0019 e 0020): axe nas tags WCAG 2.2 AA, contorno de foco de 2px,
 // alvo de 24 px, tema pela classe do <html> e movimento pela mídia emulada.
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
     emulateMedia: (options: MediaOptions) => Promise<void>;
     emulateTimezone: (timezoneId?: string) => Promise<void>;
-    pressAndChooseFiles: (key: string, files: ChosenFile[]) => Promise<boolean>;
     resetPointer: () => Promise<void>;
   }
 }

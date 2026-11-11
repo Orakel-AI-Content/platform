@@ -224,9 +224,10 @@ Não negociável, em toda tela e todo componente portado:
   Dropdown e Tooltip acessíveis por teclado (setas, Esc com o foco de volta).
 - **Auditoria:** a vitrine `/teste-de-componentes` (`src/app/(admin)/teste-de-componentes/`,
   só com `E2E_ERROR_ROUTE`, no compose local) é onde se audita cada componente: todo componente
-  novo ou portado ganha uma seção ali e um teste de componente em Chromium
-  (`*.browser.test.tsx` ao lado dele, `test:browser`) que o confere com axe (WCAG 2.2 AA) e
-  teclado nos dois temas. O E2E não audita a vitrine nem as telas (ADR 0019 da raiz). Corrija
+  de base (`ui/`, `shared/`, `template/`, `layouts/`) novo ou portado ganha uma seção ali e um
+  teste de componente em Chromium (`*.browser.test.tsx` ao lado dele, `test:browser`) que o
+  confere com axe (WCAG 2.2 AA) e teclado nos dois temas; composição de domínio não roda axe
+  (ADR 0020 da raiz). O E2E não audita a vitrine nem as telas (ADR 0019 da raiz). Corrija
   no componente, não na tela.
 
 ## Padrões de tela
@@ -294,8 +295,8 @@ menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo ca
   o HTML é o mesmo em toda largura). Abaixo de `md`, as células têm `max-md:px-2` (a partir
   dele, o respiro da Table, inclusive o do `compact`) e a largura do `getSize()` só vale a partir de `md` (#589). Conteúdos: caixa, Título,
   Status e editar; sites: Site, Status e Mais ações; revisão, que não tem status: Título e
-  Enviado em. Cada lista confere a 390 px no teste em Chromium (`visibleColumns`,
-  `pageOverflow` e `tableOverflow` de `test/browser/layout.ts`). A partir de `md`, nada muda.
+  Enviado em. Não há teste de layout por largura (ADR 0020 da raiz): confira a 390 px na revisão. A partir
+  de `md`, nada muda.
 - **Ações da linha:** a principal fica visível; editar é o botão de ícone do `CustomerListTable`
   (#441): `IconButton` como link (`asElement={Link}`, `href`) com `TbPencil` e o nome com o
   item ("Editar Guia de uso"), numa coluna `actions` de cabeçalho `sr-only` ("Ações") e

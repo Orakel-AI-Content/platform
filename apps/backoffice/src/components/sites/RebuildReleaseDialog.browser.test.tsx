@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
 import { appElementWarnings, appRoot, expectFocusTrapped } from '../../../test/browser/dialog.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 import { Button } from '@/components/ui/Button';
@@ -10,8 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { RebuildReleaseDialog, type RebuildRelease } from './RebuildReleaseDialog.tsx';
 
 // Reconstruir na release em Chromium (#515): foco preso no alertdialog, o foco volta ao
-// gatilho ao fechar (Esc, Cancelar e confirmar) e o axe (WCAG 2.2 AA) com o diálogo e o
-// seletor abertos e com o aviso de imagem ausente (#574), nos dois temas.
+// gatilho ao fechar (Esc, Cancelar e confirmar).
 
 const RELEASES: RebuildRelease[] = [
   { tag: '1.3.0', imageStatus: 'ausente' },
@@ -94,35 +92,5 @@ describe('Reconstruir na release no navegador', () => {
     await expect.element(dialog).not.toBeInTheDocument();
     expect(action).toHaveBeenCalledWith('1.3.0');
     await expect.element(trigger).toHaveFocus();
-  });
-});
-
-describe.each(COLOR_SCHEMES)('Reconstruir na release no navegador (%s)', (scheme) => {
-  it('sem violação do axe com o diálogo e com o seletor abertos', async () => {
-    await setTheme(scheme);
-    await setReducedMotion('reduce');
-    const screen = await renderInApp(<Rebuild onConfirm={vi.fn()} />);
-    expect(await audit()).toEqual([]);
-
-    await screen.getByRole('button', { name: 'Reconstruir na release' }).click();
-    const dialog = page.getByRole('alertdialog', { name: NAME });
-    await expect.element(dialog.getByRole('heading', { name: NAME })).toBeVisible();
-    expect(await audit()).toEqual([]);
-
-    await dialog.getByRole('combobox', { name: 'Release' }).click();
-    await expect.element(page.getByRole('option').first()).toBeVisible();
-    expect(await audit()).toEqual([]);
-
-    await page.getByRole('option', { name: '1.3.0' }).click();
-    await expect
-      .element(dialog.getByText(/A imagem site-builder:1\.3\.0 não estava no host/))
-      .toBeVisible();
-    await expect
-      .element(dialog.getByRole('button', { name: 'Reconstruir', exact: true }))
-      .toBeEnabled();
-    expect(await audit()).toEqual([]);
-
-    await userEvent.keyboard('{Escape}');
-    await expect.element(dialog).not.toBeInTheDocument();
   });
 });
