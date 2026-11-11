@@ -14,19 +14,17 @@ nextEnv.loadEnvConfig(path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 // processo principal e em cada worker.
 if (process.env.E2E_DATABASE_URL) process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
 
-// Duas camadas (#474). Padrão: `telas`, contra o Next (`next start` no CI, `next dev` fora
+// Só fluxos críticos (ADR 0019 da raiz): aparência, teclado e acessibilidade das telas ficam nos
+// testes de componente (`*.browser.test.tsx`). Duas camadas (#474). Padrão: `telas`, contra o Next (`next start` no CI, `next dev` fora
 // dele), o Postgres da DATABASE_URL e um access-mock próprio, sem Caddy, S3, worker nem
 // build-runner; o globalSetup migra e semeia o banco. Os testes `@stack` precisam da pilha e
 // ficam de fora. Com E2E_STACK=1 (test:e2e, local:e2e:area e e2e.yml), contra o ambiente local
 // (pnpm local:up && pnpm local:seed): Caddy + access-mock + backoffice-web, com o certificado
 // da CA interna do Caddy. Ali, o projeto `stack` tem só os `@stack` e é o que o E2E completo
 // (e2e.yml) roda (#475); o `chromium`, a suíte inteira, fica para o local:e2e:area.
-// Sessões em paralelo dividem a máquina: 2 workers por padrão (E2E_WORKERS muda). Os testes
-// @perf semeiam 2.000 linhas e medem o tempo no navegador, que fora do CI depende da carga da
-// máquina: ficam no projeto `perf`, registrado só na pilha, com `CI` ou E2E_PERF=1 (#461). A
-// consulta com volume é medida no contrato.
+// Sessões em paralelo dividem a máquina: 2 workers por padrão (E2E_WORKERS muda). A consulta
+// com volume é medida no contrato, não no navegador.
 const stack = process.env.E2E_STACK === '1';
-const runPerf = Boolean(process.env.CI) || process.env.E2E_PERF === '1';
 const chromium = { ...devices['Desktop Chrome'] };
 
 // Portas próprias da camada `telas`, fora das do compose (8788 do access-mock).
@@ -41,16 +39,15 @@ const stackLayer: PlaywrightTestConfig = {
   retries: process.env.CI ? 2 : 0,
   use: { baseURL: process.env.E2E_BASE_URL ?? 'https://admin.orakel.localhost' },
   projects: [
-    { name: 'chromium', grepInvert: /@perf/, use: chromium },
+    { name: 'chromium', use: chromium },
     { name: 'stack', grep: /@stack/, use: chromium },
-    ...(runPerf ? [{ name: 'perf', grep: /@perf/, use: chromium }] : []),
   ],
 };
 
 const telasLayer: PlaywrightTestConfig = {
   globalSetup: './test/e2e/global-setup.ts',
   use: { baseURL: telasURL },
-  projects: [{ name: 'telas', grepInvert: /@stack|@perf/, use: chromium }],
+  projects: [{ name: 'telas', grepInvert: /@stack/, use: chromium }],
   webServer: [
     {
       command: 'node ../../infra/local/access-mock/server.ts',
@@ -66,8 +63,6 @@ const telasLayer: PlaywrightTestConfig = {
       timeout: 180_000,
       env: {
         ACCESS_JWKS_URL: `${process.env.E2E_ACCESS_URL}/cdn-cgi/access/certs`,
-        // /teste-de-erro e /teste-de-componentes, como no compose local.
-        E2E_ERROR_ROUTE: '1',
       },
     },
   ],

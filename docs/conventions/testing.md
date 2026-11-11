@@ -12,7 +12,7 @@ Consulte ao escrever ou rodar testes. Cada unidade complementa em
 | Sites de exemplo (orçamento de JS) | build do blog com fixtures | blog                                | `build:examples`                                    |
 | Acessibilidade                     | Playwright + axe           | blog                                | `test:a11y`                                         |
 | Paridade estático × SSR            | Playwright                 | blog                                | `test:parity`                                       |
-| E2E de telas (sem Docker)          | Playwright + Postgres      | backoffice                          | `playwright test --project=telas` (job `e2e-telas`) |
+| E2E de telas (fluxos críticos)     | Playwright + Postgres      | backoffice                          | `playwright test --project=telas` (job `e2e-telas`) |
 | E2E da pilha completa              | Playwright                 | backoffice                          | `test:e2e` (`e2e.yml`, fora do PR)                  |
 
 ## Configuração
@@ -50,6 +50,15 @@ export default mergeConfig(baseConfig, withCoverageThreshold(90)); // só nos pa
 - E2E de telas: no CI, em todo PR que afeta o Backoffice (job `e2e-telas` do `ci.yml`)
 - E2E da pilha completa: fora do PR (`e2e.yml`: push na main, noturno, label `e2e:completo` e
   manual; ADR 0017)
+
+## E2E do Backoffice: só fluxos críticos (ADR 0019)
+
+- O E2E cobre o que o produto não pode deixar de fazer e só o app inteiro prova: gravação pela
+  tela, permissão por papel e publicação. Hoje são 10 testes de telas e 4 de pilha.
+- Tela nova ou alterada não ganha E2E: ganha teste de componente (`test:browser`). Só um fluxo
+  crítico novo entra no E2E.
+- No teste de fluxo, nada de aparência: classe, tamanho, posição, título da aba, ordem de
+  colunas e axe ficam nos testes de componente.
 
 ## Definição de pronto
 

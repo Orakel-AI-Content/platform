@@ -9,7 +9,7 @@
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `test`          | Vitest sem banco: RBAC, varredura de `recordPendingChange`, JWT, tokens, mapeamento do snapshot, env                                                       | CI (`quality`)                                                     |
 | `test:contract` | Vitest + Postgres (`DATABASE_URL`): snapshot × fixtures do `content-model`, transação das mudanças pendentes, `REPEATABLE READ`, IDs, agendamento de build | CI (job de contrato)                                               |
-| `test:e2e`      | Playwright + axe contra o ambiente local (Caddy, access-mock, imagem); no `e2e.yml`, só os `@stack` e os `@perf`                                           | `e2e.yml`, fora do PR (ADR 0017 da raiz); local por área, opcional |
+| `test:e2e`      | Playwright contra o ambiente local (Caddy, access-mock, imagem), só fluxos críticos e sem axe (ADR 0019 da raiz); no `e2e.yml`, só os `@stack`             | `e2e.yml`, fora do PR (ADR 0017 da raiz); local por área, opcional |
 
 - As duas configurações do Vitest substituem o `include` da raiz (o `mergeConfig` somaria
   as listas e misturaria as suítes).

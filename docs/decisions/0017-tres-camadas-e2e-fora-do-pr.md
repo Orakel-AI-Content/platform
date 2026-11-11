@@ -1,6 +1,7 @@
 # 0017 – Três camadas de teste do Backoffice, PR sem Docker e pilha completa fora do PR
 
-- Status: aceito (substitui o item 3 da Decisão do 0016, "Suíte completa, no CI")
+- Status: aceito (substitui o item 3 da Decisão do 0016, "Suíte completa, no CI"); o que o E2E
+  cobre, o axe na camada de telas e o projeto `perf` foram substituídos pelo 0019
 - Data: 2026-10-31
 
 ## Contexto

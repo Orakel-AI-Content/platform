@@ -27,7 +27,7 @@ CLICKHOUSE_PASSWORD=orakel-ci -p 127.0.0.1:58123:8123 clickhouse/clickhouse-serv
   e `BACKOFFICE_TEST_AE_SQL_URL='http://orakel:orakel-ci@127.0.0.1:58123/?database=default'`.
 - **Componente em Chromium** (`src/**/*.browser.test.tsx`, ao lado do componente; #457): teclado,
   foco, axe, tema e movimento no navegador de verdade, com o CSS de `globals.css`, sem servidor
-  nem banco. É onde ficam os testes de acessibilidade de um componente (antes na vitrine do E2E).
+  nem banco. É onde ficam os testes de acessibilidade do Backoffice: o E2E não roda axe (ADR 0019 da raiz).
   Render com `renderUi` (`test/browser/render.tsx`, com o `MotionProvider` do layout) ou, para
   Dialog, Drawer, ConfirmDialog e toast, `renderInApp` (o corpo do layout: `#app-root` com o
   `appElement` do react-modal e o `ToastProvider` fora dele; #458), com `appRoot`,
@@ -58,39 +58,31 @@ CLICKHOUSE_PASSWORD=orakel-ci -p 127.0.0.1:58123:8123 clickhouse/clickhouse-serv
   `Seq Scan` é o plano certo (lê a tabela inteira) e não diria nada: por isso os vizinhos. A
   busca sem acento e o filtro das listas no cliente têm o caso de 2.000 itens no unitário de
   `useListState`.
-- **E2E** (`test/e2e/`): telas de sites, o editor de conteúdo e axe (WCAG 2.2 AA), em duas
-  camadas (#474). O padrão do `playwright.config.ts` é o projeto `telas`: o próprio Playwright
+- **E2E** (`test/e2e/`): só fluxos críticos (ADR 0019 da raiz), em duas camadas (#474). O
+  padrão do `playwright.config.ts` é o projeto `telas`: o próprio Playwright
   sobe o Next (`next start` com `CI`, `next dev` fora dele, porta `E2E_TELAS_PORT`, 3100 por
   padrão) e um access-mock (`E2E_ACCESS_PORT`, 8790). O `globalSetup` migra o banco e semeia os
   usuários de teste e `exemplo-a`/`exemplo-b`. Não há Caddy, S3, worker nem build-runner; no CI,
   é o job `e2e-telas` do `ci.yml`. O teste que só a pilha prova (sessão do Access pelo Caddy,
-  S3 e worker, build, pré-visualização) leva `{ tag: '@stack' }` e fica fora do `telas`. Com
+  S3 e worker, build) leva `{ tag: '@stack' }` e fica fora do `telas`. Com
   `E2E_STACK=1` (o `test:e2e` e o `local:e2e:area` já passam), a suíte inteira roda no projeto
   `chromium`, contra a pilha: por padrão, a imagem `backoffice:local` do compose. A sessão vem
   de `asRole(page, papel)` (`test/e2e/auth.ts`): o JWT da rota de token do access-mock, no
   header `cf-access-jwt-assertion` e no cookie `CF_Authorization`, valendo para as duas
-  camadas. Login pela tela do mock só nos testes da sessão do Access. Numa sessão,
+  camadas. Login pela tela do mock só no teste da sessão do Access. Numa sessão,
   o E2E é opcional e só da área tocada: `pnpm local:e2e:telas <arquivo sem .spec.ts>`, na raiz,
   roda o `telas` com `next dev`, numa das vagas da máquina, num banco copiado por TEMPLATE de
   `orakel_e2e_template` (ADR 0017 da raiz). O `playwright.config.ts` usa o `E2E_DATABASE_URL` no
   lugar da `DATABASE_URL` nos specs, na limpeza e no `globalSetup`. Contra a pilha local:
   `pnpm local:e2e:area <arquivo sem .spec.ts>` (ou `smoke`), na raiz. O par isolado
   (`pnpm local:isolated up <id>`, legado, com `E2E_BASE_URL` e `E2E_DATABASE_URL`) sai depois de
-  2 semanas sem uso. Jornada principal de uma área nova leva `{ tag: '@smoke' }`. Localmente, nenhum spec semeia lista com mais de 100 itens: o
-  que precisa de uma lista com mais de uma página usa um site pequeno (`test/volume.ts`).
-- **Axe e interação no E2E** (#476): cada tela tem um teste de axe, que passa pelos estados
-  abertos (diálogo, menu, seletor) com `expectNoViolations(page)` de `test/e2e/axe.ts`, nos dois
-  temas numa chamada. Teclado, foco, menus, Drawer e o tema escolhido no menu ficam nos testes de
-  componente; para um link navegar no roteador em memória, `followLinks()`
-  (`test/browser/navigation.ts`). No E2E fica o que depende do servidor ou do roteador do Next:
-  rotas, RBAC, gravação, estado na URL, HTML do servidor e a primeira pintura do tema.
-- **Projeto `perf`** (`playwright.config.ts`, #461): o teste que semeia 2.000 linhas e mede
-  tempo no navegador leva `{ tag: '@perf' }`, um por bloco ("abre e busca em menos de 2 s"). O
-  `telas` e o `chromium` excluem `@perf`; o `perf` só tem `@perf` e só existe na pilha, com `CI`
-  (o `e2e.yml`) ou `E2E_PERF=1`, porque fora do CI o tempo depende da carga da máquina, não do
-  código. O `local:e2e:area` passa arquivos ao Playwright e não pega o `perf`. Conferir:
-  `E2E_STACK=1 pnpm exec playwright test --list` não lista `@perf`; com `CI=1`, lista os do
-  `[perf]`.
+  2 semanas sem uso.
+- **Quando escrever E2E** (ADR 0019 da raiz): só para um fluxo crítico novo (gravação pela
+  tela, permissão por papel, publicação), nunca por tela nova ou alterada. Teclado, foco, menus,
+  Drawer, tema, layout por largura e axe ficam nos testes de componente; para um link navegar no
+  roteador em memória, `followLinks()` (`test/browser/navigation.ts`). No teste de fluxo não vai
+  asserção de aparência (classe, tamanho, posição, título da aba, ordem de colunas) nem axe. O
+  tempo com volume é medido no contrato, não no navegador.
 - **Sites do E2E**: quem cadastra site (`e2e-<timestamp>`) registra o ID e o remove do banco
   no `afterAll` com `removeSites` (`test/e2e/cleanup.ts`), junto com o build agendado.
 

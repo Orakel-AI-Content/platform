@@ -1,6 +1,6 @@
 # 0016 – Camadas de teste do Backoffice e E2E completo no CI
 
-- Status: Substituído em parte pelo 0017 (item 3 da Decisão); o resto segue aceito (substitui o "E2E só manual" do 0008)
+- Status: Substituído em parte pelo 0017 (item 3 da Decisão) e pelo 0019 (o que o E2E cobre e os `@perf`); o resto segue aceito (substitui o "E2E só manual" do 0008)
 - Data: 2026-10-22
 
 ## Contexto

@@ -1,4 +1,4 @@
-# E2E completo (#475): os testes `@stack` e `@perf` contra o ambiente local em containers,
+# E2E completo (#475, ADR 0019): os fluxos `@stack` contra o ambiente local em containers,
 # como no `pnpm local:up`. Fica fora do caminho do PR: roda em todo push na main que afeta o
 # Backoffice, toda noite, em PR com o label `e2e:completo` e manual. O resto da suíte é o job
 # `e2e-telas` do ci.yml, sem Docker. Falha na main ou no noturno abre (ou comenta) a issue
@@ -57,7 +57,7 @@ env:
 
 jobs:
   e2e:
-    name: E2E completo (stack e perf)
+    name: E2E completo (stack)
     # No PR, só com o label; um `labeled` com outro label não roda.
     if: >-
       github.event_name != 'pull_request'
@@ -88,8 +88,8 @@ jobs:
         with:
           filter: '@orakel/backoffice'
       - name: Testes da pilha
-        run: pnpm turbo run test:e2e -- --list --project=stack --project=perf
-      - run: pnpm turbo run test:e2e -- --project=stack --project=perf
+        run: pnpm turbo run test:e2e -- --list --project=stack
+      - run: pnpm turbo run test:e2e -- --project=stack
       - name: Logs do compose
         if: failure()
         run: infra/local/compose.sh logs --no-color --timestamps > compose.log 2>&1 || true

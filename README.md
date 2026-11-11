@@ -126,6 +126,7 @@ local) o site é publicado. Em `/sites`, "Publicar agora" antecipa o build.
 | E2E completo contra o ambiente local                 | `pnpm local:e2e`                        |
 
 Áreas = arquivos `apps/backoffice/test/e2e/<área>.spec.ts` (ex.: `sites`, `midia`, `revisao`).
+O E2E do Backoffice cobre só fluxos críticos (ADR 0019); tela nova ganha teste de componente.
 Argumentos extras vão para o Playwright.
 
 ### Imagens Docker

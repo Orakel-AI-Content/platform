@@ -118,10 +118,17 @@ ThemeConfigurator completo.
   - `prefers-reduced-motion` desliga as animações do `motion`;
   - `react-modal`: `appElement` definido, título ligado por `aria-labelledby`, foco devolvido ao
     botão de origem; `react-select`: rótulo associado; Dropdown e Tooltip acessíveis por teclado.
-- **Testes:** cada história migra os testes das telas que toca. Seletor por role e nome; nada de
-  `data-testid`. Asserção de classe só para cor de estado, com os nomes novos.
+- **Testes:** cada história migra os testes de componente das telas que toca (`*.test.tsx` e
+  `*.browser.test.tsx`). Tela portada não ganha E2E nem axe no E2E: o E2E é só de fluxos
+  críticos (ADR 0019 da raiz). Seletor por role e nome; nada de `data-testid`. Asserção de
+  classe só para cor de estado, com os nomes novos.
 
 ## Matriz de testes
+
+Registro do porte. Desde o ADR 0019 da raiz, os specs de E2E citados abaixo que não são de fluxo
+crítico (`header`, `site-layout`, `sites-list`, `vitrine`, `theme`, `fonte`, `item-titles` e os
+testes de axe e de layout dos demais) foram removidos; o que precisa continuar fica nos testes
+de componente da mesma linha.
 
 | Área                                                                                                               | O que precisa continuar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | O que muda                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
