@@ -25,6 +25,12 @@
 // Acrescentado (#585): a coluna com `meta: { fluid: true }` ocupa a largura que sobra na tabela
 // (`w-full max-w-0` no Th e no Td, sem a largura do `getSize()`), e o `Truncated` dentro dela só
 // corta quando falta espaço. As outras colunas ficam como no Ecme.
+// Acrescentado (#589): a coluna com `meta: { hideBelow: 'md' }` fica oculta (Th e Td) abaixo de
+// `md`, com `hidden md:table-cell`, para a coluna principal e o status caberem a 390 px sem
+// rolagem. Por classe, não por `columnVisibility`: o HTML é o mesmo em toda largura. Abaixo de
+// `md` também, as células têm `px-2` (o `px-6` da Table a partir dele) e a largura do
+// `getSize()` (150 px por padrão no TanStack) só vale a partir de `md`, pela variável `--col-w`:
+// a 390 px, os 48 px de respiro e os 150 px por coluna não deixavam espaço para o título.
 'use client';
 
 import { createContext, use, useImperativeHandle, useMemo, useState } from 'react';
@@ -67,7 +73,7 @@ import type {
 import type { TableProps } from '@/components/ui/Table';
 import type { SkeletonProps } from '@/components/ui/Skeleton';
 import type { CheckboxProps } from '@/components/ui/Checkbox';
-import type { ChangeEvent, ReactNode, Ref } from 'react';
+import type { ChangeEvent, CSSProperties, ReactNode, Ref } from 'react';
 
 // Ordenação e paginação são controladas por quem usa (manualSorting / manualPagination); as
 // features registradas cobrem as APIs usadas no render e as do cálculo do `useListTable`.
@@ -98,12 +104,26 @@ declare module '@tanstack/table-core' {
   > {
     /** Coluna principal da lista: ocupa a largura que sobra, e o texto longo corta nela (#585). */
     fluid?: boolean;
+    /** Abaixo desta largura, a coluna (cabeçalho e células) fica oculta (#589). */
+    hideBelow?: 'md';
   }
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
 /** Classe da coluna fluida no Th e no Td: `max-w-0` deixa o `truncate` seguir a coluna. */
 export const FLUID_CELL_CLASS = 'w-full max-w-0';
+
+/**
+ * Classes do Th e do Td de uma coluna, pelo `meta`: respiro menor abaixo de `md`, fluida (ou com
+ * a largura do `--col-w` a partir de `md`) e oculta abaixo de `md` (#589).
+ */
+function columnClass(meta: { fluid?: boolean; hideBelow?: 'md' } | undefined, cell = false) {
+  return classNames(
+    'px-2 md:px-6',
+    meta?.fluid ? FLUID_CELL_CLASS : cell && 'md:w-(--col-w)',
+    meta?.hideBelow === 'md' && 'hidden md:table-cell',
+  );
+}
 
 export type ColumnDef<T extends RowData, TValue = unknown> = BaseColumnDef<
   DataTableFeatures,
@@ -405,7 +425,7 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
                     <Th
                       key={header.id}
                       colSpan={header.colSpan}
-                      className={header.column.columnDef.meta?.fluid ? FLUID_CELL_CLASS : undefined}
+                      className={columnClass(header.column.columnDef.meta)}
                       sort={canSort ? sorted || 'none' : undefined}
                     >
                       {canSort && !header.isPlaceholder ? (
@@ -465,13 +485,11 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
                           return (
                             <Td
                               key={cell.id}
-                              className={
-                                cell.column.columnDef.meta?.fluid ? FLUID_CELL_CLASS : undefined
-                              }
+                              className={columnClass(cell.column.columnDef.meta, true)}
                               style={
                                 cell.column.columnDef.meta?.fluid
                                   ? undefined
-                                  : { width: cell.column.getSize() }
+                                  : ({ '--col-w': `${cell.column.getSize()}px` } as CSSProperties)
                               }
                             >
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}

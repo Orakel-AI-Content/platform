@@ -34,7 +34,7 @@ const rowTexts = () =>
     .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
 
 describe('DataTable', () => {
-  it('a coluna fluida ocupa a largura que sobra; as outras ficam com a do `getSize()` (#585)', () => {
+  it('a coluna fluida ocupa a largura que sobra; as outras ficam com a do `getSize()` a partir de md (#585, #589)', () => {
     const columns: ColumnDef<Artigo>[] = [
       { header: 'Título', accessorKey: 'titulo', meta: { fluid: true } },
       { header: 'Status', accessorKey: 'status', enableSorting: false },
@@ -42,13 +42,28 @@ describe('DataTable', () => {
     render(<DataTable columns={columns} data={ARTIGOS} pagingData={paging} />);
 
     const [titleHeader, statusHeader] = screen.getAllByRole('columnheader');
-    expect(titleHeader?.className).toBe('w-full max-w-0');
-    expect(statusHeader?.className).toBe('');
+    expect(titleHeader?.className).toBe('px-2 md:px-6 w-full max-w-0');
+    expect(statusHeader?.className).toBe('px-2 md:px-6');
     const [title, status] = within(screen.getAllByRole('row')[1]!).getAllByRole('cell');
-    expect(title?.className).toBe('w-full max-w-0');
-    expect(title?.style.width).toBe('');
-    expect(status?.className).toBe('');
-    expect(status?.style.width).toBe('150px');
+    expect(title?.className).toBe('px-2 md:px-6 w-full max-w-0');
+    expect(title?.style.getPropertyValue('--col-w')).toBe('');
+    expect(status?.className).toBe('px-2 md:px-6 md:w-(--col-w)');
+    expect(status?.style.getPropertyValue('--col-w')).toBe('150px');
+  });
+
+  it("`meta.hideBelow: 'md'` oculta o cabeçalho e as células da coluna abaixo de md (#589)", () => {
+    const columns: ColumnDef<Artigo>[] = [
+      { header: 'Título', accessorKey: 'titulo', meta: { fluid: true } },
+      { header: 'Status', accessorKey: 'status', meta: { hideBelow: 'md' } },
+    ];
+    render(<DataTable columns={columns} data={ARTIGOS} pagingData={paging} />);
+
+    const [titleHeader, statusHeader] = screen.getAllByRole('columnheader');
+    expect(titleHeader?.className).not.toContain('hidden');
+    expect(statusHeader?.className).toContain('hidden md:table-cell');
+    const [title, status] = within(screen.getAllByRole('row')[1]!).getAllByRole('cell');
+    expect(title?.className).not.toContain('hidden');
+    expect(status?.className).toContain('hidden md:table-cell');
   });
 
   it('renderiza as linhas dos dados, na ordem recebida (ordenação manual)', () => {
