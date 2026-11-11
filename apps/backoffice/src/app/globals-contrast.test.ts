@@ -2022,6 +2022,67 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:hover:bg-gray-700',
     minimum: 4.5,
   },
+  // Gráfico (#599): as séries são objeto gráfico (3:1, 1.4.11) e o texto do eixo e da dica é
+  // texto, sobre o cartão (`apex-chart.css`, `Chart.tsx`, `AudienceChart.tsx`). As classes são
+  // as de `fill-`/`stroke-` do CSS, escritas como `text-` para este teste. A dica no escuro tem
+  // texto próprio: a cor herdada do body não chega a 4,5:1 sobre o gray-600 dela.
+  {
+    name: 'série de visualizações',
+    theme: 'claro',
+    text: 'text-primary',
+    background: 'bg-white',
+    minimum: 3,
+  },
+  {
+    name: 'série de sessões',
+    theme: 'claro',
+    text: 'text-success',
+    background: 'bg-white',
+    minimum: 3,
+  },
+  {
+    name: 'texto do eixo do gráfico',
+    theme: 'claro',
+    text: 'text-gray-500',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto da dica do gráfico',
+    theme: 'claro',
+    text: 'text-gray-600',
+    background: 'bg-white',
+    minimum: 4.5,
+  },
+  {
+    name: 'série de visualizações',
+    theme: 'escuro',
+    text: 'dark:text-primary',
+    background: 'dark:bg-gray-800',
+    minimum: 3,
+  },
+  {
+    name: 'série de sessões',
+    theme: 'escuro',
+    text: 'dark:text-success',
+    background: 'dark:bg-gray-800',
+    minimum: 3,
+  },
+  {
+    name: 'texto do eixo do gráfico',
+    theme: 'escuro',
+    text: 'dark:text-gray-400',
+    background: 'dark:bg-gray-800',
+    minimum: 4.5,
+  },
+  {
+    name: 'texto da dica do gráfico',
+    theme: 'escuro',
+    text: 'dark:text-gray-100',
+    background: 'dark:bg-gray-600',
+    minimum: 4.5,
+    ecme: 'dark:text-gray-400',
+  },
 ];
 
 /** Classe do Tailwind → token do globals.css: `dark:placeholder:text-gray-300` → `gray-300`.
