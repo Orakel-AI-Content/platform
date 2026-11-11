@@ -25,8 +25,8 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
 
   return (
     <section aria-labelledby="new-content-title" className="space-y-4">
-      {/* A largura fica na coluna do formulário: a barra de ações encosta nas bordas do main. */}
-      <div className="form-width">
+      {/* Largura na coluna (barra nas bordas do main); duas colunas a partir de `xl` (#591). */}
+      <div className="list-width">
         <PageHeader
           id="new-content-title"
           trail={siteTrail(site, { label: 'Conteúdos', segment: 'conteudos' }, [
@@ -39,7 +39,7 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
         mode="create"
         siteId={site.id}
         backHref={`/sites/${site.id}/conteudos`}
-        contentClassName="form-width"
+        contentClassName="list-width"
         timeZone={site.timeZone}
         defaultValues={{
           kind: 'article',

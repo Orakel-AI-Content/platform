@@ -48,9 +48,7 @@ import { IconButton } from '@/components/shared/IconButton';
 import { Button } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Dropdown from '@/components/ui/Dropdown';
-import { FormItem } from '@/components/ui/Form';
 import Notification from '@/components/ui/Notification';
-import Select from '@/components/ui/Select';
 import toast from '@/components/ui/toast';
 import Tooltip from '@/components/ui/Tooltip';
 import classNames from '@/components/ui/utils/classNames';
@@ -210,17 +208,21 @@ export function ContentEditor({
       setCarried(null);
     }
   }
-  /** Expande os blocos dos índices e, no quadro seguinte, foca o primeiro campo inválido. */
-  const revealErrors = (indexes: readonly number[]) => {
+  // SEO recolhível (#591): fechado ao abrir a tela; abre sozinho quando tem campo com erro.
+  const [seoOpen, setSeoOpen] = useState(false);
+  /**
+   * Expande os blocos dos índices (e o SEO, se tem erro) e, no quadro seguinte, foca o
+   * primeiro campo inválido.
+   */
+  const revealErrors = (indexes: readonly number[], seo: boolean) => {
     const ids = new Set(indexes.flatMap((index) => blocks.fields[index]?.id ?? []));
     setCollapsed((current) => new Set([...current].filter((fieldId) => !ids.has(fieldId))));
+    if (seo) setSeoOpen(true);
     requestAnimationFrame(() =>
       document.querySelector<HTMLElement>(`#${CSS.escape(id)}-form [aria-invalid="true"]`)?.focus(),
     );
   };
   const offered = options.blockTypes.filter(isBlockType);
-  const [nextType, setNextType] = useState<Block['type'] | undefined>(offered[0]);
-  const typeOptions = offered.map((type) => ({ value: type, label: BLOCK_TYPE_LABEL[type] }));
 
   const blockFields: Record<Block['type'], Record<string, FieldRenderer>> = {
     text: { 'blocks.*.content': richTextField('richText') },
@@ -285,6 +287,30 @@ export function ContentEditor({
     focusBlock(index);
   };
 
+  /** "+" que insere um bloco na posição `index + 1` (#134; o do fim, #591). */
+  const insertMenu = (index: number) => {
+    const label = `Inserir bloco na posição ${index + 1}`;
+    return (
+      <Tooltip title={label} wrapperClass="inline-flex">
+        <InsertMenu
+          aria-label={label}
+          toggleClassName={INSERT_TOGGLE_CLASS}
+          renderTitle={<PiPlus aria-hidden />}
+        >
+          {offered.map((option) => (
+            <Dropdown.Item
+              key={option}
+              eventKey={option}
+              onClick={() => insertBlock(index, option)}
+            >
+              {BLOCK_TYPE_LABEL[option]}
+            </Dropdown.Item>
+          ))}
+        </InsertMenu>
+      </Tooltip>
+    );
+  };
+
   const onValid = (value: FieldValues) =>
     startTransition(async () => {
       setSummary([]);
@@ -310,6 +336,7 @@ export function ContentEditor({
         result.issues.flatMap((issue) =>
           issue.path[0] === 'blocks' && typeof issue.path[1] === 'number' ? [issue.path[1]] : [],
         ),
+        result.issues.some((issue) => issue.path[0] === 'seo'),
       );
       const top = applyServerIssues(form.setError, result.issues);
       setSummary(top.length > 0 ? top : [result.message]);
@@ -352,37 +379,72 @@ export function ContentEditor({
               Array.isArray(blockErrors)
                 ? blockErrors.flatMap((error, index) => (error ? [index] : []))
                 : [],
+              errors.seo !== undefined,
             );
           })(event);
         }}
       >
-        <div className={classNames('flex flex-col gap-4', contentClassName)}>
-          <section aria-labelledby={`${id}-meta`}>
-            <Card>
-              {/* Como o título de seção do `SchemaForm`: o `h4 mb-6` do Ecme, `h2` na estrutura. */}
-              <h2
-                id={`${id}-meta`}
-                className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100"
-              >
-                Dados do conteúdo
-              </h2>
-              <SchemaFields
-                schema={ContentMetaSchema}
-                labels={META_LABELS}
-                hints={{ ...META_HINTS, publishedAt: `Horário de ${timeZone}` }}
-                // O tipo não muda depois de criado; `updatedAt` é do site, não do editor.
-                hidden={mode === 'edit' ? ['kind', 'updatedAt'] : ['updatedAt']}
-                fields={metaFields}
-              />
-            </Card>
-          </section>
+        {/* Duas colunas a partir de `xl` (#591), como o `ProductForm` do Ecme: os dados vêm
+            primeiro no DOM (primeiros no empilhado e no Tab) e o `flex-row-reverse` os põe à
+            direita. */}
+        <div className={classNames('flex flex-col gap-4 xl:flex-row-reverse', contentClassName)}>
+          <div className="flex flex-col gap-4 xl:w-[440px] xl:shrink-0 2xl:w-[500px]">
+            <section aria-labelledby={`${id}-meta`}>
+              <Card>
+                {/* Como o título de seção do `SchemaForm`: o `h4 mb-6` do Ecme, `h2` na estrutura. */}
+                <h2
+                  id={`${id}-meta`}
+                  className="mb-6 text-xl font-bold text-gray-900 dark:text-gray-100"
+                >
+                  Dados do conteúdo
+                </h2>
+                <SchemaFields
+                  schema={ContentMetaSchema}
+                  labels={META_LABELS}
+                  hints={{ ...META_HINTS, publishedAt: `Horário de ${timeZone}` }}
+                  // O tipo não muda depois de criado; `updatedAt` é do site, não do editor; o
+                  // SEO tem cartão próprio, recolhível.
+                  hidden={mode === 'edit' ? ['kind', 'updatedAt', 'seo'] : ['updatedAt', 'seo']}
+                  fields={metaFields}
+                />
+              </Card>
+            </section>
+
+            <section aria-labelledby={`${id}-seo`}>
+              <Card>
+                <div className="flex items-center gap-2">
+                  <IconButton
+                    label="Campos de SEO"
+                    icon={seoOpen ? <PiCaretDown /> : <PiCaretRight />}
+                    aria-expanded={seoOpen}
+                    aria-controls={`${id}-seo-body`}
+                    onClick={() => setSeoOpen((open) => !open)}
+                  />
+                  <h2
+                    id={`${id}-seo`}
+                    className="text-xl font-bold text-gray-900 dark:text-gray-100"
+                  >
+                    SEO
+                  </h2>
+                </div>
+                {/* Fechado, só oculto: os campos seguem registrados (valores e erros). */}
+                <div id={`${id}-seo-body`} hidden={!seoOpen} className="mt-6">
+                  <SchemaFields
+                    schema={ContentMetaSchema.shape.seo}
+                    prefix="seo"
+                    labels={META_LABELS}
+                  />
+                </div>
+              </Card>
+            </section>
+          </div>
 
           {/* O erro da lista ("ao menos um bloco") é a mensagem do `FormItem` (#329). */}
           <FieldGroup
             as="section"
             message={blocksError}
             aria-labelledby={`${id}-blocks`}
-            className="space-y-4"
+            className="min-w-0 flex-auto space-y-4"
           >
             <div className="flex flex-wrap items-center gap-2">
               <h2 id={`${id}-blocks`} className="mr-auto text-lg font-semibold">
@@ -406,26 +468,7 @@ export function ContentEditor({
               const isCollapsed = collapsed.has(field.id);
               return (
                 <Fragment key={field.id}>
-                  <Tooltip
-                    title={`Inserir bloco na posição ${position}`}
-                    wrapperClass="inline-flex"
-                  >
-                    <InsertMenu
-                      aria-label={`Inserir bloco na posição ${position}`}
-                      toggleClassName={INSERT_TOGGLE_CLASS}
-                      renderTitle={<PiPlus aria-hidden />}
-                    >
-                      {offered.map((option) => (
-                        <Dropdown.Item
-                          key={option}
-                          eventKey={option}
-                          onClick={() => insertBlock(index, option)}
-                        >
-                          {BLOCK_TYPE_LABEL[option]}
-                        </Dropdown.Item>
-                      ))}
-                    </InsertMenu>
-                  </Tooltip>
+                  {insertMenu(index)}
                   <Card>
                     <fieldset id={`${id}-block-${index}`} tabIndex={-1}>
                       {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
@@ -487,32 +530,11 @@ export function ContentEditor({
                 </Fragment>
               );
             })}
-            <div className="flex flex-wrap items-end gap-2">
-              {/* Um `FormItem` próprio: o tipo do novo bloco não herda o erro da lista em volta. */}
-              <FormItem
-                htmlFor={`${id}-new-type`}
-                label="Tipo do novo bloco"
-                className="mb-0 min-w-52"
-              >
-                <Select<{ value: Block['type']; label: string }>
-                  size="sm"
-                  options={typeOptions}
-                  value={typeOptions.find((option) => option.value === nextType) ?? null}
-                  onChange={(option) => setNextType(option?.value)}
-                />
-              </FormItem>
-              <Button
-                type="button"
-                size="sm"
-                disabled={nextType === undefined}
-                onClick={() => nextType && blocks.append(newBlock(nextType))}
-              >
-                Adicionar bloco
-              </Button>
-            </div>
+            {/* O "+" do fim (#591): o único caminho para o primeiro bloco e para o último. */}
+            {insertMenu(blocks.fields.length)}
           </FieldGroup>
         </div>
-
+        ;
         <FormActionBar
           kind={mode}
           href={backHref}
