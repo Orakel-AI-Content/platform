@@ -51,8 +51,9 @@ test(
     // Operação enfileira o build do site sem esperar a janela (12.0, L3). Espera a página
     // hidratar: um clique antes disso não chega ao onClick (a ação nem é chamada).
     await page.waitForLoadState('networkidle');
-    // Muda o site publicado: confirma num diálogo (#327).
-    await page.getByRole('button', { name: 'Publicar agora exemplo-a' }).click();
+    // Muda o site publicado: no menu "Mais ações" da linha (#586), confirma num diálogo (#327).
+    await page.getByRole('button', { name: 'Mais ações: exemplo-a' }).click();
+    await page.getByRole('menuitem', { name: 'Publicar agora exemplo-a' }).click();
     await page
       .getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' })
       .getByRole('button', { name: 'Publicar' })
