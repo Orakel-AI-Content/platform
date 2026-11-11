@@ -699,6 +699,17 @@ export function SchemaFields({
   // num `Card` sem título (o único, sem seções), se alguma for visível.
   const rest = Object.keys(root.shape).filter((key) => !inSection.has(key));
   const restFields = <Children ctx={ctx} shape={pick(rest)} prefix="" />;
+  // Seção de uma chave só que é um objeto sem campo registrado: os filhos vão direto no cartão,
+  // sem o `fieldset` do objeto, porque o `h2` da seção já nomeia o grupo (#594).
+  const sectionFields = (paths: string[]) => {
+    const [only] = paths;
+    const child = only === undefined || paths.length > 1 ? undefined : root.shape[only];
+    const node = child && !ctx.fields[only as string] ? describe(child).node : undefined;
+    if (node?.kind === 'object' && !ctx.hidden.has(only as string)) {
+      return <Children ctx={ctx} shape={node.shape} prefix={only as string} />;
+    }
+    return <Children ctx={ctx} shape={pick(paths)} prefix="" />;
+  };
   return (
     <>
       {(sections ?? []).map((section) => (
@@ -711,7 +722,7 @@ export function SchemaFields({
             >
               {section.title}
             </h2>
-            <Children ctx={ctx} shape={pick(section.paths)} prefix="" />
+            {sectionFields(section.paths)}
           </Card>
         </section>
       ))}
