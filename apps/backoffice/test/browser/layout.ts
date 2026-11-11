@@ -97,3 +97,13 @@ export function columnLines(table: Target, header: string): number[] {
     .filter((cell) => cell.column === column)
     .map((cell) => cell.lines);
 }
+
+/**
+ * Texto dos cabeçalhos das colunas que aparecem (#589): fica de fora a coluna com `hideBelow`
+ * oculta pelo `hidden md:table-cell` do DataTable na largura atual.
+ */
+export function visibleColumns(table: Target): string[] {
+  return Array.from(toElement(table).querySelectorAll('thead th'))
+    .filter((th) => getComputedStyle(th).display !== 'none')
+    .map((th) => th.textContent?.trim() ?? '');
+}

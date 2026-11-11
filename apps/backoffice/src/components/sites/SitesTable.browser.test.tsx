@@ -9,6 +9,7 @@ import {
   isClipped,
   pageOverflow,
   tableOverflow,
+  visibleColumns,
 } from '../../../test/browser/layout.ts';
 import { followLinks, navigation } from '../../../test/browser/navigation.ts';
 import { ListScreen, renderInFrame } from '../../../test/browser/render.tsx';
@@ -94,6 +95,20 @@ const menu = () => page.getByRole('menu');
 const menuItem = (name: string) => menu().getByRole('menuitem', { name: `${name} ${ids[0]}` });
 
 describe('SitesTable no navegador', () => {
+  // Tela estreita (#589): abaixo de md, Ciclo de vida, Indexável, Mudanças pendentes e Último
+  // build ficam ocultas; o site, o status e o Mais ações cabem sem rolar.
+  it('a 390 px, site, status e Mais ações sem rolagem horizontal', async () => {
+    await page.viewport(390, 844);
+    await renderInFrame(<Sites />, { roles: ['admin'] });
+
+    expect(visibleColumns(table())).toEqual(['Site', 'Status', 'Ações']);
+    expect(pageOverflow()).toBe(0);
+    expect(tableOverflow(table())).toBe(0);
+    expect(cellsOverLines(table())).toEqual([]);
+    await expect.element(row(ids[0]!).getByRole('link', { name: LONG_NAME })).toBeVisible();
+    await expect.element(moreActions()).toBeVisible();
+  });
+
   it('com 20 sites a 1280 px, sem rolagem horizontal e com até duas linhas por célula', async () => {
     await renderInFrame(<Sites />, { roles: ['admin'] });
     expect(table().getByRole('row').elements()).toHaveLength(21);

@@ -75,6 +75,7 @@ function columnsFor(
     {
       header: 'Tipo',
       accessorKey: 'kind',
+      meta: { hideBelow: 'md' },
       enableGlobalFilter: false,
       filterFn: 'equalsString',
       sortFn: byText((item) => CONTENT_KIND_LABEL[item.kind]),
@@ -113,10 +114,17 @@ function columnsFor(
         </StateTag>
       ),
     },
-    { header: 'Versão', accessorKey: 'version', enableGlobalFilter: false, enableSorting: false },
+    {
+      header: 'Versão',
+      accessorKey: 'version',
+      meta: { hideBelow: 'md' },
+      enableGlobalFilter: false,
+      enableSorting: false,
+    },
     {
       header: 'Última alteração',
       accessorKey: 'updatedAt',
+      meta: { hideBelow: 'md' },
       enableGlobalFilter: false,
       sortFn: 'datetime',
       cell: ({ row }) => <NoWrap>{formatDateTime(row.original.updatedAt, timeZone)}</NoWrap>,
