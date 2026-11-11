@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
+import { sites } from '../../src/db/schema/index.ts';
 import { buildNow, scheduleBuild } from '../../src/domain/builds/schedule.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
@@ -12,7 +13,14 @@ beforeAll(async () => {
   ({ db, close } = await setupDatabase());
 });
 afterAll(() => close());
-beforeEach(() => resetDatabase(db));
+beforeEach(async () => {
+  await resetDatabase(db);
+  // A linha `na_fila` do agendamento referencia o site.
+  await db.insert(sites).values([
+    { id: 'exemplo-a', name: 'A' },
+    { id: 'exemplo-b', name: 'B' },
+  ]);
+});
 
 type JobRow = { task_identifier: string; queue_name: string; key: string; run_at: string };
 
@@ -44,7 +52,7 @@ describe('agendamento de build (Graphile Worker)', () => {
   it('um job por site, e "publicar agora" antecipa o horário', async () => {
     await db.transaction((tx) => scheduleBuild(tx, 'exemplo-a', { windowMs: 60_000, now: t0 }));
     await db.transaction((tx) => scheduleBuild(tx, 'exemplo-b', { windowMs: 60_000, now: t0 }));
-    await db.transaction((tx) => buildNow(tx, 'exemplo-a', t0));
+    await db.transaction((tx) => buildNow(tx, 'exemplo-a', 'o@orakel.local', t0));
     const jobs = await buildJobs();
     expect(jobs.map((job) => job.key).sort()).toEqual(['build:exemplo-a', 'build:exemplo-b']);
     expect(

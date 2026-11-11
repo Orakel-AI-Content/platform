@@ -1,10 +1,18 @@
 import type { Task } from 'graphile-worker';
 
 import type { Db } from '../../db/client.ts';
-import { loadBuildTarget, recordBuild, startBuild } from '../../domain/builds/builds.ts';
+import {
+  cancelQueuedBuild,
+  loadBuildTarget,
+  queueRetry,
+  recordBuild,
+  startBuild,
+} from '../../domain/builds/builds.ts';
 import { planBuild, type BuildSettings } from '../../domain/builds/plan.ts';
 import { runBuild } from '../../domain/builds/run-build.ts';
 import type { ContainerRuntime } from '../../domain/builds/runtime.ts';
+import { retryRunAt } from '../../domain/builds/schedule.ts';
+import { isLastAttempt } from './last-attempt.ts';
 
 export type BuildTaskDeps = {
   db: Db;
@@ -27,10 +35,11 @@ function siteIdOf(payload: unknown): string {
 }
 
 /**
- * Build de um site (build-runner, 12.0 L3). Site pausado não é construído até ser retomado.
- * Cada tentativa é uma linha em `builds`: nasce `rodando` e é fechada com o resultado. A
- * transitória lança para o Graphile Worker repetir, a permanente pausa o site (recordBuild) e
- * encerra o job.
+ * Build de um site (build-runner, 12.0 L3). Site pausado não é construído até ser retomado, e
+ * a linha `na_fila` do job fecha como `cancelado`. Cada tentativa é uma linha em `builds`: a
+ * `na_fila` do agendamento é promovida a `rodando` e fechada com o resultado. A transitória
+ * deixa a próxima tentativa `na_fila` e lança para o Graphile Worker repetir; a permanente
+ * pausa o site (recordBuild) e encerra o job.
  */
 export function createBuildTask(deps: BuildTaskDeps): Task {
   const now = deps.now ?? Date.now;
@@ -39,10 +48,12 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
     const log = helpers.logger;
     const target = await loadBuildTarget(deps.db, siteId);
     if (target === undefined) {
+      await cancelQueuedBuild(deps.db, helpers.job.id);
       log.warn(`build de ${siteId} ignorado: site não existe`);
       return;
     }
     if (target.state === 'pausado') {
+      await cancelQueuedBuild(deps.db, helpers.job.id);
       log.info(
         `build de ${siteId} ignorado: site pausado (${target.pausedReason ?? 'sem motivo'})`,
       );
@@ -66,13 +77,17 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
       now,
       log: (msg) => log.warn(msg),
     });
-    await deps.db.transaction((tx) =>
-      recordBuild(
+    const retried = outcome.status === 'failed' && outcome.failure.kind === 'transient';
+    await deps.db.transaction(async (tx) => {
+      await recordBuild(
         tx,
         { buildId, siteId, massUnpublishDeclaredAt: target.massUnpublishDeclaredAt },
         outcome,
-      ),
-    );
+      );
+      if (retried && !isLastAttempt(helpers)) {
+        await queueRetry(tx, buildId, retryRunAt(helpers.job.run_at, attempt, new Date(now())));
+      }
+    });
 
     if (outcome.status === 'ok') {
       log.info(
