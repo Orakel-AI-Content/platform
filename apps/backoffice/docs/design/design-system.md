@@ -26,7 +26,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   demanda, não o catálogo inteiro. Exceção: o subcomponente que a API do componente portado
   expõe vem junto, mesmo sem tela que o use, para a API ficar a do Ecme — `Avatar.Group`
   (`AvatarGroup`) e `Dropdown.Menu` (o submenu, `DropdownSub` e `DropdownSubItem`, que o
-  `DropdownMenu` usa para o item que abre o submenu), auditados na vitrine e no E2E. Utilitário
+  `DropdownMenu` usa para o item que abre o submenu), auditados na vitrine e nos testes de componente. Utilitário
   sem import não fica. As classes de cada componente ficam numa folha por componente
   em `src/app/styles/`, em `@layer components`, importada por `src/app/globals.css`. Junte
   classes sempre com o `classNames` de `src/components/ui/utils/` (`twMerge` sobre `classnames`).
@@ -80,8 +80,7 @@ acessibilidade: `docs/design/accessibility.md` da raiz (WCAG 2.2 AA).
   que já põe a classe no HTML do servidor. Sem cookie, vale o sistema: um script inline no
   `<head>` aplica a preferência antes da primeira pintura. A troca é o `ThemeSwitcher` do
   cabeçalho (`src/components/template/ThemeSwitcher.tsx`), que grava ou apaga o cookie e troca a
-  classe na hora. Sem zustand nem localStorage para o tema. O E2E `theme.spec.ts` confere que
-  nenhum quadro sai no tema oposto.
+  classe na hora. Sem zustand nem localStorage para o tema. Os testes de componente do `ThemeSwitcher` conferem a troca.
 - **Camada base:** a `@layer base` do `globals.css`, portada do `tailwind/index.css` do
   template, estiliza o que não tem classe própria: o body em `text-sm font-medium
 leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` (a substituta
@@ -227,8 +226,8 @@ Não negociável, em toda tela e todo componente portado:
   só com `E2E_ERROR_ROUTE`, no compose local) é onde se audita cada componente: todo componente
   novo ou portado ganha uma seção ali e um teste de componente em Chromium
   (`*.browser.test.tsx` ao lado dele, `test:browser`) que o confere com axe (WCAG 2.2 AA) e
-  teclado nos dois temas; o E2E `test/e2e/vitrine.spec.ts` fica com o render no servidor e o
-  axe da página inteira. Corrija no componente, não na tela.
+  teclado nos dois temas. O E2E não audita a vitrine nem as telas (ADR 0019 da raiz). Corrija
+  no componente, não na tela.
 
 ## Padrões de tela
 
@@ -727,5 +726,5 @@ domínio e não mudam com os rótulos.
 - **Testes de componente:** `*.test.tsx` com `// @vitest-environment happy-dom` e Testing
   Library (rótulos por `getByLabelText`, teclado por `user-event`). Seletor por role e nome;
   nada de `data-testid`. Asserção de classe só para cor de estado.
-- **E2E:** Playwright com axe nas telas (`test/e2e/`), e a vitrine para cada componente (ver
-  Acessibilidade).
+- **E2E:** Playwright só nos fluxos críticos (`test/e2e/`, ADR 0019 da raiz), sem axe e sem
+  asserção de aparência. Tela nova ou alterada ganha teste de componente, não E2E.

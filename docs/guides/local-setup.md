@@ -117,7 +117,7 @@ regrava a tag `local`. Uma tarefa fica pronta sem E2E (`lint`, `typecheck`, `tes
 na camada de telas, a partir do worktree:
 
 ```sh
-pnpm local:e2e:telas sites,header      # num worktree sem .env.local:
+pnpm local:e2e:telas sites,revisao     # num worktree sem .env.local:
 ORAKEL_ENV_FILE=<raiz>/.env.local pnpm local:e2e:telas sites
 ```
 
@@ -146,8 +146,6 @@ Contra a pilha local (`E2E_STACK=1`, com o ambiente compartilhado no ar):
 - `pnpm local:e2e:area <área>[,<área>…]` roda `apps/backoffice/test/e2e/<área>.spec.ts` no
   projeto `chromium`; `pnpm local:e2e:area smoke` roda as jornadas marcadas com `@smoke` (uma
   por área). Ocupa uma das mesmas vagas.
-- Os testes `@perf` (listas com 2.000 linhas e metas de tempo) ficam no projeto Playwright
-  `perf`, que só existe no CI; localmente, com `E2E_PERF=1`.
 
 ### Legado: `pnpm local:isolated`
 
@@ -157,7 +155,7 @@ só da sessão, com o ambiente compartilhado no ar:
 ```sh
 pnpm local:isolated up 433     # legado; imprime E2E_BASE_URL e E2E_DATABASE_URL
 E2E_BASE_URL=https://admin.orakel.localhost:<porta> \
-  E2E_DATABASE_URL=postgres://…/orakel_433 pnpm local:e2e:area sites,header
+  E2E_DATABASE_URL=postgres://…/orakel_433 pnpm local:e2e:area sites,revisao
 pnpm local:isolated down 433   # legado
 ```
 

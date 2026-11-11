@@ -19,7 +19,7 @@ apps/backoffice/
 │   ├── env.ts  proxy.ts  instrumentation.ts
 └── test/
     ├── contract/                Vitest + Postgres
-    └── e2e/                     Playwright + axe, um <área>.spec.ts por tela ou jornada
+    └── e2e/                     Playwright, só fluxos críticos (ADR 0019 da raiz)
                                  (geracao.spec.ts: da geração ao site, com o worker em fixture)
 ```
 

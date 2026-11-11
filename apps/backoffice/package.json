@@ -73,7 +73,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@axe-core/playwright": "catalog:",
     "@next/eslint-plugin-next": "catalog:",
     "@orakel/eslint-config": "workspace:*",
     "@orakel/tsconfig": "workspace:*",

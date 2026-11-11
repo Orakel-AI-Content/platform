@@ -11,7 +11,8 @@ trocar a branch do checkout principal entre dois comandos. Sempre pelo `pnpm wor
 (`docs/guides/local-setup.md`, "Worktrees"): `new` no começo, `rm` ao terminar, e o `gc` do
 `SessionStart` remove o que uma sessão interrompida deixou para trás.
 A tarefa está pronta com `lint`, `typecheck`, `test`, `test:browser` e, se tocar o domínio,
-`test:contract` (ADR 0017). O E2E local é opcional e só na camada de telas:
+`test:contract` (ADR 0017). Tela nova ou alterada ganha teste de componente, não E2E: o E2E
+do Backoffice é só de fluxos críticos (ADR 0019). O E2E local é opcional e só na camada de telas:
 `pnpm local:e2e:telas <área>` roda o spec da área contra o `next dev` do worktree, numa das
 vagas da máquina, com um banco só da sessão e sem build (`docs/guides/local-setup.md`,
 "Sessões em paralelo"). A sessão não roda a suíte inteira: as telas rodam no PR (job

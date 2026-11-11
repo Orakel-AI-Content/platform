@@ -13,7 +13,7 @@ Consulte ao criar ou revisar qualquer interface (sites, Backoffice, componentes)
 | `@orakel/tokens`        | Todo par de cor de texto/fundo passa pela fórmula de contraste da WCAG; abaixo de AA (4,5:1 texto normal, 3:1 texto grande e componentes), o build falha |
 | `@orakel/content-model` | Bloco de imagem exige texto alternativo ou marcação explícita de decorativa                                                                              |
 | CI (`test:a11y`)        | axe com Playwright nos dois sites de exemplo                                                                                                             |
-| E2E manual (`e2e.yml`)  | Fluxos completos, incluindo navegação por teclado                                                                                                        |
+| CI (`test:browser`)     | Backoffice: axe, teclado e foco de cada componente em Chromium, nos dois temas. O E2E do Backoffice não roda axe (ADR 0019)                              |
 
 ## Checklist por componente
 

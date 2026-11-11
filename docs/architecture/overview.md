@@ -124,7 +124,8 @@ passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`
 - **Acessibilidade** WCAG 2.2 AA (`docs/design/accessibility.md`).
 - **Testes do Backoffice em três camadas** (ADR 0017): componente (Browser Mode), telas
   (Next + Postgres + access-mock, sem Docker; job `e2e-telas` em todo PR e
-  `pnpm local:e2e:telas <área>` no local) e pilha completa (`e2e.yml`, fora do PR).
+  `pnpm local:e2e:telas <área>` no local) e pilha completa (`e2e.yml`, fora do PR). O E2E
+  cobre só fluxos críticos; aparência e acessibilidade ficam na camada de componente (ADR 0019).
 - **Privacidade**: eventos anônimos — sem cookie, sem identificador persistente, sem IP
   armazenado (LGPD).
 - **Dependências**: correções de segurança em até 7 dias; críticas de Next.js ou React em
