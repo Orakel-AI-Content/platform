@@ -130,6 +130,10 @@ describe('ContentsTable no navegador', () => {
     const title = first.getByRole('link', { name: /^Receita \d+ \(ver versões\)$/ });
     expect(isClipped(title)).toBe(false);
     await expect.element(first.getByRole('link', { name: /^Editar / })).toBeVisible();
+    // O "Ver no site" (#587) só aparece a partir de md: com ele, o título curto já cortava.
+    const view = table().element().querySelector('tbody a[target="_blank"]');
+    expect(view?.getAttribute('aria-label')).toMatch(/^Ver .* no site$/);
+    expect(view?.checkVisibility()).toBe(false);
   });
 
   it.each(COLOR_SCHEMES)('com seleção, sem violação do axe (%s)', async (scheme) => {

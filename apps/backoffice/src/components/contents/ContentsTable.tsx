@@ -144,15 +144,19 @@ function columnsFor(
         const href = publicUrl(row.original, publicOrigin);
         return (
           <div className="flex items-center justify-end gap-1">
+            {/* Abaixo de md, só o editar (#589): o "Ver no site" alargava a coluna em todas as
+                linhas e cortava o título a 390 px. */}
             {href !== undefined && (
-              <IconButton
-                asElement="a"
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                label={`Ver ${row.original.title} no site`}
-                icon={<TbExternalLink />}
-              />
+              <span className="hidden md:inline-flex">
+                <IconButton
+                  asElement="a"
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  label={`Ver ${row.original.title} no site`}
+                  icon={<TbExternalLink />}
+                />
+              </span>
             )}
             {canWrite && (
               <IconButton
