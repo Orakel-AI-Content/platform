@@ -42,12 +42,12 @@ describe('DataTable', () => {
     render(<DataTable columns={columns} data={ARTIGOS} pagingData={paging} />);
 
     const [titleHeader, statusHeader] = screen.getAllByRole('columnheader');
-    expect(titleHeader?.className).toBe('px-2 md:px-6 w-full max-w-0');
-    expect(statusHeader?.className).toBe('px-2 md:px-6');
+    expect(titleHeader?.className).toBe('max-md:px-2 w-full max-w-0');
+    expect(statusHeader?.className).toBe('max-md:px-2');
     const [title, status] = within(screen.getAllByRole('row')[1]!).getAllByRole('cell');
-    expect(title?.className).toBe('px-2 md:px-6 w-full max-w-0');
+    expect(title?.className).toBe('max-md:px-2 w-full max-w-0');
     expect(title?.style.getPropertyValue('--col-w')).toBe('');
-    expect(status?.className).toBe('px-2 md:px-6 md:w-(--col-w)');
+    expect(status?.className).toBe('max-md:px-2 md:w-(--col-w)');
     expect(status?.style.getPropertyValue('--col-w')).toBe('150px');
   });
 

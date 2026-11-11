@@ -28,9 +28,10 @@
 // Acrescentado (#589): a coluna com `meta: { hideBelow: 'md' }` fica oculta (Th e Td) abaixo de
 // `md`, com `hidden md:table-cell`, para a coluna principal e o status caberem a 390 px sem
 // rolagem. Por classe, não por `columnVisibility`: o HTML é o mesmo em toda largura. Abaixo de
-// `md` também, as células têm `px-2` (o `px-6` da Table a partir dele) e a largura do
-// `getSize()` (150 px por padrão no TanStack) só vale a partir de `md`, pela variável `--col-w`:
-// a 390 px, os 48 px de respiro e os 150 px por coluna não deixavam espaço para o título.
+// `md` também, as células têm `max-md:px-2` (a partir dele, o respiro da Table: `px-6`, ou o
+// `px-3` do `compact`) e a largura do `getSize()` (150 px por padrão no TanStack) só vale a
+// partir de `md`, pela variável `--col-w`: a 390 px, os 48 px de respiro e os 150 px por coluna
+// não deixavam espaço para o título.
 'use client';
 
 import { createContext, use, useImperativeHandle, useMemo, useState } from 'react';
@@ -119,7 +120,7 @@ export const FLUID_CELL_CLASS = 'w-full max-w-0';
  */
 function columnClass(meta: { fluid?: boolean; hideBelow?: 'md' } | undefined, cell = false) {
   return classNames(
-    'px-2 md:px-6',
+    'max-md:px-2',
     meta?.fluid ? FLUID_CELL_CLASS : cell && 'md:w-(--col-w)',
     meta?.hideBelow === 'md' && 'hidden md:table-cell',
   );

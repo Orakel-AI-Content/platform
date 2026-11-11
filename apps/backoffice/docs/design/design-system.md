@@ -291,8 +291,8 @@ menus, sites, revisão, pendências, versões; a mídia é uma grade no mesmo ca
 - **Tela estreita (abaixo de `md`):** cada lista mostra, sem rolar, a coluna principal, o status
   e a ação da linha; as demais levam `meta: { hideBelow: 'md' }` na `ColumnDef`, e o `DataTable`
   dá `hidden md:table-cell` ao cabeçalho e às células (por classe, não por `columnVisibility`:
-  o HTML é o mesmo em toda largura). Abaixo de `md`, as células têm `px-2` (`px-6` a partir
-  dele) e a largura do `getSize()` só vale a partir de `md` (#589). Conteúdos: caixa, Título,
+  o HTML é o mesmo em toda largura). Abaixo de `md`, as células têm `max-md:px-2` (a partir
+  dele, o respiro da Table, inclusive o do `compact`) e a largura do `getSize()` só vale a partir de `md` (#589). Conteúdos: caixa, Título,
   Status e editar; sites: Site, Status e Mais ações; revisão, que não tem status: Título e
   Enviado em. Cada lista confere a 390 px no teste em Chromium (`visibleColumns`,
   `pageOverflow` e `tableOverflow` de `test/browser/layout.ts`). A partir de `md`, nada muda.
