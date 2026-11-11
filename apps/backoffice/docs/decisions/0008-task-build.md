@@ -32,6 +32,18 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
   falha, páginas, arquivos, versão publicada, `cacheKey`, durações). Com sucesso, a mesma
   transação baixa as mudanças pela lista `pendingChangeIds` do snapshot e marca o site
   `publicado`. A versão ativa (último build `ok`) dá o `ACTIVE_PAGE_COUNT` da trava.
+- **Execução com estado (#630):** a linha deixa de nascer pronta. `status` tem `na_fila` e
+  `rodando` (linhas abertas, sem `finished_at`) e `ok`, `failed` e `cancelado` (fechadas); o
+  `CHECK` `builds_finished_check` amarra o estado aberto ao `finished_at` nulo. `kind` separa
+  `build` de `rollback`. A task `build` grava a linha `rodando` antes do `runBuild`
+  (`startBuild`), fora da transação do resultado, para ela ser vista enquanto a execução
+  acontece; `recordBuild` fecha essa mesma linha por `update`, na transação que aplica os
+  efeitos no site. Continua valendo uma linha por tentativa: a aberta e a fechada são a mesma
+  (`job_id` + `attempt`). As consultas de versão ativa, versões do "Reverter", último build e
+  builds recentes só leem linhas `kind = build` fechadas (`ok`, ou `ok`/`failed`).
+  `current_stage`, `requested_by` (e-mail ou `system`), `scheduled_for` e `log_tail` nascem
+  aqui e são preenchidas pelas issues seguintes (#631, #632, #633), como as linhas `na_fila`,
+  `cancelado` e `rollback`.
 - **Falhas:** transitória lança e o Graphile Worker repete (até 5, backoff exponencial);
   permanente pausa o site com `<etapa>: <motivo>`; site pausado não é construído.
 - **Estado do site:** `src/domain/builds/site-state.ts` grava só colunas operacionais, sem
@@ -45,6 +57,12 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
   distância.
 - Resultado pelo log do container: duplicaria o contrato do volume.
 - `POST /containers/{id}/wait`: conexão longa, sujeita aos limites de tempo do `fetch`.
+- Renomear `ok`/`failed` para o idioma dos estados novos: reescreveria as linhas gravadas; a
+  migração da #630 só acrescenta colunas e relaxa `NOT NULL`/`DEFAULT` de `started_at` e
+  `finished_at`.
+- `finished_at` obrigatório com valor provisório na linha aberta: data falsa, e a ordenação
+  por `finished_at` poria a linha aberta no topo das consultas.
+- Linha `rodando` na mesma transação do resultado: só apareceria ao fim da execução.
 
 ## Consequências
 
@@ -54,9 +72,10 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
 - Retomar o site, rollback e reconstruir em outra release: L4 (Registro de instâncias).
 - **Recuperação na partida (#453):** o Graphile Worker só solta a trava de um worker morto
   depois de 4 h, e a fila `build:<site>` deixaria o site sem build até lá. Antes do `run()`, o
-  `build-runner` chama `recoverInterruptedBuilds` (`src/domain/builds/recover.ts`): cada job
-  `build` travado vira uma linha `failed`/`transient` em `builds` ("build interrompido…", com
-  `job_id`, `attempt` e `started_at` = `locked_at`), e os donos das travas dos jobs `build` e das
+  `build-runner` chama `recoverInterruptedBuilds` (`src/domain/builds/recover.ts`): a linha
+  `rodando` de cada job `build` travado (mesmo `job_id` e `attempt`) é fechada como
+  `failed`/`transient` ("build interrompido…"), sem inserir outra; só quando o processo morreu
+  antes de gravá-la a linha é inserida já fechada (com `started_at` = `locked_at`), e os donos das travas dos jobs `build` e das
   filas `build:%` são liberados com `graphile_worker.force_unlock_workers`, numa transação. O
   job volta à fila com a tentativa já contada; a política de retry segue igual. Toda trava
   presente na partida é tratada como de um processo morto, o que só vale enquanto houver um
