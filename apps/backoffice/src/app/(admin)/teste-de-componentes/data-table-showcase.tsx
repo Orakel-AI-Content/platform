@@ -48,16 +48,23 @@ const COLUNAS: ColumnDef<Materia>[] = [
   {
     header: 'Manchete',
     accessorKey: 'titulo',
+    meta: { fluid: true },
     sortFn: (a, b) => a.original.titulo.localeCompare(b.original.titulo, 'pt-BR'),
     cell: ({ row }) => (
-      <TwoLines secondary={<Truncated text={row.original.resumo} className="max-w-48" />}>
+      <TwoLines secondary={<Truncated text={row.original.resumo} />}>
         <Link href="#vitrine-data-table" className={ROW_LINK_CLASS}>
           {row.original.titulo}
         </Link>
       </TwoLines>
     ),
   },
-  { header: 'Visitas', accessorKey: 'visitas', enableGlobalFilter: false },
+  // Oculta abaixo de md (#589): a manchete e a situação cabem a 390 px sem rolar.
+  {
+    header: 'Visitas',
+    accessorKey: 'visitas',
+    meta: { hideBelow: 'md' },
+    enableGlobalFilter: false,
+  },
   {
     header: 'Situação',
     accessorKey: 'status',

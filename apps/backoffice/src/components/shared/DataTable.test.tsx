@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MotionGlobalConfig } from 'motion/react';
 import { createRef, useState } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import DataTable, { type ColumnDef, type DataTableResetHandle } from './DataTable.tsx';
 
@@ -11,6 +12,14 @@ import DataTable, { type ColumnDef, type DataTableResetHandle } from './DataTabl
 // tamanho de página.
 
 afterEach(cleanup);
+// A dica da caixa desabilitada abre no hover; o happy-dom rejeita a animação nativa que o motion
+// cancela ao desmontar.
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+});
 
 type Artigo = { titulo: string; status: string };
 
@@ -34,7 +43,7 @@ const rowTexts = () =>
     .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
 
 describe('DataTable', () => {
-  it('a coluna fluida ocupa a largura que sobra; as outras ficam com a do `getSize()` (#585)', () => {
+  it('a coluna fluida ocupa a largura que sobra; as outras ficam com a do `getSize()` a partir de md (#585, #589)', () => {
     const columns: ColumnDef<Artigo>[] = [
       { header: 'Título', accessorKey: 'titulo', meta: { fluid: true } },
       { header: 'Status', accessorKey: 'status', enableSorting: false },
@@ -42,13 +51,28 @@ describe('DataTable', () => {
     render(<DataTable columns={columns} data={ARTIGOS} pagingData={paging} />);
 
     const [titleHeader, statusHeader] = screen.getAllByRole('columnheader');
-    expect(titleHeader?.className).toBe('w-full max-w-0');
-    expect(statusHeader?.className).toBe('');
+    expect(titleHeader?.className).toBe('max-md:px-2 w-full max-w-0');
+    expect(statusHeader?.className).toBe('max-md:px-2');
     const [title, status] = within(screen.getAllByRole('row')[1]!).getAllByRole('cell');
-    expect(title?.className).toBe('w-full max-w-0');
-    expect(title?.style.width).toBe('');
-    expect(status?.className).toBe('');
-    expect(status?.style.width).toBe('150px');
+    expect(title?.className).toBe('max-md:px-2 w-full max-w-0');
+    expect(title?.style.getPropertyValue('--col-w')).toBe('');
+    expect(status?.className).toBe('max-md:px-2 md:w-(--col-w)');
+    expect(status?.style.getPropertyValue('--col-w')).toBe('150px');
+  });
+
+  it("`meta.hideBelow: 'md'` oculta o cabeçalho e as células da coluna abaixo de md (#589)", () => {
+    const columns: ColumnDef<Artigo>[] = [
+      { header: 'Título', accessorKey: 'titulo', meta: { fluid: true } },
+      { header: 'Status', accessorKey: 'status', meta: { hideBelow: 'md' } },
+    ];
+    render(<DataTable columns={columns} data={ARTIGOS} pagingData={paging} />);
+
+    const [titleHeader, statusHeader] = screen.getAllByRole('columnheader');
+    expect(titleHeader?.className).not.toContain('hidden');
+    expect(statusHeader?.className).toContain('hidden md:table-cell');
+    const [title, status] = within(screen.getAllByRole('row')[1]!).getAllByRole('cell');
+    expect(title?.className).not.toContain('hidden');
+    expect(status?.className).toContain('hidden md:table-cell');
   });
 
   it('renderiza as linhas dos dados, na ordem recebida (ordenação manual)', () => {
@@ -278,6 +302,46 @@ describe('DataTable', () => {
       screen.getByRole<HTMLInputElement>('checkbox', { name: 'Selecionar Receita de pão' }).checked,
     ).toBe(true);
     expect(onIndeterminateCheckBoxChange).toHaveBeenLastCalledWith(true, expect.any(Array));
+  });
+
+  it('rowUnselectableReason: a linha negada tem caixa desabilitada, com o motivo, fora do "selecionar todas" (#587)', async () => {
+    const user = userEvent.setup();
+    const onIndeterminateCheckBoxChange = vi.fn();
+    render(
+      <DataTable
+        columns={COLUNAS}
+        data={ARTIGOS}
+        pagingData={paging}
+        selectable
+        rowSelectable={(artigo) => artigo.status !== 'Rascunho'}
+        rowUnselectableReason={() => 'Rascunho não pode ser escolhido'}
+        checkboxLabel={(artigo) => `Selecionar ${artigo.titulo}`}
+        onIndeterminateCheckBoxChange={onIndeterminateCheckBoxChange}
+      />,
+    );
+
+    const negada = screen.getByRole<HTMLInputElement>('checkbox', {
+      name: 'Selecionar Análise do mercado',
+    });
+    expect(negada.disabled).toBe(true);
+    const motivo = negada.getAttribute('aria-describedby');
+    expect(motivo).toBeTruthy();
+    expect(document.getElementById(motivo!)?.textContent).toBe('Rascunho não pode ser escolhido');
+
+    const todas = screen.getByRole<HTMLInputElement>('checkbox', {
+      name: 'Selecionar todas as linhas',
+    });
+    await user.click(todas);
+    expect(negada.checked).toBe(false);
+    expect(
+      screen.getByRole<HTMLInputElement>('checkbox', { name: 'Selecionar Guia de jardinagem' })
+        .checked,
+    ).toBe(true);
+    // As duas escolhíveis marcadas: o cabeçalho fica marcado, sem o indeterminado.
+    expect(todas.checked).toBe(true);
+    expect(todas.indeterminate).toBe(false);
+    await user.click(negada);
+    expect(negada.checked).toBe(false);
   });
 
   it('rowSelectable: cabeçalho desabilitado quando nenhuma linha da página pode ser escolhida', () => {

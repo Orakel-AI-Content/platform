@@ -155,6 +155,30 @@ describe('DataTable no navegador', () => {
     await expect.poll(direction).toBe('column');
   });
 
+  it('a 390 px, a coluna com hideBelow some e a principal e o status cabem sem rolar (#589)', async () => {
+    await renderUi(<DataTableShowcase />);
+    const table = () => materias().element();
+    /** `display` do cabeçalho e da primeira célula de uma coluna, pelo texto do cabeçalho. */
+    const display = (name: string) => {
+      const headers = [...table().querySelectorAll('thead th')];
+      const index = headers.findIndex((th) => th.textContent?.trim() === name);
+      const cell = table().querySelector('tbody tr')?.children[index];
+      return [headers[index], cell].map((element) => element && getComputedStyle(element).display);
+    };
+    const scroller = () => table().parentElement!;
+
+    await page.viewport(390, 800);
+    await expect.poll(() => display('Visitas')).toEqual(['none', 'none']);
+    expect(display('Manchete')).toEqual(['table-cell', 'table-cell']);
+    expect(display('Situação')).toEqual(['table-cell', 'table-cell']);
+    await expect.element(materias().getByRole('link', { name: 'Editar Matéria 01' })).toBeVisible();
+    expect(scroller().scrollWidth).toBeLessThanOrEqual(scroller().clientWidth);
+
+    await page.viewport(1280, 800);
+    await expect.poll(() => display('Visitas')).toEqual(['table-cell', 'table-cell']);
+    expect(scroller().scrollWidth).toBeLessThanOrEqual(scroller().clientWidth);
+  });
+
   it('lista vazia mostra a ação principal; carregando, o esqueleto com aria-busy', async () => {
     await renderUi(<DataTableShowcase />);
 

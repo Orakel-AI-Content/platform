@@ -22,16 +22,29 @@
 // ser escolhida. As caixas leem a seleção por contexto, com as colunas estáveis: no Ecme, o
 // `checkboxChecked` novo a cada clique recriava as colunas, remontava as células e tirava o
 // foco da caixa marcada pelo teclado.
+// Acrescentado (#587): com `rowUnselectableReason`, a linha que `rowSelectable` nega desenha a
+// caixa `disabled`, com o motivo na dica (`Tooltip`, para quem passa o ponteiro) e num texto
+// oculto ligado à caixa por `aria-describedby` (para o leitor de tela, que não abre a dica de um
+// controle desabilitado). Sem a prop, a linha continua sem caixa. A caixa desabilitada não entra
+// no "selecionar todas" nem no indeterminado: quem decide é o `getCanSelect` do TanStack.
 // Acrescentado (#585): a coluna com `meta: { fluid: true }` ocupa a largura que sobra na tabela
 // (`w-full max-w-0` no Th e no Td, sem a largura do `getSize()`), e o `Truncated` dentro dela só
 // corta quando falta espaço. As outras colunas ficam como no Ecme.
+// Acrescentado (#589): a coluna com `meta: { hideBelow: 'md' }` fica oculta (Th e Td) abaixo de
+// `md`, com `hidden md:table-cell`, para a coluna principal e o status caberem a 390 px sem
+// rolagem. Por classe, não por `columnVisibility`: o HTML é o mesmo em toda largura. Abaixo de
+// `md` também, as células têm `max-md:px-2` (a partir dele, o respiro da Table: `px-6`, ou o
+// `px-3` do `compact`) e a largura do `getSize()` (150 px por padrão no TanStack) só vale a
+// partir de `md`, pela variável `--col-w`: a 390 px, os 48 px de respiro e os 150 px por coluna
+// não deixavam espaço para o título.
 'use client';
 
-import { createContext, use, useImperativeHandle, useMemo, useState } from 'react';
+import { createContext, use, useId, useImperativeHandle, useMemo, useState } from 'react';
 import Table from '@/components/ui/Table';
 import Pagination from '@/components/ui/Pagination';
 import Select from '@/components/ui/Select';
 import Checkbox from '@/components/ui/Checkbox';
+import { Tooltip } from '@/components/ui/Tooltip';
 import classNames from '@/components/ui/utils/classNames';
 import TableRowSkeleton from './loaders/TableRowSkeleton';
 import Loading from './Loading';
@@ -67,7 +80,7 @@ import type {
 import type { TableProps } from '@/components/ui/Table';
 import type { SkeletonProps } from '@/components/ui/Skeleton';
 import type { CheckboxProps } from '@/components/ui/Checkbox';
-import type { ChangeEvent, ReactNode, Ref } from 'react';
+import type { ChangeEvent, CSSProperties, ReactNode, Ref } from 'react';
 
 // Ordenação e paginação são controladas por quem usa (manualSorting / manualPagination); as
 // features registradas cobrem as APIs usadas no render e as do cálculo do `useListTable`.
@@ -98,12 +111,26 @@ declare module '@tanstack/table-core' {
   > {
     /** Coluna principal da lista: ocupa a largura que sobra, e o texto longo corta nela (#585). */
     fluid?: boolean;
+    /** Abaixo desta largura, a coluna (cabeçalho e células) fica oculta (#589). */
+    hideBelow?: 'md';
   }
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
 /** Classe da coluna fluida no Th e no Td: `max-w-0` deixa o `truncate` seguir a coluna. */
 export const FLUID_CELL_CLASS = 'w-full max-w-0';
+
+/**
+ * Classes do Th e do Td de uma coluna, pelo `meta`: respiro menor abaixo de `md`, fluida (ou com
+ * a largura do `--col-w` a partir de `md`) e oculta abaixo de `md` (#589).
+ */
+function columnClass(meta: { fluid?: boolean; hideBelow?: 'md' } | undefined, cell = false) {
+  return classNames(
+    'max-md:px-2',
+    meta?.fluid ? FLUID_CELL_CLASS : cell && 'md:w-(--col-w)',
+    meta?.hideBelow === 'md' && 'hidden md:table-cell',
+  );
+}
 
 export type ColumnDef<T extends RowData, TValue = unknown> = BaseColumnDef<
   DataTableFeatures,
@@ -151,6 +178,11 @@ export type DataTableProps<T extends RowData> = {
   indeterminateCheckboxChecked?: (row: Row<T>[]) => boolean;
   /** Quais linhas podem ser escolhidas; as outras ficam sem caixa. Sem ela, todas. */
   rowSelectable?: (row: T) => boolean;
+  /**
+   * Por que a linha negada por `rowSelectable` não pode ser escolhida: com ela, a linha ganha a
+   * caixa desabilitada com esse motivo na dica e no `aria-describedby`.
+   */
+  rowUnselectableReason?: (row: T) => string;
   /** Nome da caixa de cada linha ("Selecionar <título>"); sem ele, "Selecionar linha". */
   checkboxLabel?: (row: T) => string;
   ref?: Ref<DataTableResetHandle>;
@@ -192,6 +224,7 @@ type Selection<T extends RowData> = {
   checkboxChecked?: (row: T) => boolean;
   indeterminateCheckboxChecked?: (rows: Row<T>[]) => boolean;
   checkboxLabel?: (row: T) => string;
+  rowUnselectableReason?: (row: T) => string;
   onRowChange: (checked: boolean, row: T) => void;
   onAllChange: (checked: boolean, rows: Row<T>[]) => void;
 };
@@ -234,12 +267,49 @@ function SelectAllCheckbox<T extends RowData>({
   );
 }
 
+/**
+ * O filho que o `Tooltip` clona: o `aria-describedby` que ele injeta ao abrir fica de fora (o
+ * motivo já está no texto oculto), como no `IconButton`.
+ */
+function UnselectableCheckboxControl({
+  describedBy,
+  ...props
+}: CheckboxProps & { describedBy: string }) {
+  return <Checkbox {...props} aria-describedby={describedBy} />;
+}
+
+/** Caixa da linha que não pode ser escolhida, com o motivo (`rowUnselectableReason`). */
+function UnselectableRowCheckbox({ label, reason }: { label: string; reason: string }) {
+  const reasonId = useId();
+  return (
+    <>
+      <Tooltip title={reason} wrapperClass="inline-flex">
+        <UnselectableCheckboxControl
+          className="mb-0"
+          aria-label={label}
+          describedBy={reasonId}
+          checked={false}
+          disabled
+        />
+      </Tooltip>
+      <span id={reasonId} className="sr-only">
+        {reason}
+      </span>
+    </>
+  );
+}
+
 function SelectRowCheckbox<T extends RowData>({ row }: { row: Row<T> }) {
-  const { checkboxChecked, checkboxLabel, onRowChange } = useSelection<T>();
-  if (!row.getCanSelect()) return null;
+  const { checkboxChecked, checkboxLabel, rowUnselectableReason, onRowChange } = useSelection<T>();
+  const label = checkboxLabel ? checkboxLabel(row.original) : 'Selecionar linha';
+  if (!row.getCanSelect()) {
+    return rowUnselectableReason ? (
+      <UnselectableRowCheckbox label={label} reason={rowUnselectableReason(row.original)} />
+    ) : null;
+  }
   return (
     <IndeterminateCheckbox
-      aria-label={checkboxLabel ? checkboxLabel(row.original) : 'Selecionar linha'}
+      aria-label={label}
       checked={checkboxChecked ? checkboxChecked(row.original) : row.getIsSelected()}
       indeterminate={row.getIsSomeSelected()}
       onChange={row.getToggleSelectedHandler()}
@@ -285,6 +355,7 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
     checkboxChecked,
     indeterminateCheckboxChecked,
     rowSelectable,
+    rowUnselectableReason,
     checkboxLabel,
     instanceId = 'data-table',
     ref,
@@ -340,6 +411,7 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
     checkboxChecked,
     indeterminateCheckboxChecked,
     checkboxLabel,
+    rowUnselectableReason,
     onRowChange: handleCheckBoxChange,
     onAllChange: handleIndeterminateCheckBoxChange,
   };
@@ -405,7 +477,7 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
                     <Th
                       key={header.id}
                       colSpan={header.colSpan}
-                      className={header.column.columnDef.meta?.fluid ? FLUID_CELL_CLASS : undefined}
+                      className={columnClass(header.column.columnDef.meta)}
                       sort={canSort ? sorted || 'none' : undefined}
                     >
                       {canSort && !header.isPlaceholder ? (
@@ -465,13 +537,11 @@ function DataTable<T extends RowData>(props: DataTableProps<T>) {
                           return (
                             <Td
                               key={cell.id}
-                              className={
-                                cell.column.columnDef.meta?.fluid ? FLUID_CELL_CLASS : undefined
-                              }
+                              className={columnClass(cell.column.columnDef.meta, true)}
                               style={
                                 cell.column.columnDef.meta?.fluid
                                   ? undefined
-                                  : { width: cell.column.getSize() }
+                                  : ({ '--col-w': `${cell.column.getSize()}px` } as CSSProperties)
                               }
                             >
                               {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -47,12 +47,19 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueItem
     {
       header: 'Tipo',
       accessorKey: 'kind',
+      meta: { hideBelow: 'md' },
       enableGlobalFilter: false,
       filterFn: 'equalsString',
       sortFn: byText((item) => CONTENT_KIND_LABEL[item.kind]),
       cell: ({ row }) => CONTENT_KIND_LABEL[row.original.kind],
     },
-    { header: 'Versão', accessorKey: 'version', enableGlobalFilter: false, sortFn: 'basic' },
+    {
+      header: 'Versão',
+      accessorKey: 'version',
+      meta: { hideBelow: 'md' },
+      enableGlobalFilter: false,
+      sortFn: 'basic',
+    },
     // Data da versão enviada: a data do envio não é guardada (#72).
     {
       header: 'Enviado em',
