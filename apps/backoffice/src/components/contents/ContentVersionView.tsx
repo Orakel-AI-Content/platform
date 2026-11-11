@@ -1,6 +1,7 @@
 import type { Block, Inline, RichText } from '@orakel/content-model/v1';
 import { Fragment, type ReactNode } from 'react';
 
+import { MediaThumbnail, type MediaItem } from '@/components/media/MediaLibrary';
 import { InfoField, InfoList } from '@/components/shared/InfoList';
 import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import {
@@ -14,7 +15,41 @@ import type { ContentData } from '@/db/schema/index.ts';
 // Leitura de uma versão de conteúdo (#44): HTML semântico desenhado no servidor, sem
 // controle de formulário nem JS no cliente. Estrutural, não o tema do site (o renderizador
 // do apps/blog não entra aqui: app não importa app). "Dados" e cada bloco num `Card` do Ecme, com
-// os títulos de seção das outras telas (#372).
+// os títulos de seção das outras telas (#372). Autores, taxonomias e mídias aparecem pelo nome e
+// pela miniatura, resolvidos pela página (#593); o que não existe mais vira "removido (ID n)".
+
+/** Nomes e miniaturas por ID, lidos pela página; um ID ausente é uma referência removida. */
+export type VersionReferences = {
+  authors: ReadonlyMap<number, string>;
+  /** Rótulo com o tipo, como no editor: "Hortas (categoria)". */
+  taxonomies: ReadonlyMap<number, string>;
+  media: ReadonlyMap<number, MediaItem>;
+};
+
+const removed = (id: number) => `removido (ID ${id})`;
+
+function names(ids: readonly number[], labels: ReadonlyMap<number, string>) {
+  return ids.length > 0 ? ids.map((id) => labels.get(id) ?? removed(id)).join(', ') : '—';
+}
+
+/**
+ * Miniatura de uma mídia com as dimensões, como o campo de mídia do editor (`PickerFields`):
+ * `alt=""` (o texto alternativo fica ao lado); a mídia removida, no espaço tracejado.
+ */
+function MediaPreview({ id, item }: { id: number; item: MediaItem | undefined }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="w-24 shrink-0">
+        {item ? (
+          <MediaThumbnail item={item} />
+        ) : (
+          <div className="aspect-square rounded-md border border-dashed border-gray-300 dark:border-gray-600" />
+        )}
+      </div>
+      <span>{item ? `Mídia ${item.id} · ${item.width}×${item.height}` : removed(id)}</span>
+    </div>
+  );
+}
 
 const MARK_TAG = { bold: 'strong', italic: 'em', code: 'code' } as const;
 
@@ -74,7 +109,7 @@ function RichTextView({ nodes }: { nodes: RichText }) {
   });
 }
 
-function BlockBody({ block }: { block: Block }) {
+function BlockBody({ block, media }: { block: Block; media: VersionReferences['media'] }) {
   switch (block.type) {
     case 'text':
       return <RichTextView nodes={block.content} />;
@@ -97,7 +132,9 @@ function BlockBody({ block }: { block: Block }) {
     case 'image':
       return (
         <InfoList>
-          <InfoField label="Mídia">{block.mediaId}</InfoField>
+          <InfoField label="Mídia">
+            <MediaPreview id={block.mediaId} item={media.get(block.mediaId)} />
+          </InfoField>
           <InfoField label="Texto alternativo">
             {block.decorative === true ? 'Decorativa' : block.alt}
           </InfoField>
@@ -125,16 +162,27 @@ function BlockBody({ block }: { block: Block }) {
 }
 
 /** Metadados e blocos de uma versão, só para ler; a data de publicação no fuso do site. */
-export function ContentVersionView({ data, timeZone }: { data: ContentData; timeZone: string }) {
-  const ids = (values: number[]) => (values.length > 0 ? values.join(', ') : '—');
+export function ContentVersionView({
+  data,
+  timeZone,
+  references,
+}: {
+  data: ContentData;
+  timeZone: string;
+  references: VersionReferences;
+}) {
+  const cover = data.coverMediaId;
   const meta: [string, ReactNode][] = [
     ['Tipo', CONTENT_KIND_LABEL[data.kind]],
     ['Título', data.title],
     ['Slug', data.slug],
     ['Descrição', data.description ?? '—'],
-    ['Autores (IDs)', ids(data.authorIds)],
-    ['Taxonomias (IDs)', ids(data.taxonomyIds)],
-    ['Capa (mídia)', data.coverMediaId ?? '—'],
+    ['Autores', names(data.authorIds, references.authors)],
+    ['Taxonomias', names(data.taxonomyIds, references.taxonomies)],
+    [
+      'Capa',
+      cover === undefined ? '—' : <MediaPreview id={cover} item={references.media.get(cover)} />,
+    ],
     ['Data de publicação', formatDateTime(new Date(data.publishedAt), timeZone)],
     ['Título SEO', data.seo?.title ?? '—'],
     ['Descrição SEO', data.seo?.description ?? '—'],
@@ -168,7 +216,7 @@ export function ContentVersionView({ data, timeZone }: { data: ContentData; time
                 <h3 className={SECTION_TITLE_CLASS}>
                   {BLOCK_TYPE_LABEL[block.type]} · bloco {block.n}
                 </h3>
-                <BlockBody block={block} />
+                <BlockBody block={block} media={references.media} />
               </Card>
             </li>
           ))}
