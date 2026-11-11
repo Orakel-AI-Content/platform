@@ -7,14 +7,15 @@ import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/
 import { pageOverflow } from '../../../test/browser/layout.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInFrame } from '../../../test/browser/render.tsx';
-import { ContentVersionView } from './ContentVersionView.tsx';
+import { ContentVersionView, type VersionReferences } from './ContentVersionView.tsx';
 
 vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 
 // Uma versão em cartões em Chromium (#460; antes no E2E, `contents.spec.ts`, #372): a 375 px, na
 // moldura do admin e na largura dos formulários (a da página da versão), a URL canônica de 120
 // caracteres sem espaço quebra dentro do cartão "Dados" e a página não rola na horizontal; o axe
-// roda nos dois temas.
+// roda nos dois temas. Com a capa e a imagem do bloco em miniatura e os nomes (#593), também sem
+// rolar.
 
 const CANONICAL = `https://exemplo-a.example.com/${'guiacompleto'.repeat(10)}`.slice(0, 120);
 
@@ -26,13 +27,32 @@ const DATA: ContentData = {
   taxonomyIds: [],
   publishedAt: '2026-10-01T12:00:00Z',
   seo: { title: 'Versão em cartões', description: 'Uma versão para ler.', canonical: CANONICAL },
-  blocks: [{ n: 1, type: 'toc', title: 'Neste guia' }],
+  coverMediaId: 3,
+  blocks: [
+    { n: 1, type: 'toc', title: 'Neste guia' },
+    { n: 2, type: 'image', mediaId: 9, alt: 'Canteiro de alface em vasos na varanda' },
+  ],
+};
+
+/** Imagem local (sem rede) nas dimensões da mídia: a miniatura tem de caber no cartão mesmo larga. */
+const pixel = (width: number, height: number) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#6b8e23"/></svg>`,
+  )}`;
+
+const REFERENCES: VersionReferences = {
+  authors: new Map([[1, 'Ana Souza']]),
+  taxonomies: new Map(),
+  media: new Map([
+    [3, { id: 3, width: 3200, height: 1800, sources: [], src: pixel(3200, 1800) }],
+    [9, { id: 9, width: 1600, height: 1200, sources: [], src: pixel(1600, 1200) }],
+  ]),
 };
 
 function Version() {
   return (
     <article aria-label="Versão 1" className="form-width space-y-4">
-      <ContentVersionView data={DATA} timeZone="America/Sao_Paulo" />
+      <ContentVersionView data={DATA} timeZone="America/Sao_Paulo" references={REFERENCES} />
     </article>
   );
 }
@@ -58,6 +78,24 @@ describe('ContentVersionView no navegador', () => {
     expect(valueBox.height).toBeGreaterThan(
       Number.parseFloat(getComputedStyle(value).lineHeight) * 1.5,
     );
+    expect(pageOverflow()).toBe(0);
+  });
+
+  it('a 375 px, a capa e a imagem do bloco ficam em miniatura dentro do cartão, sem rolar', async () => {
+    await page.viewport(375, 800);
+    const screen = await renderInFrame(<Version />);
+    expect(screen.getByText('Ana Souza', { exact: true }).element()).toBeTruthy();
+
+    for (const caption of ['Mídia 3 · 3200×1800', 'Mídia 9 · 1600×1200']) {
+      const field = screen.getByText(caption, { exact: true }).element().closest('dd')!;
+      const image = field.querySelector('img')!;
+      const card = field.closest('.card')!.getBoundingClientRect();
+      const box = image.getBoundingClientRect();
+      expect(image.getAttribute('alt')).toBe('');
+      expect(box.width).toBeLessThanOrEqual(96);
+      expect(box.right).toBeLessThanOrEqual(card.right + 1);
+    }
+    expect(screen.getByText('Canteiro de alface em vasos na varanda').element()).toBeTruthy();
     expect(pageOverflow()).toBe(0);
   });
 
