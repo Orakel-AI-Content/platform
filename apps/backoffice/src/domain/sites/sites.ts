@@ -29,6 +29,7 @@ import { toRedirect } from '../export/mappers.ts';
 import { countPendingChangesByOrigin, type PendingOriginCount } from '../pending-changes/list.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 import { effectiveDailyPublishLimit, publishedOnDayBySite } from '../publications/publish.ts';
+import { latestAvailableRelease } from '../releases/releases.ts';
 import { hasPolicyTrigger } from './policy-triggers.ts';
 
 /** Textos das páginas institucionais (o content-model só exporta o schema). */
@@ -115,7 +116,11 @@ async function checkIndexing(tx: Executor, config: SiteConfig): Promise<Result<v
   };
 }
 
-/** Cadastra um site com a configuração v1, validada contra os recursos da release. */
+/**
+ * Cadastra um site com a configuração v1, validada contra os recursos da release. O site nasce
+ * na release `disponivel` mais recente (nula sem nenhuma, e o build cai no `SITE_BUILDER_TAG`);
+ * não é uma troca de versão, então não grava `site_events`.
+ */
 export async function createSite(
   tx: Executor,
   actor: Actor,
@@ -141,7 +146,8 @@ export async function createSite(
     };
   }
 
-  await tx.insert(sites).values({ id: config.siteId, name: config.name });
+  const release = await latestAvailableRelease(tx);
+  await tx.insert(sites).values({ id: config.siteId, name: config.name, release });
   await tx.insert(siteConfigs).values({ siteId: config.siteId, version: 1, config });
   await recordPendingChange(tx, config.siteId, 'config', 'v1');
   return { ok: true, value: { siteId: config.siteId } };

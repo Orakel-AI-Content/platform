@@ -6,6 +6,7 @@ import type { Db } from '../../src/db/client.ts';
 import {
   builds,
   pendingChanges,
+  releases,
   siteConfigs,
   siteEvents,
   sitePolicyTriggers,
@@ -825,5 +826,41 @@ describe('pausa manual com motivo (#644)', () => {
     await db.transaction((tx) => pauseSiteManually(tx, operacao, 'exemplo-a', 'Manutenção'));
     const [after] = await db.select({ n: count() }).from(pendingChanges);
     expect(after?.n).toBe(before?.n);
+  });
+});
+
+describe('versão no cadastro do site (#689)', () => {
+  const createExemploC = async () => {
+    const line = (await readFixture('exemplo-a')).find((l) => l.type === 'config');
+    if (line?.type !== 'config') throw new Error('fixture sem config');
+    return db.transaction((tx) =>
+      createSite(tx, SYSTEM_ACTOR, { ...line.data, siteId: 'exemplo-c' }),
+    );
+  };
+  const releaseOf = async (siteId: string) =>
+    (await db.select({ release: sites.release }).from(sites).where(eq(sites.id, siteId)))[0]
+      ?.release;
+
+  it('grava a release disponível mais recente, em ordem numérica, sem evento', async () => {
+    await db.insert(releases).values([
+      { tag: '1.4.0', pipelineState: 'disponivel' },
+      { tag: '1.10.0', pipelineState: 'disponivel' },
+      { tag: '1.11.0', pipelineState: 'gerando' },
+    ]);
+
+    expect(await createExemploC()).toEqual({ ok: true, value: { siteId: 'exemplo-c' } });
+
+    expect(await releaseOf('exemplo-c')).toBe('1.10.0');
+    expect(await db.select().from(siteEvents).where(eq(siteEvents.siteId, 'exemplo-c'))).toEqual(
+      [],
+    );
+  });
+
+  it('sem release disponível, grava nula', async () => {
+    await db.insert(releases).values({ tag: '1.11.0', pipelineState: 'gerando' });
+
+    expect(await createExemploC()).toMatchObject({ ok: true });
+
+    expect(await releaseOf('exemplo-c')).toBeNull();
   });
 });
