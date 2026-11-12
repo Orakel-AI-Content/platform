@@ -7,40 +7,33 @@ import { Tabs } from '@/components/ui/Tabs';
 
 /**
  * Lado direito da página do site (#370): o `Card` com `Tabs` do `CustomerDetails` do Ecme, com
- * Ciclo de vida, Histórico (execuções e eventos do site, no `SiteBuildsTable`, #637; era a aba
- * "Builds" do #595), G1, Janela de agrupamento e
- * Limite diário (#490). Cliente porque o `Tabs` é; a página (Server
- * Component) passa o conteúdo de cada aba pronto. A aba inativa desmonta o conteúdo, como no
- * template.
+ * Publicação (o painel de etapas e o histórico do site, `SitePublicationTab`, #647; juntou as
+ * antigas "Ciclo de vida" e "Histórico"), G1, Janela de agrupamento e Limite diário (#490).
+ * Cliente porque o `Tabs` é; a página (Server Component) passa o conteúdo de cada aba pronto. A
+ * aba inativa desmonta o conteúdo, como no template.
  */
 export function SiteTabs({
-  lifecycle,
-  history,
+  publication,
   g1,
   buildWindow,
   dailyLimit,
 }: {
-  lifecycle: ReactNode;
-  history: ReactNode;
+  publication: ReactNode;
   g1: ReactNode;
   buildWindow: ReactNode;
   dailyLimit: ReactNode;
 }) {
   return (
     <Card className="w-full min-w-0">
-      <Tabs defaultValue="ciclo">
+      <Tabs defaultValue="publicacao">
         <Tabs.TabList aria-label="Seções do site">
-          <Tabs.TabNav value="ciclo">Ciclo de vida</Tabs.TabNav>
-          <Tabs.TabNav value="historico">Histórico</Tabs.TabNav>
+          <Tabs.TabNav value="publicacao">Publicação</Tabs.TabNav>
           <Tabs.TabNav value="g1">G1 (indexação)</Tabs.TabNav>
           <Tabs.TabNav value="janela">Janela de agrupamento</Tabs.TabNav>
           <Tabs.TabNav value="limite">Limite diário</Tabs.TabNav>
         </Tabs.TabList>
-        <Tabs.TabContent value="ciclo" className="pt-4">
-          {lifecycle}
-        </Tabs.TabContent>
-        <Tabs.TabContent value="historico" className="pt-4">
-          {history}
+        <Tabs.TabContent value="publicacao" className="pt-4">
+          {publication}
         </Tabs.TabContent>
         <Tabs.TabContent value="g1" className="pt-4">
           {g1}

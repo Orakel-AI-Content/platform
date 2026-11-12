@@ -1,0 +1,132 @@
+import type { ReactNode } from 'react';
+
+import {
+  PUBLICATION_STEPS,
+  PUBLICATION_STEP_LABEL,
+  SITE_STATE_LABEL,
+  liveResultText,
+  liveStatusText,
+  liveVersionText,
+  type PublicationStep,
+} from '@/components/shared/siteLabels.ts';
+import type { StepStatus } from '@/components/ui/@types/common';
+import { Steps } from '@/components/ui/Steps';
+import type { ExecutionHistoryItem, SiteActivity } from '@/domain/builds/builds.ts';
+import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
+
+import { LifecycleSteps } from './LifecycleSteps.tsx';
+
+export type PublicationSite = Pick<
+  SiteSummary,
+  'lifecycle' | 'release' | 'activeVersionId' | 'state' | 'pausedReason' | 'timeZone'
+>;
+
+export type PublicationInstance = Pick<SiteInstance, 'activePages' | 'activeSince'>;
+
+type Step = { status: StepStatus; text: ReactNode };
+
+/** O último build terminado, no histórico (do mais recente ao mais antigo). */
+function lastBuild(activity: SiteActivity): ExecutionHistoryItem | undefined {
+  return activity.history.find(
+    (item): item is ExecutionHistoryItem => item.type === 'execucao' && item.kind === 'build',
+  );
+}
+
+const BUILD_RESULT_STATUS: Record<ExecutionHistoryItem['status'], StepStatus> = {
+  ok: 'complete',
+  failed: 'error',
+  cancelado: 'pending',
+};
+
+function steps(
+  site: PublicationSite,
+  instance: PublicationInstance,
+  activity: SiteActivity,
+  lifecycleAction: ReactNode,
+): Record<PublicationStep, Step> {
+  const last = lastBuild(activity);
+  const infraDone = site.lifecycle === 'zona_ativa' || site.lifecycle === 'publicado';
+  return {
+    infra: {
+      status: infraDone ? 'complete' : 'in-progress',
+      text: <LifecycleSteps current={site.lifecycle} action={lifecycleAction} />,
+    },
+    versao: {
+      status: site.release === null ? 'pending' : 'complete',
+      text: site.release ?? 'Nenhuma release',
+    },
+    build:
+      activity.open !== null
+        ? { status: 'in-progress', text: liveStatusText(activity.open, site.timeZone) }
+        : last !== undefined
+          ? { status: BUILD_RESULT_STATUS[last.status], text: liveResultText(last, site.timeZone) }
+          : { status: 'pending', text: 'Nenhum build ainda' },
+    no_ar:
+      site.activeVersionId === null
+        ? { status: 'pending', text: 'Nenhuma versão no ar' }
+        : {
+            status: 'complete',
+            text: liveVersionText(
+              site.activeVersionId,
+              instance.activePages,
+              instance.activeSince,
+              site.timeZone,
+            ),
+          },
+    site: {
+      status:
+        site.state === 'pausado' ? 'error' : site.state === 'ativo' ? 'complete' : 'in-progress',
+      text:
+        site.state === 'pausado' && site.pausedReason
+          ? `${SITE_STATE_LABEL.pausado}: ${site.pausedReason}`
+          : SITE_STATE_LABEL[site.state],
+    },
+  };
+}
+
+/**
+ * Onde o `aria-current` fica: na etapa Build enquanto há execução aberta; senão, na primeira
+ * etapa não concluída; tudo concluído, em nenhuma (-1).
+ */
+function currentIndex(byStep: Record<PublicationStep, Step>, open: boolean): number {
+  if (open) return PUBLICATION_STEPS.indexOf('build');
+  return PUBLICATION_STEPS.findIndex((step) => byStep[step].status !== 'complete');
+}
+
+/**
+ * Painel de etapas da aba "Publicação" (#647): Infra e zona, Versão, Build, No ar e Site, em
+ * sequência no `Steps` vertical do Ecme. Cada etapa tem o `status` próprio (são independentes,
+ * não um avanço único) e o estado em texto visível na `description`; o `StepItem` diz o estado
+ * genérico ("concluída", "atual", "pendente", "com erro") em `sr-only`, sem repetir o texto.
+ * A etapa Build segue a atividade que a aba relê durante uma execução (`SiteLiveActivity`):
+ * "na fila" com o horário previsto, em andamento com a etapa ou o resultado do último build.
+ */
+export function SitePublicationSteps({
+  site,
+  instance,
+  activity,
+  lifecycleAction,
+}: {
+  site: PublicationSite;
+  instance: PublicationInstance;
+  activity: SiteActivity;
+  lifecycleAction?: ReactNode;
+}) {
+  const byStep = steps(site, instance, activity, lifecycleAction);
+  return (
+    <Steps
+      vertical
+      aria-label="Etapas da publicação"
+      current={currentIndex(byStep, activity.open !== null)}
+    >
+      {PUBLICATION_STEPS.map((step) => (
+        <Steps.Item
+          key={step}
+          status={byStep[step].status}
+          title={PUBLICATION_STEP_LABEL[step]}
+          description={<span className="block text-sm">{byStep[step].text}</span>}
+        />
+      ))}
+    </Steps>
+  );
+}

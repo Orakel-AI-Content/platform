@@ -91,6 +91,35 @@ export async function activeBuild(
   return row;
 }
 
+/** Quando a versão ativa entrou no ar e quem pediu (nulo no build sem autor, o da janela). */
+export type ActiveSince = { at: Date; by: string | null };
+
+/**
+ * Quando a versão ativa entrou no ar (#647): a execução `ok` mais recente, build ou rollback,
+ * com `versionId = sites.activeVersionId`. Depois de um "Reverter", é a reversão, não o build
+ * que gerou a versão.
+ */
+export async function activeSince(
+  db: Executor,
+  siteId: string,
+  activeVersionId: string | null,
+): Promise<ActiveSince | undefined> {
+  if (activeVersionId === null) return undefined;
+  const [row] = await db
+    .select({ at: builds.finishedAt, by: builds.requestedBy })
+    .from(builds)
+    .where(
+      and(
+        eq(builds.siteId, siteId),
+        eq(builds.status, 'ok'),
+        eq(builds.versionId, activeVersionId),
+      ),
+    )
+    .orderBy(desc(builds.finishedAt), desc(builds.id))
+    .limit(1);
+  return row?.at ? { at: row.at, by: row.by } : undefined;
+}
+
 export async function loadBuildTarget(
   db: Executor,
   siteId: string,
@@ -523,7 +552,7 @@ export const SITE_HISTORY_LIMIT = 50;
  * histórico que une as execuções terminadas de `builds` (builds e rollbacks, inclusive
  * cancelados) aos eventos de `site_events`. Cada tabela é lida até o limite, e as duas listas
  * são intercaladas pelo horário e cortadas no limite. A execução aberta fica fora do histórico.
- * Exige só `site.read`: a aba "Histórico" aparece para todos os perfis, como a "Builds" que ela
+ * Exige só `site.read`: a aba "Publicação" (#647) aparece para todos os perfis, como a "Builds" que ela
  * substitui (#637), inclusive a mensagem e o fim do log das falhas.
  */
 export async function siteActivity(

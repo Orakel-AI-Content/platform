@@ -465,7 +465,7 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   escrita à mão.
 - **Corpo:** `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, e o
   conteúdo à direita num `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de
-  uma seção (na página do site, o `SiteTabs`: Ciclo de vida, Histórico, G1, Janela e Limite; o
+  uma seção (na página do site, o `SiteTabs`: Publicação, G1, Janela e Limite; o
   nome da aba é o título da seção, e um formulário dentro dela é o `SchemaForm` com `card`, de
   botões `size: 'sm'`; acima dele, na mesma coluna, os cartões de conteúdo, ver "Métricas").
   Abaixo de `xl`, empilha. Largura `list-width` (a versão, sem resumo ao lado, fica em
@@ -497,7 +497,8 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   `https://<domínio>` em nova aba, e "Mudanças pendentes" leva à tela de pendências quando
   passa de zero, com a divisão por origem embaixo, em duas colunas. Com os cartões de conteúdo
   na coluna da direita, a 1440 × 900 o resumo inteiro cabe na primeira tela. A atividade do
-  site fica na aba "Histórico" (#637; era a "Builds"), para todos os perfis, no
+  site fica na aba "Publicação" (#647; juntou "Ciclo de vida" e "Histórico", #637, que era a
+  "Builds"), abaixo do painel de etapas e do título "Histórico", para todos os perfis, no
   `SiteBuildsTable` (`src/components/sites/SiteBuildsTable.tsx`): a `Table` do Ecme direto,
   não o `DataTable` (até 50 linhas de `siteActivity`, sem busca, ordem nem paginação), com
   Tipo (publicação, reversão, troca de versão, pausa, retomada), Status (`StateTag`, só nas
@@ -511,24 +512,31 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   horário previsto no fuso do site ou "em andamento" com a etapa, e, quando ela termina, o
   resultado (`success`, `danger` ou `warning` para concluída, falhou ou cancelada). O `Alert`
   fica dentro de um contêiner `role="status"` sempre montado, que anuncia cada mudança. Enquanto
-  há execução aberta, a aba relê faixa e tabela pela `siteActivityAction` a cada 3 s
-  (`usePolling`); sem execução aberta, não consulta e não mostra faixa.
+  há execução aberta, a aba relê painel, faixa e tabela pela `siteActivityAction` a cada 3 s
+  (`usePolling`), uma consulta só para os três (`SitePublicationTab`); sem execução aberta,
+  não consulta e não mostra faixa.
 - **Eventos em ordem cronológica:** `Timeline` (`src/components/ui/Timeline`) para uma lista
   de acontecimentos que cresce com o tempo (o histórico de publicações do site), um
   `Timeline.Item` por evento. Para etapas de ordem fixa, com estado e atual, é o `Steps`
   (abaixo). O marcador é decorativo: o que ele indicar (falha, reversão) vai em texto no
   conteúdo do item, com a cor de estado do `StateTag`; item clicável não, o detalhe abre por
   um botão no conteúdo.
-- **Sequência de etapas:** `LifecycleSteps` (`src/components/sites/LifecycleSteps.tsx`) para um
-  processo de ordem fixa (ciclo de vida do site), não tag. Usa o `Steps` vertical
+- **Sequência de etapas:** `SitePublicationSteps` (`src/components/sites/SitePublicationSteps.tsx`,
+  #647), o painel no topo da aba "Publicação": Infra e zona, Versão, Build, No ar e Site, nessa
+  ordem (`PUBLICATION_STEPS` em `siteLabels.ts`), não tag. Usa o `Steps` vertical
   (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
-  `title`; o `Steps` desenha marcador e conector, põe `aria-current="step"` na atual e diz o
-  estado ("concluída", "atual", "pendente") em `sr-only`. A atual e as pendentes repetem o
-  estado em texto visível no `title`, `aria-hidden`, para não ficarem só na cor da borda. A
-  ordem vem de `LIFECYCLE_ORDER` em `siteLabels.ts`. A ação manual fica na `description` do
-  item da etapa que ela conclui (sem `onChange`, as etapas não viram botões); o sucesso vai
-  para o toast e o erro para o `ActionAlert` abaixo da lista (`LifecycleActionScope`), que
-  sobrevive à revalidação que move o botão de item.
+  `title` e o estado de domínio em texto visível na `description` (a release; "na fila" com o
+  horário previsto ou a etapa em andamento, ou o resultado do último build; a versão no ar com
+  páginas, quando e por quem; "Ativo" ou "Pausado: <motivo>"). As etapas são independentes:
+  cada item recebe o `status` próprio (`complete`, `in-progress`, `pending`, `error`), e o
+  `StepItem` diz o estado genérico ("concluída", "atual", "pendente", "com erro") em `sr-only`,
+  sem repetir o texto visível. `aria-current="step"` vai na Build durante uma execução; senão,
+  na primeira etapa não concluída; tudo concluído, em nenhuma. A etapa Build lê a mesma
+  atividade relida pelo polling da aba e muda sem recarregar; as outras mudam na revalidação.
+  A ação manual do ciclo de vida ("Marcar infra aplicada", "Marcar zona ativa") fica na
+  `description` de Infra e zona (`LifecycleSteps`, com o texto do ciclo); sem `onChange`, as
+  etapas não viram botões; o sucesso vai para o toast e o erro para o `ActionAlert` abaixo do
+  painel (`LifecycleActionScope`), que sobrevive à revalidação que troca o botão.
 
 ### Mídia
 

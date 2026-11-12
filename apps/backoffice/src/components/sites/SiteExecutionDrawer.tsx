@@ -15,7 +15,7 @@ export type FailedExecution = ExecutionHistoryItem & {
 };
 
 /**
- * Detalhe de uma execução que falhou, na aba "Histórico" da página do site (#637): o `Drawer`
+ * Detalhe de uma execução que falhou, no histórico da aba "Publicação" da página do site (#637, #647): o `Drawer`
  * do Ecme à direita, com quando terminou, quem pediu, a etapa em que parou ("—" no rollback,
  * que é um container só), a mensagem e o fim do log do container (só o trecho final, como o
  * build-runner grava). O log fica num `<pre>` rolável e focável, para o teclado chegar nele.

@@ -1,18 +1,16 @@
 import type { ReactNode } from 'react';
 
-import { LifecycleSteps } from '@/components/sites/LifecycleSteps';
 import { RedirectUsageAlert } from '@/components/sites/RedirectUsageAlert';
 import { SiteContentMetrics } from '@/components/sites/SiteContentMetrics';
 import {
   BuildWindowForm,
   DailyPublishLimitForm,
   LifecycleAction,
-  LifecycleActionScope,
   RegisterG1Form,
 } from '@/components/sites/SiteActions';
 import { formatDateTime, formatDuration } from '@/components/shared/siteLabels.ts';
-import { SiteLiveActivity } from '@/components/sites/SiteLiveActivity';
 import { SiteOperations, SiteOperationsScope } from '@/components/sites/SiteOperations';
+import { SitePublicationTab } from '@/components/sites/SitePublicationTab';
 import { SiteSummaryCard } from '@/components/sites/SiteSummaryCard';
 import { SiteTabs } from '@/components/sites/SiteTabs';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
@@ -49,9 +47,9 @@ export const dynamic = 'force-dynamic';
  * (#595): no cabeçalho, "Editar configuração" (site.configure) e as ações de operação
  * (operations.run): "Publicar agora" ou, pausado, "Retomar", e o "Mais ações" com "Reconstruir
  * na release" e "Reverter", com o erro logo abaixo do cabeçalho. Embaixo, o resumo só com o
- * estado atual à esquerda e, à direita, o `Card` com as abas Ciclo de vida, Histórico (a
- * atividade do site, para todos os perfis, #637, com o status ao vivo da execução aberta, #638), G1, Janela de agrupamento e Limite diário
- * (#490; empilham abaixo de `xl`). Lê o site pelo
+ * estado atual à esquerda e, à direita, o `Card` com as abas Publicação (o painel de etapas e,
+ * embaixo, a atividade do site com o status ao vivo, para todos os perfis, #637, #638, #647), G1,
+ * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo
  * sitePageContext (a mesma busca do layout), os gatilhos e o uso de redirects, que vira um aviso
  * acima do resumo quando o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do
  * limite só aparecem com site.configure, e o domínio confere de novo.
@@ -196,28 +194,30 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
             canWrite={canWrite}
           />
           <SiteTabs
-            lifecycle={
-              canConfigure ? (
-                <LifecycleActionScope>
-                  <LifecycleSteps
-                    current={site.lifecycle}
-                    action={
-                      <LifecycleAction
-                        lifecycle={site.lifecycle}
-                        action={advanceLifecycleAction.bind(null, site.id)}
-                      />
-                    }
-                  />
-                </LifecycleActionScope>
-              ) : (
-                <LifecycleSteps current={site.lifecycle} />
-              )
-            }
-            history={
-              <SiteLiveActivity
+            publication={
+              <SitePublicationTab
+                site={{
+                  lifecycle: site.lifecycle,
+                  release: site.release,
+                  activeVersionId: site.activeVersionId,
+                  state: site.state,
+                  pausedReason: site.pausedReason,
+                  timeZone: site.timeZone,
+                }}
+                instance={{
+                  activePages: instance.value.activePages,
+                  activeSince: instance.value.activeSince,
+                }}
                 activity={activity.value}
                 status={siteActivityAction.bind(null, site.id)}
-                timeZone={site.timeZone}
+                lifecycleAction={
+                  canConfigure ? (
+                    <LifecycleAction
+                      lifecycle={site.lifecycle}
+                      action={advanceLifecycleAction.bind(null, site.id)}
+                    />
+                  ) : undefined
+                }
               />
             }
             g1={

@@ -50,13 +50,21 @@ const instance: SiteInstance = {
     },
   ],
   activeFiles: 120,
+  activePages: 80,
+  activeSince: null,
   pendingByOrigin: [
     { origin: 'content', count: 2 },
     { origin: 'config', count: 1 },
   ],
 };
 
-const empty: SiteInstance = { recentBuilds: [], activeFiles: null, pendingByOrigin: [] };
+const empty: SiteInstance = {
+  recentBuilds: [],
+  activeFiles: null,
+  activePages: null,
+  activeSince: null,
+  pendingByOrigin: [],
+};
 
 /** Valor (`dd`) do campo de rótulo `label`. */
 function field(label: string): HTMLElement {

@@ -207,6 +207,29 @@ describe('estado da instância (#516)', () => {
     expect(result.value.activeFiles).toBe(30);
   });
 
+  it('a versão ativa entrou no ar pela execução ok mais recente dela, build ou rollback', async () => {
+    // v-3 foi publicada pela janela (sem autor) e depois reativada por um rollback da ana.
+    await db.insert(builds).values([
+      { ...build('exemplo-a', 3, 'ok', 'v-3', 30), pages: 12 },
+      { ...build('exemplo-a', 6, 'ok', 'v-6', 60), requestedBy: 'bia@orakel.local' },
+      {
+        ...build('exemplo-a', 8, 'ok', 'v-3'),
+        kind: 'rollback' as const,
+        requestedBy: 'ana@orakel.local',
+      },
+    ]);
+    await db.update(sites).set({ activeVersionId: 'v-3' }).where(eq(sites.id, 'exemplo-a'));
+
+    const result = await readSiteInstance(db, SYSTEM_ACTOR, 'exemplo-a');
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.activePages).toBe(12);
+    expect(result.value.activeSince).toEqual({
+      at: new Date('2026-10-20T12:08:00.000Z'),
+      by: 'ana@orakel.local',
+    });
+  });
+
   it('conta as pendências por origem, sem as resolvidas e sem as de outro site', async () => {
     const author = (slug: string) => ({ slug, name: slug });
     await db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, 'exemplo-a', author('ana')));
@@ -229,7 +252,13 @@ describe('estado da instância (#516)', () => {
 
     expect(await readSiteInstance(db, SYSTEM_ACTOR, 'exemplo-a')).toEqual({
       ok: true,
-      value: { recentBuilds: [], activeFiles: null, pendingByOrigin: [] },
+      value: {
+        recentBuilds: [],
+        activeFiles: null,
+        activePages: null,
+        activeSince: null,
+        pendingByOrigin: [],
+      },
     });
   });
 

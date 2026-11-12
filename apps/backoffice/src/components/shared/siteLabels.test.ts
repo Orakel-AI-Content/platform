@@ -10,14 +10,18 @@ import {
   BUILD_STATUS_VARIANT,
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_TAG,
+  INFRA_STEP_TEXT,
   LIFECYCLE_LABEL,
   LIFECYCLE_ORDER,
+  PUBLICATION_STEPS,
+  PUBLICATION_STEP_LABEL,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
   formatDateTime,
   formatDuration,
   liveResultText,
   liveStatusText,
+  liveVersionText,
 } from './siteLabels.ts';
 
 // Cada estado tem aparência própria dentro do seu grupo (#86): a variante não se repete e
@@ -144,5 +148,29 @@ describe('ordem do ciclo de vida (#148)', () => {
   it('tem cada etapa com rótulo exatamente uma vez', () => {
     expect(new Set(LIFECYCLE_ORDER).size).toBe(LIFECYCLE_ORDER.length);
     expect([...LIFECYCLE_ORDER].sort()).toEqual(Object.keys(LIFECYCLE_LABEL).sort());
+  });
+});
+
+describe('painel de etapas da aba Publicação (#647)', () => {
+  it('tem cada etapa com rótulo exatamente uma vez, na ordem do painel', () => {
+    expect(PUBLICATION_STEPS.map((step) => PUBLICATION_STEP_LABEL[step])).toEqual([
+      'Infra e zona',
+      'Versão',
+      'Build',
+      'No ar',
+      'Site',
+    ]);
+    expect(Object.keys(INFRA_STEP_TEXT).sort()).toEqual([...LIFECYCLE_ORDER].sort());
+  });
+
+  it('a versão no ar com páginas, quando e por quem', () => {
+    const since = { at: new Date('2026-10-01T12:00:00Z'), by: 'ana@orakel.local' };
+    expect(liveVersionText('v41', 120, since, 'America/Sao_Paulo')).toBe(
+      'v41 · 120 páginas · no ar desde 01/10/2026, 09:00 BRT, por ana@orakel.local',
+    );
+    expect(liveVersionText('v41', 1, { ...since, by: null }, 'UTC')).toBe(
+      'v41 · 1 página · no ar desde 01/10/2026, 12:00 UTC',
+    );
+    expect(liveVersionText('v41', null, null, 'UTC')).toBe('v41');
   });
 });

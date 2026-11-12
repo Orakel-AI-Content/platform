@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 
 import { liveResultText, liveStatusText } from '@/components/shared/siteLabels.ts';
 import { usePolling } from '@/components/shared/usePolling.ts';
@@ -69,27 +69,37 @@ function banner(
 }
 
 /**
- * Aba "Histórico" com o status ao vivo (#638): no topo, a faixa com a execução aberta ("na
+ * Atividade do site com o status ao vivo (#638): no topo, a faixa com a execução aberta ("na
  * fila" com o horário previsto, "em andamento" com a etapa) e, quando ela termina, o resultado;
  * embaixo, o `SiteBuildsTable` com o histórico relido. Enquanto há execução aberta, relê a
  * atividade pela Server Action a cada `pollMs`; sem execução aberta, não consulta. A faixa fica
  * num contêiner `role="status"` sempre montado, para o leitor de tela anunciar cada mudança.
+ * Com `panel` (o painel de etapas da aba "Publicação", #647), desenha-o acima, com a mesma
+ * atividade relida, e põe o título "Histórico" entre os dois: um polling só para a aba.
  */
 export function SiteLiveActivity({
   activity,
   status,
   timeZone,
   pollMs = SITE_ACTIVITY_POLL_MS,
+  panel,
 }: {
   activity: SiteActivity;
   status: SiteActivityStatus;
   timeZone: string;
   pollMs?: number;
+  panel?: (activity: SiteActivity) => ReactNode;
 }) {
   const snapshot = useSiteActivity(activity, status, pollMs);
   const current = banner(snapshot, timeZone);
   return (
     <div className="space-y-4">
+      {panel && (
+        <>
+          {panel(snapshot.activity)}
+          <h2 className="h5 pt-2">Histórico</h2>
+        </>
+      )}
       <div role="status">
         {current && (
           <Alert type={current.type} showIcon duration={0}>
