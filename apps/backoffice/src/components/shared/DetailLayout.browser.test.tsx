@@ -140,6 +140,7 @@ function SiteDetail() {
                 <LifecycleAction
                   lifecycle="infra_aplicada"
                   action={() => Promise.resolve({ ok: true, message: '' })}
+                  undo={() => Promise.resolve({ ok: true, message: '' })}
                 />
               }
             />
