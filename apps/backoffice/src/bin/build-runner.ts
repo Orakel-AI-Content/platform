@@ -5,6 +5,7 @@ import type { BuildSettings } from '../domain/builds/plan.ts';
 import { recoverInterruptedBuilds } from '../domain/builds/recover.ts';
 import { getBuildRunnerEnv, getEnv, type BuildRunnerEnv, type Env } from '../env.ts';
 import { BUILD_RUNNER_CONCURRENCY, buildRunnerTasks } from '../jobs/task-lists.ts';
+import type { ReleaseDriver } from '../jobs/tasks/release-run.ts';
 import { dockerRuntime } from '../lib/docker.ts';
 import { githubClient } from '../lib/github.ts';
 import { runProcess } from './run-process.ts';
@@ -34,6 +35,21 @@ function settingsFrom(env: Env, runner: BuildRunnerEnv): BuildSettings {
   };
 }
 
+/** Driver da release (ADR 0023 da raiz); o env já recusa `github` sem o PAT. */
+function releaseDriverFrom(runner: BuildRunnerEnv): ReleaseDriver {
+  if (runner.RELEASE_DRIVER === 'local') return { kind: 'local' };
+  if (runner.GITHUB_RELEASE_TOKEN === undefined) {
+    throw new Error('RELEASE_DRIVER=github sem GITHUB_RELEASE_TOKEN');
+  }
+  return {
+    kind: 'github',
+    github: githubClient({
+      token: runner.GITHUB_RELEASE_TOKEN,
+      repository: runner.GITHUB_RELEASE_REPOSITORY,
+    }),
+  };
+}
+
 // build-runner (12.0, L3): só a task `build`, no máximo dois builds simultâneos; a fila
 // nomeada build:<site> garante um por vez por site. Cria os containers do site-builder pela
 // API do Docker, sempre pelo docker-socket-proxy.
@@ -54,13 +70,7 @@ await runProcess('build-runner', async (logger) => {
         siteBuilderImage: runner.SITE_BUILDER_IMAGE,
       }),
       settings: settingsFrom(getEnv(), runner),
-      github:
-        runner.GITHUB_RELEASE_TOKEN === undefined
-          ? undefined
-          : githubClient({
-              token: runner.GITHUB_RELEASE_TOKEN,
-              repository: runner.GITHUB_RELEASE_REPOSITORY,
-            }),
+      driver: releaseDriverFrom(runner),
     }),
     concurrency: BUILD_RUNNER_CONCURRENCY,
   });
@@ -68,10 +78,10 @@ await runProcess('build-runner', async (logger) => {
     {
       deployTarget: runner.DEPLOY_TARGET,
       image: runner.SITE_BUILDER_IMAGE,
-      github:
-        runner.GITHUB_RELEASE_TOKEN === undefined
-          ? 'sem credencial'
-          : runner.GITHUB_RELEASE_REPOSITORY,
+      release:
+        runner.RELEASE_DRIVER === 'local'
+          ? 'local'
+          : `github (${runner.GITHUB_RELEASE_REPOSITORY})`,
     },
     'build-runner no ar',
   );

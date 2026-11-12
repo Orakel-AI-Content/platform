@@ -7,6 +7,12 @@ import {
 } from '../../domain/releases/releases.ts';
 import type { BuildTaskDeps } from './build.ts';
 import { isLastAttempt } from './last-attempt.ts';
+import type { ReleaseRunTaskDeps } from './release-run.ts';
+
+/** Driver local sem a imagem de origem no host: repetir não a traz (ADR 0023 da raiz). */
+export function missingLocalImageReason(source: string): string {
+  return `A imagem ${source} não está no host: rode pnpm local:images e tente de novo`;
+}
 
 function tagOf(payload: unknown): string {
   const tag = (payload as { tag?: unknown } | null)?.tag;
@@ -22,9 +28,12 @@ function tagOf(payload: unknown): string {
  * Imagem no host leva a `disponivel`. Erro do pull, ou pull que termina sem a imagem, lança para
  * o Graphile Worker repetir; na última tentativa, a release vai a `falhou` com o motivo do
  * runtime em vez de ficar `baixando` para sempre. Release em outro estado é ignorada.
+ * Com o driver local, em vez do pull, etiqueta `SITE_BUILDER_IMAGE:SITE_BUILDER_TAG` (a imagem
+ * do `pnpm local:images`) como a versão; sem ela no host, `falhou` já na primeira tentativa.
  */
 export function createCheckReleaseImageTask(
-  deps: Pick<BuildTaskDeps, 'db' | 'runtime' | 'settings' | 'now'>,
+  deps: Pick<BuildTaskDeps, 'db' | 'runtime' | 'settings' | 'now'> &
+    Pick<ReleaseRunTaskDeps, 'driver'>,
 ): Task {
   const now = deps.now ?? Date.now;
   return async (payload, helpers) => {
@@ -41,17 +50,29 @@ export function createCheckReleaseImageTask(
       return;
     }
 
+    const fail = async (reason: string) => {
+      await recordReleaseImagePullFailed(deps.db, tag, reason, new Date(now()));
+      log.warn(`release ${tag} falhou: ${reason}`);
+    };
+
     try {
-      await deps.runtime.pullImage(image);
+      if (deps.driver.kind === 'local') {
+        const source = `${deps.settings.image}:${deps.settings.defaultTag}`;
+        if (!(await deps.runtime.imageExists(source))) {
+          await fail(missingLocalImageReason(source));
+          return;
+        }
+        await deps.runtime.tagImage(source, image);
+      } else {
+        await deps.runtime.pullImage(image);
+      }
       if (!(await deps.runtime.imageExists(image))) {
         throw new Error(`o download terminou, mas ${image} não está no host`);
       }
     } catch (error) {
       if (!isLastAttempt(helpers)) throw error;
       const message = error instanceof Error ? error.message : String(error);
-      const reason = `Não foi possível baixar a imagem: ${message}`;
-      await recordReleaseImagePullFailed(deps.db, tag, reason, new Date(now()));
-      log.warn(`release ${tag} falhou: ${reason}`);
+      await fail(`Não foi possível baixar a imagem: ${message}`);
       return;
     }
     await recordReleaseImagePulled(deps.db, tag, new Date(now()));
