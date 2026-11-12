@@ -6,7 +6,13 @@ import type { Db } from '../../src/db/client.ts';
 import { builds, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
-import { listRollbackVersions, requestRollback } from '../../src/domain/builds/builds.ts';
+import {
+  activeBuild,
+  lastBuilds,
+  listRollbackVersions,
+  recentBuilds,
+  requestRollback,
+} from '../../src/domain/builds/builds.ts';
 import { failedFile, fakeRuntime, rollbackOk } from '../../src/domain/builds/fake-runtime.ts';
 import type { FakeStage } from '../../src/domain/builds/fake-runtime.ts';
 import type { BuildSettings } from '../../src/domain/builds/plan.ts';
@@ -44,7 +50,13 @@ const logger = {
     errors.push(msg);
   },
 };
-const helpers = (attempts = 1) => ({ logger, job: { id: '9', attempts } }) as unknown as JobHelpers;
+const REQUESTER = 'o@orakel.local';
+const RUN_AT = new Date('2026-10-21T12:00:00Z');
+const helpers = (jobId: string, attempts = 1) =>
+  ({
+    logger,
+    job: { id: jobId, attempts, max_attempts: 5, run_at: RUN_AT },
+  }) as unknown as JobHelpers;
 
 beforeAll(async () => {
   ({ db, close } = await setupDatabase());
@@ -64,18 +76,34 @@ async function site() {
   return row;
 }
 
-function run(rollback: FakeStage, attempts = 1) {
+/** Pede o rollback para OLDER e devolve o id do job, como o "Reverter" faz. */
+async function queueRollback(): Promise<string> {
+  await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', OLDER, REQUESTER));
+  const { rows } = await db.execute<{ id: string }>(sql`
+    select id::text from graphile_worker.jobs where task_identifier = 'rollback'`);
+  const [job] = rows;
+  if (job === undefined) throw new Error('rollback não enfileirado');
+  return job.id;
+}
+
+/** Roda a tentativa `attempts` do job do pedido (ou de `jobId`, um job sem linha na fila). */
+async function run(rollback: FakeStage, attempts = 1, jobId?: string) {
+  const id = jobId ?? (await queueRollback());
   const fake = fakeRuntime({ rollback });
   const result = createRollbackTask({ db, runtime: fake.runtime, settings })(
     { siteId: 'exemplo-a', versionId: OLDER },
-    helpers(attempts),
+    helpers(id, attempts),
   );
-  return { fake, result };
+  return { fake, result, jobId: id };
+}
+
+function rollbackRows() {
+  return db.select().from(builds).where(eq(builds.kind, 'rollback')).orderBy(builds.id);
 }
 
 describe('task rollback', () => {
   it('sucesso: roda o container rollback com a versão pedida e ela passa a ser a ativa', async () => {
-    const { fake, result } = run({ file: rollbackOk('exemplo-a', OLDER) });
+    const { fake, result } = await run({ file: rollbackOk('exemplo-a', OLDER) });
     await result;
 
     expect(fake.started).toHaveLength(1);
@@ -93,11 +121,39 @@ describe('task rollback', () => {
     expect(fake.volumes.removed).toHaveLength(1);
   });
 
+  it('a linha do pedido passa por rodando e fecha ok com a versão ativada', async () => {
+    const { result, jobId } = await run({ file: rollbackOk('exemplo-a', OLDER) });
+    await result;
+    const rows = await rollbackRows();
+    expect(rows).toEqual([
+      expect.objectContaining({
+        kind: 'rollback',
+        jobId,
+        attempt: 1,
+        status: 'ok',
+        requestedBy: REQUESTER,
+        versionId: OLDER,
+        release: 'local',
+        failureKind: null,
+        startedAt: expect.any(Date) as Date,
+        finishedAt: expect.any(Date) as Date,
+      }),
+    ]);
+  });
+
+  it('job sem linha na fila (enfileirado antes dela existir): grava a tentativa e a fecha', async () => {
+    const { result } = await run({ file: rollbackOk('exemplo-a', OLDER) }, 1, '9');
+    await result;
+    expect(await rollbackRows()).toEqual([
+      expect.objectContaining({ jobId: '9', status: 'ok', versionId: OLDER, requestedBy: null }),
+    ]);
+  });
+
   it('não muda o estado nem a pausa do site', async () => {
     await db.transaction((tx) =>
       pauseSite(tx, 'exemplo-a', 'falhou', { origin: 'content', reference: '3' }),
     );
-    const { result } = run({ file: rollbackOk('exemplo-a', OLDER) });
+    const { result } = await run({ file: rollbackOk('exemplo-a', OLDER) });
     await result;
     expect(await site()).toMatchObject({
       activeVersionId: OLDER,
@@ -117,22 +173,60 @@ describe('task rollback', () => {
   ])(
     'rollback.json %s: lança para o Graphile Worker repetir e não troca a versão',
     async (_, stage) => {
-      const { fake, result } = run(stage, 2);
+      const { fake, result, jobId } = await run(stage, 2);
       await expect(result).rejects.toBeInstanceOf(TransientBuildError);
       expect((await site())?.activeVersionId).toBe(CURRENT);
       expect(fake.removed).toHaveLength(1);
       expect(fake.volumes.removed).toHaveLength(1);
+      // A tentativa fecha como falha e a repetição nasce na fila, com quem pediu e o destino.
+      expect(await rollbackRows()).toEqual([
+        expect.objectContaining({
+          jobId,
+          attempt: 2,
+          status: 'failed',
+          failedStage: null,
+          failureKind: 'transient',
+          failureMessage: expect.any(String) as string,
+          versionId: OLDER,
+          requestedBy: REQUESTER,
+        }),
+        expect.objectContaining({
+          kind: 'rollback',
+          jobId,
+          attempt: 3,
+          status: 'na_fila',
+          versionId: OLDER,
+          requestedBy: REQUESTER,
+          scheduledFor: expect.any(Date) as Date,
+          finishedAt: null,
+        }),
+      ]);
     },
   );
 
+  it('falha transitória na última tentativa: fecha a linha sem nova na fila', async () => {
+    const { result } = await run({ exitCode: 20, file: failedFile('transient', 'alvo fora') }, 5);
+    await expect(result).rejects.toBeInstanceOf(TransientBuildError);
+    expect((await rollbackRows()).map((r) => [r.attempt, r.status])).toEqual([[5, 'failed']]);
+  });
+
   it('falha permanente: registra no log, encerra o job e não pausa o site', async () => {
-    const { fake, result } = run({
+    const { fake, result } = await run({
       exitCode: 10,
       file: failedFile('permanent', 'Versão não existe no alvo'),
     });
     await result;
     expect(errors).toEqual([expect.stringContaining('Versão não existe no alvo')]);
     expect(await site()).toMatchObject({ activeVersionId: CURRENT, state: 'ativo' });
+    expect(await rollbackRows()).toEqual([
+      expect.objectContaining({
+        status: 'failed',
+        failedStage: null,
+        failureKind: 'permanent',
+        failureMessage: 'Versão não existe no alvo',
+        versionId: OLDER,
+      }),
+    ]);
     expect(fake.removed).toHaveLength(1);
     expect(fake.volumes.removed).toHaveLength(1);
   });
@@ -141,15 +235,16 @@ describe('task rollback', () => {
     const fake = fakeRuntime({});
     await createRollbackTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'nao-existe', versionId: OLDER },
-      helpers(),
+      helpers('9'),
     );
     expect(fake.started).toEqual([]);
+    expect(await rollbackRows()).toEqual([]);
   });
 });
 
 describe('scheduleRollback', () => {
   it('grava um job rollback na fila build:<site>, a mesma do build', async () => {
-    await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', OLDER));
+    await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', OLDER, REQUESTER));
     // A view `jobs` não expõe o payload; a tabela privada sim. Criar o site agenda um build.
     const { rows } = await db.execute<{
       task_identifier: string;
@@ -174,8 +269,8 @@ describe('scheduleRollback', () => {
   });
 
   it('não substitui o build já agendado do site', async () => {
-    await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', OLDER));
-    await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', CURRENT));
+    await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', OLDER, REQUESTER));
+    await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', CURRENT, REQUESTER));
     const { rows } = await db.execute<{ task_identifier: string }>(sql`
       select task_identifier from graphile_worker.jobs order by task_identifier`);
     expect(rows.map((r) => r.task_identifier)).toEqual(['build', 'rollback', 'rollback']);
@@ -183,7 +278,7 @@ describe('scheduleRollback', () => {
 });
 
 describe('reverter', () => {
-  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+  const operacao = { email: REQUESTER, roles: ['operacao'] as const };
 
   async function build(
     siteId: string,
@@ -257,6 +352,69 @@ describe('reverter', () => {
       state: 'pausado',
       pausedReason: 'falhou',
     });
+  });
+
+  it('o pedido grava a linha rollback na fila, com quem pediu e a versão de destino', async () => {
+    await db.transaction((tx) => requestRollback(tx, operacao, 'exemplo-a', OLDER));
+    const { rows: jobs } = await db.execute<{ id: string }>(sql`
+      select id::text from graphile_worker.jobs where task_identifier = 'rollback'`);
+    expect(await rollbackRows()).toEqual([
+      expect.objectContaining({
+        siteId: 'exemplo-a',
+        kind: 'rollback',
+        jobId: jobs[0]?.id,
+        attempt: 1,
+        status: 'na_fila',
+        requestedBy: REQUESTER,
+        versionId: OLDER,
+        scheduledFor: expect.any(Date) as Date,
+        release: null,
+        startedAt: null,
+        finishedAt: null,
+      }),
+    ]);
+  });
+
+  it('linhas de rollback não contam como build: versões, referência da trava e último build', async () => {
+    const MIDDLE = '20261010T120000Z-bbbbbbbb';
+    // Rollbacks mais novos que todo build: um ok para uma versão nunca publicada por build e
+    // um ok para OLDER, com páginas que nenhum build teve; e um que falhou.
+    for (const [versionId, status] of [
+      [MIDDLE, 'ok'],
+      [OLDER, 'ok'],
+      [OLDER, 'failed'],
+    ] as const) {
+      await db.insert(builds).values({
+        siteId: 'exemplo-a',
+        kind: 'rollback',
+        release: 'local',
+        attempt: 1,
+        status,
+        versionId,
+        pages: 99,
+        startedAt: new Date('2026-10-25T12:00:00Z'),
+        finishedAt: new Date('2026-10-25T12:00:00Z'),
+      });
+    }
+    expect(await listRollbackVersions(db, operacao, 'exemplo-a')).toEqual({
+      ok: true,
+      value: [
+        {
+          versionId: OLDER,
+          release: 'local',
+          pages: 10,
+          finishedAt: new Date('2026-10-01T12:00:00Z'),
+        },
+      ],
+    });
+    expect(await activeBuild(db, 'exemplo-a', OLDER)).toEqual({ pages: 10, files: null });
+    expect(await activeBuild(db, 'exemplo-a', MIDDLE)).toBeUndefined();
+    expect((await lastBuilds(db)).get('exemplo-a')).toEqual({
+      status: 'ok',
+      versionId: CURRENT,
+      finishedAt: new Date('2026-10-20T12:00:00Z'),
+    });
+    expect((await recentBuilds(db, 'exemplo-a')).map((b) => b.versionId)).toEqual([CURRENT, OLDER]);
   });
 
   it.each([

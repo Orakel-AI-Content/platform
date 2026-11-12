@@ -3,7 +3,8 @@
 // `rodando` e a mesma linha é fechada com o resultado: com sucesso,
 // a transação que a fecha baixa as mudanças pela lista que o snapshot viu; com falha
 // permanente, pausa o site com o motivo. As consultas daqui só leem builds fechados. "Reverter" (L4) escolhe
-// entre as versões dos builds `ok` e enfileira o rollback.
+// entre as versões dos builds `ok` e enfileira o rollback, que tem o mesmo ciclo de linhas
+// (tipo rollback) e fica fora das consultas de build.
 import type { Result } from '@orakel/content-model';
 import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
@@ -18,7 +19,8 @@ import {
 import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome } from './run-build.ts';
-import { buildNow, recordQueuedBuild, scheduleRollback } from './schedule.ts';
+import type { RollbackOutcome } from './run-rollback.ts';
+import { buildNow, recordQueuedBuild, scheduleRollback, type QueuedRun } from './schedule.ts';
 import { clearMassUnpublish, markPublished, pauseSite, setActiveVersion } from './site-state.ts';
 
 export type BuildTarget = {
@@ -102,15 +104,19 @@ export type BuildRun = {
   jobId: string | undefined;
   attempt: number;
   startedAt: Date;
+  /** Tipo da execução; sem ele, build. */
+  run?: QueuedRun;
 };
 
 /**
  * Abre a tentativa: promove a linha `na_fila` do job a `rodando`, com a release do plano. Sem
  * linha na fila (job enfileirado antes dela existir, ou tentativa devolvida por `recover.ts`),
  * grava a linha `rodando` direto. Roda fora da transação do resultado, para a linha ser vista
- * enquanto a execução acontece; se o processo morrer, a recuperação na partida a fecha.
+ * enquanto a execução acontece; se o processo morrer, a recuperação na partida a fecha. Vale
+ * para o build e para o rollback.
  */
 export async function startBuild(db: Executor, run: BuildRun): Promise<number> {
+  const queued = run.run ?? { kind: 'build' as const };
   const opened = {
     release: run.release,
     attempt: run.attempt,
@@ -127,15 +133,24 @@ export async function startBuild(db: Executor, run: BuildRun): Promise<number> {
   }
   const [row] = await db
     .insert(builds)
-    .values({ ...opened, siteId: run.siteId, kind: 'build', jobId: run.jobId ?? null })
+    .values({
+      ...opened,
+      siteId: run.siteId,
+      kind: queued.kind,
+      jobId: run.jobId ?? null,
+      ...(queued.kind === 'rollback' && { versionId: queued.versionId }),
+    })
     .returning({ id: builds.id });
-  if (row === undefined) throw new Error(`Build de ${run.siteId} não foi registrado`);
+  if (row === undefined) throw new Error(`Execução de ${run.siteId} não foi registrada`);
   return row.id;
 }
 
-/** A linha `na_fila` do job de build. */
+/**
+ * A linha `na_fila` do job, de build ou de rollback: o id do job é único entre as tasks e o
+ * índice `builds_queued_job_unique` garante uma só.
+ */
 function queuedRow(jobId: string) {
-  return and(eq(builds.kind, 'build'), eq(builds.jobId, jobId), eq(builds.status, 'na_fila'));
+  return and(eq(builds.jobId, jobId), eq(builds.status, 'na_fila'));
 }
 
 /** Job ignorado (site pausado ou inexistente): a linha `na_fila` dele fecha como `cancelado`. */
@@ -157,17 +172,56 @@ export async function queueRetry(tx: Executor, buildId: number, runAt: Date): Pr
       jobId: builds.jobId,
       attempt: builds.attempt,
       requestedBy: builds.requestedBy,
+      kind: builds.kind,
+      versionId: builds.versionId,
     })
     .from(builds)
     .where(eq(builds.id, buildId));
   if (failed === undefined || failed.jobId === null) return;
+  // A linha de rollback guarda a versão de destino desde a fila, e a falha não a apaga.
+  const run: QueuedRun =
+    failed.kind === 'rollback' && failed.versionId !== null
+      ? { kind: 'rollback', versionId: failed.versionId }
+      : { kind: 'build' };
   await recordQueuedBuild(
     tx,
     failed.siteId,
     { id: failed.jobId, attempts: failed.attempt, runAt },
     failed.requestedBy ?? SYSTEM_ACTOR.email,
-    { replaceRequester: false },
+    { replaceRequester: false, run },
   );
+}
+
+/**
+ * Fecha a linha `rodando` da tentativa de rollback com o resultado. Com sucesso, a versão
+ * ativada passa a ser a ativa do site, na mesma transação; com falha, a linha guarda o tipo e
+ * a mensagem (sem etapa: o rollback é um único container) e o site não é pausado.
+ */
+export async function recordRollback(
+  tx: Executor,
+  run: { buildId: number; siteId: string },
+  outcome: RollbackOutcome,
+): Promise<void> {
+  const result =
+    outcome.status === 'ok'
+      ? { status: 'ok' as const, versionId: outcome.rollback.versionId }
+      : {
+          status: 'failed' as const,
+          failedStage: null,
+          failureKind: outcome.failure.kind,
+          failureMessage: outcome.failure.message,
+        };
+  const closed = await tx
+    .update(builds)
+    .set({ ...result, finishedAt: new Date() })
+    .where(
+      and(eq(builds.id, run.buildId), eq(builds.kind, 'rollback'), eq(builds.status, 'rodando')),
+    )
+    .returning({ id: builds.id });
+  if (closed.length === 0) {
+    throw new Error(`Rollback ${run.buildId} de ${run.siteId} não está rodando: nada a fechar`);
+  }
+  if (outcome.status === 'ok') await setActiveVersion(tx, run.siteId, outcome.rollback.versionId);
 }
 
 export type BuildClosing = {
@@ -420,6 +474,6 @@ export async function requestRollback(
       ],
     };
   }
-  await scheduleRollback(tx, siteId, versionId);
+  await scheduleRollback(tx, siteId, versionId, actor.email);
   return { ok: true, value: undefined };
 }

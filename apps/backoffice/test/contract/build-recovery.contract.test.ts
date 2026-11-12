@@ -6,7 +6,12 @@ import type { Db } from '../../src/db/client.ts';
 import { builds } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
-import { INTERRUPTED_MESSAGE, recoverInterruptedBuilds } from '../../src/domain/builds/recover.ts';
+import {
+  INTERRUPTED_MESSAGE,
+  INTERRUPTED_ROLLBACK_MESSAGE,
+  recoverInterruptedBuilds,
+} from '../../src/domain/builds/recover.ts';
+import { scheduleRollback } from '../../src/domain/builds/schedule.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
@@ -45,13 +50,18 @@ async function promoted(): Promise<void> {
 const queuedRow = (): unknown =>
   expect.objectContaining({ siteId: 'exemplo-a', status: 'na_fila', requestedBy: 'system' });
 
-/** Trava o job e a fila como o Graphile Worker faz ao pegar o job, com o dono `owner`. */
-async function lock(queue: string, owner: string): Promise<void> {
+/**
+ * Trava o job (só os da task `task`, quando dada) e a fila como o Graphile Worker faz ao
+ * pegar o job, com o dono `owner`.
+ */
+async function lock(queue: string, owner: string, task?: string): Promise<void> {
   await db.execute(sql`
     update graphile_worker._private_jobs set locked_by = ${owner}, locked_at = ${LOCKED_AT},
       attempts = attempts + 1
     where job_queue_id = (select id from graphile_worker._private_job_queues
-                          where queue_name = ${queue})`);
+                          where queue_name = ${queue})
+      and (${task ?? null}::text is null
+           or task_id = (select id from graphile_worker._private_tasks where identifier = ${task ?? null}))`);
   await db.execute(sql`
     update graphile_worker._private_job_queues set locked_by = ${owner}, locked_at = ${LOCKED_AT}
     where queue_name = ${queue}`);
@@ -88,7 +98,7 @@ describe('recuperação dos builds interrompidos', () => {
     const recovered = await recoverInterruptedBuilds(db, 'local');
 
     expect(recovered).toEqual([
-      { siteId: 'exemplo-a', jobId: job?.id, attempt: 1, lockedBy: DEAD },
+      { kind: 'build', siteId: 'exemplo-a', jobId: job?.id, attempt: 1, lockedBy: DEAD },
     ]);
     const rows = await db.select().from(builds);
     expect(rows).toEqual([
@@ -143,7 +153,7 @@ describe('recuperação dos builds interrompidos', () => {
     const [job] = (await db.execute<{ id: string }>(sql`select id::text from graphile_worker.jobs`))
       .rows;
     expect(recovered).toEqual([
-      { siteId: 'exemplo-a', jobId: job?.id, attempt: 1, lockedBy: DEAD },
+      { kind: 'build', siteId: 'exemplo-a', jobId: job?.id, attempt: 1, lockedBy: DEAD },
     ]);
     expect(await locks()).toEqual([
       { queue_name: 'build:exemplo-a', locked_by: null },
@@ -208,6 +218,67 @@ describe('recuperação dos builds interrompidos', () => {
       locked_by: 'worker-vivo',
     });
     expect(await db.select().from(builds)).toEqual([queuedRow()]);
+  });
+
+  it('rollback interrompido: fecha a linha rodando dele como falha transitória', async () => {
+    const versionId = '20261001T120000Z-abcdef12';
+    await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', versionId, 'o@orakel.local'));
+    await lock('build:exemplo-a', DEAD, 'rollback');
+    const [job] = (
+      await db.execute<{ id: string }>(
+        sql`select id::text from graphile_worker.jobs where task_identifier = 'rollback'`,
+      )
+    ).rows;
+    // A task promoveu a linha do pedido.
+    await db
+      .update(builds)
+      .set({ status: 'rodando', release: 'local', startedAt: LOCKED_AT })
+      .where(eq(builds.kind, 'rollback'));
+
+    const recovered = await recoverInterruptedBuilds(db, 'local');
+
+    expect(recovered).toEqual([
+      { kind: 'rollback', siteId: 'exemplo-a', jobId: job?.id, attempt: 1, lockedBy: DEAD },
+    ]);
+    expect(await db.select().from(builds).where(eq(builds.kind, 'rollback'))).toEqual([
+      expect.objectContaining({
+        jobId: job?.id,
+        attempt: 1,
+        status: 'failed',
+        failedStage: null,
+        failureKind: 'transient',
+        failureMessage: INTERRUPTED_ROLLBACK_MESSAGE,
+        versionId,
+        requestedBy: 'o@orakel.local',
+        finishedAt: expect.any(Date) as Date,
+      }),
+    ]);
+    // O build agendado do cadastro não estava travado: a linha dele continua na fila.
+    expect(await db.select().from(builds).where(eq(builds.kind, 'build'))).toEqual([queuedRow()]);
+    expect(await locks()).not.toContainEqual(expect.objectContaining({ locked_by: DEAD }));
+  });
+
+  it('rollback interrompido sem linha rodando: registra a tentativa com a versão de destino', async () => {
+    const versionId = '20261001T120000Z-abcdef12';
+    await db.transaction((tx) => scheduleRollback(tx, 'exemplo-a', versionId, 'o@orakel.local'));
+    await lock('build:exemplo-a', DEAD, 'rollback');
+
+    await recoverInterruptedBuilds(db, 'local');
+
+    expect(
+      await db.select().from(builds).where(eq(builds.kind, 'rollback')).orderBy(builds.id),
+    ).toEqual([
+      expect.objectContaining({ status: 'na_fila', versionId }),
+      expect.objectContaining({
+        status: 'failed',
+        failureKind: 'transient',
+        failureMessage: INTERRUPTED_ROLLBACK_MESSAGE,
+        release: 'local',
+        attempt: 1,
+        versionId,
+        startedAt: LOCKED_AT,
+      }),
+    ]);
   });
 
   it('sem travas, não grava nada', async () => {
