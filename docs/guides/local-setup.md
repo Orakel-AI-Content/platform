@@ -8,7 +8,7 @@ Consulte para preparar a máquina e subir o ambiente local ponta a ponta.
   (`devEngines.runtime`) nos scripts do projeto; com nvm, `nvm use` lê o `.nvmrc`.
 - **pnpm 11** via Corepack: `corepack enable` (a versão vem de `packageManager`).
 - **Docker** com Compose v2 e Buildx, com pelo menos **8 GB** de memória (Docker Desktop:
-  Settings → Resources → Memory). O `local:images` constrói as imagens em paralelo; o pico
+  Settings → Resources → Memory). O `local:up` constrói em paralelo as imagens que faltam; o pico
   medido da subida mais o E2E foi de 6,5 GB.
 - **No Linux, `*.localhost` resolvendo para o loopback** no sistema, não só no navegador: o
   Node do Backoffice e do Playwright usa o resolvedor do sistema. Com systemd-resolved já
@@ -21,14 +21,18 @@ Consulte para preparar a máquina e subir o ambiente local ponta a ponta.
 corepack enable
 pnpm install               # instala e ativa os git hooks (lefthook)
 cp .env.example .env.local # valores locais; nunca commite .env.local
-pnpm local:images          # constrói as imagens (backoffice, site-builder, edge-local)
-pnpm local:up              # sobe o compose, cria os buckets e roda as migrações
-pnpm local:seed            # usuários de teste, sites de exemplo e o Horta em Casa (<site>.localhost)
+pnpm local:up              # constrói as imagens que faltam, sobe o compose, cria os buckets e roda as migrações
+pnpm local:seed            # usuários de teste, sites de exemplo e o Horta em Casa, com o primeiro build na fila
 pnpm local:trust           # CA do Caddy no Keychain do sistema (macOS; pede a senha)
 pnpm local:check           # confere serviços, hostnames, buckets, redes e o proxy do socket
-pnpm local:publish exemplo-a   # render + publish no edge-local → https://exemplo-a.localhost
-pnpm local:publish horta-em-casa   # o blog completo de demonstração
 ```
+
+O `local:up` confere se as imagens `backoffice`, `site-builder` e `edge-local` (tag `local`)
+estão no host e roda o bake só quando falta alguma; imagem presente, mas desatualizada em
+relação ao código, não é detectada: depois de mudar o código, reconstrua com
+`pnpm local:images`. O seed pede, pela fila do Backoffice, o primeiro build de cada site ainda
+sem publicação; quando o `build-runner` termina, o site está em `https://<site>.localhost`
+(acompanhe em `https://admin.orakel.localhost/sites`, coluna "Último build").
 
 O seed cria, se ainda não existirem: os usuários de teste, `exemplo-a` e `exemplo-b` (das
 fixtures do `content-model`; os E2E dependem deles) e cada site completo de
@@ -175,15 +179,15 @@ sessão. Num worktree sem `.env.local`, aponte o da raiz (legado):
 | `pnpm dev`                                                  | Todas as unidades em modo dev                                                      |
 | `pnpm build` · `pnpm lint` · `pnpm typecheck` · `pnpm test` | Pipeline do Turborepo                                                              |
 | `pnpm format`                                               | Prettier no repositório                                                            |
-| `pnpm local:up`                                             | Sobe o compose (base + override local) e roda `db:migrate`                         |
+| `pnpm local:up`                                             | Constrói as imagens que faltam, sobe o compose e roda `db:migrate`                 |
 | `pnpm local:check`                                          | Confere o ambiente; sai com 1 se algo falhar                                       |
-| `pnpm local:publish <site>`                                 | `render` (rede export) + `publish` (rede publish) no edge                          |
+| `pnpm local:publish <site>`                                 | Pede o build ao Backoffice (fila do "Publicar agora") e espera o resultado         |
 | `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere ClickHouse, tabelas diárias e ausência de IP |
 | `pnpm local:trust`                                          | Instala a CA atual do Caddy no Keychain (macOS)                                    |
-| `pnpm local:seed`                                           | Roda `db:seed` (usuários, exemplos e `infra/local/seeds/`)                         |
+| `pnpm local:seed`                                           | Roda `db:seed` (usuários, exemplos e `infra/local/seeds/`) e enfileira os builds   |
 | `pnpm local:down`                                           | Para os containers, prévia do `build-runner` inclusive (mantém os dados)           |
 | `pnpm local:reset`                                          | Para e **apaga os volumes**                                                        |
-| `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit)                        |
+| `pnpm local:images`                                         | Reconstrói as imagens depois de mudar o código (tags de produção, SHA do commit)   |
 | `pnpm local:e2e`                                            | E2E completo com Playwright                                                        |
 | `pnpm local:e2e:telas <área>`                               | E2E de telas de uma área, sem build, numa das vagas                                |
 | `pnpm local:e2e:area <área>` · `smoke`                      | E2E de uma área ou só os `@smoke`, numa das vagas da máquina                       |
@@ -223,20 +227,24 @@ O `build-runner` constrói e publica sozinho: toda gravação que vai para um si
 que roda depois de `BUILD_WINDOW_SECONDS` (30 s no local). Em
 `https://admin.orakel.localhost/sites`, "Publicar agora" antecipa e "Último build" mostra o
 resultado. Falha permanente pausa o site (motivo na coluna Estado); transitória é repetida até
-5 vezes. Logs: `infra/local/compose.sh logs -f build-runner`; histórico: tabela `builds`. A
-imagem usada é `site-builder:<release do site>` ou, antes da primeira promoção,
-`site-builder:local` (do `pnpm local:images`). Detalhes: ADR 0008 do backoffice. Versão do
-site-builder, quando usar "Reconstruir na release", "Reverter" e "Publicar agora", e como
-testar uma versão nova no local:
+5 vezes. Logs: `infra/local/compose.sh logs -f build-runner`; histórico: tabela `builds`. Pelo
+terminal, `pnpm local:publish <site>` faz o mesmo pedido do "Publicar agora" e espera o
+resultado, saindo com erro se o build falhar. A imagem usada é `site-builder:<release do site>`
+ou, antes da primeira promoção, `site-builder:local` (a que o `local:up` construiu). Detalhes:
+ADR 0008 do backoffice. Versão do site-builder, quando usar "Atualizar todos os sites",
+"Atualizar para a mais recente", "Voltar à versão anterior" e "Publicar agora", e como testar
+uma versão nova no local:
 [README, "Versão do site-builder e builds"](../../README.md#versão-do-site-builder-e-builds).
 
 ### Gerar nova versão
 
 No local, "Gerar nova versão" (Releases) não usa GitHub nem GHCR: o `build-runner` sobe com
 `RELEASE_DRIVER=local`, dá o CI como concluído e etiqueta a `site-builder:local` do host como
-`site-builder:X.Y.Z` (ADR 0023 da raiz). A versão é uma cópia da imagem do momento: rode
-`pnpm local:images` antes, se o site-builder mudou. Sem a `site-builder:local` no host, a
-release termina em "falhou" pedindo o `pnpm local:images`. Para a rodada com o GitHub de
+`site-builder:X.Y.Z` (ADR 0023 da raiz). A versão é uma cópia da imagem do momento: se o
+site-builder mudou, reconstrua com `pnpm local:images` antes. Sem a `site-builder:local` no
+host, a release termina em "falhou" pedindo o `pnpm local:images`. Com a versão "Disponível",
+"Atualizar todos os sites" (ou "Atualizar para a mais recente", num site) a leva aos sites como
+na produção. Para a rodada com o GitHub de
 verdade, defina `GITHUB_RELEASE_TOKEN` no `.env.local` e suba com
 `LOCAL_RELEASE_DRIVER=github pnpm local:up`.
 
@@ -306,7 +314,7 @@ Para ver ou desligar: acrescente o `--profile` ao `ps`, `logs` ou `down`.
 - **`ERR_PNPM_NO_MATURE_MATCHING_VERSION`**: a versão pedida saiu há menos de 24 h;
   use a anterior no `catalog` ou espere.
 - **Porta ocupada**: pare o serviço local que usa 5432, 8123 ou 8333.
-- **`exit code: 137` ou `Killed` no `local:images`**: memória do Docker abaixo do mínimo
+- **`exit code: 137` ou `Killed` no `local:up` ou no `local:images`**: memória do Docker abaixo do mínimo
   (veja "Pré-requisitos"); aumente e rode de novo.
 - **`getaddrinfo ENOTFOUND admin.orakel.localhost` no E2E (Linux)**: o sistema não resolve
   `*.localhost`, embora o curl e o Chromium resolvam; instale o `libnss-myhostname` (veja
@@ -318,6 +326,6 @@ Para ver ou desligar: acrescente o `--profile` ao `ps`, `logs` ou `down`.
   Sem o bucket, ponha o site em `infra/local/seeds/sites.json` e rode `local:up`; sem as
   imagens, `pnpm local:seed` grava de novo as que faltam. Um `.env.local` antigo ainda pode ter
   `LOCAL_SITES` e `LOCAL_MEDIA_HOSTS`: não são mais lidas, apague-as.
-- **Aviso de plataforma (`linux/amd64`) no `local:up` ou `local:publish`**: imagens de antes
+- **Aviso de plataforma (`linux/amd64`) no `local:up` ou num build**: imagens de antes
   do build nativo; reconstrua com `pnpm local:images` (usa a arquitetura da máquina; o CI
   constrói amd64, a da VPS). Para testar amd64 no local: `PLATFORM=linux/amd64 pnpm local:images`.
