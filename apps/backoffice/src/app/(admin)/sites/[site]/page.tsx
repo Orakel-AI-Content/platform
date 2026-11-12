@@ -11,7 +11,7 @@ import {
   RegisterG1Form,
 } from '@/components/sites/SiteActions';
 import { formatDateTime, formatDuration } from '@/components/shared/siteLabels.ts';
-import { SiteBuildsTable } from '@/components/sites/SiteBuildsTable';
+import { SiteLiveActivity } from '@/components/sites/SiteLiveActivity';
 import { SiteOperations, SiteOperationsScope } from '@/components/sites/SiteOperations';
 import { SiteSummaryCard } from '@/components/sites/SiteSummaryCard';
 import { SiteTabs } from '@/components/sites/SiteTabs';
@@ -38,6 +38,7 @@ import {
   rollbackSiteAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
+  siteActivityAction,
 } from '../actions.ts';
 import { sitePageContext } from './editorial-page.tsx';
 
@@ -49,7 +50,7 @@ export const dynamic = 'force-dynamic';
  * (operations.run): "Publicar agora" ou, pausado, "Retomar", e o "Mais ações" com "Reconstruir
  * na release" e "Reverter", com o erro logo abaixo do cabeçalho. Embaixo, o resumo só com o
  * estado atual à esquerda e, à direita, o `Card` com as abas Ciclo de vida, Histórico (a
- * atividade do site, para todos os perfis, #637), G1, Janela de agrupamento e Limite diário
+ * atividade do site, para todos os perfis, #637, com o status ao vivo da execução aberta, #638), G1, Janela de agrupamento e Limite diário
  * (#490; empilham abaixo de `xl`). Lê o site pelo
  * sitePageContext (a mesma busca do layout), os gatilhos e o uso de redirects, que vira um aviso
  * acima do resumo quando o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do
@@ -212,7 +213,13 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                 <LifecycleSteps current={site.lifecycle} />
               )
             }
-            history={<SiteBuildsTable history={activity.value.history} timeZone={site.timeZone} />}
+            history={
+              <SiteLiveActivity
+                activity={activity.value}
+                status={siteActivityAction.bind(null, site.id)}
+                timeZone={site.timeZone}
+              />
+            }
             g1={
               !g1 && canConfigure ? (
                 <RegisterG1Form intro={g1Intro} action={registerG1Action.bind(null, site.id)} />
