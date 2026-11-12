@@ -335,6 +335,33 @@ export async function revertRelease(
   return { ok: true, value: previous.value };
 }
 
+/**
+ * Site da vez na atualização de todos os sites: passa a `promovendo` na release de destino e
+ * grava a `troca_de_versao` em nome de quem iniciou. Quem chama já autorizou (`release.promote`)
+ * e conferiu a release; a mudança pendente e o build ficam com ele.
+ */
+export async function promoteForRollout(
+  tx: Executor,
+  siteId: string,
+  release: string,
+  requestedBy: string,
+): Promise<void> {
+  const [current] = await tx
+    .select({ release: sites.release })
+    .from(sites)
+    .where(eq(sites.id, siteId))
+    .for('update');
+  if (current === undefined) throw new Error(`Site ${siteId} não encontrado`);
+  await tx.update(sites).set({ state: 'promovendo', release }).where(eq(sites.id, siteId));
+  await recordSiteEvent(tx, {
+    siteId,
+    kind: 'troca_de_versao',
+    requestedBy,
+    previousRelease: current.release,
+    release,
+  });
+}
+
 /** Primeira publicação bem-sucedida: o site passa a `publicado`. */
 export async function markPublished(tx: Executor, siteId: string): Promise<void> {
   await tx

@@ -12,6 +12,7 @@ import { getDatabaseUrl } from '../../src/env.ts';
  * tabela fora dela faz o `delete from sites` falhar e desfaz a limpeza inteira (#145).
  */
 export const SITE_TABLES = [
+  'release_rollout_sites',
   'builds',
   'site_events',
   'reviews',
