@@ -55,8 +55,8 @@ group "images" {
   targets = ["backoffice"]
 }
 
-# Versão do site-builder (ADR 0018): o release.yml publica na tag site-builder-vX.Y.Z,
-# com TAG=X.Y.Z.
+# Versão do site-builder (ADR 0018): o release.yml, disparado com version=X.Y.Z, publica
+# com TAG=X.Y.Z e depois cria a tag Git site-builder-vX.Y.Z.
 target "site-builder" {
   inherits   = ["_base"]
   dockerfile = "docker/site-builder/Dockerfile"
@@ -133,7 +133,7 @@ target "events-test" {
 # Grupos: crie-os junto com o primeiro alvo de cada um (grupo vazio é erro no bake).
 #
 #   group "images"  { targets = ["backoffice"] }    # backoffice e serviços, a cada merge na main
-#   group "release" { targets = ["site-builder"] }  # na tag site-builder-vX.Y.Z
+#   group "release" { targets = ["site-builder"] }  # no release.yml (dispatch)
 #   group "local"   { targets = ["edge-local"] }    # só o pnpm local:images
 #   group "default" { targets = ["images", "release", "local"] }
 #

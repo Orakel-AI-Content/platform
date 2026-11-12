@@ -240,7 +240,7 @@ decisions:
     }
   quality.git_conventions:
     {
-      value: 'main sem proteção; branch <issue>-<slug>; Conventional Commits; squash merge; tags manuais site-builder-vX.Y.Z (ADR 0018)',
+      value: 'main sem proteção; branch <issue>-<slug>; Conventional Commits; squash merge; tags site-builder-vX.Y.Z criadas pelo release.yml (ADR 0018)',
       source: input,
       input_ref: 'Git; skill execute do orakel',
     }
@@ -302,7 +302,7 @@ decisions:
     }
   ops.ci:
     {
-      value: 'GitHub Actions sem segredos: ci.yml (filtros de caminho, turbo --affected, fixtures NDJSON para os sites de exemplo), images.yml (bake → GHCR, tag = SHA, mantém 30 versões), release.yml (tag site-builder-v*), e2e.yml (pilha completa: push na main, noturno, label e2e:completo e manual; ADR 0017)',
+      value: 'GitHub Actions sem segredos: ci.yml (filtros de caminho, turbo --affected, fixtures NDJSON para os sites de exemplo), images.yml (bake → GHCR, tag = SHA, mantém 30 versões), release.yml (workflow_dispatch com version, cria a tag site-builder-vX.Y.Z ao final), e2e.yml (pilha completa: push na main, noturno, label e2e:completo e manual; ADR 0017)',
       source: input,
       input_ref: 'CI',
     }
@@ -352,7 +352,7 @@ decisions:
     }
   extra.release-policy:
     {
-      value: 'versão do site-builder (ADR 0018): tag manual site-builder-vX.Y.Z, imagem site-builder:X.Y.Z, valor registrado X.Y.Z; major muda o schema da API ou exige migração de configuração; minor funcionalidades; patch correções; merge na main não cria release',
+      value: 'versão do site-builder (ADR 0018): tag site-builder-vX.Y.Z criada pelo release.yml (workflow_dispatch disparado pelo Backoffice) depois de publicar a imagem, imagem site-builder:X.Y.Z, valor registrado X.Y.Z; major muda o schema da API ou exige migração de configuração; minor funcionalidades; patch correções; merge na main não cria release',
       source: input,
       input_ref: 'Git',
     }
