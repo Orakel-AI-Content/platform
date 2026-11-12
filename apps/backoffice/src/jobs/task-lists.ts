@@ -6,6 +6,7 @@ import { REPROCESS_TASK } from '../domain/media/reprocess.ts';
 import { INGEST_TASK } from '../domain/media/upload.ts';
 import { VARIANTS_TASK } from '../domain/media/variants.ts';
 import { ROLLBACK_TASK } from '../domain/builds/schedule.ts';
+import { CHECK_SITE_INFRA_TASK } from '../domain/builds/site-state.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../domain/publications/schedule.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
@@ -15,6 +16,7 @@ import {
 } from './tasks/aggregate-audience.ts';
 import { createBuildTask, type BuildTaskDeps } from './tasks/build.ts';
 import { createCheckReleaseImageTask } from './tasks/check-release-image.ts';
+import { createCheckSiteInfraTask, type CheckSiteInfraTaskDeps } from './tasks/check-site-infra.ts';
 import {
   createGenerateArticleTask,
   type GenerateArticleTaskDeps,
@@ -33,6 +35,7 @@ import { createRollbackTask } from './tasks/rollback.ts';
 
 export type WorkerTaskDeps = MediaVariantsTaskDeps &
   Pick<GenerateArticleTaskDeps, 'generation' | 'api'> &
+  Pick<CheckSiteInfraTaskDeps, 'zones'> &
   Partial<Omit<AggregateAudienceTaskDeps, 'db'>>;
 
 /** Jobs gerais do backoffice-worker. O agregador entra aqui, com o cron dele (ADR 0009 da raiz). */
@@ -45,16 +48,19 @@ export function workerTasks(deps: WorkerTaskDeps): TaskList {
     [PUBLISH_SCHEDULED_TASK]: createPublishScheduledTask(deps),
     [GENERATE_ARTICLE_TASK]: createGenerateArticleTask(deps),
     [AGGREGATE_AUDIENCE_TASK]: createAggregateAudienceTask(deps),
+    [CHECK_SITE_INFRA_TASK]: createCheckSiteInfraTask(deps),
   };
 }
 
 /**
  * Cron embutido do Graphile Worker (formato crontab + nome da task). A consolidação da
- * audiência roda de hora em hora na fila `audience`, a mesma do comando da operação.
+ * audiência roda de hora em hora na fila `audience`, a mesma do comando da operação. A
+ * conferência da infra roda a cada 5 minutos, numa tentativa só: a próxima é o próprio cron.
  */
 export const WORKER_CRONTAB = [
   '*/5 * * * * heartbeat',
   `0 * * * * ${AGGREGATE_AUDIENCE_TASK} ?queue=${AUDIENCE_QUEUE}`,
+  `*/5 * * * * ${CHECK_SITE_INFRA_TASK} ?max=1`,
 ].join('\n');
 
 /**
