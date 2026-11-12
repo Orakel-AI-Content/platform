@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { approveAction, confirmAction, confirmAllAction } from './actions.ts';
+import {
+  approveAction,
+  approvePublishAction,
+  approveScheduleAction,
+  confirmAction,
+  confirmAllAction,
+} from './actions.ts';
 
 // A action só traduz: sessão → recusa, Result do domínio → resumo do formulário ou mensagem,
 // sucesso → revalida a revisão (e, na aprovação, a fila e o conteúdo). Regras e permissão estão
@@ -9,6 +15,8 @@ import { approveAction, confirmAction, confirmAllAction } from './actions.ts';
 const mocks = vi.hoisted(() => ({
   currentActor: vi.fn(),
   approveVersion: vi.fn(),
+  approveAndPublish: vi.fn(),
+  approveAndSchedule: vi.fn(),
   setConfirmation: vi.fn(),
   setAllConfirmations: vi.fn(),
   revalidatePath: vi.fn(),
@@ -19,7 +27,11 @@ vi.mock('@/auth/request-actor.ts', () => ({ currentActor: mocks.currentActor }))
 vi.mock('@/db/client.ts', () => ({
   getDb: () => ({ db: { transaction: (fn: (tx: unknown) => unknown) => fn({}) } }),
 }));
-vi.mock('@/domain/reviews/reviews.ts', () => ({ approveVersion: mocks.approveVersion }));
+vi.mock('@/domain/reviews/reviews.ts', () => ({
+  approveVersion: mocks.approveVersion,
+  approveAndPublish: mocks.approveAndPublish,
+  approveAndSchedule: mocks.approveAndSchedule,
+}));
 vi.mock('@/domain/reviews/confirmations.ts', () => ({
   setConfirmation: mocks.setConfirmation,
   setAllConfirmations: mocks.setAllConfirmations,
@@ -83,6 +95,108 @@ describe('aprovar na tela de revisão', () => {
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(1, '/sites/exemplo-a/revisao');
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(2, '/sites/exemplo-a/revisao/1');
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(3, '/sites/exemplo-a/conteudos/1');
+  });
+});
+
+describe('aprovar e publicar ou agendar na tela de revisão (workspace#89)', () => {
+  const outcome = (value: object) => ({
+    ok: true,
+    value: { reviewId: 9, publicationId: 4, overflowed: false, ...value },
+  });
+  const overflow =
+    'O dia pedido já tinha atingido o limite diário de publicações do site; a publicação foi para o próximo dia com vaga, no mesmo horário.';
+
+  it('sem sessão não chama o domínio nem revalida', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+    const refused = {
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+      issues: [{ path: [], message: 'Sessão inválida; entre de novo.' }],
+    };
+
+    expect(await approvePublishAction('exemplo-a', 1, 2)).toEqual(refused);
+    expect(await approveScheduleAction('exemplo-a', 1, 2, '2026-11-20T13:00:00.000Z')).toEqual(
+      refused,
+    );
+    expect(mocks.approveAndPublish).not.toHaveBeenCalled();
+    expect(mocks.approveAndSchedule).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('publicada na hora: diz que o artigo foi ao ar e revalida a fila, a revisão e o conteúdo', async () => {
+    mocks.approveAndPublish.mockResolvedValue(
+      outcome({ outcome: 'published', at: new Date('2026-11-12T13:00:00Z') }),
+    );
+
+    expect(await approvePublishAction('exemplo-a', 1, 2)).toEqual({
+      ok: true,
+      message: 'Versão 2 aprovada: o artigo foi ao ar.',
+    });
+    expect(mocks.approveAndPublish).toHaveBeenCalledWith({}, revisor, 'exemplo-a', 1, 2);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/revisao');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/conteudos/1');
+  });
+
+  it('agendada: passa o instante ISO ao domínio e diz a data e a hora de São Paulo', async () => {
+    mocks.approveAndSchedule.mockResolvedValue(
+      outcome({ outcome: 'scheduled', at: new Date('2026-11-20T13:00:00.000Z') }),
+    );
+
+    expect(await approveScheduleAction('exemplo-a', 1, 2, '2026-11-20T13:00:00.000Z')).toEqual({
+      ok: true,
+      message: 'Versão 2 aprovada: o artigo foi agendado para 20/11/2026, 10:00 BRT.',
+    });
+    expect(mocks.approveAndSchedule).toHaveBeenCalledWith(
+      {},
+      revisor,
+      'exemplo-a',
+      1,
+      2,
+      new Date('2026-11-20T13:00:00.000Z'),
+    );
+  });
+
+  it('com o dia cheio, publicar na hora vira agendamento na próxima vaga, com o aviso', async () => {
+    mocks.approveAndPublish.mockResolvedValue(
+      outcome({ outcome: 'scheduled', at: new Date('2026-11-13T13:00:00Z'), overflowed: true }),
+    );
+
+    expect(await approvePublishAction('exemplo-a', 1, 2)).toEqual({
+      ok: true,
+      message: 'Versão 2 aprovada: o artigo foi agendado para 13/11/2026, 10:00 BRT.',
+      warning: overflow,
+    });
+  });
+
+  it('com o dia escolhido cheio, o agendamento vai para a próxima vaga, com o aviso', async () => {
+    mocks.approveAndSchedule.mockResolvedValue(
+      outcome({ outcome: 'scheduled', at: new Date('2026-11-21T13:00:00Z'), overflowed: true }),
+    );
+
+    const result = await approveScheduleAction('exemplo-a', 1, 2, '2026-11-20T13:00:00.000Z');
+    expect(result).toMatchObject({ ok: true, warning: overflow });
+  });
+
+  it('recusa do domínio volta como resumo do formulário e não revalida', async () => {
+    mocks.approveAndPublish.mockResolvedValue({
+      ok: false,
+      issues: [
+        {
+          code: 'publication.no_slot',
+          message: 'O site exemplo-a não tem vaga de publicação nos próximos 30 dias',
+          path: [],
+        },
+      ],
+    });
+
+    expect(await approvePublishAction('exemplo-a', 1, 2)).toEqual({
+      ok: false,
+      message: 'Não foi possível aprovar.',
+      issues: [
+        { path: [], message: 'O site exemplo-a não tem vaga de publicação nos próximos 30 dias' },
+      ],
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
 
