@@ -33,8 +33,9 @@ import {
 // `SiteOperationsScope` guarda o estado comum e monta cada diálogo de confirmação uma vez; cada
 // etapa recebe só o seu `SiteOperationButton`. O sucesso vai ao toast e a recusa de qualquer
 // uma ao `SiteOperationsAlert`, logo abaixo do painel. A página só monta o escopo com
-// operations.run. "Cancelar" (#649) troca de lugar com "Publicar agora" na Build enquanto há
-// publicação aberta, e "Desfazer última publicação" fica ao lado de "Escolher outra versão".
+// operations.run. "Cancelar" (#649) fica na Build ao lado de "Publicar agora" com publicação na
+// fila e no lugar dele em andamento; "Desfazer última publicação" fica ao lado de "Escolher outra
+// versão".
 
 export type SiteOperation = 'publish' | 'resume' | 'rebuild' | 'rollback' | 'cancel' | 'undo';
 
@@ -67,6 +68,8 @@ type Scope = {
   running: SiteOperation | null;
   error: string | null;
   open: (operation: SiteOperation, trigger: HTMLElement) => void;
+  /** Guarda (ou, com `null`, esquece) o botão montado de cada operação. */
+  register: (operation: SiteOperation, trigger: HTMLElement | null) => void;
 };
 
 const SiteOperationsContext = createContext<Scope | null>(null);
@@ -114,6 +117,11 @@ export function SiteOperationsScope({
   const [running, setRunning] = useState<SiteOperation | null>(null);
   const [, startTransition] = useTransition();
   const returnFocus = useRef<HTMLElement | null>(null);
+  const triggers = useRef(new Map<SiteOperation, HTMLElement>());
+  const register = (operation: SiteOperation, trigger: HTMLElement | null) => {
+    if (trigger === null) triggers.current.delete(operation);
+    else triggers.current.set(operation, trigger);
+  };
   const { siteId, paused, release, timeZone, publish, resume, rebuild, rollback, cancel, undo } =
     operations;
 
@@ -123,6 +131,10 @@ export function SiteOperationsScope({
     setOpen(operation);
   };
   const execute = (operation: SiteOperation, action: () => Promise<ActionResult>) => {
+    // Cancelar a publicação na fila tira o "Cancelar" da tela: o foco vai ao "Publicar agora",
+    // que fica. Em andamento não há outro; o "Cancelar" vira o "Publicar agora" quando fecha.
+    if (operation === 'cancel')
+      returnFocus.current = triggers.current.get('publish') ?? returnFocus.current;
     setOpen(null);
     setRunning(operation);
     result.fail(null);
@@ -138,7 +150,9 @@ export function SiteOperationsScope({
   const afterClose = () => returnFocus.current?.focus();
 
   return (
-    <SiteOperationsContext value={{ operations, running, error: result.error, open: openFrom }}>
+    <SiteOperationsContext
+      value={{ operations, running, error: result.error, open: openFrom, register }}
+    >
       {children}
       {publish && (
         <PublishNowDialog
@@ -231,6 +245,10 @@ export function SiteOperationButton({ operation }: { operation: SiteOperation })
       type="button"
       size="sm"
       customColorClass={dangerButtonClass}
+      ref={(element) => {
+        scope.register(operation, element);
+        return () => scope.register(operation, null);
+      }}
       aria-disabled={scope.running !== null || undefined}
       onClick={(event) => scope.open(operation, event.currentTarget)}
     >

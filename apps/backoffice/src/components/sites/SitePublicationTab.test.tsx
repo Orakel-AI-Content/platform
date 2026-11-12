@@ -117,7 +117,7 @@ describe('aba Publicação', () => {
     expect(status).toHaveBeenCalledTimes(2);
   });
 
-  it('"Cancelar" fica na Build enquanto a publicação está aberta e sai quando fecha (#649)', async () => {
+  it('"Cancelar" acompanha a publicação aberta e sai quando ela fecha (#649)', async () => {
     status
       .mockResolvedValueOnce({ open: running, history: [] })
       .mockResolvedValueOnce({ open: null, history: [finished] });
@@ -133,7 +133,8 @@ describe('aba Publicação', () => {
         .queryAllByRole('button')
         .map((button) => button.textContent);
 
-    expect(buildButtons()).toEqual(['Cancelar']);
+    // Na fila, "Publicar agora" pula a janela; em andamento, só "Cancelar".
+    expect(buildButtons()).toEqual(['Publicar agora', 'Cancelar']);
     await tick();
     expect(buildButtons()).toEqual(['Cancelar']);
     await tick();

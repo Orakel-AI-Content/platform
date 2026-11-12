@@ -23,8 +23,8 @@ import { type PublicationSite, SitePublicationSteps } from './SitePublicationSte
 // "Reconstruir na release" na Versão, "Publicar agora" na Build, "Escolher outra versão" na No ar
 // e, pausado, "Retomar" na linha Site, cada uma com a confirmação de hoje (#327, #514, #515); o
 // sucesso vai ao toast e a recusa de qualquer uma ao `SiteOperationsAlert`, abaixo do painel.
-// "Cancelar" troca de lugar com "Publicar agora" com publicação aberta e "Desfazer última
-// publicação" fica ao lado de "Escolher outra versão" (#649). Foco no navegador, em
+// "Cancelar" fica ao lado de "Publicar agora" com publicação na fila e no lugar dele em
+// andamento; "Desfazer última publicação" fica ao lado de "Escolher outra versão" (#649). Foco no navegador, em
 // `SiteOperations.browser.test.tsx`.
 
 beforeAll(() => {
@@ -182,11 +182,14 @@ describe('ações nas etapas', () => {
     expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
   });
 
-  it.each([
-    ['na fila', QUEUED],
-    ['em andamento', RUNNING],
-  ])('com publicação %s, "Cancelar" no lugar de "Publicar agora" na Build', (_, open) => {
-    renderPanel({ ...ALL, activity: { open, history: [] } });
+  it('com publicação na fila, "Publicar agora" (pula a janela) e "Cancelar" na Build', () => {
+    renderPanel({ ...ALL, activity: QUEUED_ACTIVITY });
+
+    expect(stepButtons(2)).toEqual(['Publicar agora exemplo-a', 'Cancelar exemplo-a']);
+  });
+
+  it('com publicação em andamento, só "Cancelar" na Build', () => {
+    renderPanel({ ...ALL, activity: { open: RUNNING, history: [] } });
 
     expect(stepButtons(2)).toEqual(['Cancelar exemplo-a']);
     expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();

@@ -542,10 +542,11 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   operação (#648) vêm prontas da página em `actions`, uma por etapa, abaixo do estado, como o
   "Marcar…": "Reconstruir na release" na Versão (só com a lista de releases), "Publicar agora"
   na Build (fora da pausa), "Escolher outra versão" na No ar (o "Reverter", só com a lista de
-  versões) e "Retomar" na linha Site (só pausado). Com publicação (não reversão) na fila ou em
-  andamento, "Cancelar" toma o lugar de "Publicar agora" na Build (#649), pela mesma atividade
-  relida: os dois são o mesmo `SiteOperationButton` na mesma posição, então, quando a execução
-  fecha, o React troca só o texto e o foco fica no "Publicar agora" que volta. "Desfazer última
+  versões) e "Retomar" na linha Site (só pausado). "Cancelar" entra na Build com publicação (não
+  reversão) aberta (#649), pela mesma atividade relida: na fila, ao lado de "Publicar agora" (que
+  pula a janela); em andamento, no lugar dele. Cancelar na fila leva o foco ao "Publicar agora",
+  que fica; em andamento, o "Cancelar" e o "Publicar agora" ocupam a mesma posição, então, quando
+  a execução fecha, o React troca só o texto e o foco fica no botão. "Desfazer última
   publicação" fica ao lado de "Escolher outra versão", só quando há versão anterior, e a
   confirmação diz para qual versão o site volta. Sem operations.run, o painel não tem botões
   de operação e mostra os mesmos estados.

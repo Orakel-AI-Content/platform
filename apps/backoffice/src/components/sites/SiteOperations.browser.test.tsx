@@ -17,7 +17,7 @@ import { SitePublicationSteps } from './SitePublicationSteps.tsx';
 // Ações de operação nas etapas da aba "Publicação" em Chromium (#648): cada botão abre a
 // confirmação de hoje com o foco preso, a action só roda depois de confirmar, e fechar devolve
 // o foco ao botão da etapa. "Cancelar" e "Desfazer última publicação" (#649) seguem o mesmo
-// caminho; quando a publicação cancelada fecha, o foco fica no "Publicar agora" que volta à etapa.
+// caminho; quando a publicação cancelada fecha, o foco fica no "Publicar agora" da etapa.
 
 const RELEASES = [{ tag: '1.3.0', imageStatus: 'disponivel' as const }];
 const VERSIONS = [
@@ -39,6 +39,7 @@ const QUEUED: OpenExecution = {
   requestedBy: 'ana@orakel.local',
   cancelRequestedAt: null,
 };
+const RUNNING: OpenExecution = { ...QUEUED, status: 'rodando', currentStage: 'render' };
 const IDLE: SiteActivity = { open: null, history: [] };
 
 const ok = () => vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' }));
@@ -165,8 +166,8 @@ const CASES = [
 ] as const;
 
 /** O painel cuja publicação fecha quando o "Cancelar" responde, como o polling traria. */
-function ClosingPanel({ actions }: { actions: Actions }) {
-  const [activity, setActivity] = useState<SiteActivity>({ open: QUEUED, history: [] });
+function ClosingPanel({ actions, open }: { actions: Actions; open: OpenExecution }) {
+  const [activity, setActivity] = useState<SiteActivity>({ open, history: [] });
   const cancel = vi.fn(() => {
     setActivity(IDLE);
     return actions.cancel();
@@ -184,7 +185,7 @@ describe('ações nas etapas no navegador', () => {
         <Panel
           paused={paused}
           actions={actions}
-          activity={operation === 'cancel' ? { open: QUEUED, history: [] } : IDLE}
+          activity={operation === 'cancel' ? { open: RUNNING, history: [] } : IDLE}
         />,
       );
       const trigger = page.getByRole('button', { name: button });
@@ -210,9 +211,12 @@ describe('ações nas etapas no navegador', () => {
 });
 
 describe('"Cancelar" no navegador', () => {
-  it('confirmado, a publicação fecha e o foco fica no "Publicar agora" que volta à Build', async () => {
+  it.each([
+    ['na fila', QUEUED],
+    ['em andamento', RUNNING],
+  ])('%s: confirmado, a publicação fecha e o foco fica no "Publicar agora"', async (_, open) => {
     const actions = allActions();
-    await renderInApp(<ClosingPanel actions={actions} />);
+    await renderInApp(<ClosingPanel actions={actions} open={open} />);
     const cancel = page.getByRole('button', { name: 'Cancelar exemplo-a' });
     const confirmation = page.getByRole('alertdialog', {
       name: 'Cancelar a publicação de exemplo-a?',
