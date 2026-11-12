@@ -1,15 +1,17 @@
 // "Atualizar todos os sites" (workspace#83): leva a release `disponivel` mais recente a todos os
 // sites, um por vez, começando pelo de menor audiência (canário). A atualização é um registro
 // próprio (`release_rollouts` e seus sites), não deduzida de `sites.state`. Aqui: iniciar, que
-// grava o registro e promove o primeiro site, e a leitura do progresso. Avançar quando o build
-// termina e interromper ficam nas Tasks seguintes. Toda escrita em `sites` passa por
-// `site-state.ts`.
+// grava o registro e promove o primeiro site; avançar, na transação que fecha o build do site
+// em andamento; e a leitura do progresso. Interromper fica na Task seguinte. Toda escrita em
+// `sites` passa por `site-state.ts`.
 import type { Result } from '@orakel/content-model';
-import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import {
   audienceDailySite,
+  builds,
+  pendingChanges,
   releaseRollouts,
   releaseRolloutSites,
   sites,
@@ -20,7 +22,8 @@ import type {
 } from '../../db/schema/releases.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { audiencePeriodWindow } from '../audience/read.ts';
-import { promoteForRollout } from '../builds/site-state.ts';
+import type { BuildOutcome } from '../builds/run-build.ts';
+import { finishPromotion, pauseSite, promoteForRollout } from '../builds/site-state.ts';
 import { buildNow } from '../builds/schedule.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 import { latestAvailableRelease } from './releases.ts';
@@ -146,11 +149,185 @@ export async function startRollout(
     .insert(releaseRolloutSites)
     .values(ordered.map((site) => ({ rolloutId: rollout.id, ...site })));
 
-  await promoteForRollout(tx, first.siteId, target, actor.email);
-  await recordPendingChange(tx, first.siteId, 'release', target);
-  await buildNow(tx, first.siteId, actor.email, now);
+  await promoteSite(tx, first.siteId, target, actor.email, now);
 
   return { ok: true, value: { ...rollout, sites: ordered } };
+}
+
+/** O site da vez vai a `promovendo` na release de destino, com mudança pendente e build já. */
+async function promoteSite(
+  tx: Executor,
+  siteId: string,
+  target: string,
+  requestedBy: string,
+  now: Date,
+): Promise<void> {
+  await promoteForRollout(tx, siteId, target, requestedBy);
+  await recordPendingChange(tx, siteId, 'release', target);
+  await buildNow(tx, siteId, requestedBy, now);
+}
+
+/** A tentativa de build que acabou de fechar, como o avanço da atualização a vê. */
+export type ClosedBuild = {
+  buildId: number;
+  siteId: string;
+  outcome: BuildOutcome;
+  /** Última tentativa do job: a falha transitória não volta a rodar. */
+  lastAttempt: boolean;
+};
+
+/**
+ * O build é o da troca de versão do site em andamento: no sucesso, ele levou a mudança pendente
+ * `release` do destino; na falha (o render pode nem ter listado as mudanças), foi feito na
+ * release de destino com essa mudança ainda pendente.
+ */
+async function isRolloutBuild(tx: Executor, build: ClosedBuild, target: string): Promise<boolean> {
+  const release = and(
+    eq(pendingChanges.siteId, build.siteId),
+    eq(pendingChanges.origin, 'release'),
+    eq(pendingChanges.reference, target),
+  );
+  if (build.outcome.status === 'ok') {
+    const ids = build.outcome.render.pendingChangeIds;
+    if (ids.length === 0) return false;
+    const [change] = await tx
+      .select({ id: pendingChanges.id })
+      .from(pendingChanges)
+      .where(and(release, inArray(pendingChanges.id, ids)))
+      .limit(1);
+    return change !== undefined;
+  }
+  const [row] = await tx
+    .select({ release: builds.release })
+    .from(builds)
+    .where(eq(builds.id, build.buildId));
+  if (row?.release !== target) return false;
+  const [pending] = await tx
+    .select({ id: pendingChanges.id })
+    .from(pendingChanges)
+    .where(and(release, isNull(pendingChanges.resolvedAt)))
+    .limit(1);
+  return pending !== undefined;
+}
+
+/**
+ * Promove o próximo site `aguardando`, na ordem; o que estiver pausado quando chega a vez fica
+ * `nao_atualizado` e o avanço segue. Sem próximo, a atualização fecha `concluida`.
+ */
+async function promoteNext(
+  tx: Executor,
+  rollout: { id: number; targetRelease: string; requestedBy: string },
+  now: Date,
+): Promise<void> {
+  const waiting = await tx
+    .select({ siteId: releaseRolloutSites.siteId })
+    .from(releaseRolloutSites)
+    .where(
+      and(
+        eq(releaseRolloutSites.rolloutId, rollout.id),
+        eq(releaseRolloutSites.state, 'aguardando'),
+      ),
+    )
+    .orderBy(asc(releaseRolloutSites.position));
+  const setSite = (siteId: string, state: RolloutSiteState) =>
+    tx
+      .update(releaseRolloutSites)
+      .set({ state })
+      .where(
+        and(eq(releaseRolloutSites.rolloutId, rollout.id), eq(releaseRolloutSites.siteId, siteId)),
+      );
+  for (const { siteId } of waiting) {
+    // Trava a linha do site: pausar no meio do avanço espera a decisão.
+    const [site] = await tx
+      .select({ state: sites.state })
+      .from(sites)
+      .where(eq(sites.id, siteId))
+      .for('update');
+    if (site === undefined || site.state === 'pausado') {
+      await setSite(siteId, 'nao_atualizado');
+      continue;
+    }
+    await setSite(siteId, 'em_andamento');
+    await promoteSite(tx, siteId, rollout.targetRelease, rollout.requestedBy, now);
+    return;
+  }
+  await tx
+    .update(releaseRollouts)
+    .set({ state: 'concluida', finishedAt: now })
+    .where(eq(releaseRollouts.id, rollout.id));
+}
+
+/**
+ * Avança a atualização de todos os sites na transação que fecha o build (`recordBuild`). Só age
+ * no build da troca de versão do site `em_andamento`. Sucesso: o site fica `atualizado`, volta a
+ * `ativo`, e o próximo começa (ou a atualização fecha `concluida`). Falha permanente, ou
+ * transitória na última tentativa: o site fica `falhou`, pausado na versão nova, e a atualização
+ * fecha `falhou`, sem promover mais nenhum. Transitória com nova tentativa e cancelado não mudam
+ * nada. Atualização que já não está `em_andamento` (interrompida) só registra o site em andamento.
+ */
+export async function advanceRollout(
+  tx: Executor,
+  build: ClosedBuild,
+  now: Date = new Date(),
+): Promise<void> {
+  const { outcome } = build;
+  if (outcome.status === 'cancelled') return;
+  if (outcome.status === 'failed' && outcome.failure.kind === 'transient' && !build.lastAttempt) {
+    return;
+  }
+
+  const [current] = await tx
+    .select({ rolloutId: releaseRolloutSites.rolloutId })
+    .from(releaseRolloutSites)
+    .where(
+      and(
+        eq(releaseRolloutSites.siteId, build.siteId),
+        eq(releaseRolloutSites.state, 'em_andamento'),
+      ),
+    )
+    .orderBy(desc(releaseRolloutSites.rolloutId))
+    .limit(1);
+  if (current === undefined) return;
+  // Trava a atualização: interromper ao mesmo tempo espera o avanço terminar.
+  const [rollout] = await tx
+    .select()
+    .from(releaseRollouts)
+    .where(eq(releaseRollouts.id, current.rolloutId))
+    .for('update');
+  if (rollout === undefined) return;
+  if (!(await isRolloutBuild(tx, build, rollout.targetRelease))) return;
+
+  const ok = outcome.status === 'ok';
+  await tx
+    .update(releaseRolloutSites)
+    .set({ state: ok ? 'atualizado' : 'falhou' })
+    .where(
+      and(
+        eq(releaseRolloutSites.rolloutId, rollout.id),
+        eq(releaseRolloutSites.siteId, build.siteId),
+      ),
+    );
+  if (ok) {
+    await finishPromotion(tx, build.siteId);
+  } else if (outcome.status === 'failed' && outcome.failure.kind === 'transient') {
+    // A permanente já pausou o site em `recordBuild`; a transitória da última tentativa também.
+    await pauseSite(
+      tx,
+      build.siteId,
+      `${outcome.stage}: ${outcome.failure.message}`,
+      outcome.failure.culprit,
+    );
+  }
+  if (rollout.state !== 'em_andamento') return;
+
+  if (ok) {
+    await promoteNext(tx, rollout, now);
+  } else {
+    await tx
+      .update(releaseRollouts)
+      .set({ state: 'falhou', finishedAt: now })
+      .where(eq(releaseRollouts.id, rollout.id));
+  }
 }
 
 /** A atualização mais recente com o estado de cada site, ou `null` sem nenhuma. */
