@@ -20,9 +20,8 @@ import {
   publishVersion,
 } from '../../src/domain/publications/publish.ts';
 import { unpublishContent } from '../../src/domain/publications/unpublish.ts';
-import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
-import { resetDatabase, setupDatabase } from './helpers.ts';
+import { confirmAndApprove, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Despublicação com 301 opcional (#491, workspace#20). Na fixture exemplo-a, o conteúdo 1
 // está no ar em /guia-completo/ (com /guia-antigo/ → /guia-completo/), o 2 em
@@ -32,7 +31,6 @@ let db: Db;
 let close: () => Promise<void>;
 
 const SITE = 'exemplo-a';
-const ALL = REVIEW_CHECKLIST.map((item) => item.key);
 const role = (name: 'editor' | 'revisor'): Actor => ({
   email: `${name}@orakel.local`,
   roles: [name],
@@ -79,7 +77,7 @@ async function approved(contentId: number, changes: { title?: string; slug?: str
   if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
   await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
   const ok = await db.transaction((tx) =>
-    approveVersion(tx, role('revisor'), SITE, contentId, saved.value.version, ALL),
+    confirmAndApprove(tx, role('revisor'), SITE, contentId, saved.value.version),
   );
   if (!ok.ok) throw new Error(JSON.stringify(ok.issues));
   return saved.value.version;
