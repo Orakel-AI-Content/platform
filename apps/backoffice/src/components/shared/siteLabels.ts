@@ -233,6 +233,22 @@ export function liveVersionText(
   return parts.join(' · ');
 }
 
+/**
+ * Versão de destino do "Desfazer última publicação" (#649), na confirmação: a versão, a release, as
+ * páginas e quando foi publicada, no fuso do site.
+ */
+export function previousVersionText(
+  version: { versionId: string; release: string; pages: number | null; finishedAt: Date },
+  timeZone: string,
+): string {
+  const parts = [version.versionId, `release ${version.release}`];
+  if (version.pages !== null) {
+    parts.push(`${version.pages} ${version.pages === 1 ? 'página' : 'páginas'}`);
+  }
+  parts.push(`publicada em ${formatDateTime(version.finishedAt, timeZone)}`);
+  return parts.join(' · ');
+}
+
 const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
 
 /**

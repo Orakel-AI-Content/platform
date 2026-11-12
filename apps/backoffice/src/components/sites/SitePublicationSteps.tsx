@@ -23,8 +23,42 @@ export type PublicationSite = Pick<
 
 export type PublicationInstance = Pick<SiteInstance, 'activePages' | 'activeSince'>;
 
-/** A ação de cada etapa, abaixo do estado (#648); a de Infra e zona vem em `lifecycleAction`. */
-export type PublicationStepActions = Partial<Record<Exclude<PublicationStep, 'infra'>, ReactNode>>;
+/**
+ * A ação de cada etapa, abaixo do estado (#648); a de Infra e zona vem em `lifecycleAction`.
+ * `cancel` (#649) entra na Build enquanto há publicação na fila ou em andamento.
+ */
+export type PublicationStepActions = Partial<
+  Record<Exclude<PublicationStep, 'infra'>, ReactNode>
+> & { cancel?: ReactNode };
+
+/**
+ * As ações da Build (#649). Na fila, "Publicar agora" (que pula a janela) e "Cancelar"; em
+ * andamento, só "Cancelar"; sem publicação aberta (ou com reversão), só "Publicar agora". Duas
+ * posições fixas: a primeira é "Cancelar" em andamento e "Publicar agora" no resto, então, quando
+ * o build em andamento fecha, o React troca só o texto do botão e o foco fica nele; a segunda é o
+ * "Cancelar" da fila.
+ */
+function buildActions(actions: PublicationStepActions, activity: SiteActivity): ReactNode {
+  const open = activity.open?.kind === 'build' ? activity.open.status : null;
+  const cancel = actions.cancel;
+  const first = open === 'rodando' && cancel !== undefined ? cancel : actions.build;
+  const second = open === 'na_fila' ? cancel : undefined;
+  if (first === undefined && second === undefined) return undefined;
+  return (
+    <span className="flex flex-wrap gap-2">
+      {first}
+      {second}
+    </span>
+  );
+}
+
+function stepAction(
+  step: Exclude<PublicationStep, 'infra'>,
+  actions: PublicationStepActions,
+  activity: SiteActivity,
+): ReactNode {
+  return step === 'build' ? buildActions(actions, activity) : actions[step];
+}
 
 type Step = { status: StepStatus; text: ReactNode };
 
@@ -104,7 +138,8 @@ function currentIndex(byStep: Record<PublicationStep, Step>, open: boolean): num
  * A etapa Build segue a atividade que a aba relê durante uma execução (`SiteLiveActivity`):
  * "na fila" com o horário previsto, em andamento com a etapa ou o resultado do último build.
  * As ações de operação (#648) vêm prontas em `actions`, uma por etapa, abaixo do estado, como o
- * "Marcar…" de Infra e zona; o painel só as posiciona.
+ * "Marcar…" de Infra e zona; o painel só as posiciona. Com publicação na fila, a Build mostra
+ * `cancel` ao lado da sua; em andamento, no lugar dela (#649).
  */
 export function SitePublicationSteps({
   site,
@@ -127,7 +162,7 @@ export function SitePublicationSteps({
       current={currentIndex(byStep, activity.open !== null)}
     >
       {PUBLICATION_STEPS.map((step) => {
-        const action = step === 'infra' ? undefined : actions[step];
+        const action = step === 'infra' ? undefined : stepAction(step, actions, activity);
         return (
           <Steps.Item
             key={step}

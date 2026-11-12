@@ -7,6 +7,7 @@ import type { ComponentProps } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ActionResult } from '@/components/shared/actionResult.ts';
+import type { OpenExecution, SiteActivity } from '@/domain/builds/builds.ts';
 import { toast, ToastProvider } from '@/components/ui/toast';
 import { CONTROL_SIZES } from '@/components/ui/utils/constants';
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
@@ -22,7 +23,9 @@ import { type PublicationSite, SitePublicationSteps } from './SitePublicationSte
 // "Reconstruir na release" na Versão, "Publicar agora" na Build, "Escolher outra versão" na No ar
 // e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", cada uma com a confirmação de hoje (#327, #514, #515); o
 // sucesso vai ao toast e a recusa de qualquer uma ao `SiteOperationsAlert`, abaixo do painel.
-// Foco no navegador, em `SiteOperations.browser.test.tsx`.
+// "Cancelar" fica ao lado de "Publicar agora" com publicação na fila e no lugar dele em
+// andamento; "Desfazer última publicação" fica ao lado de "Escolher outra versão" (#649). Foco no
+// navegador, em `SiteOperations.browser.test.tsx`.
 
 beforeAll(() => {
   MotionGlobalConfig.skipAnimations = true;
@@ -74,10 +77,28 @@ const SITE: PublicationSite = {
   timeZone: 'America/Sao_Paulo',
 };
 
+const QUEUED: OpenExecution = {
+  id: 7,
+  kind: 'build',
+  status: 'na_fila',
+  currentStage: null,
+  scheduledFor: null,
+  startedAt: null,
+  requestedBy: 'ana@orakel.local',
+  cancelRequestedAt: null,
+};
+const RUNNING: OpenExecution = { ...QUEUED, status: 'rodando', currentStage: 'render' };
+const ROLLING_BACK: OpenExecution = { ...RUNNING, kind: 'rollback', currentStage: null };
+const QUEUED_ACTIVITY: SiteActivity = { open: QUEUED, history: [] };
+
 type Props = Partial<Omit<ComponentProps<typeof SiteOperationsScope>, 'children'>>;
 
 /** O painel com os botões nas etapas, como a página monta com operations.run. */
-function Panel({ pausedReason = null, ...props }: Props & { pausedReason?: string | null }) {
+function Panel({
+  pausedReason = null,
+  activity = { open: null, history: [] },
+  ...props
+}: Props & { pausedReason?: string | null; activity?: SiteActivity }) {
   const paused = props.paused ?? false;
   return (
     <>
@@ -91,11 +112,17 @@ function Panel({ pausedReason = null, ...props }: Props & { pausedReason?: strin
         <SitePublicationSteps
           site={{ ...SITE, state: paused ? 'pausado' : 'ativo', pausedReason }}
           instance={{ activePages: 120, activeSince: null }}
-          activity={{ open: null, history: [] }}
+          activity={activity}
           actions={{
             versao: <SiteOperationButton operation="rebuild" />,
             build: <SiteOperationButton operation="publish" />,
-            no_ar: <SiteOperationButton operation="rollback" />,
+            cancel: <SiteOperationButton operation="cancel" />,
+            no_ar: (
+              <span className="flex flex-wrap gap-2">
+                <SiteOperationButton operation="undo" />
+                <SiteOperationButton operation="rollback" />
+              </span>
+            ),
             site: (
               <>
                 <SiteOperationButton operation="pause" />
@@ -113,12 +140,15 @@ function Panel({ pausedReason = null, ...props }: Props & { pausedReason?: strin
   );
 }
 
+const PREVIOUS = VERSIONS[0]!;
+
 const ALL: Props = {
   publish: ok('Build de exemplo-a enfileirado.'),
   pause: ok('exemplo-a pausado.'),
   resume: ok('exemplo-a retomado; build enfileirado.'),
   rebuild: { releases: RELEASES, action: ok('Build enfileirado.') },
   rollback: { versions: VERSIONS, action: ok('Reversão enfileirada.') },
+  cancel: ok('Publicação de exemplo-a cancelada.'),
 };
 
 function renderPanel(props: ComponentProps<typeof Panel>) {
@@ -159,6 +189,36 @@ describe('ações nas etapas', () => {
     expect(stepButtons(4)).toEqual(['Retomar exemplo-a']);
     expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Pausar/ })).toBeNull();
+  });
+
+  it('com publicação na fila, "Publicar agora" (pula a janela) e "Cancelar" na Build', () => {
+    renderPanel({ ...ALL, activity: QUEUED_ACTIVITY });
+
+    expect(stepButtons(2)).toEqual(['Publicar agora exemplo-a', 'Cancelar exemplo-a']);
+  });
+
+  it('com publicação em andamento, só "Cancelar" na Build', () => {
+    renderPanel({ ...ALL, activity: { open: RUNNING, history: [] } });
+
+    expect(stepButtons(2)).toEqual(['Cancelar exemplo-a']);
+    expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
+  });
+
+  it('com reversão em andamento, a Build não oferece "Cancelar"', () => {
+    renderPanel({ ...ALL, activity: { open: ROLLING_BACK, history: [] } });
+
+    expect(stepButtons(2)).toEqual(['Publicar agora exemplo-a']);
+  });
+
+  it('"Desfazer última publicação" só com versão anterior, ao lado de "Escolher outra versão"', () => {
+    const { rerender } = renderPanel(ALL);
+    expect(stepButtons(3)).toEqual(['Escolher outra versão exemplo-a']);
+
+    rerender(<Panel {...ALL} undo={{ version: PREVIOUS, action: ok('') }} />);
+    expect(stepButtons(3)).toEqual([
+      'Desfazer última publicação exemplo-a',
+      'Escolher outra versão exemplo-a',
+    ]);
   });
 
   it('sem a lista de releases ou de versões, o botão da etapa não aparece', () => {
@@ -263,6 +323,42 @@ describe('confirmação', () => {
     await waitFor(() => expect(alert().textContent).toBe('O site já está pausado.'));
   });
 
+  it('"Cancelar" só cancela depois de confirmar; o sucesso vai ao toast', async () => {
+    const user = userEvent.setup();
+    const cancel = ok('Publicação de exemplo-a cancelada.');
+    renderPanel({ ...ALL, cancel, activity: { open: RUNNING, history: [] } });
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar exemplo-a' }));
+    expect(cancel).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Cancelar a publicação de exemplo-a?',
+    });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar publicação' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Publicação de exemplo-a cancelada.'),
+    );
+    expect(cancel).toHaveBeenCalledWith('exemplo-a');
+  });
+
+  it('"Desfazer última publicação" mostra a versão de destino e desfaz sem escolher', async () => {
+    const user = userEvent.setup();
+    const action = ok('Rollback de exemplo-a para 20261010T120000Z-bbbbbbbb enfileirado.');
+    renderPanel({ ...ALL, undo: { version: PREVIOUS, action } });
+
+    await user.click(screen.getByRole('button', { name: 'Desfazer última publicação exemplo-a' }));
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Desfazer a última publicação de exemplo-a?',
+    });
+    expect(dialog.textContent).toContain(
+      '20261010T120000Z-bbbbbbbb · release 1.2.0 · 12 páginas · publicada em 10/10/2026, 09:00 BRT',
+    );
+    expect(within(dialog).queryByRole('combobox')).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Desfazer' }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledWith('exemplo-a'));
+  });
+
   it('Cancelar não roda a ação', async () => {
     const user = userEvent.setup();
     const publish = ok('');
@@ -291,6 +387,16 @@ describe('recusa e ação em curso', () => {
       { rollback: { versions: VERSIONS, action: refused(REFUSED) } },
     ],
     ['Retomar exemplo-a', 'Retomar', { paused: true, resume: refused(REFUSED) }],
+    [
+      'Cancelar exemplo-a',
+      'Cancelar publicação',
+      { cancel: refused(REFUSED), activity: QUEUED_ACTIVITY },
+    ],
+    [
+      'Desfazer última publicação exemplo-a',
+      'Desfazer',
+      { undo: { version: PREVIOUS, action: refused(REFUSED) } },
+    ],
   ] as const)('a recusa de "%s" vai ao alerta único do painel', async (name, confirm, props) => {
     const user = userEvent.setup();
     renderPanel({ ...ALL, ...props });

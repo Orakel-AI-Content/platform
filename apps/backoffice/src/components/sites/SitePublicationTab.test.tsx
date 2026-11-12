@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExecutionHistoryItem, OpenExecution, SiteActivity } from '@/domain/builds/builds.ts';
 
 import type { SiteActivityStatus } from './SiteLiveActivity.tsx';
-import type { PublicationSite } from './SitePublicationSteps.tsx';
+import type { PublicationSite, PublicationStepActions } from './SitePublicationSteps.tsx';
 import { SitePublicationTab } from './SitePublicationTab.tsx';
 
 // Aba "Publicação" (#647): o painel de etapas em cima e o histórico embaixo, na mesma aba, lendo
@@ -56,7 +56,7 @@ const finished: ExecutionHistoryItem = {
 
 const status = vi.fn<SiteActivityStatus>();
 
-function renderTab(activity: SiteActivity) {
+function renderTab(activity: SiteActivity, actions?: PublicationStepActions) {
   return render(
     <SitePublicationTab
       site={SITE}
@@ -64,6 +64,7 @@ function renderTab(activity: SiteActivity) {
       activity={activity}
       status={status}
       lifecycleAction={<button type="button">Marcar zona ativa</button>}
+      actions={actions}
       pollMs={POLL_MS}
     />,
   );
@@ -115,5 +116,29 @@ describe('aba Publicação', () => {
     expect(buildStep()).toBe('Publicação concluída em 11/10/2026, 14:05 BRT');
     // Uma consulta por passo: o painel não tem polling próprio.
     expect(status).toHaveBeenCalledTimes(2);
+  });
+
+  it('"Cancelar" acompanha a publicação aberta e sai quando ela fecha (#649)', async () => {
+    status
+      .mockResolvedValueOnce({ open: running, history: [] })
+      .mockResolvedValueOnce({ open: null, history: [finished] });
+    renderTab(
+      { open: queued, history: [] },
+      {
+        build: <button type="button">Publicar agora</button>,
+        cancel: <button type="button">Cancelar</button>,
+      },
+    );
+    const buildButtons = () =>
+      within(within(panel()).getAllByRole('listitem')[2]!)
+        .queryAllByRole('button')
+        .map((button) => button.textContent);
+
+    // Na fila, "Publicar agora" pula a janela; em andamento, só "Cancelar".
+    expect(buildButtons()).toEqual(['Publicar agora', 'Cancelar']);
+    await tick();
+    expect(buildButtons()).toEqual(['Cancelar']);
+    await tick();
+    expect(buildButtons()).toEqual(['Publicar agora']);
   });
 });
