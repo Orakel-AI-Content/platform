@@ -107,6 +107,28 @@ describe('runRollback', () => {
     expect(fake.volumes.removed).toEqual(['orakel-build-exemplo-a-9-1']);
   });
 
+  it('na falha, guarda o fim do log do container, lido antes de removê-lo', async () => {
+    const fake = fakeRuntime({
+      rollback: { exitCode: 10, file: failedFile('permanent', 'x'), log: 'ativando\nnão existe' },
+    });
+    expect(await runRollback(plan, { runtime: fake.runtime, now })).toMatchObject({
+      status: 'failed',
+      logTail: 'ativando\nnão existe',
+    });
+  });
+
+  it('erro ao ler o log não muda o resultado nem a classificação', async () => {
+    const outcome = await runRollback(plan, {
+      runtime: fakeRuntime({ rollback: { exitCode: 137 }, failOn: 'logs' }).runtime,
+      now,
+    });
+    expect(outcome).toMatchObject({
+      status: 'failed',
+      failure: { kind: 'transient', message: 'rollback saiu com 137 sem um rollback.json válido' },
+    });
+    expect(outcome).not.toHaveProperty('logTail');
+  });
+
   it('imagem fora do host: permanente, sem criar volume', async () => {
     const fake = fakeRuntime({ image: false });
     expect(await runRollback(plan, { runtime: fake.runtime, now })).toMatchObject({

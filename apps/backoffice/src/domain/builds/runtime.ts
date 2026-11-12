@@ -35,6 +35,33 @@ export interface ContainerRuntime {
   removeVolume(name: string): Promise<void>;
 }
 
+/** Limite do trecho final do log guardado na falha: linhas pedidas ao Docker e bytes gravados. */
+export const LOG_TAIL_LIMITS = { lines: 200, bytes: 16 * 1024 } as const;
+
+/**
+ * Fim do log do container, no limite de `LOG_TAIL_LIMITS`, para guardar com a falha. Lido antes
+ * de o container ser removido. Melhor esforço: erro de leitura só vai para o `log` e devolve
+ * `undefined`, sem mudar o resultado da execução.
+ */
+export async function readLogTail(
+  runtime: ContainerRuntime,
+  id: string,
+  log?: (msg: string) => void,
+): Promise<string | undefined> {
+  try {
+    const text = await runtime.logsTail(id, LOG_TAIL_LIMITS.lines);
+    const bytes = new TextEncoder().encode(text);
+    if (bytes.length <= LOG_TAIL_LIMITS.bytes) return text;
+    // Corta pelo começo; um caractere partido no corte vira U+FFFD e sai.
+    return new TextDecoder()
+      .decode(bytes.subarray(bytes.length - LOG_TAIL_LIMITS.bytes))
+      .replace(/^\uFFFD+/, '');
+  } catch (error) {
+    log?.(`Log do container ${id} não lido: ${String(error)}`);
+    return undefined;
+  }
+}
+
 /** Erro do runtime (rede, proxy, daemon): o build é repetido. */
 export class RuntimeError extends Error {
   override readonly name = 'RuntimeError';

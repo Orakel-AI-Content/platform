@@ -1,7 +1,8 @@
 // Execução de um build (12.0, L3): volume próprio, container render na rede export e, com
 // sucesso, container publish na rede publish. O resultado vem dos arquivos do volume
 // (contrato do @orakel/build-contract); o código de saída só decide quando o arquivo falta.
-// Containers e volume são sempre removidos.
+// A troca de etapa é avisada a quem chamou (que a grava na linha `rodando`); na falha, o fim do
+// log do container da etapa é lido antes de ele sair. Containers e volume são sempre removidos.
 import {
   BUILD_DIR,
   EXIT_CODES,
@@ -14,7 +15,7 @@ import {
 } from '@orakel/build-contract';
 
 import type { BUILD_STAGES } from '../../db/schema/index.ts';
-import type { ContainerRuntime, ContainerSpec } from './runtime.ts';
+import { readLogTail, type ContainerRuntime, type ContainerSpec } from './runtime.ts';
 
 export type BuildStage = (typeof BUILD_STAGES)[number];
 
@@ -44,12 +45,20 @@ export type BuildOutcome =
       status: 'failed';
       stage: BuildStage;
       failure: Failure;
+      /** Fim do log do container da etapa que falhou, quando ele chegou a existir. */
+      logTail?: string;
       render?: RenderOk;
       renderMs?: number;
       publishMs?: number;
     };
 
-type Deps = { runtime: ContainerRuntime; now: () => number; log?: (msg: string) => void };
+type Deps = {
+  runtime: ContainerRuntime;
+  now: () => number;
+  log?: (msg: string) => void;
+  /** Troca de etapa (image, render, publish). Erro dele só vai para o `log`. */
+  onStage?: (stage: BuildStage) => Promise<void>;
+};
 
 /** Falha sem arquivo de resultado: o código de saída classifica (10 permanente; o resto, não). */
 function fromExitCode(stage: BuildStage, exitCode: number): Failure {
@@ -69,7 +78,14 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
   const { runtime, now } = deps;
   const labels = { 'orakel.build': plan.runId, 'orakel.site': plan.siteId };
   const volume = `orakel-build-${plan.runId}`;
-  const containers: string[] = [];
+  /** Container de cada etapa: o log da que falhou é lido, e todos são removidos. */
+  const stageContainers = new Map<BuildStage, string>();
+
+  async function enter(stage: BuildStage): Promise<void> {
+    await deps.onStage?.(stage).catch((error: unknown) => {
+      deps.log?.(`Etapa ${stage} de ${plan.runId} não registrada: ${String(error)}`);
+    });
+  }
 
   /** Roda uma etapa e devolve o arquivo de resultado lido do volume. */
   async function stage(
@@ -86,7 +102,7 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
       ...(stagePlan.limits && { limits: stagePlan.limits }),
       labels: { ...labels, 'orakel.stage': name },
     });
-    containers.push(id);
+    stageContainers.set(name, id);
     const waited = await runtime.wait(id, stagePlan.timeoutMs);
     if ('timedOut' in waited) {
       await runtime.kill(id);
@@ -107,7 +123,9 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
   let current: BuildStage = 'image';
   let render: RenderOk | undefined;
   let renderMs: number | undefined;
-  try {
+
+  async function attempt(): Promise<BuildOutcome> {
+    await enter('image');
     if (!(await runtime.imageExists(plan.image))) {
       return {
         status: 'failed',
@@ -120,6 +138,7 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
     }
 
     current = 'render';
+    await enter('render');
     const startedAt = now();
     await runtime.createVolume(volume, labels);
 
@@ -142,6 +161,7 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
     render = parsed.data;
 
     current = 'publish';
+    await enter('publish');
     const publishStart = now();
     const published = await stage('publish', plan.publish);
     const publishMs = now() - publishStart;
@@ -177,16 +197,22 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
       };
     }
     return { status: 'ok', render, publish: publishParsed.data, renderMs, publishMs };
-  } catch (error) {
-    return {
+  }
+
+  try {
+    const outcome = await attempt().catch((error: unknown): BuildOutcome => ({
       status: 'failed',
       stage: current,
       failure: errorFailure(current, error),
       ...(render && { render }),
       ...(renderMs !== undefined && { renderMs }),
-    };
+    }));
+    if (outcome.status === 'ok') return outcome;
+    const id = stageContainers.get(outcome.stage);
+    const logTail = id === undefined ? undefined : await readLogTail(runtime, id, deps.log);
+    return logTail === undefined ? outcome : { ...outcome, logTail };
   } finally {
-    for (const id of containers) {
+    for (const id of stageContainers.values()) {
       await runtime.removeContainer(id).catch((error: unknown) => {
         deps.log?.(`Container ${id} não removido: ${String(error)}`);
       });

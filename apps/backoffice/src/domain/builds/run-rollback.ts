@@ -1,7 +1,8 @@
 // Execução de um rollback (ADR 0009 do build-site): volume próprio e um único container
 // rollback na rede publish, no padrão do runBuild. O resultado vem do rollback.json do
 // volume (contrato do @orakel/build-contract); o código de saída só decide quando o arquivo
-// falta. Container e volume são sempre removidos.
+// falta. Na falha, o fim do log do container é lido antes de ele sair. Container e volume são
+// sempre removidos.
 import {
   BUILD_DIR,
   EXIT_CODES,
@@ -11,7 +12,7 @@ import {
   type RollbackResult,
 } from '@orakel/build-contract';
 
-import type { ContainerRuntime } from './runtime.ts';
+import { readLogTail, type ContainerRuntime } from './runtime.ts';
 
 export type RollbackPlan = {
   siteId: string;
@@ -30,7 +31,13 @@ export type RollbackOk = Extract<RollbackResult, { status: 'ok' }>;
 
 export type RollbackOutcome =
   | { status: 'ok'; rollback: RollbackOk; durationMs: number }
-  | { status: 'failed'; failure: Failure; durationMs?: number };
+  | {
+      status: 'failed';
+      failure: Failure;
+      durationMs?: number;
+      /** Fim do log do container, quando ele chegou a existir. */
+      logTail?: string;
+    };
 
 type Deps = { runtime: ContainerRuntime; now: () => number; log?: (msg: string) => void };
 
@@ -51,7 +58,7 @@ export async function runRollback(plan: RollbackPlan, deps: Deps): Promise<Rollb
   let startedAt: number | undefined;
   const elapsed = () => (startedAt === undefined ? {} : { durationMs: now() - startedAt });
 
-  try {
+  async function attempt(): Promise<RollbackOutcome> {
     if (!(await runtime.imageExists(plan.image))) {
       return {
         status: 'failed',
@@ -119,10 +126,17 @@ export async function runRollback(plan: RollbackPlan, deps: Deps): Promise<Rollb
       };
     }
     return { status: 'ok', rollback: result, durationMs: now() - startedAt };
-  } catch (error) {
-    // Erro do runtime (rede, proxy, daemon): transitório.
-    const message = error instanceof Error ? error.message : String(error);
-    return { status: 'failed', failure: { kind: 'transient', message: `rollback: ${message}` } };
+  }
+
+  try {
+    const outcome = await attempt().catch((error: unknown): RollbackOutcome => {
+      // Erro do runtime (rede, proxy, daemon): transitório.
+      const message = error instanceof Error ? error.message : String(error);
+      return { status: 'failed', failure: { kind: 'transient', message: `rollback: ${message}` } };
+    });
+    if (outcome.status === 'ok' || container === undefined) return outcome;
+    const logTail = await readLogTail(runtime, container, deps.log);
+    return logTail === undefined ? outcome : { ...outcome, logTail };
   } finally {
     if (container !== undefined) {
       const id = container;
