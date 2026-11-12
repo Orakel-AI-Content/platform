@@ -10,9 +10,9 @@ import { nextVersion, RELEASE_BUMPS, type ReleaseBump } from './next-version.ts'
 // Registro de versões do site-builder (L1): "Gerar nova versão" (`requestNewRelease`) cria a
 // release antes de ela existir no GHCR, em `gerando`, com o número calculado pela tabela
 // (`nextVersion`), e enfileira o run do release.yml; a ação "Reconstruir na release X" escolhe
-// entre as registradas. Tabela operacional, fora do snapshot. A imagem é conferida no host (não
-// no GHCR) por um job do build-runner, o único com acesso ao Docker (ADR 0011 da raiz), e a
-// operação pode pedir a conferência de novo. Editar e remover estão fora do escopo atual.
+// entre as registradas. Tabela operacional, fora do snapshot. Com o CI verde, a imagem é baixada
+// e conferida no host (não no GHCR) por um job do build-runner, o único com acesso ao Docker
+// (ADR 0011 da raiz). Editar e remover estão fora do escopo atual.
 
 export type ReleaseImageStatus = (typeof RELEASE_IMAGE_STATUSES)[number];
 export type ReleasePipelineState = (typeof RELEASE_PIPELINE_STATES)[number];
@@ -45,7 +45,7 @@ const RECORD_COLUMNS = {
   requestedBy: releases.requestedBy,
 };
 
-/** Conferência da imagem site-builder:X.Y.Z no host; só o build-runner registra esta task. */
+/** Download e conferência da imagem site-builder:X.Y.Z no host; só o build-runner registra esta task. */
 export const CHECK_RELEASE_IMAGE_TASK = 'check-release-image';
 
 /**
@@ -168,24 +168,6 @@ export async function requestReleaseImageCheck(
   return { ok: true, value: undefined };
 }
 
-/**
- * Grava o resultado da conferência (job do build-runner, sem ator). Devolve `false` se a
- * release não está registrada.
- */
-export async function recordReleaseImageCheck(
-  db: Executor,
-  tag: string,
-  available: boolean,
-  checkedAt: Date,
-): Promise<boolean> {
-  const updated = await db
-    .update(releases)
-    .set({ imageStatus: available ? 'disponivel' : 'ausente', imageCheckedAt: checkedAt })
-    .where(eq(releases.tag, tag))
-    .returning({ tag: releases.tag });
-  return updated.length > 0;
-}
-
 // Acompanhamento do run pelo job `release-run` (build-runner, sem ator). Toda transição parte
 // de `gerando`: release descartada ou já adiante não muda, e a função devolve `false`.
 
@@ -252,6 +234,52 @@ export async function recordReleaseRunFailed(
     .update(releases)
     .set({ pipelineState: 'falhou', failureReason: reason })
     .where(generating(tag))
+    .returning({ tag: releases.tag });
+  return updated.length > 0;
+}
+
+// Download da imagem pelo job `check-release-image` (build-runner, sem ator). Toda transição
+// parte de `baixando`: release descartada, já disponível ou ainda gerando não muda, e a função
+// devolve `false`. `imageStatus` acompanha o resultado para quem ainda o lê (RebuildReleaseDialog).
+
+const downloading = (tag: string) =>
+  and(eq(releases.tag, tag), eq(releases.pipelineState, 'baixando'));
+
+/** Imagem no host: a release fica `disponivel`. */
+export async function recordReleaseImagePulled(
+  db: Executor,
+  tag: string,
+  checkedAt: Date,
+): Promise<boolean> {
+  const updated = await db
+    .update(releases)
+    .set({
+      pipelineState: 'disponivel',
+      failureReason: null,
+      imageStatus: 'disponivel',
+      imageCheckedAt: checkedAt,
+    })
+    .where(downloading(tag))
+    .returning({ tag: releases.tag });
+  return updated.length > 0;
+}
+
+/** O download não trouxe a imagem depois das tentativas: `falhou` com o motivo do runtime. */
+export async function recordReleaseImagePullFailed(
+  db: Executor,
+  tag: string,
+  reason: string,
+  checkedAt: Date,
+): Promise<boolean> {
+  const updated = await db
+    .update(releases)
+    .set({
+      pipelineState: 'falhou',
+      failureReason: reason,
+      imageStatus: 'ausente',
+      imageCheckedAt: checkedAt,
+    })
+    .where(downloading(tag))
     .returning({ tag: releases.tag });
   return updated.length > 0;
 }
