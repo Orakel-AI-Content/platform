@@ -7,6 +7,7 @@ import { INGEST_TASK } from '../domain/media/upload.ts';
 import { VARIANTS_TASK } from '../domain/media/variants.ts';
 import { ROLLBACK_TASK } from '../domain/builds/schedule.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../domain/publications/schedule.ts';
+import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
 import {
   createAggregateAudienceTask,
@@ -23,6 +24,10 @@ import { createIngestMediaTask } from './tasks/ingest-media.ts';
 import { createMediaReprocessTask } from './tasks/media-reprocess.ts';
 import { createMediaVariantsTask, type MediaVariantsTaskDeps } from './tasks/media-variants.ts';
 import { createPublishScheduledTask } from './tasks/publish-scheduled.ts';
+import {
+  createReconcilePreviewTask,
+  type ReconcilePreviewTaskDeps,
+} from './tasks/reconcile-preview.ts';
 import { createReleaseRunTask, type ReleaseRunTaskDeps } from './tasks/release-run.ts';
 import { createRollbackTask } from './tasks/rollback.ts';
 
@@ -53,18 +58,22 @@ export const WORKER_CRONTAB = [
 ].join('\n');
 
 /**
- * O build-runner executa builds e rollbacks (fila `build:<site>`) e a conferência da imagem
- * das releases, os únicos jobs que falam com o Docker, e o run do release.yml, o único que usa
- * a credencial do GitHub (ADR 0022 da raiz); concorrência 2.
+ * O build-runner executa builds e rollbacks (fila `build:<site>`), a conferência da imagem
+ * das releases e a troca do container da prévia (fila `preview`, ADR 0024 da raiz), os únicos
+ * jobs que falam com o Docker, e o run do release.yml, o único que usa a credencial do GitHub
+ * (ADR 0022 da raiz); concorrência 2.
  */
 export function buildRunnerTasks(
-  deps: BuildTaskDeps & Pick<ReleaseRunTaskDeps, 'driver'>,
+  deps: BuildTaskDeps &
+    Pick<ReleaseRunTaskDeps, 'driver'> &
+    Pick<ReconcilePreviewTaskDeps, 'preview'>,
 ): TaskList {
   return {
     build: createBuildTask(deps),
     [ROLLBACK_TASK]: createRollbackTask(deps),
     [CHECK_RELEASE_IMAGE_TASK]: createCheckReleaseImageTask(deps),
     [RELEASE_RUN_TASK]: createReleaseRunTask(deps),
+    [RECONCILE_PREVIEW_TASK]: createReconcilePreviewTask(deps),
   };
 }
 export const BUILD_RUNNER_CONCURRENCY = 2;
