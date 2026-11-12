@@ -22,7 +22,7 @@ os eventos atravessam Worker, Analytics Engine, fila e agregador.
 - **Teste de contrato no CI** (`test:contract`): a exportação do backoffice precisa
   produzir linhas que passam no schema. As mesmas fixtures NDJSON versionadas alimentam
   o build dos dois sites de exemplo.
-- **Release do core:** tag manual `core-vX.Y.Z`. Major muda o schema da API ou exige
+- **Release do core:** tag manual `site-builder-vX.Y.Z` (prefixo trocado pelo ADR 0018). Major muda o schema da API ou exige
   migração de configuração; minor, funcionalidades; patch, correções. Merge na `main`
   não cria release.
 

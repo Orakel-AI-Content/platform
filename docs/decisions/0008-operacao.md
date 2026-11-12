@@ -30,8 +30,8 @@ infraestrutura mínimo.
   publicação no GHCR com `GITHUB_TOKEN`, tag = SHA do commit, 30 versões mantidas.
   Plataforma `linux/amd64` (a da VPS) no CI; no `pnpm local:images`, a da máquina (as
   imagens locais não são publicadas; amd64 num Mac Apple Silicon roda emulado).
-- **Release (`release.yml`):** tag `core-v*` → imagem `site-builder`; pula enquanto o
-  Dockerfile não existir.
+- **Release (`release.yml`):** tag `site-builder-v*` (prefixo trocado pelo ADR 0018) → imagem `site-builder`;
+  pula enquanto o Dockerfile não existir.
 - **E2E (`e2e.yml`):** só manual (`workflow_dispatch`) ou local (`pnpm local:e2e`).
   Substituído pelo 0016: suíte completa em todo PR que afeta o Backoffice, em 2 shards.
 - **Logs:** pino (JSON) nos processos Node; console JSON nos Workers; Sentry desligado
