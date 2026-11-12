@@ -1,5 +1,6 @@
 'use server';
 
+import type { Result } from '@orakel/content-model';
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
@@ -19,6 +20,13 @@ import { noSession, refused } from '../content-form-result.ts';
 // do Result para o painel.
 
 export type ApproveResult = FormActionResult<SchemaFormIssue>;
+
+/**
+ * Desfecho de aprovar e publicar ou agendar: a mensagem de sucesso e, quando o dia pedido estava
+ * cheio e a publicação foi para a próxima vaga, o aviso (`warning`).
+ */
+export type DecisionResult =
+  { ok: true; message: string; warning?: string } | Extract<ApproveResult, { ok: false }>;
 
 /** Marcação gravada: as chaves confirmadas na versão depois dela, ou a recusa. */
 export type ConfirmResult = { ok: true; confirmed: string[] } | { ok: false; message: string };
@@ -98,6 +106,71 @@ export async function approveAction(
   }
   revalidateReview(siteId, contentId);
   return { ok: true, message: `Versão ${version} aprovada.` };
+}
+
+/** Aprova a versão que o revisor viu e a publica na hora (ou na próxima vaga, com o dia cheio). */
+export async function approvePublishAction(
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<DecisionResult> {
+  return decide(siteId, contentId, version, (tx, actor) =>
+    approveAndPublish(tx, actor, siteId, contentId, version),
+  );
+}
+
+/** Aprova a versão que o revisor viu e a agenda para `at` (ISO), ou para a próxima vaga. */
+export async function approveScheduleAction(
+  siteId: string,
+  contentId: number,
+  version: number,
+  at: string,
+): Promise<DecisionResult> {
+  return decide(siteId, contentId, version, (tx, actor) =>
+    approveAndSchedule(tx, actor, siteId, contentId, version, new Date(at)),
+  );
+}
+
+async function decide(
+  siteId: string,
+  contentId: number,
+  version: number,
+  run: (tx: Executor, actor: Actor) => Promise<Result<ApprovalOutcome>>,
+): Promise<DecisionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) {
+    return {
+      ok: false,
+      message: INVALID_SESSION,
+      issues: [{ path: [], message: INVALID_SESSION }],
+    };
+  }
+  const result = await getDb().db.transaction((tx) => run(tx, actor.value));
+  if (!result.ok) {
+    // Recusa da aprovação ou da publicação: tudo foi desfeito; no formulário, o resumo.
+    return {
+      ok: false,
+      message: 'Não foi possível aprovar.',
+      issues: result.issues.map((issue) => ({ path: [], message: issue.message })),
+    };
+  }
+  revalidateReview(siteId, contentId);
+  return decisionMessage(version, result.value);
+}
+
+/** "Foi ao ar" ou "agendado para <data e hora de São Paulo>", com o aviso do transbordo. */
+function decisionMessage(version: number, outcome: ApprovalOutcome): DecisionResult {
+  const message =
+    outcome.outcome === 'published'
+      ? `Versão ${version} aprovada: o artigo foi ao ar.`
+      : `Versão ${version} aprovada: o artigo foi agendado para ${formatDateTime(outcome.at, PUBLISH_DAY_TIME_ZONE)}.`;
+  if (!outcome.overflowed) return { ok: true, message };
+  return {
+    ok: true,
+    message,
+    warning:
+      'O dia pedido já tinha atingido o limite diário de publicações do site; a publicação foi para o próximo dia com vaga, no mesmo horário.',
+  };
 }
 
 /** Devolve ao editor a versão que o revisor viu, com o comentário do que corrigir. */

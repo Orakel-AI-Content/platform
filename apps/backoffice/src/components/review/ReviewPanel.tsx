@@ -3,7 +3,13 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
 import * as z from 'zod';
 
-import { SchemaForm, type FieldProps, type SchemaFormIssue } from '@/components/forms/SchemaForm';
+import { ScheduleDialog } from '@/components/contents/ScheduleDialog.tsx';
+import {
+  SchemaForm,
+  type FieldProps,
+  type SchemaFormActionHelpers,
+  type SchemaFormIssue,
+} from '@/components/forms/SchemaForm';
 import { ActionAlert } from '@/components/shared/ActionFeedback.tsx';
 import type { FormActionResult } from '@/components/shared/actionResult.ts';
 import { CONTENT_STATUS_LABEL } from '@/components/shared/siteLabels.ts';
@@ -21,7 +27,12 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 // não pode ir para o bundle do cliente) e as confirmações já gravadas na versão (#749). Cada caixa
 // grava ao ser clicada (#752): a tela muda na hora e fica com as chaves que o domínio devolve; uma
 // recusa desfaz a mudança e aparece no `ActionAlert` do cartão. "Marcar todos" grava as três.
-// "Aprovar" não envia nada: só fica habilitado com todas gravadas e o domínio confere de novo.
+// As aprovações não enviam nada: só ficam habilitadas com todas gravadas e o domínio confere de
+// novo. São três (workspace#89): "Aprovar e publicar agora", "Aprovar e agendar" (o Dialog de
+// agendamento da página do conteúdo) e "Só aprovar", o envio do formulário; as duas primeiras são
+// ações próprias do rodapé (`card.actions`), com o mesmo resumo de erros. Depois de publicar ou
+// agendar, o desfecho ("foi ao ar", "agendado para…") fica no cartão do checklist, com o aviso
+// quando o dia pedido estava cheio e a publicação foi para a próxima vaga; o toast repete os dois.
 // Visual do Ecme (#277): o conteúdo em `Card`s, com as cores do `@theme`; o `<aside>` fica por fora
 // para manter o landmark. O checklist tem cartão próprio, com "Aprovar" no rodapé dele (#333) e
 // "Marcar todos" no topo. As seções são seções da tela (`h2`, como "Dados" e "Blocos" na versão,
@@ -36,6 +47,13 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 export type ChecklistItem = { key: string; label: string };
 
 type FormAction = () => Promise<FormActionResult<SchemaFormIssue>>;
+
+/** Desfecho de aprovar e publicar ou agendar: `warning` é o aviso do transbordo. */
+export type DecisionOutcome =
+  | { ok: true; message: string; warning?: string }
+  | { ok: false; message: string; issues: SchemaFormIssue[] };
+
+type Decided = { message: string; warning?: string };
 
 /** Resultado de gravar confirmações: as chaves gravadas na versão depois, ou a recusa. */
 export type ConfirmOutcome = { ok: true; confirmed: string[] } | { ok: false; message: string };
@@ -122,6 +140,8 @@ export function ReviewPanel({
   confirm,
   confirmAll,
   approve,
+  approvePublish,
+  approveSchedule,
   giveBack,
 }: {
   version: number;
@@ -139,18 +159,49 @@ export function ReviewPanel({
   confirm: (key: string, confirmed: boolean) => Promise<ConfirmOutcome>;
   /** Grava ou apaga todas (`confirmAllAction`); "Marcar todos" passa `true`. */
   confirmAll: (confirmed: boolean) => Promise<ConfirmOutcome>;
-  /** Aprova com as confirmações gravadas (`approveVersion`). */
+  /** "Só aprovar": aprova com as confirmações gravadas (`approveVersion`). */
   approve: FormAction;
+  /** Aprova e publica na hora, ou na próxima vaga (`approveAndPublish`). */
+  approvePublish: () => Promise<DecisionOutcome>;
+  /** Aprova e agenda para o instante em ISO, ou para a próxima vaga (`approveAndSchedule`). */
+  approveSchedule: (at: string) => Promise<DecisionOutcome>;
   /** Devolve ao editor com o comentário (`returnVersion`). */
   giveBack: (comment: string) => Promise<FormActionResult<SchemaFormIssue>>;
 }) {
   const id = useId();
   // Decidida nesta tela: os formulários saem e a confirmação vai para o toast (pelo SchemaForm).
   const [decided, setDecided] = useState(false);
+  // Desfecho de publicar ou agendar, que fica no cartão do checklist depois da decisão.
+  const [outcome, setOutcome] = useState<Decided | null>(null);
+  // Qual das ações próprias do rodapé está em curso, para o rótulo dela.
+  const [running, setRunning] = useState<'publish' | 'schedule' | null>(null);
   const inReview = status === 'em_revisao';
   const open = canApprove && inReview && !decided;
   const { confirmed, error, saving, write } = useConfirmations(initialConfirmed);
   const complete = checklist.every((item) => confirmed.includes(item.key));
+  const approveDisabled = blocked || !complete || saving;
+  const approveDescribedBy =
+    [blocked && `${id}-blocked`, !complete && `${id}-incomplete`].filter(Boolean).join(' ') ||
+    undefined;
+
+  /** Roda publicar ou agendar pelo formulário: a recusa vai ao resumo e o sucesso fica no cartão. */
+  const decide = (
+    { run }: SchemaFormActionHelpers,
+    kind: 'publish' | 'schedule',
+    action: () => Promise<DecisionOutcome>,
+  ) =>
+    run(async () => {
+      setRunning(kind);
+      try {
+        const result = await action();
+        if (!result.ok) return result.issues;
+        setOutcome({ message: result.message, warning: result.warning });
+        setDecided(true);
+        return { success: [result.message, result.warning].filter(Boolean).join(' ') };
+      } finally {
+        setRunning(null);
+      }
+    });
   const checklistTitle = (
     <h2 id={`${id}-checklist`} className={SECTION_TITLE_CLASS}>
       Checklist
@@ -221,15 +272,31 @@ export function ReviewPanel({
                   <ActionAlert error={error} />
                 </>
               ),
+              actions: (helpers) => (
+                <>
+                  <ScheduleDialog
+                    label={running === 'schedule' ? 'Agendando…' : 'Aprovar e agendar'}
+                    disabled={approveDisabled || helpers.pending}
+                    describedBy={approveDescribedBy}
+                    onSchedule={(at) =>
+                      decide(helpers, 'schedule', () => approveSchedule(at.toISOString()))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    disabled={approveDisabled || helpers.pending}
+                    aria-describedby={approveDescribedBy}
+                    onClick={() => decide(helpers, 'publish', approvePublish)}
+                  >
+                    {running === 'publish' ? 'Publicando…' : 'Aprovar e publicar agora'}
+                  </Button>
+                </>
+              ),
             }}
-            submitLabel="Aprovar"
+            submitLabel="Só aprovar"
             pendingLabel="Aprovando…"
-            submitDisabled={blocked || !complete || saving}
-            submitDescribedBy={
-              [blocked && `${id}-blocked`, !complete && `${id}-incomplete`]
-                .filter(Boolean)
-                .join(' ') || undefined
-            }
+            submitDisabled={approveDisabled}
+            submitDescribedBy={approveDescribedBy}
             onSubmit={async () => {
               const outcome = await approve();
               if (!outcome.ok) return outcome.issues;
@@ -245,6 +312,18 @@ export function ReviewPanel({
                 <li key={item.key}>{item.label}</li>
               ))}
             </ul>
+            {outcome !== null && (
+              <div className="space-y-2">
+                <Alert type="success" showIcon duration={0}>
+                  <p className="text-sm">{outcome.message}</p>
+                </Alert>
+                {outcome.warning !== undefined && (
+                  <Alert type="warning" showIcon duration={0}>
+                    <p className="text-sm">{outcome.warning}</p>
+                  </Alert>
+                )}
+              </div>
+            )}
             {!inReview && !decided && (
               <p className={SECTION_HINT_CLASS}>
                 Esta versão está {CONTENT_STATUS_LABEL[status].toLowerCase()}: só uma versão em

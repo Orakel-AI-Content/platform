@@ -402,7 +402,10 @@ usa o gerador, #47).
   no corpo, e os botões no rodapé (`footer` com borda), à direita, todos do mesmo tamanho e a
   ação principal `solid`. A ação secundária (`card.extra`, ex.: "Usar padrão" da janela) fica à
   esquerda do envio, não passa pelo schema e tem o mesmo retorno do envio (toast, erro de campo
-  ou resumo). O cartão é o da seção inteira: sem permissão para o formulário, a página mostra a
+  ou resumo). Quando uma ação não basta (várias decisões, uma delas por um Dialog: "Aprovar e
+  publicar agora" e "Aprovar e agendar" no checklist da revisão), `card.actions` desenha as ações
+  próprias no mesmo lugar e as roda por `run`, com a mesma pendência e o mesmo retorno; cada uma
+  tem o seu rótulo no gerúndio ("Publicando…", "Agendando…"). O cartão é o da seção inteira: sem permissão para o formulário, a página mostra a
   mesma introdução num `Card` só de leitura; na revisão, o checklist tem o seu próprio cartão,
   separado do da validação.
 - **Formulário longo** (a configuração do site) passa `sections` (`{ id, title, paths }`,

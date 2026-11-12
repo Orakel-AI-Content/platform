@@ -231,6 +231,8 @@ function ReviewDetail() {
             confirm={() => Promise.resolve({ ok: true as const, confirmed: [] })}
             confirmAll={() => Promise.resolve({ ok: true as const, confirmed: [] })}
             approve={() => Promise.resolve({ ok: true as const, message: 'ok' })}
+            approvePublish={() => Promise.resolve({ ok: true as const, message: 'ok' })}
+            approveSchedule={() => Promise.resolve({ ok: true as const, message: 'ok' })}
             giveBack={() => Promise.resolve({ ok: true as const, message: 'ok' })}
           />
         </div>

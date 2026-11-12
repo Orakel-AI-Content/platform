@@ -114,7 +114,18 @@ export type SchemaFormExtraAction = {
 export type SchemaFormCard = {
   intro?: ReactNode;
   extra?: SchemaFormExtraAction;
+  /**
+   * Ações próprias no rodapé, à esquerda do envio, quando uma `extra` não basta (ex.: várias
+   * decisões, uma delas por um Dialog): `run` trata a ação como o envio (desabilita os botões,
+   * limpa o resumo e segue o retorno), e `pending` diz se alguma está em curso.
+   */
+  actions?: (helpers: SchemaFormActionHelpers) => ReactNode;
   size?: ButtonProps['size'];
+};
+
+export type SchemaFormActionHelpers = {
+  pending: boolean;
+  run: (action: () => Promise<SubmitOutcome>) => void;
 };
 
 export type SchemaFormProps<T> = {
@@ -163,7 +174,7 @@ export type SchemaFormProps<T> = {
 /** Recusa do servidor (serializável; `path` aponta o campo). */
 export type SchemaFormIssue = { path: (string | number)[]; message: string };
 
-type SubmitOutcome = void | readonly SchemaFormIssue[] | { success: string };
+export type SubmitOutcome = void | readonly SchemaFormIssue[] | { success: string };
 
 type Ctx = {
   id: string;
@@ -792,8 +803,8 @@ export function SchemaForm<T>({
   const { isSubmitting, errors } = form.formState;
   const items = errorItems(errors, schema, new Set(Object.keys(fields ?? {})));
   // Ação secundária do cartão em curso: os dois botões ficam desabilitados, como no envio.
-  const [extraPending, setExtraPending] = useState(false);
-  const pending = isSubmitting || extraPending;
+  const [extraPending, setExtraPending] = useState<'extra' | 'actions' | null>(null);
+  const pending = isSubmitting || extraPending !== null;
 
   const settle = (outcome: SubmitOutcome) => {
     if (outcome !== undefined && 'success' in outcome) {
@@ -801,6 +812,22 @@ export function SchemaForm<T>({
       return;
     }
     setGeneral(applyServerIssues(form.setError, outcome ?? []));
+  };
+
+  // Ação fora do envio (a `extra` ou uma das `actions` do cartão): não passa pelo schema.
+  const runExtra = (
+    origin: 'extra' | 'actions',
+    action: () => Promise<SubmitOutcome>,
+    resetTo?: Record<string, unknown>,
+  ) => {
+    if (pending) return;
+    form.clearErrors();
+    setGeneral([]);
+    if (resetTo) form.reset(resetTo);
+    setExtraPending(origin);
+    void action()
+      .then(settle)
+      .finally(() => setExtraPending(null));
   };
 
   const submit = (
@@ -853,6 +880,7 @@ export function SchemaForm<T>({
               bordered: true,
               content: (
                 <div className="flex flex-wrap items-center justify-end gap-3">
+                  {card.actions?.({ pending, run: (action) => runExtra('actions', action) })}
                   {card.extra && (
                     <Button
                       type="button"
@@ -861,17 +889,10 @@ export function SchemaForm<T>({
                       onClick={() => {
                         const extra = card.extra;
                         if (!extra) return;
-                        form.clearErrors();
-                        setGeneral([]);
-                        if (extra.resetTo) form.reset(extra.resetTo);
-                        setExtraPending(true);
-                        void extra
-                          .run()
-                          .then(settle)
-                          .finally(() => setExtraPending(false));
+                        runExtra('extra', extra.run, extra.resetTo);
                       }}
                     >
-                      {extraPending ? card.extra.pendingLabel : card.extra.label}
+                      {extraPending === 'extra' ? card.extra.pendingLabel : card.extra.label}
                     </Button>
                   )}
                   {submit}
