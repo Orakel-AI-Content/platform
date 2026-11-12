@@ -12,6 +12,7 @@ import {
   resumeSiteAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
+  siteActivityAction,
   undoLastPublishAction,
   updateSiteConfigAction,
 } from './actions.ts';
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   requestRollback: vi.fn(),
   requestUndoLastPublish: vi.fn(),
   cancelBuild: vi.fn(),
+  siteActivity: vi.fn(),
   setBuildWindow: vi.fn(),
   setDailyPublishLimit: vi.fn(),
   registerPolicyTrigger: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock('@/domain/builds/builds.ts', () => ({
   requestRollback: mocks.requestRollback,
   requestUndoLastPublish: mocks.requestUndoLastPublish,
   cancelBuild: mocks.cancelBuild,
+  siteActivity: mocks.siteActivity,
 }));
 vi.mock('@/domain/builds/site-state.ts', () => ({
   advanceLifecycle: mocks.advanceLifecycle,
@@ -487,5 +490,52 @@ describe('Server Actions da página do site', () => {
       issues: [{ path: ['buildWindowSeconds'], message: 'Janela recusada' }],
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe('siteActivityAction (#635)', () => {
+  const activity = {
+    open: {
+      id: 3,
+      kind: 'build',
+      status: 'rodando',
+      currentStage: 'render',
+      scheduledFor: null,
+      startedAt: new Date('2026-11-11T12:00:00Z'),
+      requestedBy: 'operacao@orakel.local',
+      cancelRequestedAt: null,
+    },
+    history: [
+      {
+        type: 'evento',
+        id: 1,
+        kind: 'retomada',
+        requestedBy: 'operacao@orakel.local',
+        at: new Date('2026-11-11T11:00:00Z'),
+        reason: null,
+        previousRelease: null,
+        release: null,
+      },
+    ],
+  };
+
+  it('só delega ao domínio com quem está na sessão e devolve a atividade, sem revalidar', async () => {
+    mocks.siteActivity.mockResolvedValue({ ok: true, value: activity });
+
+    const result = await siteActivityAction('exemplo-a');
+
+    expect(result).toEqual(activity);
+    expect(structuredClone(result)).toEqual(activity);
+    expect(mocks.siteActivity).toHaveBeenCalledWith(expect.anything(), operacao, 'exemplo-a');
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('sem sessão devolve null sem chamar o domínio; recusa do domínio também vira null', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await siteActivityAction('exemplo-a')).toBeNull();
+    expect(mocks.siteActivity).not.toHaveBeenCalled();
+
+    mocks.siteActivity.mockResolvedValue({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await siteActivityAction('exemplo-a')).toBeNull();
   });
 });
