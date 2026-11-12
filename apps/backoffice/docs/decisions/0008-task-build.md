@@ -44,6 +44,21 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
   `current_stage`, `requested_by` (e-mail ou `system`), `scheduled_for` e `log_tail` nascem
   aqui e são preenchidas pelas issues seguintes (#631, #632, #633), como as linhas `na_fila`,
   `cancelado` e `rollback`.
+- **Na fila ao enfileirar (#631):** `scheduleBuild` e `buildNow` gravam, na transação do
+  `add_job`, a linha `na_fila` do job que ele devolve (`job_id`, `scheduled_for` = `run_at`,
+  `requested_by`): `system` no agendamento automático, o e-mail de quem clicou em "Publicar
+  agora", "Retomar" e "Reconstruir". Pedido que cai no mesmo job cai na mesma linha (índice
+  único parcial `builds_queued_job_unique` em `job_id` onde `status = 'na_fila'`); só o
+  `buildNow` troca quem pediu. Com o build rodando, o Graphile tira a chave do job travado e
+  cria outro, que ganha a própria linha: um `rodando` e um `na_fila` de jobs diferentes. A
+  task promove a linha `na_fila` do seu job a `rodando` (`startBuild`) e só insere uma nova
+  se não houver o que promover (job anterior à #631 ou tentativa devolvida pela recuperação).
+  Job ignorado (site pausado ou inexistente) fecha a linha como `cancelado`. Falha
+  transitória que o Graphile vai repetir fecha a tentativa e abre a seguinte `na_fila`, no
+  horário da repetição pela mesma conta de backoff do Graphile 0.18
+  (`greatest(now, run_at) + exp(least(attempts, 10))` s, `retryRunAt`), sem ler a fila; na
+  última tentativa, não abre. `release` aceita nulo enquanto a linha está `na_fila`: a tag
+  padrão só existe no build-runner e a release é a que o plano usa ao promover.
 - **Falhas:** transitória lança e o Graphile Worker repete (até 5, backoff exponencial);
   permanente pausa o site com `<etapa>: <motivo>`; site pausado não é construído.
 - **Estado do site:** `src/domain/builds/site-state.ts` grava só colunas operacionais, sem
@@ -63,6 +78,12 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
 - `finished_at` obrigatório com valor provisório na linha aberta: data falsa, e a ordenação
   por `finished_at` poria a linha aberta no topo das consultas.
 - Linha `rodando` na mesma transação do resultado: só apareceria ao fim da execução.
+- Release provisória na linha `na_fila` (`sites.release` ou a tag padrão): mentiria quando a
+  release mudasse antes da execução, pelo mesmo motivo do `finished_at` provisório.
+- Uma linha `na_fila` por site, segurando o pedido feito durante o build até ele terminar:
+  esconderia um job que já está na fila.
+- Ler `graphile_worker.jobs` para o horário da repetição ou para o status: acopla o status à
+  fila interna do Graphile.
 
 ## Consequências
 

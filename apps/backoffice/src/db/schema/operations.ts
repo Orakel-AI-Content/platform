@@ -5,6 +5,7 @@ import {
   integer,
   pgTable,
   primaryKey,
+  uniqueIndex,
   serial,
   text,
   timestamp,
@@ -44,8 +45,8 @@ export const BUILD_STAGES = ['image', 'render', 'publish'] as const;
 export const FAILURE_KINDS = ['permanent', 'transient'] as const;
 
 /**
- * Uma execução da task `build` (12.0, L3): cada tentativa vira uma linha, gravada `rodando` ao
- * começar e fechada com o resultado. A de sucesso mais recente é a versão ativa do site —
+ * Uma execução da task `build` (12.0, L3): cada tentativa vira uma linha, gravada `na_fila` ao
+ * enfileirar, promovida a `rodando` ao começar e fechada com o resultado. A de sucesso mais recente é a versão ativa do site —
  * referência da trava de segurança e do rollback (L4).
  */
 export const builds = pgTable(
@@ -55,8 +56,11 @@ export const builds = pgTable(
     siteId: text()
       .notNull()
       .references(() => sites.id),
-    /** Versão do site-builder usada (X.Y.Z, a tag da imagem site-builder). */
-    release: text().notNull(),
+    /**
+     * Versão do site-builder usada (X.Y.Z, a tag da imagem site-builder). Nula enquanto a linha
+     * está `na_fila`: a tag padrão só existe no build-runner, e a release é a que o plano usa.
+     */
+    release: text(),
     kind: text({ enum: BUILD_KINDS }).notNull().default('build'),
     /** Job do Graphile Worker e tentativa (1 a 5). */
     jobId: text(),
@@ -91,6 +95,10 @@ export const builds = pgTable(
   },
   (t) => [
     index().on(t.siteId, t.finishedAt),
+    /** Uma linha `na_fila` por job: o agendamento atualiza a do job em vez de criar outra. */
+    uniqueIndex('builds_queued_job_unique')
+      .on(t.jobId)
+      .where(sql`${t.status} = 'na_fila'`),
     check(
       'builds_finished_check',
       sql`(${t.status} in ('na_fila', 'rodando')) = (${t.finishedAt} is null)`,

@@ -1,11 +1,17 @@
 import { readFile } from 'node:fs/promises';
 
-import { eq, sql } from 'drizzle-orm';
-import type { JobHelpers } from 'graphile-worker';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { eq, inArray, sql } from 'drizzle-orm';
+import { Logger, runOnce, type JobHelpers } from 'graphile-worker';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { builds, releases, siteEvents, sites } from '../../src/db/schema/index.ts';
+import {
+  builds,
+  OPEN_BUILD_STATUSES,
+  releases,
+  siteEvents,
+  sites,
+} from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
@@ -52,8 +58,23 @@ const settings: BuildSettings = {
 };
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
-const helpers = (attempts = 1) =>
-  ({ logger: silent, job: { id: '7', attempts } }) as unknown as JobHelpers;
+
+/**
+ * Helpers da task com o job de build do site que está na fila (o da linha `na_fila`), como o
+ * Graphile Worker os entrega. Sem job na fila, um job avulso, sem linha para promover.
+ */
+async function helpers(attempts = 1, siteId = 'exemplo-a'): Promise<JobHelpers> {
+  const { rows } = await db.execute<{ id: string; run_at: Date | string }>(
+    sql`select id::text as id, run_at from graphile_worker.jobs
+        where queue_name = ${`build:${siteId}`} and task_identifier = 'build'
+        order by id desc limit 1`,
+  );
+  const job = rows[0] ?? { id: '7', run_at: new Date() };
+  return {
+    logger: silent,
+    job: { id: job.id, attempts, max_attempts: 5, run_at: new Date(job.run_at) },
+  } as unknown as JobHelpers;
+}
 
 beforeAll(async () => {
   ({ db, close } = await setupDatabase());
@@ -89,6 +110,12 @@ async function events() {
     .orderBy(siteEvents.id);
 }
 
+/** Esvazia a fila de build: os jobs e as linhas `na_fila` que os espelham. */
+async function clearQueue(): Promise<void> {
+  await db.execute(sql`delete from graphile_worker._private_jobs`);
+  await db.delete(builds).where(eq(builds.status, 'na_fila'));
+}
+
 const noDetail = {
   reason: null,
   culpritOrigin: null,
@@ -122,6 +149,217 @@ describe('agendamento', () => {
   });
 });
 
+describe('linha na fila', () => {
+  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+
+  async function buildJobs(): Promise<{ id: string; runAt: Date }[]> {
+    const { rows } = await db.execute<{ id: string; run_at: Date | string }>(
+      sql`select id::text as id, run_at from graphile_worker.jobs
+          where task_identifier = 'build' order by id`,
+    );
+    return rows.map((row) => ({ id: row.id, runAt: new Date(row.run_at) }));
+  }
+
+  const rows = () => db.select().from(builds).orderBy(builds.id);
+  const openRows = () =>
+    db.select().from(builds).where(inArray(builds.status, OPEN_BUILD_STATUSES)).orderBy(builds.id);
+
+  /** Grava um autor no site: uma mudança pendente, que agenda o build. */
+  const publish = (slug: string) =>
+    db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, 'exemplo-a', { slug, name: slug }));
+
+  it('agendar cria a linha na_fila com o horário do job e solicitante system; a janela não cria outra', async () => {
+    const [job] = await buildJobs();
+    const expected = {
+      siteId: 'exemplo-a',
+      kind: 'build',
+      jobId: job?.id,
+      attempt: 1,
+      status: 'na_fila',
+      requestedBy: 'system',
+      scheduledFor: job?.runAt,
+      release: null,
+      startedAt: null,
+      finishedAt: null,
+    };
+    expect(await rows()).toEqual([expect.objectContaining(expected)]);
+
+    await publish('ana');
+    await publish('bia');
+    expect(await buildJobs()).toEqual([job]);
+    expect(await rows()).toEqual([expect.objectContaining(expected)]);
+  });
+
+  it('"Publicar agora" leva a linha para agora e para quem pediu; o agendamento seguinte a mantém', async () => {
+    const before = Date.now();
+    await db.transaction((tx) => requestBuildNow(tx, operacao, 'exemplo-a'));
+    const [job] = await buildJobs();
+    const [row] = await rows();
+    expect(await rows()).toHaveLength(1);
+    expect(row).toMatchObject({
+      status: 'na_fila',
+      jobId: job?.id,
+      requestedBy: 'o@orakel.local',
+      scheduledFor: job?.runAt,
+    });
+    expect(row?.scheduledFor?.getTime()).toBeGreaterThanOrEqual(before);
+    expect(row?.scheduledFor?.getTime()).toBeLessThanOrEqual(Date.now());
+
+    await publish('ana');
+    expect(await rows()).toEqual([
+      expect.objectContaining({ requestedBy: 'o@orakel.local', scheduledFor: row?.scheduledFor }),
+    ]);
+  });
+
+  it('"Retomar" registra quem pediu', async () => {
+    await db.update(sites).set({ state: 'pausado', pausedReason: 'x' });
+    await db.transaction((tx) => resumeSite(tx, operacao, 'exemplo-a'));
+    expect(await rows()).toEqual([
+      expect.objectContaining({ status: 'na_fila', requestedBy: 'o@orakel.local' }),
+    ]);
+  });
+
+  it('"Reconstruir na release" registra quem pediu', async () => {
+    await db.insert(releases).values({ tag: '1.2.0' });
+    await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', '1.2.0'));
+    expect(await rows()).toEqual([
+      expect.objectContaining({ status: 'na_fila', requestedBy: 'o@orakel.local' }),
+    ]);
+  });
+
+  it('ao rodar, a task promove a linha na_fila a rodando, sem abrir outra', async () => {
+    const [queued] = await rows();
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    const during: (typeof builds.$inferSelect)[][] = [];
+    const runtime = {
+      ...fake.runtime,
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
+        during.push(await openRows());
+        return fake.runtime.wait(...args);
+      },
+    };
+    await createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, await helpers());
+
+    expect(during[0]).toEqual([
+      expect.objectContaining({
+        id: queued?.id,
+        status: 'rodando',
+        release: 'local',
+        requestedBy: 'system',
+        scheduledFor: queued?.scheduledFor,
+      }),
+    ]);
+    expect(await rows()).toEqual([expect.objectContaining({ id: queued?.id, status: 'ok' })]);
+  });
+
+  it('pedido durante o build abre a linha de outro job, e o banco recusa duas na_fila do mesmo job', async () => {
+    const [job] = await buildJobs();
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    const during: { jobId: string | null; status: string }[][] = [];
+    const runtime = {
+      ...fake.runtime,
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
+        // Como o worker: o job está travado enquanto roda, e o add_job cria outro.
+        await db.execute(sql`update graphile_worker._private_jobs
+          set locked_at = now(), locked_by = 'worker' where id = ${job?.id}::bigint`);
+        await publish('ana');
+        during.push((await openRows()).map(({ jobId, status }) => ({ jobId, status })));
+        return fake.runtime.wait(...args);
+      },
+    };
+    await createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, await helpers());
+
+    const [, next] = await buildJobs();
+    expect(next?.id).not.toBe(job?.id);
+    expect(during[0]).toEqual([
+      { jobId: job?.id, status: 'rodando' },
+      { jobId: next?.id, status: 'na_fila' },
+    ]);
+
+    const row = { siteId: 'exemplo-a', attempt: 1, status: 'na_fila' as const, jobId: next?.id };
+    await expect(db.insert(builds).values(row)).rejects.toThrow();
+  });
+
+  it('falha transitória: a tentativa fecha failed e a próxima nasce na_fila no horário da repetição', async () => {
+    await db.execute(sql`update graphile_worker._private_jobs set run_at = now()`);
+    const fake = fakeRuntime({
+      render: { exitCode: 20, file: failedFile('transient', 'API fora') },
+    });
+    await runOnce({
+      pgPool: db.$client,
+      logger: new Logger(() => () => {}),
+      taskList: { build: createBuildTask({ db, runtime: fake.runtime, settings }) },
+    });
+    // O Graphile Worker 0.18 não espera o fail_job: espera a trava sair.
+    await vi.waitFor(async () => {
+      const { rows: locked } = await db.execute<{ n: number }>(
+        sql`select count(*)::int as n from graphile_worker._private_jobs where locked_at is not null`,
+      );
+      expect(locked[0]?.n).toBe(0);
+    });
+
+    const [job] = await buildJobs();
+    const [failed, retry] = await rows();
+    expect(await rows()).toHaveLength(2);
+    expect(failed).toMatchObject({ status: 'failed', jobId: job?.id, attempt: 1 });
+    expect(retry).toMatchObject({
+      status: 'na_fila',
+      jobId: job?.id,
+      attempt: 2,
+      requestedBy: 'system',
+    });
+    // O horário que o Graphile Worker gravou para a repetição, pela mesma conta de backoff.
+    const drift = Math.abs((retry?.scheduledFor?.getTime() ?? 0) - (job?.runAt.getTime() ?? 0));
+    expect(drift).toBeLessThan(1000);
+  });
+
+  it('na última tentativa, a falha transitória não deixa linha na_fila', async () => {
+    const fake = fakeRuntime({
+      render: { exitCode: 20, file: failedFile('transient', 'API fora') },
+    });
+    await expect(
+      createBuildTask({ db, runtime: fake.runtime, settings })(
+        { siteId: 'exemplo-a' },
+        await helpers(5),
+      ),
+    ).rejects.toBeInstanceOf(TransientBuildError);
+    expect(await openRows()).toEqual([]);
+    expect(await rows()).toEqual([expect.objectContaining({ status: 'failed', attempt: 5 })]);
+  });
+
+  it('job ignorado por site pausado fecha a linha na_fila como cancelado', async () => {
+    await db.update(sites).set({ state: 'pausado', pausedReason: 'x' });
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      await helpers(),
+    );
+    expect(fake.started).toHaveLength(0);
+    expect(await openRows()).toEqual([]);
+    expect(await rows()).toEqual([
+      expect.objectContaining({ status: 'cancelado', finishedAt: expect.any(Date) as Date }),
+    ]);
+  });
+
+  it('job sem linha na_fila (tentativa recuperada) grava a linha rodando ao começar', async () => {
+    await db.delete(builds);
+    const [job] = await buildJobs();
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      await helpers(),
+    );
+    expect(await rows()).toEqual([
+      expect.objectContaining({
+        status: 'ok',
+        jobId: job?.id,
+        release: 'local',
+        requestedBy: null,
+      }),
+    ]);
+  });
+});
+
 describe('janela por site', () => {
   async function runAt(siteId: string): Promise<number[]> {
     const result = await db.execute<{ run_at: Date }>(
@@ -146,7 +384,7 @@ describe('janela por site', () => {
     const line = (await readFixture('exemplo-b')).find((l) => l.type === 'config');
     if (line?.type !== 'config') throw new Error('fixture sem config');
     await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, line.data));
-    await db.execute(sql`delete from graphile_worker._private_jobs`);
+    await clearQueue();
   });
 
   it('cada site agenda com a própria janela', async () => {
@@ -237,7 +475,7 @@ describe('task build', () => {
     });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
 
     const [build] = await db.select().from(builds);
@@ -268,9 +506,10 @@ describe('task build', () => {
         return fake.runtime.wait(...args);
       },
     };
+    const job = await helpers(2);
     await createBuildTask({ db, runtime, settings, now: () => Date.UTC(2026, 10, 11, 12) })(
       { siteId: 'exemplo-a' },
-      helpers(2),
+      job,
     );
 
     expect(during[0]).toEqual([
@@ -279,7 +518,7 @@ describe('task build', () => {
         status: 'rodando',
         siteId: 'exemplo-a',
         release: 'local',
-        jobId: '7',
+        jobId: job.job.id,
         attempt: 2,
         startedAt: new Date(Date.UTC(2026, 10, 11, 12)),
         finishedAt: null,
@@ -291,7 +530,7 @@ describe('task build', () => {
       id: during[0]?.[0]?.id,
       kind: 'build',
       status: 'ok',
-      jobId: '7',
+      jobId: job.job.id,
       attempt: 2,
       startedAt: new Date(Date.UTC(2026, 10, 11, 12)),
       versionId: '20261001T120000Z-abcdef12',
@@ -312,7 +551,7 @@ describe('task build', () => {
       },
     };
     await expect(
-      createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, helpers()),
+      createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, await helpers()),
     ).rejects.toBeInstanceOf(TransientBuildError);
 
     expect(during[0]).toEqual([{ id: expect.any(Number) as number, status: 'rodando' }]);
@@ -324,6 +563,8 @@ describe('task build', () => {
         failureKind: 'transient',
         failureMessage: 'API fora',
       },
+      // A repetição do Graphile Worker: a próxima tentativa nasce na fila.
+      { status: 'na_fila', attempt: 2 },
     ]);
   });
 
@@ -337,27 +578,30 @@ describe('task build', () => {
     await db.insert(builds).values({ ...row, status: 'na_fila', startedAt: null });
   });
 
-  it('a migração da execução com estado só acrescenta e relaxa, sem reescrever linhas', async () => {
-    const migration = await readFile(
-      new URL('../../drizzle/0019_execucao_com_estado.sql', import.meta.url),
-      'utf8',
-    );
-    const allowed =
-      /^ALTER TABLE "builds" (ADD COLUMN |ALTER COLUMN "\w+" DROP (NOT NULL|DEFAULT);$|ADD CONSTRAINT "\w+" CHECK )/;
-    const statements = migration.split('--> statement-breakpoint').map((s) => s.trim());
-    expect(statements.filter((statement) => !allowed.test(statement))).toEqual([]);
-  });
+  it.each(['0019_execucao_com_estado', '0020_build_na_fila'])(
+    'a migração %s só acrescenta e relaxa, sem reescrever linhas',
+    async (name) => {
+      const migration = await readFile(
+        new URL(`../../drizzle/${name}.sql`, import.meta.url),
+        'utf8',
+      );
+      const allowed =
+        /^(ALTER TABLE "builds" (ADD COLUMN |ALTER COLUMN "\w+" DROP (NOT NULL|DEFAULT);$|ADD CONSTRAINT "\w+" CHECK )|CREATE UNIQUE INDEX "\w+" ON "builds" )/;
+      const statements = migration.split('--> statement-breakpoint').map((s) => s.trim());
+      expect(statements.filter((statement) => !allowed.test(statement))).toEqual([]);
+    },
+  );
 
   it('o próximo build recebe as páginas da versão ativa (trava de segurança)', async () => {
     const first = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
     await createBuildTask({ db, runtime: first.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
     const second = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
     await createBuildTask({ db, runtime: second.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
     expect(second.started[0]?.env).toMatchObject({ ACTIVE_PAGE_COUNT: '12' });
   });
@@ -370,7 +614,7 @@ describe('task build', () => {
     });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
     return fake;
   }
@@ -425,7 +669,7 @@ describe('task build', () => {
     const failed = fakeRuntime({ render: { exitCode: 10, file: failedFile('permanent', 'x') } });
     await createBuildTask({ db, runtime: failed.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
     await db.update(sites).set({ activeVersionId: null });
 
@@ -450,7 +694,7 @@ describe('task build', () => {
     });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
 
     expect(await site()).toMatchObject({
@@ -477,7 +721,7 @@ describe('task build', () => {
     const next = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
     await createBuildTask({ db, runtime: next.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
     expect(next.started).toHaveLength(0);
   });
@@ -494,7 +738,7 @@ describe('task build', () => {
     });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
 
     expect(await site()).toMatchObject({
@@ -524,7 +768,7 @@ describe('task build', () => {
     });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
 
     expect(await site()).toMatchObject({
@@ -545,10 +789,14 @@ describe('task build', () => {
       render: { exitCode: 20, file: failedFile('transient', 'API fora') },
     });
     await expect(
-      createBuildTask({ db, runtime: fake.runtime, settings })({ siteId: 'exemplo-a' }, helpers(3)),
+      createBuildTask({ db, runtime: fake.runtime, settings })(
+        { siteId: 'exemplo-a' },
+        await helpers(3),
+      ),
     ).rejects.toBeInstanceOf(TransientBuildError);
-    expect(await db.select().from(builds)).toMatchObject([
+    expect(await db.select().from(builds).orderBy(builds.id)).toMatchObject([
       { status: 'failed', failureKind: 'transient', attempt: 3 },
+      { status: 'na_fila', attempt: 4 },
     ]);
     expect(await site()).toMatchObject({ state: 'ativo' });
     expect(await events()).toEqual([]);
@@ -570,7 +818,10 @@ describe('task build', () => {
       },
     });
     await expect(
-      createBuildTask({ db, runtime: fake.runtime, settings })({ siteId: 'exemplo-a' }, helpers()),
+      createBuildTask({ db, runtime: fake.runtime, settings })(
+        { siteId: 'exemplo-a' },
+        await helpers(),
+      ),
     ).rejects.toBeInstanceOf(TransientBuildError);
 
     expect(await site()).toMatchObject({
@@ -597,9 +848,9 @@ describe('retomar', () => {
     });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
-    await db.execute(sql`delete from graphile_worker._private_jobs`);
+    await clearQueue();
   }
 
   async function buildJobs(): Promise<{ key: string; run_at: Date }[]> {
@@ -658,7 +909,7 @@ describe('retomar', () => {
     });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
 
     expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual([]);
@@ -680,7 +931,7 @@ describe('retomar', () => {
   });
 
   it('recusa site que não está pausado, sem enfileirar', async () => {
-    await db.execute(sql`delete from graphile_worker._private_jobs`);
+    await clearQueue();
     expect(await db.transaction((tx) => resumeSite(tx, SYSTEM_ACTOR, 'exemplo-a'))).toMatchObject({
       ok: false,
       issues: [{ code: 'site.not_paused' }],
@@ -728,7 +979,7 @@ describe('reconstruir na release', () => {
 
   beforeEach(async () => {
     await db.insert(releases).values([{ tag: '1.2.0' }, { tag: '1.3.0' }]);
-    await db.execute(sql`delete from graphile_worker._private_jobs`);
+    await clearQueue();
   });
 
   async function buildJobs(): Promise<{ key: string; run_at: Date }[]> {
@@ -823,7 +1074,7 @@ describe('reconstruir na release', () => {
     const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
     await createBuildTask({ db, runtime: fake.runtime, settings })(
       { siteId: 'exemplo-a' },
-      helpers(),
+      await helpers(),
     );
 
     expect(fake.started.map((spec) => spec.image)).toEqual([

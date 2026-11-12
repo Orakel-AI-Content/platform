@@ -1,5 +1,6 @@
 // Builds no banco (12.0, L3): o que o build-runner precisa antes de começar e o registro da
-// execução. A tentativa nasce `rodando` e a mesma linha é fechada com o resultado: com sucesso,
+// execução. O pedido nasce `na_fila` no agendamento (schedule.ts), a tentativa o promove a
+// `rodando` e a mesma linha é fechada com o resultado: com sucesso,
 // a transação que a fecha baixa as mudanças pela lista que o snapshot viu; com falha
 // permanente, pausa o site com o motivo. As consultas daqui só leem builds fechados. "Reverter" (L4) escolhe
 // entre as versões dos builds `ok` e enfileira o rollback.
@@ -14,10 +15,10 @@ import {
   sites,
   type BuildStatus,
 } from '../../db/schema/index.ts';
-import { requireRole, type Actor } from '../access/rbac.ts';
+import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome } from './run-build.ts';
-import { buildNow, scheduleRollback } from './schedule.ts';
+import { buildNow, recordQueuedBuild, scheduleRollback } from './schedule.ts';
 import { clearMassUnpublish, markPublished, pauseSite, setActiveVersion } from './site-state.ts';
 
 export type BuildTarget = {
@@ -104,25 +105,69 @@ export type BuildRun = {
 };
 
 /**
- * Abre a tentativa: grava a linha `rodando`. Roda fora da transação do resultado, para a linha
- * ser vista enquanto a execução acontece; se o processo morrer, a recuperação na partida a
- * fecha (`recover.ts`).
+ * Abre a tentativa: promove a linha `na_fila` do job a `rodando`, com a release do plano. Sem
+ * linha na fila (job enfileirado antes dela existir, ou tentativa devolvida por `recover.ts`),
+ * grava a linha `rodando` direto. Roda fora da transação do resultado, para a linha ser vista
+ * enquanto a execução acontece; se o processo morrer, a recuperação na partida a fecha.
  */
 export async function startBuild(db: Executor, run: BuildRun): Promise<number> {
+  const opened = {
+    release: run.release,
+    attempt: run.attempt,
+    status: 'rodando' as const,
+    startedAt: run.startedAt,
+  };
+  if (run.jobId !== undefined) {
+    const [promoted] = await db
+      .update(builds)
+      .set(opened)
+      .where(queuedRow(run.jobId))
+      .returning({ id: builds.id });
+    if (promoted !== undefined) return promoted.id;
+  }
   const [row] = await db
     .insert(builds)
-    .values({
-      siteId: run.siteId,
-      release: run.release,
-      kind: 'build',
-      jobId: run.jobId ?? null,
-      attempt: run.attempt,
-      status: 'rodando',
-      startedAt: run.startedAt,
-    })
+    .values({ ...opened, siteId: run.siteId, kind: 'build', jobId: run.jobId ?? null })
     .returning({ id: builds.id });
   if (row === undefined) throw new Error(`Build de ${run.siteId} não foi registrado`);
   return row.id;
+}
+
+/** A linha `na_fila` do job de build. */
+function queuedRow(jobId: string) {
+  return and(eq(builds.kind, 'build'), eq(builds.jobId, jobId), eq(builds.status, 'na_fila'));
+}
+
+/** Job ignorado (site pausado ou inexistente): a linha `na_fila` dele fecha como `cancelado`. */
+export async function cancelQueuedBuild(db: Executor, jobId: string): Promise<void> {
+  await db
+    .update(builds)
+    .set({ status: 'cancelado', finishedAt: new Date() })
+    .where(queuedRow(jobId));
+}
+
+/**
+ * Depois de uma falha transitória que o Graphile Worker vai repetir: a próxima tentativa nasce
+ * `na_fila`, no horário da repetição e em nome de quem pediu a que falhou.
+ */
+export async function queueRetry(tx: Executor, buildId: number, runAt: Date): Promise<void> {
+  const [failed] = await tx
+    .select({
+      siteId: builds.siteId,
+      jobId: builds.jobId,
+      attempt: builds.attempt,
+      requestedBy: builds.requestedBy,
+    })
+    .from(builds)
+    .where(eq(builds.id, buildId));
+  if (failed === undefined || failed.jobId === null) return;
+  await recordQueuedBuild(
+    tx,
+    failed.siteId,
+    { id: failed.jobId, attempts: failed.attempt, runAt },
+    failed.requestedBy ?? SYSTEM_ACTOR.email,
+    { replaceRequester: false },
+  );
 }
 
 export type BuildClosing = {
@@ -245,7 +290,10 @@ export async function recentBuilds(
     .where(and(eq(builds.siteId, siteId), finishedBuild))
     .orderBy(desc(builds.finishedAt), desc(builds.id))
     .limit(limit);
-  return rows.filter(isFinished);
+  // Linha fechada sempre passou por `rodando`, que grava a release: a nula é só a `na_fila`.
+  return rows
+    .filter(isFinished)
+    .flatMap(({ release, ...row }) => (release === null ? [] : [{ ...row, release }]));
 }
 
 /** "Publicar agora": o build do site roda já, sem esperar a janela. */
@@ -271,7 +319,7 @@ export async function requestBuildNow(
       ],
     };
   }
-  await buildNow(tx, siteId);
+  await buildNow(tx, siteId, actor.email);
   return { ok: true, value: undefined };
 }
 
@@ -316,7 +364,10 @@ export async function listRollbackVersions(
   const versions = rows
     .filter(
       (row): row is RollbackVersion =>
-        row.versionId !== null && row.finishedAt !== null && row.versionId !== site.activeVersionId,
+        row.versionId !== null &&
+        row.release !== null &&
+        row.finishedAt !== null &&
+        row.versionId !== site.activeVersionId,
     )
     .sort((a, b) => b.finishedAt.getTime() - a.finishedAt.getTime());
   return { ok: true, value: versions };

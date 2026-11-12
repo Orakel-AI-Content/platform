@@ -173,7 +173,7 @@ export async function resumeSite(
   if (!allowed.ok) return allowed;
 
   if (await unpause(tx, siteId, actor.email)) {
-    await buildNow(tx, siteId);
+    await buildNow(tx, siteId, actor.email);
     return { ok: true, value: undefined };
   }
 
@@ -250,7 +250,7 @@ export async function rebuildOnRelease(
     release: registered.tag,
   });
   await unpause(tx, siteId, actor.email);
-  await buildNow(tx, siteId);
+  await buildNow(tx, siteId, actor.email);
   return { ok: true, value: undefined };
 }
 

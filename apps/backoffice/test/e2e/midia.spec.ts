@@ -158,7 +158,7 @@ test(
         { status: 'publicado' },
       );
       if (!created.ok) throw new Error(JSON.stringify(created.issues));
-      await buildNow(tx, SITE);
+      await buildNow(tx, SITE, SYSTEM_ACTOR.email);
     });
 
     const pageUrl = `https://${config.domains[0]}${contentPath({ slug })}`;

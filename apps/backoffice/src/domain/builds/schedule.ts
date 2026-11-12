@@ -1,7 +1,8 @@
 import { eq, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { sites } from '../../db/schema/index.ts';
+import { builds, sites } from '../../db/schema/index.ts';
+import { SYSTEM_ACTOR } from '../access/rbac.ts';
 import { processSettings } from '../process-settings.ts';
 
 /**
@@ -22,12 +23,71 @@ export function effectiveBuildWindowMs(siteSeconds: number | null): number {
   return siteSeconds === null ? processSettings().buildWindowMs : siteSeconds * 1000;
 }
 
+/** Job de build como o `add_job` o devolve: o mesmo job quando o pedido cai num já na fila. */
+type QueuedJob = { id: string; attempts: number; runAt: Date };
+
+async function addBuildJob(
+  tx: Executor,
+  siteId: string,
+  runAt: Date,
+  mode: 'preserve_run_at' | 'replace',
+): Promise<QueuedJob> {
+  const { rows } = await tx.execute<{ id: string; attempts: number; run_at: Date | string }>(sql`
+    select id::text as id, attempts, run_at from graphile_worker.add_job(
+      identifier => 'build',
+      payload => ${JSON.stringify({ siteId })}::json,
+      queue_name => ${`build:${siteId}`},
+      run_at => ${runAt.toISOString()}::timestamptz,
+      max_attempts => 5,
+      job_key => ${`build:${siteId}`},
+      job_key_mode => ${mode}
+    )`);
+  const [job] = rows;
+  if (job === undefined) throw new Error(`Build de ${siteId} não foi enfileirado`);
+  return { id: job.id, attempts: job.attempts, runAt: new Date(job.run_at) };
+}
+
+/**
+ * Grava a linha `na_fila` do job, ou atualiza a que ele já tem (índice único parcial em
+ * `job_id`): pedidos que caem no mesmo job caem na mesma linha. `requestedBy` só troca quando
+ * o pedido regrava o horário ("Publicar agora"); o agendamento automático mantém quem pediu.
+ */
+export async function recordQueuedBuild(
+  tx: Executor,
+  siteId: string,
+  job: QueuedJob,
+  requestedBy: string,
+  options: { replaceRequester: boolean },
+): Promise<void> {
+  const attempt = job.attempts + 1;
+  await tx
+    .insert(builds)
+    .values({
+      siteId,
+      kind: 'build',
+      jobId: job.id,
+      attempt,
+      status: 'na_fila',
+      requestedBy,
+      scheduledFor: job.runAt,
+    })
+    .onConflictDoUpdate({
+      target: builds.jobId,
+      targetWhere: sql`${builds.status} = 'na_fila'`,
+      set: {
+        attempt,
+        scheduledFor: job.runAt,
+        ...(options.replaceRequester && { requestedBy }),
+      },
+    });
+}
+
 /**
  * Agenda o build do site na mesma transação da gravação. `job_key` + fila nomeada: um build
  * por vez por site, e publicações dentro da janela caem no mesmo job (`preserve_run_at`
- * mantém o horário do primeiro agendamento). Janela: `options.windowMs`, senão a do site,
- * senão a padrão; lida a cada agendamento, sem reiniciar o processo. Chamado por
- * recordPendingChange.
+ * mantém o horário do primeiro agendamento) e na mesma linha `na_fila`, pedida por `system`.
+ * Janela: `options.windowMs`, senão a do site, senão a padrão; lida a cada agendamento, sem
+ * reiniciar o processo. Chamado por recordPendingChange.
  */
 export async function scheduleBuild(
   tx: Executor,
@@ -36,16 +96,8 @@ export async function scheduleBuild(
 ): Promise<void> {
   const delayMs = options.windowMs ?? effectiveBuildWindowMs(await siteWindowSeconds(tx, siteId));
   const runAt = new Date((options.now ?? new Date()).getTime() + delayMs);
-  await tx.execute(sql`
-    select graphile_worker.add_job(
-      identifier => 'build',
-      payload => ${JSON.stringify({ siteId })}::json,
-      queue_name => ${`build:${siteId}`},
-      run_at => ${runAt.toISOString()}::timestamptz,
-      max_attempts => 5,
-      job_key => ${`build:${siteId}`},
-      job_key_mode => 'preserve_run_at'
-    )`);
+  const job = await addBuildJob(tx, siteId, runAt, 'preserve_run_at');
+  await recordQueuedBuild(tx, siteId, job, SYSTEM_ACTOR.email, { replaceRequester: false });
 }
 
 async function siteWindowSeconds(tx: Executor, siteId: string): Promise<number | null> {
@@ -56,22 +108,28 @@ async function siteWindowSeconds(tx: Executor, siteId: string): Promise<number |
   return site?.seconds ?? null;
 }
 
-/** "Publicar agora": regrava o job do site para rodar imediatamente. */
+/**
+ * "Publicar agora", "Retomar" e "Reconstruir": regrava o job do site para rodar
+ * imediatamente, e a linha `na_fila` passa a ter o horário de agora e quem pediu.
+ */
 export async function buildNow(
   tx: Executor,
   siteId: string,
+  requestedBy: string,
   now: Date = new Date(),
 ): Promise<void> {
-  await tx.execute(sql`
-    select graphile_worker.add_job(
-      identifier => 'build',
-      payload => ${JSON.stringify({ siteId })}::json,
-      queue_name => ${`build:${siteId}`},
-      run_at => ${now.toISOString()}::timestamptz,
-      max_attempts => 5,
-      job_key => ${`build:${siteId}`},
-      job_key_mode => 'replace'
-    )`);
+  const job = await addBuildJob(tx, siteId, now, 'replace');
+  await recordQueuedBuild(tx, siteId, job, requestedBy, { replaceRequester: true });
+}
+
+/**
+ * Horário da próxima tentativa depois de uma falha: a mesma conta de backoff do Graphile
+ * Worker (`greatest(now, run_at) + exp(least(attempts, 10))` segundos). A linha `na_fila` da
+ * repetição sai daqui, sem ler a fila.
+ */
+export function retryRunAt(runAt: Date, attempts: number, now: Date): Date {
+  const base = Math.max(now.getTime(), runAt.getTime());
+  return new Date(base + Math.exp(Math.min(attempts, 10)) * 1000);
 }
 
 export const ROLLBACK_TASK = 'rollback';

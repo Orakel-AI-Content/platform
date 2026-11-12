@@ -1,0 +1,2 @@
+ALTER TABLE "builds" ALTER COLUMN "release" DROP NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "builds_queued_job_unique" ON "builds" USING btree ("job_id") WHERE "builds"."status" = 'na_fila';

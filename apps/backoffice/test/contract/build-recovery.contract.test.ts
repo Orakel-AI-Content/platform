@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { Logger, runOnce } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -33,6 +33,18 @@ beforeEach(async () => {
   await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, config));
 });
 
+/**
+ * A task pegou o job e promoveu a linha `na_fila` dele: o teste grava a linha `rodando` à mão,
+ * então tira a da fila.
+ */
+async function promoted(): Promise<void> {
+  await db.delete(builds).where(eq(builds.status, 'na_fila'));
+}
+
+/** Linha `na_fila` do cadastro: a do job que ainda não rodou nenhuma tentativa. */
+const queuedRow = (): unknown =>
+  expect.objectContaining({ siteId: 'exemplo-a', status: 'na_fila', requestedBy: 'system' });
+
 /** Trava o job e a fila como o Graphile Worker faz ao pegar o job, com o dono `owner`. */
 async function lock(queue: string, owner: string): Promise<void> {
   await db.execute(sql`
@@ -57,6 +69,7 @@ async function locks(): Promise<{ queue_name: string; locked_by: string | null }
 describe('recuperação dos builds interrompidos', () => {
   it('fecha a linha rodando da tentativa interrompida, sem inserir outra', async () => {
     await lock('build:exemplo-a', DEAD);
+    await promoted();
     const [job] = (await db.execute<{ id: string }>(sql`select id::text from graphile_worker.jobs`))
       .rows;
     const startedAt = new Date('2026-10-21T22:04:23Z');
@@ -97,6 +110,7 @@ describe('recuperação dos builds interrompidos', () => {
 
   it('não fecha a linha rodando de outra tentativa do mesmo job', async () => {
     await lock('build:exemplo-a', DEAD);
+    await promoted();
     const [job] = (await db.execute<{ id: string }>(sql`select id::text from graphile_worker.jobs`))
       .rows;
     await db.insert(builds).values({
@@ -135,7 +149,9 @@ describe('recuperação dos builds interrompidos', () => {
       { queue_name: 'build:exemplo-a', locked_by: null },
       { queue_name: 'build:exemplo-a', locked_by: null },
     ]);
-    expect(await db.select().from(builds)).toEqual([
+    // A linha da fila continua: o job volta a rodar e a próxima tentativa a promove.
+    expect(await db.select().from(builds).orderBy(builds.id)).toEqual([
+      queuedRow(),
       expect.objectContaining({
         siteId: 'exemplo-a',
         release: 'local',
@@ -191,11 +207,11 @@ describe('recuperação dos builds interrompidos', () => {
       queue_name: 'media:exemplo-a',
       locked_by: 'worker-vivo',
     });
-    expect(await db.select().from(builds)).toEqual([]);
+    expect(await db.select().from(builds)).toEqual([queuedRow()]);
   });
 
   it('sem travas, não grava nada', async () => {
     expect(await recoverInterruptedBuilds(db, 'local')).toEqual([]);
-    expect(await db.select().from(builds)).toEqual([]);
+    expect(await db.select().from(builds)).toEqual([queuedRow()]);
   });
 });
