@@ -3,7 +3,7 @@ import { Logger, runOnce } from 'graphile-worker';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { builds } from '../../src/db/schema/index.ts';
+import { builds, sites } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
@@ -11,6 +11,7 @@ import {
   INTERRUPTED_ROLLBACK_MESSAGE,
   recoverInterruptedBuilds,
 } from '../../src/domain/builds/recover.ts';
+import { SITE_WITHOUT_RELEASE } from '../../src/domain/builds/plan.ts';
 import { scheduleRollback } from '../../src/domain/builds/schedule.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
@@ -116,6 +117,30 @@ describe('recuperação dos builds interrompidos', () => {
       }),
     ]);
     expect(rows[0]?.finishedAt).toBeInstanceOf(Date);
+  });
+
+  it('site sem versão e sem tag padrão: fecha como permanente na etapa image e pausa', async () => {
+    await lock('build:exemplo-a', DEAD);
+    await promoted();
+
+    await recoverInterruptedBuilds(db, undefined);
+
+    expect(await db.select().from(builds)).toEqual([
+      expect.objectContaining({
+        kind: 'build',
+        release: null,
+        status: 'failed',
+        failedStage: 'image',
+        failureKind: 'permanent',
+        failureMessage: SITE_WITHOUT_RELEASE,
+      }),
+    ]);
+    const [site] = await db
+      .select({ state: sites.state, pausedReason: sites.pausedReason })
+      .from(sites)
+      .where(eq(sites.id, 'exemplo-a'));
+    expect(site).toEqual({ state: 'pausado', pausedReason: `image: ${SITE_WITHOUT_RELEASE}` });
+    expect((await locks()).every((row) => row.locked_by === null)).toBe(true);
   });
 
   it('não fecha a linha rodando de outra tentativa do mesmo job', async () => {

@@ -4,12 +4,16 @@
 // trava de fila build:% ou de job `build` ou `rollback` (a mesma fila) presente na partida é
 // de um processo que morreu no meio da tentativa: a linha `rodando` dela é fechada como
 // `failed`/`transient` e os donos são destravados. Se o processo morreu antes de gravar a
-// linha, ela é inserida já fechada, com o tipo do job.
+// linha, ela é inserida já fechada, com o tipo do job. Site sem release e sem tag padrão é
+// recusado como no plano: a tentativa fecha `failed`/`permanent` na etapa `image` e, no build,
+// o site é pausado com o motivo (o rollback com falha não pausa, como em `recordRollback`).
 import { and, desc, eq, isNotNull, sql } from 'drizzle-orm';
 
 import type { Db, Executor } from '../../db/client.ts';
 import { builds, type BuildKind } from '../../db/schema/index.ts';
 import { loadBuildTarget } from './builds.ts';
+import { resolveRelease, SITE_WITHOUT_RELEASE } from './plan.ts';
+import { pauseSite } from './site-state.ts';
 import { ROLLBACK_TASK } from './schedule.ts';
 
 export const INTERRUPTED_MESSAGE = 'build interrompido: o build-runner parou no meio da tentativa';
@@ -40,7 +44,7 @@ type LockedJob = {
  */
 export async function recoverInterruptedBuilds(
   db: Db,
-  defaultTag: string,
+  defaultTag: string | undefined,
 ): Promise<InterruptedBuild[]> {
   return db.transaction(async (tx) => {
     // O site vem do nome da fila (build:<site>, de scheduleBuild e buildNow): a view pública
@@ -61,13 +65,24 @@ export async function recoverInterruptedBuilds(
       const target = await loadBuildTarget(tx, job.site_id);
       if (target === undefined) continue;
       const kind: BuildKind = job.task_identifier === ROLLBACK_TASK ? 'rollback' : 'build';
-      const interrupted = {
-        status: 'failed' as const,
-        failedStage: null,
-        failureKind: 'transient' as const,
-        failureMessage: kind === 'rollback' ? INTERRUPTED_ROLLBACK_MESSAGE : INTERRUPTED_MESSAGE,
-        finishedAt: new Date(),
-      };
+      const release = resolveRelease(target, defaultTag);
+      const interrupted =
+        release === null
+          ? {
+              status: 'failed' as const,
+              failedStage: kind === 'build' ? ('image' as const) : null,
+              failureKind: 'permanent' as const,
+              failureMessage: SITE_WITHOUT_RELEASE,
+              finishedAt: new Date(),
+            }
+          : {
+              status: 'failed' as const,
+              failedStage: null,
+              failureKind: 'transient' as const,
+              failureMessage:
+                kind === 'rollback' ? INTERRUPTED_ROLLBACK_MESSAGE : INTERRUPTED_MESSAGE,
+              finishedAt: new Date(),
+            };
       const closed = await tx
         .update(builds)
         .set(interrupted)
@@ -84,7 +99,7 @@ export async function recoverInterruptedBuilds(
         await tx.insert(builds).values({
           ...interrupted,
           siteId: job.site_id,
-          release: target.release ?? defaultTag,
+          release,
           kind,
           jobId: job.id,
           attempt: job.attempts,
@@ -92,6 +107,9 @@ export async function recoverInterruptedBuilds(
           // A versão de destino do rollback vem da linha `na_fila` do job (a view não tem o payload).
           ...(kind === 'rollback' && { versionId: await queuedVersion(tx, job.id) }),
         });
+      }
+      if (release === null && kind === 'build') {
+        await pauseSite(tx, job.site_id, `image: ${SITE_WITHOUT_RELEASE}`);
       }
       recorded.push({
         kind,
