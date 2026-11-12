@@ -544,7 +544,8 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   operação (#648) vêm prontas da página em `actions`, uma por etapa, abaixo do estado, como o
   "Marcar…": "Reconstruir na release" na Versão (só com a lista de releases), "Publicar agora"
   na Build (fora da pausa), "Escolher outra versão" na No ar (o "Reverter", só com a lista de
-  versões) e "Retomar" na linha Site (só pausado). "Cancelar" entra na Build com publicação (não
+  versões) e, na linha Site, "Pausar" (só ativo, com motivo obrigatório no diálogo, #650) ou
+  "Retomar" (só pausado). "Cancelar" entra na Build com publicação (não
   reversão) aberta (#649), pela mesma atividade relida: na fila, ao lado de "Publicar agora" (que
   pula a janela); em andamento, no lugar dele. Cancelar na fila leva o foco ao "Publicar agora",
   que fica; em andamento, o "Cancelar" e o "Publicar agora" ocupam a mesma posição, então, quando
@@ -682,8 +683,10 @@ Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
     ar), que reverte o site no ar para uma versão anterior; "Desfazer última publicação" (etapa
     No ar, #649), que volta o site à versão que estava no ar antes da atual e mostra qual na
     confirmação; "Cancelar" (etapa Build, #649), que tira da fila ou interrompe a publicação
-    aberta (o diálogo usa "Voltar" no lugar do "Cancelar" padrão, para não repetir o rótulo); e
-    "Retomar" (linha Site), que tira o site da pausa e enfileira o próximo build. Salvar configuração ou conteúdo,
+    aberta (o diálogo usa "Voltar" no lugar do "Cancelar" padrão, para não repetir o rótulo);
+    "Pausar" (linha Site), que para os builds do site até ser retomado e pede o motivo no diálogo
+    (vazio, o erro fica no campo e o diálogo não confirma); e "Retomar" (linha Site), que tira o
+    site da pausa e enfileira o próximo build. Salvar configuração ou conteúdo,
     aprovar na revisão, as etapas do ciclo de vida, o G1 e a janela não confirmam: passam pela
     janela ou não mudam o que está no ar.
 

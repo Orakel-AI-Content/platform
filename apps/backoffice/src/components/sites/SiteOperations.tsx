@@ -39,7 +39,11 @@ import {
 // fila e no lugar dele em andamento; "Desfazer última publicação" fica ao lado de "Escolher outra
 // versão".
 
-export type SiteOperation = 'publish' | 'resume' | 'rebuild' | 'rollback' | 'cancel' | 'undo';
+export type SiteOperation =
+  'publish' | 'pause' | 'resume' | 'rebuild' | 'rollback' | 'cancel' | 'undo';
+
+/** "Pausar" com o motivo informado, já ligado ao site. */
+export type PauseSite = (reason: string) => Promise<ActionResult>;
 
 /** Server Action ligada a um site por `siteId`, como a de "Publicar agora". */
 export type SiteAction = (siteId: string) => Promise<ActionResult>;
@@ -109,7 +113,8 @@ function available(operations: SiteOperationsProps, operation: SiteOperation): b
 }
 
 /**
- * As ações de operação do site: `publish`, `resume`, `rebuild`, `rollback`, `cancel` e `undo` só vêm de quem tem
+ * As ações de operação do site: `publish`, `pause`, `resume`, `rebuild`, `rollback`, `cancel` e
+ * `undo` só vêm de quem tem
  * operations.run. Uma ação de cada vez: enquanto uma está na fila, todos os botões ficam
  * `aria-disabled` (não `disabled`: o diálogo fecha antes da resposta, e o foco volta ao botão
  * que o abriu).
@@ -128,8 +133,19 @@ export function SiteOperationsScope({
     if (trigger === null) triggers.current.delete(operation);
     else triggers.current.set(operation, trigger);
   };
-  const { siteId, paused, release, timeZone, publish, resume, rebuild, rollback, cancel, undo } =
-    operations;
+  const {
+    siteId,
+    paused,
+    release,
+    timeZone,
+    publish,
+    pause,
+    resume,
+    rebuild,
+    rollback,
+    cancel,
+    undo,
+  } = operations;
 
   const openFrom = (operation: SiteOperation, trigger: HTMLElement) => {
     if (running !== null) return;

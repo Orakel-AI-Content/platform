@@ -24,8 +24,8 @@ import { type PublicationSite, SitePublicationSteps } from './SitePublicationSte
 // e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", cada uma com a confirmação de hoje (#327, #514, #515); o
 // sucesso vai ao toast e a recusa de qualquer uma ao `SiteOperationsAlert`, abaixo do painel.
 // "Cancelar" fica ao lado de "Publicar agora" com publicação na fila e no lugar dele em
-// andamento; "Desfazer última publicação" fica ao lado de "Escolher outra versão" (#649). Foco no navegador, em
-// `SiteOperations.browser.test.tsx`.
+// andamento; "Desfazer última publicação" fica ao lado de "Escolher outra versão" (#649). Foco no
+// navegador, em `SiteOperations.browser.test.tsx`.
 
 beforeAll(() => {
   MotionGlobalConfig.skipAnimations = true;
@@ -91,12 +91,14 @@ const RUNNING: OpenExecution = { ...QUEUED, status: 'rodando', currentStage: 're
 const ROLLING_BACK: OpenExecution = { ...RUNNING, kind: 'rollback', currentStage: null };
 const QUEUED_ACTIVITY: SiteActivity = { open: QUEUED, history: [] };
 
-type Props = Partial<Omit<ComponentProps<typeof SiteOperationsScope>, 'children'>> & {
-  activity?: SiteActivity;
-};
+type Props = Partial<Omit<ComponentProps<typeof SiteOperationsScope>, 'children'>>;
 
 /** O painel com os botões nas etapas, como a página monta com operations.run. */
-function Panel({ activity = { open: null, history: [] }, ...props }: Props) {
+function Panel({
+  pausedReason = null,
+  activity = { open: null, history: [] },
+  ...props
+}: Props & { pausedReason?: string | null; activity?: SiteActivity }) {
   const paused = props.paused ?? false;
   return (
     <>
@@ -121,7 +123,12 @@ function Panel({ activity = { open: null, history: [] }, ...props }: Props) {
                 <SiteOperationButton operation="rollback" />
               </span>
             ),
-            site: <SiteOperationButton operation="resume" />,
+            site: (
+              <>
+                <SiteOperationButton operation="pause" />
+                <SiteOperationButton operation="resume" />
+              </>
+            ),
           }}
         />
         <div data-testid="alert">
@@ -284,6 +291,36 @@ describe('confirmação', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Reverter' }));
 
     await waitFor(() => expect(action).toHaveBeenCalledWith('20261001T120000Z-aaaaaaaa'));
+  });
+
+  it('"Pausar" roda a action com o motivo; revalidada, a linha Site mostra o motivo', async () => {
+    const user = userEvent.setup();
+    const pause = ok('exemplo-a pausado.');
+    const { rerender } = renderPanel({ ...ALL, pause });
+
+    await user.click(screen.getByRole('button', { name: 'Pausar exemplo-a' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Pausar exemplo-a?' });
+    await user.type(within(dialog).getByRole('textbox', { name: /Motivo/ }), 'migração de domínio');
+    await user.click(within(dialog).getByRole('button', { name: 'Pausar' }));
+
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('exemplo-a pausado.'));
+    expect(pause).toHaveBeenCalledWith('migração de domínio');
+    // A revalidação da Server Action traz o site pausado com o motivo.
+    rerender(<Panel {...ALL} pause={pause} paused pausedReason="migração de domínio" />);
+    expect(step(4).textContent).toContain('Pausado: migração de domínio');
+    expect(stepButtons(4)).toEqual(['Retomar exemplo-a']);
+  });
+
+  it('a recusa de "Pausar" vai ao alerta único do painel', async () => {
+    const user = userEvent.setup();
+    renderPanel({ ...ALL, pause: refused('O site já está pausado.') });
+
+    await user.click(screen.getByRole('button', { name: 'Pausar exemplo-a' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Pausar exemplo-a?' });
+    await user.type(within(dialog).getByRole('textbox', { name: /Motivo/ }), 'manutenção');
+    await user.click(within(dialog).getByRole('button', { name: 'Pausar' }));
+
+    await waitFor(() => expect(alert().textContent).toBe('O site já está pausado.'));
   });
 
   it('"Cancelar" só cancela depois de confirmar; o sucesso vai ao toast', async () => {

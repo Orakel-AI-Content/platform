@@ -28,6 +28,7 @@ import { siteTrail } from '@/components/shared/trail.ts';
 import {
   advanceLifecycleAction,
   cancelBuildAction,
+  pauseSiteAction,
   publishNow,
   rebuildOnReleaseAction,
   registerG1Action,
@@ -49,9 +50,10 @@ export const dynamic = 'force-dynamic';
  * embaixo, a atividade do site com o status ao vivo, para todos os perfis, #637, #638, #647), G1,
  * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). As ações de operação
  * (operations.run, #648) ficam nas etapas do painel: "Reconstruir na release" na Versão,
- * "Publicar agora" na Build (ou "Cancelar", com publicação na fila ou em andamento, #649),
- * "Desfazer última publicação" (com versão anterior, #649) e "Escolher outra versão" na No ar e,
- * pausado, "Retomar" na linha Site, com a recusa logo abaixo do painel. Lê o site pelo
+ * "Publicar agora" na Build (com "Cancelar" ao lado na fila e no lugar dele em andamento,
+ * #649), "Desfazer última publicação" (com versão anterior, #649) e "Escolher outra versão" na No
+ * ar e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", com a recusa logo
+ * abaixo do painel. Lê o site pelo
  * sitePageContext (a mesma busca do layout), os gatilhos e o uso de redirects, que vira um aviso
  * acima do resumo quando o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do
  * limite só aparecem com site.configure, e o domínio confere de novo.
@@ -179,7 +181,13 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                   <SiteOperationButton operation="rollback" />
                 </span>
               ),
-              site: <SiteOperationButton operation="resume" />,
+              // Um ou outro: "Pausar" com o site ativo, "Retomar" com ele pausado.
+              site: (
+                <>
+                  <SiteOperationButton operation="pause" />
+                  <SiteOperationButton operation="resume" />
+                </>
+              ),
             }
           : undefined
       }
