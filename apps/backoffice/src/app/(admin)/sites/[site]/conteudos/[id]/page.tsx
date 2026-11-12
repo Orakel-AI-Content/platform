@@ -178,6 +178,7 @@ export default async function ContentVersionsPage({ params }: Params) {
               status: version.status,
               title: version.data.title,
               createdAt: version.createdAt,
+              createdBy: version.createdBy,
               approval: version.approval,
             }))}
           />

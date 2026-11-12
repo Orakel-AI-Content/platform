@@ -1,0 +1,1 @@
+ALTER TABLE "content_versions" ADD COLUMN "created_by" text;

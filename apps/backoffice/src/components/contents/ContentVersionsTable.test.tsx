@@ -43,6 +43,7 @@ const rows: ContentVersionRow[] = [1, 2, 3].map((version) => ({
   status: version === 1 ? 'publicado' : 'rascunho',
   title: `Guia v${version}`,
   createdAt: new Date(`2026-10-0${version}T12:00:00Z`),
+  createdBy: null,
   approval: null,
 }));
 
@@ -188,6 +189,26 @@ describe('tabela de versões', () => {
     expect(approval.parentElement?.className).toContain('text-xs');
   });
 
+  it('mostra quem criou cada versão sob a data, e "—" sem autor (#748)', () => {
+    const authored: ContentVersionRow[] = [
+      { ...rows[0]!, createdBy: null },
+      { ...rows[1]!, createdBy: 'generator' },
+      { ...rows[2]!, createdBy: 'revisor@orakel.local' },
+    ];
+    renderTable(authored);
+
+    // Da mais recente à primeira; a data é a coluna "Gravada em" (a terceira).
+    const createdCells = screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelectorAll('td')[2]?.textContent);
+    expect(createdCells).toEqual([
+      '03/10/2026, 09:00 BRTrevisor@orakel.local',
+      '02/10/2026, 09:00 BRTgenerator',
+      '01/10/2026, 09:00 BRT—',
+    ]);
+  });
+
   it('sem versões mostra o estado vazio no lugar da tabela e da toolbar', () => {
     renderTable([]);
 
@@ -203,6 +224,7 @@ describe('busca, filtro, ordem e paginação (#366)', () => {
     status: index % 3 === 0 ? 'publicado' : 'rascunho',
     title: index < 20 ? `Guia de café v${index + 1}` : `Receita v${index + 1}`,
     createdAt: new Date(Date.UTC(2026, 9, 1, 12, index)),
+    createdBy: null,
     approval: null,
   }));
 

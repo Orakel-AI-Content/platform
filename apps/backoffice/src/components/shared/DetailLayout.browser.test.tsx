@@ -190,6 +190,7 @@ function ContentDetail() {
                 status: 'rascunho',
                 title: 'Detalhe',
                 createdAt: new Date('2026-10-20T12:00Z'),
+                createdBy: null,
                 approval: null,
               },
               {
@@ -197,6 +198,7 @@ function ContentDetail() {
                 status: 'aprovado',
                 title: LONG_TITLE,
                 createdAt: new Date('2026-10-21T12:00Z'),
+                createdBy: 'editor@orakel.local',
                 approval: {
                   reviewer: 'revisora.editorial@orakel.local',
                   approvedAt: new Date('2026-10-21T15:30Z'),
