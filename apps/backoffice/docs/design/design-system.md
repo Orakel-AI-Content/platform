@@ -542,7 +542,12 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   operação (#648) vêm prontas da página em `actions`, uma por etapa, abaixo do estado, como o
   "Marcar…": "Reconstruir na release" na Versão (só com a lista de releases), "Publicar agora"
   na Build (fora da pausa), "Escolher outra versão" na No ar (o "Reverter", só com a lista de
-  versões) e "Retomar" na linha Site (só pausado). Sem operations.run, o painel não tem botões
+  versões) e "Retomar" na linha Site (só pausado). Com publicação (não reversão) na fila ou em
+  andamento, "Cancelar" toma o lugar de "Publicar agora" na Build (#649), pela mesma atividade
+  relida: os dois são o mesmo `SiteOperationButton` na mesma posição, então, quando a execução
+  fecha, o React troca só o texto e o foco fica no "Publicar agora" que volta. "Desfazer última
+  publicação" fica ao lado de "Escolher outra versão", só quando há versão anterior, e a
+  confirmação diz para qual versão o site volta. Sem operations.run, o painel não tem botões
   de operação e mostra os mesmos estados.
 
 ### Mídia
@@ -671,8 +676,11 @@ Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
   - **ações que afetam o site publicado:** "Publicar agora" (lista e etapa Build da página do
     site), que muda o site no ar sem esperar a janela de agrupamento; "Reconstruir na release"
     (etapa Versão), que troca a release e enfileira um build; "Escolher outra versão" (etapa No
-    ar), que reverte o site no ar para uma versão anterior; e "Retomar" (linha Site), que tira o
-    site da pausa e enfileira o próximo build. Salvar configuração ou conteúdo,
+    ar), que reverte o site no ar para uma versão anterior; "Desfazer última publicação" (etapa
+    No ar, #649), que volta o site à versão que estava no ar antes da atual e mostra qual na
+    confirmação; "Cancelar" (etapa Build, #649), que tira da fila ou interrompe a publicação
+    aberta (o diálogo usa "Voltar" no lugar do "Cancelar" padrão, para não repetir o rótulo); e
+    "Retomar" (linha Site), que tira o site da pausa e enfileira o próximo build. Salvar configuração ou conteúdo,
     aprovar na revisão, as etapas do ciclo de vida, o G1 e a janela não confirmam: passam pela
     janela ou não mudam o que está no ar.
 
