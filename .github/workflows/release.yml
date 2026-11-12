@@ -1,27 +1,63 @@
-# Versão do site-builder (ADR 0018): a tag manual site-builder-vX.Y.Z publica a imagem
-# site-builder:X.Y.Z. Merge na main não cria release. A imagem é testada em todo PR pelo
-# job "Imagem site-builder" do ci.yml. O release só sai com o último E2E completo da main
-# verde (#475).
+# Versão do site-builder (ADR 0018): o Backoffice dispara este workflow com o input `version`
+# (X.Y.Z); ele publica a imagem site-builder:X.Y.Z e, só depois, cria a tag Git
+# site-builder-vX.Y.Z no commit do run. Push de tag não dispara nada, e merge na main não cria
+# release. A imagem é testada em todo PR pelo job "Imagem site-builder" do ci.yml. O release só
+# sai com o último E2E completo da main verde (#475).
 name: Release
 
 on:
-  push:
-    tags:
-      - 'site-builder-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão do site-builder, no formato X.Y.Z (sem o prefixo site-builder-v)'
+        required: true
+        type: string
+
+# Dois disparos do mesmo número não publicam a imagem duas vezes: o segundo espera e falha no
+# validate, porque a tag já existe.
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
+  validate:
+    name: Versão válida e livre
+    runs-on: ubuntu-latest
+    steps:
+      - name: Formato, branch e tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+          REF: ${{ github.ref }}
+        run: |
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::A versão \"$VERSION\" não está no formato X.Y.Z (ex.: 1.2.0, sem o prefixo site-builder-v)."
+            exit 1
+          fi
+          if [ "$REF" != refs/heads/main ]; then
+            echo "::error::O release só sai da main; este run foi disparado em $REF."
+            exit 1
+          fi
+          if gh api "repos/$GH_REPO/git/matching-refs/tags/site-builder-v$VERSION" \
+            --jq '.[].ref' | grep -qx "refs/tags/site-builder-v$VERSION"; then
+            echo "::error::A tag site-builder-v$VERSION já existe: escolha outro número."
+            exit 1
+          fi
+          echo "Versão $VERSION livre."
+
   e2e-main:
     name: E2E completo verde na main
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       actions: read
     steps:
-      # O último run concluído de push ou noturno; cancelado não conta. Não é o run do commit da
-      # tag: um push que não toca os caminhos do e2e.yml não gera run.
+      # O último run concluído de push ou noturno; cancelado não conta. Não é o run do commit do
+      # release: um push que não toca os caminhos do e2e.yml não gera run.
       - name: Último run da main
         env:
           GH_TOKEN: ${{ github.token }}
@@ -46,6 +82,9 @@ jobs:
     name: Imagem site-builder
     needs: e2e-main
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -56,5 +95,24 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Bake do grupo release
         env:
-          REF_NAME: ${{ github.ref_name }}
-        run: TAG="${REF_NAME#site-builder-v}" docker/bake.sh release --push
+          TAG: ${{ inputs.version }}
+        run: docker/bake.sh release --push
+
+  # Só depois da imagem publicada: um CI que falha não gasta o número.
+  tag:
+    name: Tag Git
+    needs: site-builder
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Cria site-builder-vX.Y.Z no commit do run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh api "repos/$GH_REPO/git/refs" \
+            -f ref="refs/tags/site-builder-v$VERSION" -f sha="$SHA" --silent
+          echo "Tag site-builder-v$VERSION criada em $SHA."
