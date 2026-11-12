@@ -15,8 +15,12 @@ import {
   FINISHED_BUILD_STATUSES,
   OPEN_BUILD_STATUSES,
   pendingChanges,
+  siteEvents,
   sites,
+  type BuildKind,
   type BuildStatus,
+  type FAILURE_KINDS,
+  type SiteEventKind,
 } from '../../db/schema/index.ts';
 import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
@@ -407,6 +411,177 @@ const notFound = (siteId: string) => ({
   ok: false as const,
   issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
 });
+
+type OpenBuildStatus = (typeof OPEN_BUILD_STATUSES)[number];
+type ClosedBuildStatus = Exclude<BuildStatus, OpenBuildStatus>;
+
+function isOpenStatus(status: BuildStatus): status is OpenBuildStatus {
+  return (OPEN_BUILD_STATUSES as readonly BuildStatus[]).includes(status);
+}
+
+/** Execução em andamento ou na fila do site (build ou rollback), para o status ao vivo. */
+export type OpenExecution = {
+  id: number;
+  kind: BuildKind;
+  status: OpenBuildStatus;
+  /** Etapa em andamento, enquanto `rodando`. */
+  currentStage: BuildStage | null;
+  /** Horário previsto para começar, enquanto `na_fila`. */
+  scheduledFor: Date | null;
+  startedAt: Date | null;
+  requestedBy: string | null;
+  /** Pedido de cancelamento que o build-runner ainda não atendeu. */
+  cancelRequestedAt: Date | null;
+};
+
+/** Detalhe de uma execução que falhou. */
+export type ExecutionFailure = {
+  /** Etapa em que falhou; nula no rollback, que é um container só. */
+  stage: BuildStage | null;
+  kind: (typeof FAILURE_KINDS)[number] | null;
+  message: string | null;
+  /** Trecho final do log do container. */
+  logTail: string | null;
+};
+
+/** Item do histórico: uma execução que terminou (uma linha por tentativa, ADR 0008). */
+export type ExecutionHistoryItem = {
+  type: 'execucao';
+  id: number;
+  kind: BuildKind;
+  status: ClosedBuildStatus;
+  requestedBy: string | null;
+  /** Quem cancelou, no `cancelado` pedido por alguém. */
+  cancelRequestedBy: string | null;
+  /** Fim da execução. */
+  at: Date;
+  release: string | null;
+  versionId: string | null;
+  /** Só no `failed`. */
+  failure: ExecutionFailure | null;
+};
+
+/** Item do histórico: pausa, retomada ou troca de versão do site-builder. */
+export type EventHistoryItem = {
+  type: 'evento';
+  id: number;
+  kind: SiteEventKind;
+  requestedBy: string;
+  at: Date;
+  /** Motivo da pausa. */
+  reason: string | null;
+  /** Troca de versão: release anterior e nova. */
+  previousRelease: string | null;
+  release: string | null;
+};
+
+export type SiteHistoryItem = ExecutionHistoryItem | EventHistoryItem;
+
+/** O que está acontecendo no site e o que já aconteceu, do mais recente ao mais antigo. */
+export type SiteActivity = {
+  open: OpenExecution | null;
+  history: SiteHistoryItem[];
+};
+
+/** Quantos itens o histórico do site traz (sem paginação). */
+export const SITE_HISTORY_LIMIT = 50;
+
+/**
+ * Atividade do site, para o status ao vivo e o histórico da página do site: a execução aberta
+ * (a `rodando` antes da `na_fila`, quando um pedido durante o build deixa as duas) e o
+ * histórico que une as execuções terminadas de `builds` (builds e rollbacks, inclusive
+ * cancelados) aos eventos de `site_events`. Cada tabela é lida até o limite, e as duas listas
+ * são intercaladas pelo horário e cortadas no limite. A execução aberta fica fora do histórico.
+ */
+export async function siteActivity(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+  limit = SITE_HISTORY_LIMIT,
+): Promise<Result<SiteActivity>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+  const [site] = await db.select({ id: sites.id }).from(sites).where(eq(sites.id, siteId));
+  if (site === undefined) return notFound(siteId);
+
+  const openRows = await db
+    .select({
+      id: builds.id,
+      kind: builds.kind,
+      status: builds.status,
+      currentStage: builds.currentStage,
+      scheduledFor: builds.scheduledFor,
+      startedAt: builds.startedAt,
+      requestedBy: builds.requestedBy,
+      cancelRequestedAt: builds.cancelRequestedAt,
+    })
+    .from(builds)
+    .where(and(eq(builds.siteId, siteId), inArray(builds.status, OPEN_BUILD_STATUSES)))
+    .orderBy(desc(builds.id));
+  const opened = openRows.flatMap(({ status, ...row }) =>
+    isOpenStatus(status) ? [{ ...row, status }] : [],
+  );
+  const open =
+    opened.find((row) => row.status === 'rodando') ??
+    opened.find((row) => row.status === 'na_fila') ??
+    null;
+
+  const executions = await db
+    .select()
+    .from(builds)
+    .where(and(eq(builds.siteId, siteId), isNotNull(builds.finishedAt)))
+    .orderBy(desc(builds.finishedAt), desc(builds.id))
+    .limit(limit);
+  const events = await db
+    .select()
+    .from(siteEvents)
+    .where(eq(siteEvents.siteId, siteId))
+    .orderBy(desc(siteEvents.createdAt), desc(siteEvents.id))
+    .limit(limit);
+
+  const history: SiteHistoryItem[] = [
+    ...executions.flatMap(({ status, finishedAt, ...row }): ExecutionHistoryItem[] =>
+      finishedAt === null || isOpenStatus(status)
+        ? []
+        : [
+            {
+              type: 'execucao',
+              id: row.id,
+              kind: row.kind,
+              status,
+              requestedBy: row.requestedBy,
+              cancelRequestedBy: row.cancelRequestedBy,
+              at: finishedAt,
+              release: row.release,
+              versionId: row.versionId,
+              failure:
+                status === 'failed'
+                  ? {
+                      stage: row.failedStage,
+                      kind: row.failureKind,
+                      message: row.failureMessage,
+                      logTail: row.logTail,
+                    }
+                  : null,
+            },
+          ],
+    ),
+    ...events.map((row): EventHistoryItem => ({
+      type: 'evento',
+      id: row.id,
+      kind: row.kind,
+      requestedBy: row.requestedBy,
+      at: row.createdAt,
+      reason: row.reason,
+      previousRelease: row.previousRelease,
+      release: row.release,
+    })),
+  ]
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .slice(0, limit);
+
+  return { ok: true, value: { open, history } };
+}
 
 /**
  * Desfecho do "Cancelar": `cancelado` quando a publicação estava na fila e saiu dela;
