@@ -197,6 +197,13 @@
       "when": 1794508653831,
       "tag": "0027_conferencia_da_infra",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794518093162,
+      "tag": "0028_autoria_da_versao",
+      "breakpoints": true
     }
   ]
 }

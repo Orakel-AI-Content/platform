@@ -162,6 +162,8 @@ export const contentVersions = pgTable(
     status: text({ enum: CONTENT_STATUSES }).notNull(),
     data: jsonb().$type<ContentData>().notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** E-mail de quem criou a versão (`generator` no gerador); nulo nas anteriores à #748. */
+    createdBy: text(),
   },
   (t) => [primaryKey({ columns: [t.siteId, t.contentId, t.version] })],
 );

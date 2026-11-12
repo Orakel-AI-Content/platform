@@ -252,9 +252,14 @@ export async function createContent(
 
   const id = await allocateId(tx, siteId, 'content', options.id);
   await tx.insert(contents).values({ siteId, id, kind: input.kind, nextBlockN });
-  await tx
-    .insert(contentVersions)
-    .values({ siteId, contentId: id, version: 1, status, data: data.value });
+  await tx.insert(contentVersions).values({
+    siteId,
+    contentId: id,
+    version: 1,
+    status,
+    data: data.value,
+    createdBy: actor.email,
+  });
   await recordPendingChange(tx, siteId, 'content', String(id));
   return { ok: true, value: { id } };
 }
@@ -349,9 +354,14 @@ export async function updateContent(
   }
 
   const version = latest.version + 1;
-  await tx
-    .insert(contentVersions)
-    .values({ siteId, contentId, version, status: 'rascunho', data: data.value });
+  await tx.insert(contentVersions).values({
+    siteId,
+    contentId,
+    version,
+    status: 'rascunho',
+    data: data.value,
+    createdBy: actor.email,
+  });
   await tx
     .update(contents)
     .set({ nextBlockN })
@@ -649,6 +659,8 @@ export type ContentVersion = {
   version: number;
   status: Status;
   createdAt: Date;
+  /** E-mail de quem criou a versão (`generator` no gerador); nulo nas versões antigas. */
+  createdBy: string | null;
   data: ContentData;
   /** Aprovação da versão (`reviews`): quem aprovou e quando; nula sem aprovação. */
   approval: { reviewer: string; approvedAt: Date } | null;
@@ -671,6 +683,7 @@ export async function listContentVersions(
       version: contentVersions.version,
       status: contentVersions.status,
       createdAt: contentVersions.createdAt,
+      createdBy: contentVersions.createdBy,
       data: contentVersions.data,
       reviewer: reviews.reviewer,
       approvedAt: reviews.createdAt,
