@@ -1,8 +1,16 @@
 // Runtime de containers falso para os testes do build: cada etapa (render, publish, rollback) tem o
-// código de saída, os arquivos que deixa no volume, o log que escreve e se estoura o tempo.
+// código de saída, os arquivos que deixa no volume, o log que escreve, se estoura o tempo e se
+// fica rodando até ser morto.
 import type { ContainerRuntime, ContainerSpec } from './runtime.ts';
 
-export type FakeStage = { exitCode?: number; file?: unknown; timedOut?: boolean; log?: string };
+export type FakeStage = {
+  exitCode?: number;
+  file?: unknown;
+  timedOut?: boolean;
+  log?: string;
+  /** Fica rodando (cada `wait` estoura o tempo) até o `kill`; morto, sai com 137. */
+  running?: boolean;
+};
 
 export function fakeRuntime(options: {
   /** A imagem está no host? */
@@ -47,6 +55,11 @@ export function fakeRuntime(options: {
     },
     wait(id) {
       const stage = stageOf(id);
+      if (stage?.running) {
+        return Promise.resolve(
+          killed.includes(id) ? { exitCode: 137 } : { timedOut: true as const },
+        );
+      }
       return Promise.resolve(
         stage?.timedOut ? { timedOut: true as const } : { exitCode: stage?.exitCode ?? 0 },
       );
