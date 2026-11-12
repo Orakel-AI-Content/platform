@@ -5,7 +5,7 @@
 // módulo fora de pending-changes liberado no teste de varredura.
 import type { Culprit } from '@orakel/build-contract';
 import type { Result } from '@orakel/content-model';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { releases, siteEvents, sites } from '../../db/schema/index.ts';
@@ -265,6 +265,74 @@ export async function rebuildOnRelease(
   await unpause(tx, siteId, actor.email);
   await buildNow(tx, siteId, actor.email);
   return { ok: true, value: undefined };
+}
+
+/**
+ * Destino do "Voltar à versão anterior": a release de onde veio a troca de versão mais recente
+ * do site, ou `null` quando não houve troca, quando a anterior era nula ou quando ela não está
+ * `disponivel` — os mesmos casos em que `revertRelease` recusa.
+ */
+export async function previousRelease(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<string | null>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+  const [site] = await db.select({ id: sites.id }).from(sites).where(eq(sites.id, siteId));
+  if (site === undefined) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  const [last] = await db
+    .select({ previousRelease: siteEvents.previousRelease })
+    .from(siteEvents)
+    .where(and(eq(siteEvents.siteId, siteId), eq(siteEvents.kind, 'troca_de_versao')))
+    .orderBy(desc(siteEvents.createdAt), desc(siteEvents.id))
+    .limit(1);
+  if (last?.previousRelease == null) return { ok: true, value: null };
+  const [available] = await db
+    .select({ tag: releases.tag })
+    .from(releases)
+    .where(and(eq(releases.tag, last.previousRelease), eq(releases.pipelineState, 'disponivel')));
+  return { ok: true, value: available?.tag ?? null };
+}
+
+/**
+ * "Voltar à versão anterior": troca o site para a release de onde veio a última troca de
+ * versão, pelas regras de `rebuildOnRelease` (grava a troca, retoma se pausado, enfileira o
+ * build). Como isso grava uma troca nova, voltar de novo alterna entre as duas. Sem anterior
+ * válida, recusa sem gravar nada. Devolve a release de destino.
+ */
+export async function revertRelease(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<string>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+  // Trava a linha antes de ler a troca: de dois "voltar" simultâneos, o segundo lê a troca
+  // que o primeiro gravou.
+  await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, siteId)).for('update');
+  const previous = await previousRelease(tx, actor, siteId);
+  if (!previous.ok) return previous;
+  if (previous.value === null) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'release.no_previous',
+          message: `O site ${siteId} não tem versão anterior disponível para voltar`,
+          path: [],
+        },
+      ],
+    };
+  }
+  const rebuilt = await rebuildOnRelease(tx, actor, siteId, previous.value);
+  if (!rebuilt.ok) return rebuilt;
+  return { ok: true, value: previous.value };
 }
 
 /** Primeira publicação bem-sucedida: o site passa a `publicado`. */

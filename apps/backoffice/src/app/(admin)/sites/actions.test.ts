@@ -10,6 +10,7 @@ import {
   registerG1Action,
   rollbackSiteAction,
   resumeSiteAction,
+  revertReleaseAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
   siteActivityAction,
@@ -29,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   resumeSite: vi.fn(),
   pauseSiteManually: vi.fn(),
   rebuildOnRelease: vi.fn(),
+  revertRelease: vi.fn(),
   requestRollback: vi.fn(),
   requestUndoLastPublish: vi.fn(),
   cancelBuild: vi.fn(),
@@ -55,6 +57,7 @@ vi.mock('@/domain/builds/site-state.ts', () => ({
   resumeSite: mocks.resumeSite,
   pauseSiteManually: mocks.pauseSiteManually,
   rebuildOnRelease: mocks.rebuildOnRelease,
+  revertRelease: mocks.revertRelease,
   setBuildWindow: mocks.setBuildWindow,
   setDailyPublishLimit: mocks.setDailyPublishLimit,
 }));
@@ -398,6 +401,40 @@ describe('Server Actions da página do site', () => {
     });
     expect(mocks.requestUndoLastPublish).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a');
     expect(mocks.requestRollback).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('"Voltar à versão anterior" só delega ao domínio; a recusa vira a mensagem, sem revalidar', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await revertReleaseAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.revertRelease).not.toHaveBeenCalled();
+
+    mocks.revertRelease.mockResolvedValueOnce({
+      ok: false,
+      issues: [
+        {
+          code: 'release.no_previous',
+          message: 'O site exemplo-a não tem versão anterior disponível para voltar',
+          path: [],
+        },
+      ],
+    });
+    expect(await revertReleaseAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'O site exemplo-a não tem versão anterior disponível para voltar',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+
+    mocks.revertRelease.mockResolvedValueOnce({ ok: true, value: '1.3.2' });
+    expect(await revertReleaseAction('exemplo-a')).toEqual({
+      ok: true,
+      message: 'exemplo-a de volta à release 1.3.2; build enfileirado.',
+    });
+    expect(mocks.revertRelease).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a');
+    expect(mocks.rebuildOnRelease).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });
 
