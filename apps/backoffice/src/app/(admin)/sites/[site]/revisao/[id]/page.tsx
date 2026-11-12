@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { noRead } from '@/components/shared/ForbiddenScreen';
@@ -18,6 +17,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
 import { Button } from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 
 import { itemTitle } from '../../item-title.ts';
@@ -87,13 +87,9 @@ export default async function ReviewPage({ params }: Params) {
           // cabeçalho do guia. "Corrigir" (#751) só com a permissão e a versão em revisão.
           <div className="flex flex-wrap gap-2">
             {can(actor, 'content.amend') && latest.status === 'em_revisao' && (
-              <Button
-                asElement={Link}
-                href={`/sites/${site.id}/revisao/${contentId}/corrigir`}
-                size="sm"
-              >
+              <ButtonLink href={`/sites/${site.id}/revisao/${contentId}/corrigir`} size="sm">
                 Corrigir
-              </Button>
+              </ButtonLink>
             )}
             <Button
               asElement="a"
