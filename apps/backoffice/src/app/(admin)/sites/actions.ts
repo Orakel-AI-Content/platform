@@ -51,8 +51,8 @@ export async function publishNow(siteId: string): Promise<ActionResult> {
 
 /**
  * Status e histórico do site (#635), para a página consultar enquanto há execução aberta.
- * Só leitura: o papel e o site são conferidos pelo domínio. `null` sem sessão, permissão ou
- * site, como as leituras de polling (`uploadStatusAction`).
+ * Só leitura: o papel (`site.read`) e o site são conferidos pelo domínio. `null` sem sessão,
+ * permissão ou site, como as leituras de polling (`uploadStatusAction`).
  */
 export async function siteActivityAction(siteId: string): Promise<SiteActivity | null> {
   const actor = await currentActor();

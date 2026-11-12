@@ -1603,14 +1603,17 @@ describe('atividade do site', () => {
     expect(result.value.history.map((item) => item.at)).toEqual([at(6), at(5), at(4), at(3)]);
   });
 
-  it('sem operations.run recusa com forbidden; site inexistente, com site.not_found', async () => {
+  it('responde a editor e revisor (site.read); sem papel, forbidden; site inexistente, site.not_found', async () => {
     for (const role of ['editor', 'revisor'] as const) {
       const actor = { email: `${role}@orakel.local`, roles: [role] };
-      expect(await siteActivity(db, actor, 'exemplo-a')).toMatchObject({
-        ok: false,
-        issues: [{ code: 'forbidden' }],
-      });
+      expect(await siteActivity(db, actor, 'exemplo-a')).toMatchObject({ ok: true });
     }
+    expect(
+      await siteActivity(db, { email: 'x@orakel.local', roles: [] }, 'exemplo-a'),
+    ).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
     expect(await siteActivity(db, operacao, 'nao-existe')).toMatchObject({
       ok: false,
       issues: [{ code: 'site.not_found' }],
