@@ -6,9 +6,14 @@ import { revalidatePath } from 'next/cache';
 import { currentActor } from '@/auth/request-actor.ts';
 import type { EntityFormResult } from '@/components/editorial/EntityForms';
 import { getDb } from '@/db/client.ts';
-import { enqueueGeneration, type GenerationRequest } from '@/domain/generation/runs.ts';
+import {
+  enqueueGeneration,
+  type GenerationRequest,
+  type GenerationRunSummary,
+  listGenerationRuns,
+} from '@/domain/generation/runs.ts';
 
-// Ação da aba Geração (R1): permissão (content.write), tema vazio, autor de fora e site sem
+// Ações da aba Geração (R1): permissão (content.write), tema vazio, autor de fora e site sem
 // contexto editorial ficam no domínio, que cria a execução e o job na mesma transação; aqui só
 // a tradução do Result, como em `editorial-actions.ts`. O valor chega do formulário sem tipo
 // garantido; o domínio confere.
@@ -38,4 +43,16 @@ export async function enqueueGenerationAction(
   if (!result.ok) return refused(result.issues);
   revalidatePath(`/sites/${siteId}/geracao`);
   return { ok: true, message: 'Geração enfileirada: acompanhe a execução na lista.' };
+}
+
+/**
+ * Leitura do polling da lista de execuções (#779): as execuções do site pelo domínio, que confere
+ * site.read; `null` sem sessão ou permissão, e a lista na tela fica como está. Mesmo molde de
+ * `siteActivityAction`.
+ */
+export async function generationRunsAction(siteId: string): Promise<GenerationRunSummary[] | null> {
+  const actor = await currentActor();
+  if (!actor.ok) return null;
+  const result = await listGenerationRuns(getDb().db, actor.value, siteId);
+  return result.ok ? result.value : null;
 }
