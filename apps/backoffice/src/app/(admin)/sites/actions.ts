@@ -21,6 +21,7 @@ import type { Actor } from '@/domain/access/rbac.ts';
 import { requestBuildNow, requestRollback } from '@/domain/builds/builds.ts';
 import {
   advanceLifecycle,
+  pauseSiteManually,
   rebuildOnRelease,
   resumeSite,
   setBuildWindow,
@@ -127,6 +128,18 @@ export async function resumeSiteAction(siteId: string): Promise<ActionResult> {
     siteId,
     (tx, actor) => resumeSite(tx, actor, siteId),
     `${siteId} retomado; build enfileirado.`,
+  );
+}
+
+/**
+ * "Pausar" o site ativo com o motivo informado; "Retomar" desfaz. Papel, motivo e estado são
+ * conferidos pelo domínio.
+ */
+export async function pauseSiteAction(siteId: string, reason: string): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => pauseSiteManually(tx, actor, siteId, reason),
+    `${siteId} pausado.`,
   );
 }
 

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   advanceLifecycleAction,
   createSiteAction,
+  pauseSiteAction,
   rebuildOnReleaseAction,
   registerG1Action,
   rollbackSiteAction,
@@ -23,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   advanceLifecycle: vi.fn(),
   resumeSite: vi.fn(),
+  pauseSiteManually: vi.fn(),
   rebuildOnRelease: vi.fn(),
   requestRollback: vi.fn(),
   setBuildWindow: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('@/domain/builds/builds.ts', () => ({
 vi.mock('@/domain/builds/site-state.ts', () => ({
   advanceLifecycle: mocks.advanceLifecycle,
   resumeSite: mocks.resumeSite,
+  pauseSiteManually: mocks.pauseSiteManually,
   rebuildOnRelease: mocks.rebuildOnRelease,
   setBuildWindow: mocks.setBuildWindow,
   setDailyPublishLimit: mocks.setDailyPublishLimit,
@@ -218,6 +221,41 @@ describe('Server Actions da página do site', () => {
     });
     expect(mocks.setDailyPublishLimit).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a', null);
 
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('"Pausar" delega ao domínio com o motivo; a recusa vira a mensagem, sem revalidar', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await pauseSiteAction('exemplo-a', 'Manutenção')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.pauseSiteManually).not.toHaveBeenCalled();
+
+    mocks.pauseSiteManually.mockResolvedValueOnce({
+      ok: false,
+      issues: [
+        { code: 'site.already_paused', message: 'O site exemplo-a já está pausado', path: [] },
+      ],
+    });
+    expect(await pauseSiteAction('exemplo-a', 'Manutenção')).toEqual({
+      ok: false,
+      message: 'O site exemplo-a já está pausado',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+
+    mocks.pauseSiteManually.mockResolvedValueOnce(done);
+    expect(await pauseSiteAction('exemplo-a', 'Manutenção')).toEqual({
+      ok: true,
+      message: 'exemplo-a pausado.',
+    });
+    expect(mocks.pauseSiteManually).toHaveBeenLastCalledWith(
+      {},
+      operacao,
+      'exemplo-a',
+      'Manutenção',
+    );
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });

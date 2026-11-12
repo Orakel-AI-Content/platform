@@ -21,6 +21,41 @@ async function recordSiteEvent(
 }
 
 /**
+ * Põe o site em `pausado` com o motivo e o culpado (sem ele, limpa o de uma pausa anterior) e
+ * registra a pausa em nome de quem pediu. Com `onlyFromActive`, só pausa site `ativo`: o update
+ * condicional decide a corrida. Devolve se pausou.
+ */
+async function pause(
+  tx: Executor,
+  siteId: string,
+  options: { reason: string; culprit?: Culprit; requestedBy: string; onlyFromActive: boolean },
+): Promise<boolean> {
+  const { reason, culprit, requestedBy, onlyFromActive } = options;
+  const updated = await tx
+    .update(sites)
+    .set({
+      state: 'pausado',
+      pausedReason: reason,
+      pausedCulpritOrigin: culprit?.origin ?? null,
+      pausedCulpritReference: culprit?.reference ?? null,
+    })
+    .where(
+      onlyFromActive ? and(eq(sites.id, siteId), eq(sites.state, 'ativo')) : eq(sites.id, siteId),
+    )
+    .returning({ id: sites.id });
+  if (updated.length === 0) return false;
+  await recordSiteEvent(tx, {
+    siteId,
+    kind: 'pausa',
+    requestedBy,
+    reason,
+    culpritOrigin: culprit?.origin ?? null,
+    culpritReference: culprit?.reference ?? null,
+  });
+  return true;
+}
+
+/**
  * Falha permanente: o site para de receber builds até ser retomado (L4). Grava o culpado
  * junto do motivo; sem ele, limpa o de uma pausa anterior.
  */
@@ -30,23 +65,77 @@ export async function pauseSite(
   reason: string,
   culprit?: Culprit,
 ): Promise<void> {
-  await tx
-    .update(sites)
-    .set({
-      state: 'pausado',
-      pausedReason: reason,
-      pausedCulpritOrigin: culprit?.origin ?? null,
-      pausedCulpritReference: culprit?.reference ?? null,
-    })
-    .where(eq(sites.id, siteId));
-  await recordSiteEvent(tx, {
-    siteId,
-    kind: 'pausa',
-    requestedBy: SYSTEM_ACTOR.email,
+  await pause(tx, siteId, {
     reason,
-    culpritOrigin: culprit?.origin ?? null,
-    culpritReference: culprit?.reference ?? null,
+    ...(culprit === undefined ? {} : { culprit }),
+    requestedBy: SYSTEM_ACTOR.email,
+    onlyFromActive: false,
   });
+}
+
+/**
+ * "Pausar" (L4): quem opera pausa o site ativo informando o motivo, sem culpado; o build na
+ * fila passa a ser ignorado e "Retomar" desfaz. Só a partir de `ativo`: a pausa de um site já
+ * pausado é recusada e o motivo dela fica.
+ */
+export async function pauseSiteManually(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  reason: string,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+
+  const trimmed = reason.trim();
+  if (trimmed === '') {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'site.pause_reason_required',
+          message: 'Informe o motivo da pausa',
+          path: ['reason'],
+        },
+      ],
+    };
+  }
+
+  if (
+    await pause(tx, siteId, { reason: trimmed, requestedBy: actor.email, onlyFromActive: true })
+  ) {
+    return { ok: true, value: undefined };
+  }
+
+  const [site] = await tx.select({ state: sites.state }).from(sites).where(eq(sites.id, siteId));
+  if (site === undefined) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  if (site.state === 'pausado') {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'site.already_paused',
+          message: `O site ${siteId} já está pausado`,
+          path: [],
+        },
+      ],
+    };
+  }
+  return {
+    ok: false,
+    issues: [
+      {
+        code: 'site.not_active',
+        message: `O site ${siteId} está ${site.state}; só um site ativo pode ser pausado`,
+        path: [],
+      },
+    ],
+  };
 }
 
 /**
