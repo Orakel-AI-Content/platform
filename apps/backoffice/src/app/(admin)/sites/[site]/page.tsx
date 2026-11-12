@@ -19,7 +19,7 @@ import { countContentsByStatus } from '@/domain/content/contents.ts';
 import { previousRelease } from '@/domain/builds/site-state.ts';
 import { latestAvailableRelease, listReleases } from '@/domain/releases/releases.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
-import { readSiteInstance, redirectUsageFor } from '@/domain/sites/sites.ts';
+import { readSiteInfraCheck, readSiteInstance, redirectUsageFor } from '@/domain/sites/sites.ts';
 import { DetailLayout } from '@/components/shared/DetailLayout';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -27,8 +27,8 @@ import { SECTION_HINT_CLASS } from '@/components/shared/sectionText.ts';
 import { siteTrail } from '@/components/shared/trail.ts';
 
 import {
-  advanceLifecycleAction,
   cancelBuildAction,
+  checkSiteInfraAction,
   pauseSiteAction,
   publishNow,
   rebuildOnReleaseAction,
@@ -40,6 +40,7 @@ import {
   setBuildWindowAction,
   setDailyPublishLimitAction,
   siteActivityAction,
+  siteInfraCheckAction,
   undoLastPublishAction,
 } from '../actions.ts';
 import { sitePageContext } from './editorial-page.tsx';
@@ -78,6 +79,8 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   if (!contentCounts.ok) return noRead;
   const activity = await siteActivity(db, actor, siteId);
   if (!activity.ok) return noRead;
+  const infraCheck = await readSiteInfraCheck(db, actor, siteId);
+  if (!infraCheck.ok) return noRead;
   const canConfigure = can(actor, 'site.configure');
   const canOperate = can(actor, 'operations.run');
   // As releases do "Escolher outra versão do motor" (#515): listá-las exige release.promote, que a
@@ -176,11 +179,13 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
       }}
       activity={activity.value}
       status={siteActivityAction.bind(null, site.id)}
+      infraCheck={{ check: infraCheck.value, now: new Date() }}
+      infraCheckStatus={siteInfraCheckAction.bind(null, site.id)}
       lifecycleAction={
         canConfigure ? (
           <LifecycleAction
             lifecycle={site.lifecycle}
-            action={advanceLifecycleAction.bind(null, site.id)}
+            check={checkSiteInfraAction.bind(null, site.id)}
             undo={retreatLifecycleAction.bind(null, site.id)}
           />
         ) : undefined

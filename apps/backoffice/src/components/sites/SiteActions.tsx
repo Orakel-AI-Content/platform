@@ -10,6 +10,8 @@ import { INFRA_STEP_TEXT } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
+import { useInfraCheckContext } from './LifecycleSteps.tsx';
+
 import type { SiteFormResult } from './siteConfigFormValues.ts';
 import {
   BuildWindowSchema,
@@ -25,22 +27,10 @@ import {
 // gerados do schema, em cartão com os botões no rodapé (#333), como o limite diário (#490). A
 // página só as mostra com site.configure.
 
-const NEXT_STEP = {
-  cadastrado: {
-    step: 'infra_aplicada',
-    label: 'Marcar infra aplicada',
-    pendingLabel: 'Marcando infra aplicada…',
-  },
-  infra_aplicada: {
-    step: 'zona_ativa',
-    label: 'Marcar zona ativa',
-    pendingLabel: 'Marcando zona ativa…',
-  },
-} as const;
+/** Etapas que "Desmarcar" volta (as que a conferência automática marca). */
+type Step = 'infra_aplicada' | 'zona_ativa';
 
-type Step = (typeof NEXT_STEP)[keyof typeof NEXT_STEP]['step'];
-
-/** Etapa manual que "Desmarcar" volta, com a anterior que o site passa a ter. */
+/** Etapa que "Desmarcar" volta, com a anterior que o site passa a ter. */
 const UNDO_STEP = {
   infra_aplicada: { label: 'infra aplicada', back: 'cadastrado' },
   zona_ativa: { label: 'zona ativa', back: 'infra_aplicada' },
@@ -64,43 +54,49 @@ export function LifecycleActionScope({ children }: { children: ReactNode }) {
 }
 
 /**
- * Só o próximo passo manual válido ("Marcar…") e o caminho de volta da etapa manual atual
- * ("Desmarcar", com confirmação; #714); `publicado` vem do build e não se desmarca. Sem nenhum
- * dos dois (publicado) não renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de
- * qualquer um vai ao mesmo Alert.
+ * As ações da etapa "Infra e zona": "Conferir agora" (workspace#85), que enfileira a conferência
+ * da infra só deste site, enquanto a conferência ainda tem o que avançar (`cadastrado`,
+ * `infra_aplicada`), e o caminho de volta da etapa atual ("Desmarcar", com confirmação; #714);
+ * `publicado` vem do build e não se desmarca. Com conferência na fila, "Conferir agora" fica
+ * desabilitado e diz "Conferindo…". A etapa e a fila vêm da conferência relida pela aba
+ * (`InfraCheckContext`); fora dela, da `lifecycle` da página. Sem nenhuma ação (publicado) não
+ * renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de qualquer uma vai ao mesmo
+ * Alert.
  */
 export function LifecycleAction({
-  lifecycle,
-  action,
+  lifecycle: pageLifecycle,
+  check,
   undo,
 }: {
   lifecycle: SiteSummary['lifecycle'];
-  action: (step: Step) => Promise<ActionResult>;
+  check: () => Promise<ActionResult>;
   undo: (step: Step) => Promise<ActionResult>;
 }) {
   const scope = use(LifecycleActionContext);
+  const view = useInfraCheckContext();
   const [confirming, setConfirming] = useState(false);
-  const [running, setRunning] = useState<'next' | 'undo' | null>(null);
+  const [running, setRunning] = useState<'check' | 'undo' | null>(null);
   if (scope === null) throw new Error('LifecycleAction fora de um LifecycleActionScope.');
-  const next =
-    lifecycle === 'cadastrado' || lifecycle === 'infra_aplicada' ? NEXT_STEP[lifecycle] : null;
+  const lifecycle = view?.check.lifecycle ?? pageLifecycle;
+  const queued = view?.check.queued ?? false;
+  const checkable = lifecycle === 'cadastrado' || lifecycle === 'infra_aplicada';
   const current = lifecycle === 'infra_aplicada' || lifecycle === 'zona_ativa' ? lifecycle : null;
-  if (next === null && current === null) return null;
-  const pending = (kind: 'next' | 'undo') => scope.pending && running === kind;
+  if (!checkable && current === null) return null;
+  const pending = (kind: 'check' | 'undo') => scope.pending && running === kind;
 
   return (
     <span className="flex flex-wrap gap-2">
-      {next && (
+      {checkable && (
         <Button
           type="button"
           size="sm"
-          disabled={scope.pending}
+          disabled={scope.pending || queued}
           onClick={() => {
-            setRunning('next');
-            scope.run(() => action(next.step));
+            setRunning('check');
+            scope.run(check);
           }}
         >
-          {pending('next') ? next.pendingLabel : next.label}
+          {pending('check') || queued ? 'Conferindo…' : 'Conferir agora'}
         </Button>
       )}
       {current && (

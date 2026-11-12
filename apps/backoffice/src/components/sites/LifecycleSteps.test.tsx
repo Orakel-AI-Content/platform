@@ -13,8 +13,8 @@ import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 // Conteúdo da etapa "Infra e zona" do painel da aba "Publicação" (#647): o ciclo de vida em
-// texto, a ação manual do passo seguinte e "Desmarcar" com confirmação (#714), com o erro no
-// Alert do escopo.
+// texto, "Conferir agora" (workspace#85) e "Desmarcar" com confirmação (#714), com o erro no
+// Alert do escopo. O polling da conferência está em `SitePublicationTab.test.tsx`.
 
 let app: HTMLElement;
 
@@ -40,11 +40,11 @@ type Lifecycle = SiteSummary['lifecycle'];
 
 const ok = (): Promise<ActionResult> => Promise.resolve({ ok: true, message: '' });
 
-const withAction = (lifecycle: Lifecycle, action = ok, undo = ok) => (
+const withAction = (lifecycle: Lifecycle, check = ok, undo = ok) => (
   <LifecycleActionScope>
     <LifecycleSteps
       current={lifecycle}
-      action={<LifecycleAction lifecycle={lifecycle} action={action} undo={undo} />}
+      action={<LifecycleAction lifecycle={lifecycle} check={check} undo={undo} />}
     />
   </LifecycleActionScope>
 );
@@ -64,8 +64,8 @@ describe('etapa Infra e zona', () => {
   });
 
   it.each([
-    ['cadastrado', ['Marcar infra aplicada']],
-    ['infra_aplicada', ['Marcar zona ativa', 'Desmarcar infra aplicada']],
+    ['cadastrado', ['Conferir agora']],
+    ['infra_aplicada', ['Conferir agora', 'Desmarcar infra aplicada']],
     ['zona_ativa', ['Desmarcar zona ativa']],
   ] as const)('em %s mostra as ações %j', (lifecycle, names) => {
     render(withAction(lifecycle));
@@ -73,25 +73,44 @@ describe('etapa Infra e zona', () => {
     expect(buttons()).toEqual(names);
   });
 
-  it('em publicado nenhuma ação manual aparece', () => {
+  it('em publicado nenhuma ação aparece', () => {
     render(withAction('publicado'));
 
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('o erro da ação continua no Alert quando a revalidação troca o botão', async () => {
+  it.each(['cadastrado', 'infra_aplicada', 'zona_ativa', 'publicado'] as const)(
+    'em %s, nenhum "Marcar…" aparece',
+    (lifecycle) => {
+      render(withAction(lifecycle));
+
+      expect(document.body.textContent).not.toMatch(/Marcar (infra aplicada|zona ativa)/);
+    },
+  );
+
+  it('"Conferir agora" pede a conferência uma vez', async () => {
     const user = userEvent.setup();
-    const action = (): Promise<ActionResult> =>
-      Promise.resolve({ ok: false, message: 'A etapa anterior não foi concluída.' });
-    const { rerender } = render(withAction('cadastrado', action));
+    const check = vi.fn(ok);
+    render(withAction('cadastrado', check));
+
+    await user.click(screen.getByRole('button', { name: 'Conferir agora' }));
+
+    await waitFor(() => expect(check).toHaveBeenCalledTimes(1));
+  });
+
+  it('a recusa de "Conferir agora" vai ao Alert e continua lá quando a revalidação troca a etapa', async () => {
+    const user = userEvent.setup();
+    const check = (): Promise<ActionResult> =>
+      Promise.resolve({ ok: false, message: 'Sem permissão para site.configure' });
+    const { rerender } = render(withAction('cadastrado', check));
     const region = screen.getByRole('alert');
 
-    await user.click(screen.getByRole('button', { name: 'Marcar infra aplicada' }));
-    await waitFor(() => expect(region.textContent).toBe('A etapa anterior não foi concluída.'));
+    await user.click(screen.getByRole('button', { name: 'Conferir agora' }));
+    await waitFor(() => expect(region.textContent).toBe('Sem permissão para site.configure'));
 
-    rerender(withAction('infra_aplicada', action));
-    expect(screen.getByRole('alert').textContent).toBe('A etapa anterior não foi concluída.');
-    expect(screen.getByRole('button', { name: 'Marcar zona ativa' })).not.toBeNull();
+    rerender(withAction('infra_aplicada', check));
+    expect(screen.getByRole('alert').textContent).toBe('Sem permissão para site.configure');
+    expect(screen.getByRole('button', { name: 'Conferir agora' })).not.toBeNull();
   });
 });
 

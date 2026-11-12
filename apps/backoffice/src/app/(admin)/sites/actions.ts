@@ -27,7 +27,6 @@ import {
   type SiteActivity,
 } from '@/domain/builds/builds.ts';
 import {
-  advanceLifecycle,
   pauseSiteManually,
   rebuildOnRelease,
   resumeSite,
@@ -38,7 +37,13 @@ import {
   type ManualLifecycleStep,
 } from '@/domain/builds/site-state.ts';
 import { registerPolicyTrigger } from '@/domain/sites/policy-triggers.ts';
-import { createSite, updateSiteConfig } from '@/domain/sites/sites.ts';
+import {
+  createSite,
+  readSiteInfraCheck,
+  requestSiteInfraCheck,
+  updateSiteConfig,
+  type SiteInfraCheck,
+} from '@/domain/sites/sites.ts';
 
 /** "Publicar agora": a regra (papel, site pausado) fica no domínio. */
 export async function publishNow(siteId: string): Promise<ActionResult> {
@@ -131,16 +136,28 @@ const STEP_LABEL: Record<ManualLifecycleStep, string> = {
   zona_ativa: 'Zona ativa',
 };
 
-/** Etapa manual do ciclo de vida (só a partir da anterior; a ordem é do domínio). */
-export async function advanceLifecycleAction(
-  siteId: string,
-  step: ManualLifecycleStep,
-): Promise<ActionResult> {
+/**
+ * "Conferir agora" (workspace#85): enfileira a conferência da infra só deste site; papel e
+ * etapa são do domínio. O resultado chega pelo polling de `siteInfraCheckAction`.
+ */
+export async function checkSiteInfraAction(siteId: string): Promise<ActionResult> {
   return siteOperation(
     siteId,
-    (tx, actor) => advanceLifecycle(tx, actor, siteId, step),
-    `${STEP_LABEL[step]} marcada.`,
+    (tx, actor) => requestSiteInfraCheck(tx, actor, siteId),
+    'Conferência da infra enfileirada.',
   );
+}
+
+/**
+ * Conferência da infra do site, para a etapa "Infra e zona" consultar enquanto há conferência
+ * na fila. Só leitura (`site.read` no domínio); `null` sem sessão, permissão ou site, como
+ * `siteActivityAction`.
+ */
+export async function siteInfraCheckAction(siteId: string): Promise<SiteInfraCheck | null> {
+  const actor = await currentActor();
+  if (!actor.ok) return null;
+  const result = await readSiteInfraCheck(getDb().db, actor.value, siteId);
+  return result.ok ? result.value : null;
 }
 
 /** "Desmarcar" a etapa manual atual: volta só à anterior (a ordem e a corrida são do domínio). */
