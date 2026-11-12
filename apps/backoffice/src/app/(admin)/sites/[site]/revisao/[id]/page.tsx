@@ -8,6 +8,7 @@ import { hasError, reviewCheckItems } from '@/components/review/reviewCheckItems
 import { CONTENT_STATUS_LABEL, CONTENT_STATUS_TAG } from '@/components/shared/siteLabels.ts';
 import { StateTag } from '@/components/sites/SiteStatus';
 import { can } from '@/domain/access/rbac.ts';
+import { reviewConfirmations } from '@/domain/reviews/confirmations.ts';
 import { linkCheckFor } from '@/domain/reviews/link-checks.ts';
 import { REVIEW_CHECKLIST, reviewChecks } from '@/domain/reviews/reviews.ts';
 import { DETAIL_SUMMARY_CLASS } from '@/components/shared/detailSummary.ts';
@@ -23,7 +24,7 @@ import { previewUrl } from '../../conteudos/content-urls.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { sitePageContext } from '../../editorial-page.tsx';
-import { approveAction, returnAction } from '../actions.ts';
+import { approveAction, confirmAction, confirmAllAction, returnAction } from '../actions.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +42,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 /**
  * Tela de revisão (#75): a versão mais recente na visualização do site (iframe) e, ao lado, as
  * checagens automáticas (workspace#87: as calculadas na leitura e a dos links externos, gravada
- * pelo job), o checklist, a aprovação e a devolução ao editor (#598). Ler exige site.read; aprovar só
+ * pelo job), o checklist com as confirmações gravadas na versão (#752), a aprovação e a devolução ao editor (#598). Ler exige site.read; aprovar só
  * aparece com content.publish, e o domínio confere tudo de novo. Tela de detalhe do guia (#373),
  * na ordem invertida do `CustomerDetails`: a prévia é o conteúdo principal, com a largura do
  * `main`, e o painel fica abaixo dela até `xl` e ao lado a partir dele.
@@ -63,11 +64,12 @@ export default async function ReviewPage({ params }: Params) {
     return noRead;
   }
   const latest = versions.value.at(-1)!;
-  const [checks, links] = await Promise.all([
+  const [checks, links, confirmations] = await Promise.all([
     reviewChecks(db, actor, siteId, contentId),
     linkCheckFor(db, actor, { siteId, contentId, version: latest.version }),
+    reviewConfirmations(db, actor, siteId, contentId, latest.version),
   ]);
-  if (!checks.ok || !links.ok) return noRead;
+  if (!checks.ok || !links.ok || !confirmations.ok) return noRead;
   const items = reviewCheckItems(checks.value.checks, links.value, latest.data.blocks);
   const preview = previewUrl(site.id, latest.data);
 
@@ -106,12 +108,17 @@ export default async function ReviewPage({ params }: Params) {
         </Card>
         <div className={DETAIL_SUMMARY_CLASS}>
           <ReviewPanel
+            // Outra versão (depois de uma correção) começa do que está gravado nela.
+            key={latest.version}
             version={latest.version}
             status={latest.status}
             checks={<ReviewChecks items={items} />}
             blocked={hasError(items)}
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
+            confirmed={confirmations.value.map((confirmation) => confirmation.key)}
             canApprove={can(actor, 'content.publish')}
+            confirm={confirmAction.bind(null, site.id, contentId, latest.version)}
+            confirmAll={confirmAllAction.bind(null, site.id, contentId, latest.version)}
             approve={approveAction.bind(null, site.id, contentId, latest.version)}
             giveBack={returnAction.bind(null, site.id, contentId, latest.version)}
           />

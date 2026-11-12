@@ -12,7 +12,8 @@ import type { ReviewCheckItem } from './reviewCheckItems.ts';
 import { ReviewPanel } from './ReviewPanel.tsx';
 
 // Painel da revisão (#75): checagens automáticas (workspace#87), checklist com "Marcar todos", com os rótulos recebidos, bloqueio,
-// permissão e a mensagem de aprovação (no toast, #325). No Ecme (#277), o conteúdo fica em Cards;
+// permissão e a mensagem de aprovação (no toast, #325). As caixas abrem com as confirmações
+// gravadas na versão e gravam a cada clique (#752); a recusa desfaz e é anunciada. No Ecme (#277), o conteúdo fica em Cards;
 // o checklist tem o seu, com "Aprovar" no rodapé (#333). "Devolver ao editor" (#598) tem cartão
 // próprio, com o comentário obrigatório.
 
@@ -46,6 +47,27 @@ const checklist = [
 
 type Props = ComponentProps<typeof ReviewPanel>;
 
+const allKeys = checklist.map((item) => item.key);
+
+/** Ações de confirmar como o servidor: grava numa lista e devolve as chaves gravadas depois. */
+function server(initial: readonly string[] = []) {
+  let saved = [...initial];
+  const reply = () => Promise.resolve({ ok: true as const, confirmed: [...saved] });
+  return {
+    confirmed: initial,
+    confirm: vi.fn((key: string, confirmed: boolean) => {
+      saved = confirmed ? [...new Set([...saved, key])] : saved.filter((item) => item !== key);
+      return reply();
+    }),
+    confirmAll: vi.fn((confirmed: boolean) => {
+      saved = confirmed ? [...allKeys] : [];
+      return reply();
+    }),
+  };
+}
+
+const checkbox = (label: string) => screen.getByRole<HTMLInputElement>('checkbox', { name: label });
+
 // Itens como a página os monta: avisos (capa, link externo fora do ar) não bloqueiam.
 const warnings: ReviewCheckItem[] = [
   {
@@ -72,6 +94,7 @@ const renderPanel = (props: Partial<Props> = {}) =>
       canApprove
       approve={vi.fn()}
       giveBack={vi.fn()}
+      {...server()}
       {...props}
     />,
   );
@@ -127,7 +150,7 @@ describe('painel de revisão', () => {
   });
 
   it('com erro nas checagens, bloqueia aprovar, com o motivo', () => {
-    renderPanel({ blocked: true });
+    renderPanel({ blocked: true, confirmed: allKeys });
 
     // Aviso no Alert de erro do Ecme, com ícone, sem `text-error` à mão e sem região viva: chega
     // no carregamento (#444).
@@ -154,31 +177,92 @@ describe('painel de revisão', () => {
     expect(screen.getByText(checklist[0]!.label)).toBeTruthy();
   });
 
-  it('checklist incompleto não chama a aprovação', async () => {
-    const approve = vi.fn();
-    renderPanel({ approve });
+  it('abre com as confirmações gravadas na versão (ex.: depois de uma correção só na capa)', () => {
+    renderPanel({ confirmed: ['valor_original', 'politicas_anuncios_afiliados'] });
 
-    await userEvent.click(screen.getByRole('checkbox', { name: checklist[0]!.label }));
-    await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
-
-    expect(approve).not.toHaveBeenCalled();
-    expect(screen.getAllByText('Marque este item para aprovar.')).toHaveLength(2);
+    expect(checkbox(checklist[0]!.label).checked).toBe(true);
+    expect(checkbox(checklist[1]!.label).checked).toBe(true);
+    expect(checkbox(checklist[2]!.label).checked).toBe(false);
   });
 
-  it('pelo teclado, com o checklist completo, aprova com as chaves e anuncia no toast', async () => {
+  it('com o checklist incompleto, "Aprovar" fica desabilitado, com o motivo', () => {
+    renderPanel({ confirmed: ['valor_original', 'politicas_anuncios_afiliados'] });
+
+    const button = screen.getByRole('button', { name: 'Aprovar' });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(
+      document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe('Marque todos os itens para aprovar.');
+  });
+
+  it('marcar e desmarcar uma caixa grava na hora, com a chave e o novo estado', async () => {
+    const actions = server(['valor_original']);
+    renderPanel(actions);
+
+    await userEvent.click(checkbox(checklist[2]!.label));
+    await userEvent.click(checkbox(checklist[0]!.label));
+
+    expect(actions.confirm.mock.calls).toEqual([
+      ['visualizacao_conferida', true],
+      ['valor_original', false],
+    ]);
+    await waitFor(() => expect(checkbox(checklist[0]!.label).checked).toBe(false));
+    expect(checkbox(checklist[2]!.label).checked).toBe(true);
+  });
+
+  it('fica com as chaves que o servidor devolve, não com as supostas', async () => {
+    const confirm = vi.fn().mockResolvedValue({ ok: true, confirmed: allKeys });
+    renderPanel({ confirm });
+
+    await userEvent.click(checkbox(checklist[0]!.label));
+
+    await waitFor(() => expect(checkbox(checklist[2]!.label).checked).toBe(true));
+    expect(screen.getByRole('button', { name: 'Aprovar' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('falha ao gravar é anunciada e a caixa volta ao estado anterior', async () => {
+    const confirm = vi
+      .fn()
+      .mockResolvedValue({ ok: false, message: 'Sem permissão para content.publish' });
+    renderPanel({ confirm });
+
+    await userEvent.click(checkbox(checklist[0]!.label));
+
+    const message = await screen.findByText('Sem permissão para content.publish');
+    expect(message.closest('[role="alert"]')).not.toBeNull();
+    expect(checkbox(checklist[0]!.label).checked).toBe(false);
+  });
+
+  it('ação que falha sem resposta também desfaz e anuncia', async () => {
+    const confirm = vi.fn().mockRejectedValue(new Error('rede'));
+    renderPanel({ confirmed: ['valor_original'], confirm });
+
+    await userEvent.click(checkbox(checklist[0]!.label));
+
+    expect(
+      await screen.findByText('Não foi possível gravar a confirmação; tente de novo.'),
+    ).toBeTruthy();
+    expect(checkbox(checklist[0]!.label).checked).toBe(true);
+  });
+
+  it('pelo teclado, com o checklist completo, aprova sem enviar o checklist e anuncia no toast', async () => {
     const approve = vi.fn().mockResolvedValue({ ok: true, message: 'Versão 2 aprovada.' });
-    const { rerender } = renderPanel({ approve });
+    const actions = server();
+    const { rerender } = renderPanel({ approve, ...actions });
     render(<ToastProvider />);
     const user = userEvent.setup();
 
     for (const item of checklist) {
-      screen.getByRole('checkbox', { name: item.label }).focus();
+      checkbox(item.label).focus();
       await user.keyboard(' ');
     }
-    screen.getByRole('button', { name: 'Aprovar' }).focus();
+    expect(actions.confirm.mock.calls).toEqual(allKeys.map((key) => [key, true]));
+    const button = screen.getByRole('button', { name: 'Aprovar' });
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false));
+    button.focus();
     await user.keyboard('{Enter}');
 
-    expect(approve).toHaveBeenCalledWith(checklist.map((item) => item.key));
+    expect(approve).toHaveBeenCalledWith();
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Versão 2 aprovada.'));
     expect(screen.getByRole('status').querySelector('.notification')).not.toBeNull();
 
@@ -193,39 +277,41 @@ describe('painel de revisão', () => {
         canApprove
         approve={approve}
         giveBack={vi.fn()}
+        {...server(allKeys)}
       />,
     );
     expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
     expect(screen.getByRole('complementary').querySelector('[role="status"]')).toBeNull();
   });
 
-  it('"Marcar todos" marca as três caixas, e "Aprovar" funciona em seguida', async () => {
+  it('"Marcar todos" grava as três confirmações, e "Aprovar" funciona em seguida', async () => {
     const approve = vi.fn().mockResolvedValue({ ok: true, message: 'Versão 2 aprovada.' });
-    renderPanel({ approve });
+    const actions = server();
+    renderPanel({ approve, ...actions });
 
     await userEvent.click(screen.getByRole('button', { name: 'Marcar todos' }));
-    for (const item of checklist) {
-      expect(screen.getByRole<HTMLInputElement>('checkbox', { name: item.label }).checked).toBe(
-        true,
-      );
-    }
-    await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
+    expect(actions.confirmAll).toHaveBeenCalledExactlyOnceWith(true);
+    expect(actions.confirm).not.toHaveBeenCalled();
+    for (const item of checklist) expect(checkbox(item.label).checked).toBe(true);
+    const button = screen.getByRole('button', { name: 'Aprovar' });
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false));
+    await userEvent.click(button);
 
-    expect(approve).toHaveBeenCalledWith(checklist.map((item) => item.key));
+    expect(approve).toHaveBeenCalledWith();
   });
 
-  it('"Marcar todos" limpa os erros do checklist já mostrados', async () => {
-    renderPanel();
+  it('falha de "Marcar todos" volta as caixas ao que estava gravado', async () => {
+    const confirmAll = vi.fn().mockResolvedValue({ ok: false, message: 'Versão já decidida.' });
+    renderPanel({ confirmed: ['valor_original'], confirmAll });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
-    expect(screen.getAllByText('Marque este item para aprovar.')).toHaveLength(3);
     await userEvent.click(screen.getByRole('button', { name: 'Marcar todos' }));
 
-    await waitFor(() => expect(screen.queryByText('Marque este item para aprovar.')).toBeNull());
+    expect(await screen.findByText('Versão já decidida.')).toBeTruthy();
+    expect(checklist.map((item) => checkbox(item.label).checked)).toEqual([true, false, false]);
   });
 
   it('só com avisos nas checagens, "Aprovar" fica habilitado', () => {
-    renderPanel({ checks: <ReviewChecks items={warnings} />, blocked: false });
+    renderPanel({ checks: <ReviewChecks items={warnings} />, blocked: false, confirmed: allKeys });
 
     expect(screen.getByText('O link https://x.example não respondeu: HTTP 404')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Aprovar' }).hasAttribute('disabled')).toBe(false);
@@ -245,11 +331,8 @@ describe('painel de revisão', () => {
         { path: [], message: 'A versão 2 não é a mais recente: o conteúdo está na versão 3' },
       ],
     });
-    renderPanel({ approve });
+    renderPanel({ approve, confirmed: allKeys });
 
-    for (const item of checklist) {
-      await userEvent.click(screen.getByRole('checkbox', { name: item.label }));
-    }
     await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
 
     // Cada formulário tem o próprio resumo (região viva); a recusa vai ao da aprovação.
