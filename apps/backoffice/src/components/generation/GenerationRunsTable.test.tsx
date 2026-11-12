@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GenerationRunSummary } from '@/domain/generation/runs.ts';
 
@@ -9,10 +9,12 @@ import {
   formatRunDuration,
   formatTokens,
   GenerationRunsTable,
+  type GenerationRunsStatus,
 } from './GenerationRunsTable.tsx';
 
 // Execuções da geração: a ordem do domínio, cada uma com status, provedor, modelo, tokens,
-// custo, duração e o link para o conteúdo quando `ok`; o que falta aparece como "—".
+// custo, duração e o link para a revisão do conteúdo quando `ok`; o que falta aparece como "—".
+// Com execução pendente, relê a lista pela Server Action até ela terminar (#779).
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/sites/exemplo-a/geracao',
@@ -98,7 +100,7 @@ describe('lista das execuções', () => {
     }
     expect(row.getByText('0,00035')).toBeTruthy();
     expect(row.getByRole('link', { name: 'Conteúdo #42 (abrir)' }).getAttribute('href')).toBe(
-      '/sites/exemplo-a/conteudos/42',
+      '/sites/exemplo-a/revisao/42',
     );
   });
 
@@ -122,6 +124,112 @@ describe('lista das execuções', () => {
     expect(screen.getByText(/Nenhuma execução ainda/)).toBeTruthy();
     expect(document.body.textContent).not.toContain('gere o primeiro artigo');
     expect(document.body.textContent).toContain('contexto editorial');
+  });
+});
+
+describe('lista ao vivo', () => {
+  const POLL_MS = 100;
+  const status = vi.fn<GenerationRunsStatus>();
+  const [pending, done, failed] = ROWS as [
+    GenerationRunSummary,
+    GenerationRunSummary,
+    GenerationRunSummary,
+  ];
+  const tick = () => act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+
+  function renderLive(rows: GenerationRunSummary[]) {
+    return render(
+      <GenerationRunsTable
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        rows={rows}
+        hasContext
+        status={status}
+        pollMs={POLL_MS}
+      />,
+    );
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    status.mockReset();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('com execução pendente, consulta e mostra "Concluída" quando ela termina, com o link', async () => {
+    status
+      .mockResolvedValueOnce([pending, done])
+      .mockResolvedValueOnce([{ ...done, id: 3, topic: 'Café coado', contentId: 43 }, done]);
+    renderLive([pending, done]);
+
+    expect(within(rowOf('Café coado')).getByText('Pendente')).toBeTruthy();
+    await tick();
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(within(rowOf('Café coado')).getByText('Pendente')).toBeTruthy();
+    await tick();
+    const row = within(rowOf('Café coado'));
+    expect(row.getByText('Concluída')).toBeTruthy();
+    expect(row.getByRole('link', { name: 'Conteúdo #43 (abrir)' }).getAttribute('href')).toBe(
+      '/sites/exemplo-a/revisao/43',
+    );
+  });
+
+  it('mostra "Falhou" quando a execução pendente falha', async () => {
+    status.mockResolvedValue([{ ...failed, id: 3, topic: 'Café coado' }]);
+    renderLive([pending]);
+
+    await tick();
+    expect(within(rowOf('Café coado')).getByText('Falhou')).toBeTruthy();
+  });
+
+  it('sem execução pendente, não consulta', async () => {
+    renderLive([done, failed]);
+
+    expect(vi.getTimerCount()).toBe(0);
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 10));
+    expect(status).not.toHaveBeenCalled();
+  });
+
+  it('quando nenhuma execução fica pendente, as consultas param', async () => {
+    status.mockResolvedValue([{ ...done, id: 3, topic: 'Café coado' }]);
+    renderLive([pending]);
+
+    await tick();
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 10));
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('uma leitura recusada mantém a lista e tenta de novo', async () => {
+    status
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce([{ ...done, id: 3, topic: 'Café coado' }]);
+    renderLive([pending]);
+
+    await tick();
+    expect(within(rowOf('Café coado')).getByText('Pendente')).toBeTruthy();
+    await tick();
+    expect(within(rowOf('Café coado')).getByText('Concluída')).toBeTruthy();
+  });
+
+  it('a lista nova da página substitui a do polling e liga as consultas', async () => {
+    const view = renderLive([done]);
+    expect(vi.getTimerCount()).toBe(0);
+
+    status.mockResolvedValue([{ ...done, id: 3, topic: 'Café coado' }, done]);
+    view.rerender(
+      <GenerationRunsTable
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        rows={[pending, done]}
+        hasContext
+        status={status}
+        pollMs={POLL_MS}
+      />,
+    );
+    expect(within(rowOf('Café coado')).getByText('Pendente')).toBeTruthy();
+    await tick();
+    expect(within(rowOf('Café coado')).getByText('Concluída')).toBeTruthy();
   });
 });
 

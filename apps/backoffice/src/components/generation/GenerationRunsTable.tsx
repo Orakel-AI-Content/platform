@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -10,6 +10,7 @@ import { formatDateTime, type StateTagColor } from '@/components/shared/siteLabe
 import { Truncated } from '@/components/shared/Truncated';
 import { useListTable } from '@/components/shared/useListTable';
 import type { ListConfig } from '@/components/shared/useListState.ts';
+import { usePolling } from '@/components/shared/usePolling.ts';
 import { StateTag } from '@/components/sites/SiteStatus';
 import type { GenerationStatus } from '@/db/schema/generation.ts';
 import type { GenerationRunSummary } from '@/domain/generation/runs.ts';
@@ -28,6 +29,12 @@ const GENERATION_STATUS_TAG: Record<GenerationStatus, StateTagColor> = {
   ok: 'bg-success',
   falha: 'bg-error',
 };
+
+/** Leitura do polling (`generationRunsAction` com o site); `null` quando não deu para ler. */
+export type GenerationRunsStatus = () => Promise<GenerationRunSummary[] | null>;
+
+/** Intervalo do polling enquanto há execução pendente. */
+export const GENERATION_RUNS_POLL_MS = 3000;
 
 /** Valor que a execução não tem (pendente, falha antes do modelo, modelo sem preço). */
 export const MISSING = '—';
@@ -137,7 +144,7 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
         if (status !== 'ok' || contentId === null) return MISSING;
         return (
           <Link
-            href={`/sites/${encodeURIComponent(siteId)}/conteudos/${contentId}`}
+            href={`/sites/${encodeURIComponent(siteId)}/revisao/${contentId}`}
             className={ROW_LINK_CLASS}
           >
             <span className="sr-only">Conteúdo </span>#{contentId}
@@ -150,8 +157,35 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
 }
 
 /**
+ * Linhas da lista: as da página até o polling trazer outras; quando a página entrega outras
+ * (depois do `revalidatePath` de um disparo), elas substituem as do polling, como em
+ * `SiteLiveActivity`. Só consulta com `status` e alguma execução pendente; uma leitura `null`
+ * mantém as linhas.
+ */
+function useGenerationRuns(
+  rows: GenerationRunSummary[],
+  status: GenerationRunsStatus | undefined,
+  pollMs: number,
+): GenerationRunSummary[] {
+  const [source, setSource] = useState(rows);
+  const [current, setCurrent] = useState(rows);
+  if (source !== rows) {
+    setSource(rows);
+    setCurrent(rows);
+  }
+  const poll = useCallback(async () => {
+    const next = await status?.();
+    if (next) setCurrent(next);
+  }, [status]);
+  const pending = current.some((row) => row.status === 'pendente');
+  usePolling(status !== undefined && pending, poll, pollMs);
+  return current;
+}
+
+/**
  * Execuções da geração do site (R5), só leitura: quando, tema, status, provedor e modelo, tokens,
- * custo, duração e o link para o conteúdo gerado. No DataTable do template, como a lista de
+ * custo, duração e o link para a revisão do conteúdo gerado (#779). Com `status`, relê a lista a
+ * cada `pollMs` enquanto há execução pendente; sem pendente, não consulta. No DataTable do template, como a lista de
  * pendências (#365), sem toolbar (busca e filtro ficam fora, #541); o que a execução ainda não
  * tem aparece como "—". Sem execuções, o estado vazio; sem contexto editorial no site (#600), ele
  * não manda gerar: a ação de criar o contexto fica no aviso acima.
@@ -162,6 +196,8 @@ export function GenerationRunsTable({
   rows,
   hasContext,
   labelledBy,
+  status,
+  pollMs = GENERATION_RUNS_POLL_MS,
 }: {
   siteId: string;
   /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
@@ -171,10 +207,14 @@ export function GenerationRunsTable({
   hasContext: boolean;
   /** Id do título da lista, que dá nome à tabela. */
   labelledBy?: string;
+  /** Leitura do polling; sem ela, a lista fica como a página entregou. */
+  status?: GenerationRunsStatus;
+  pollMs?: number;
 }) {
+  const runs = useGenerationRuns(rows, status, pollMs);
   const columns = useMemo(() => columnsFor(siteId, timeZone), [siteId, timeZone]);
-  const { tableProps } = useListTable({ config: LIST, columns, data: rows });
-  if (rows.length === 0) {
+  const { tableProps } = useListTable({ config: LIST, columns, data: runs });
+  if (runs.length === 0) {
     return (
       <EmptyState>
         {hasContext
