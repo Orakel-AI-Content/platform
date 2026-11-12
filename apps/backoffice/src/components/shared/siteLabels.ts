@@ -1,6 +1,7 @@
 import type { Block } from '@orakel/content-model/v1';
 
 import type { BuildKind, BuildStatus, SiteEventKind } from '@/db/schema/operations.ts';
+import type { ExecutionHistoryItem, OpenExecution } from '@/domain/builds/builds.ts';
 import type { BuildStage } from '@/domain/builds/run-build.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { PendingOrigin } from '@/domain/pending-changes/record.ts';
@@ -141,6 +142,35 @@ export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {
   render: 'Renderização',
   publish: 'Publicação',
 };
+
+/** Resultado de uma execução terminada, na faixa de status ao vivo (#638). */
+const LIVE_RESULT_LABEL: Record<ExecutionHistoryItem['status'], string> = {
+  ok: 'concluída',
+  failed: 'falhou',
+  cancelado: 'cancelada',
+};
+
+/**
+ * Texto da faixa de status ao vivo da aba "Histórico" (#638): a execução aberta "na fila", com o
+ * horário previsto no fuso do site, ou "em andamento", com a etapa quando já há uma.
+ */
+export function liveStatusText(open: OpenExecution, timeZone: string): string {
+  const kind = HISTORY_KIND_LABEL[open.kind];
+  if (open.status === 'na_fila') {
+    return open.scheduledFor === null
+      ? `${kind} na fila`
+      : `${kind} na fila, prevista para ${formatDateTime(open.scheduledFor, timeZone)}`;
+  }
+  return open.currentStage === null
+    ? `${kind} em andamento`
+    : `${kind} em andamento, etapa: ${BUILD_STAGE_LABEL[open.currentStage]}`;
+}
+
+/** Texto da faixa quando a execução observada termina (#638): o resultado e quando. */
+export function liveResultText(item: ExecutionHistoryItem, timeZone: string): string {
+  const kind = HISTORY_KIND_LABEL[item.kind];
+  return `${kind} ${LIVE_RESULT_LABEL[item.status]} em ${formatDateTime(item.at, timeZone)}`;
+}
 
 const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
 
