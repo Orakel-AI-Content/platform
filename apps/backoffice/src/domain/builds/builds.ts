@@ -141,7 +141,8 @@ export async function loadBuildTarget(
 
 export type BuildRun = {
   siteId: string;
-  release: string;
+  /** Nula no site sem versão, recusado na etapa `image`. */
+  release: string | null;
   jobId: string | undefined;
   attempt: number;
   startedAt: Date;
@@ -434,7 +435,7 @@ export async function recentBuilds(
     .where(and(eq(builds.siteId, siteId), finishedBuild))
     .orderBy(desc(builds.finishedAt), desc(builds.id))
     .limit(limit);
-  // Linha fechada sempre passou por `rodando`, que grava a release: a nula é só a `na_fila`.
+  // A release nula é a da `na_fila` ou a do site sem versão, recusado antes de rodar.
   return rows
     .filter(isFinished)
     .flatMap(({ release, ...row }) => (release === null ? [] : [{ ...row, release }]));

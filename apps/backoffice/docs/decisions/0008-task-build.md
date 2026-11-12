@@ -22,7 +22,8 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
   proxy, só leitura) e um leitor de tar mínimo. Sem dependência nova.
 - **Execução** (`runBuild`, sobre a interface `ContainerRuntime`): imagem
   `site-builder:<release do site>` (ou `SITE_BUILDER_TAG` antes da primeira promoção; ausente
-  no host → permanente, porque o proxy recusa pull); volume por tentativa; `render` na rede
+  no host → permanente, porque o proxy recusa pull; sem release e sem a tag, que a VPS não
+  define desde a #692, recusa permanente "site sem versão" antes de criar container); volume por tentativa; `render` na rede
   `orakel-export` (3 vCPU, 6 GB, `CpuShares` 256, 20 min); `publish` na `orakel-publish`
   (10 min). Containers sem capabilities e com `no-new-privileges`; containers e volume sempre
   removidos.

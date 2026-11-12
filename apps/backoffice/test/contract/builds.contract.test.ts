@@ -39,7 +39,7 @@ import {
   publishOk,
   renderOk,
 } from '../../src/domain/builds/fake-runtime.ts';
-import type { BuildSettings } from '../../src/domain/builds/plan.ts';
+import { SITE_WITHOUT_RELEASE, type BuildSettings } from '../../src/domain/builds/plan.ts';
 import type { ContainerRuntime } from '../../src/domain/builds/runtime.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
 import { createSite, unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
@@ -61,6 +61,10 @@ const settings: BuildSettings = {
   deploy: { target: 'local', edgeLocalUrl: 'http://edge-local:8081' },
   s3: { endpoint: 'http://s3:8333', accessKeyId: 'k', secretAccessKey: 's' },
 };
+
+/** Como na VPS: sem SITE_BUILDER_TAG. */
+const withoutTag: BuildSettings = { ...settings };
+delete withoutTag.defaultTag;
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
@@ -1025,6 +1029,29 @@ describe('task build', () => {
     await db.update(sites).set({ activeVersionId: 'v-1' });
     await db.execute(sql.raw(backfill));
     expect(await site()).toMatchObject({ activeVersionId: 'v-1' });
+  });
+
+  it('site sem versão e sem tag padrão: recusa na etapa image e pausa, sem container', async () => {
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    await createBuildTask({ db, runtime: fake.runtime, settings: withoutTag })(
+      { siteId: 'exemplo-a' },
+      await helpers(),
+    );
+
+    expect(fake.started).toEqual([]);
+    expect(await site()).toMatchObject({
+      state: 'pausado',
+      pausedReason: `image: ${SITE_WITHOUT_RELEASE}`,
+    });
+    expect(await db.select().from(builds)).toMatchObject([
+      {
+        status: 'failed',
+        release: null,
+        failedStage: 'image',
+        failureKind: 'permanent',
+        failureMessage: SITE_WITHOUT_RELEASE,
+      },
+    ]);
   });
 
   it('falha permanente: pausa o site com o motivo e as mudanças continuam pendentes', async () => {

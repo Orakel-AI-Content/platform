@@ -105,8 +105,8 @@ services:
       <<: *backoffice-env
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       SITE_BUILDER_IMAGE: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/site-builder
-      # Tag até a primeira promoção registrar a release do site.
-      SITE_BUILDER_TAG: ${SITE_BUILDER_TAG:-local}
+      # Sem SITE_BUILDER_TAG: site sem versão é recusado no build ("site sem versão"), em vez
+      # de buildar com uma imagem padrão. A tag padrão só existe no local e no E2E (override).
       DEPLOY_TARGET: ${DEPLOY_TARGET:?defina DEPLOY_TARGET}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}

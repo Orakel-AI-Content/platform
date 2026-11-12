@@ -116,16 +116,33 @@ describe('parseBuildRunnerEnv', () => {
     SITE_BUILDER_IMAGE: 'ghcr.io/orakel-ai-content/site-builder',
     EDGE_LOCAL_URL: 'http://edge-local:8081',
     RELEASE_DRIVER: 'local',
+    SITE_BUILDER_TAG: 'local',
   };
   const token = `github_pat_${'a'.repeat(40)}`;
 
-  it('alvo local com os padrões das redes e da tag', () => {
+  it('alvo local com os padrões das redes', () => {
     expect(parseBuildRunnerEnv(runner)).toMatchObject({
       DEPLOY_TARGET: 'local',
       SITE_BUILDER_TAG: 'local',
       BUILD_EXPORT_NETWORK: 'orakel-export',
       BUILD_PUBLISH_NETWORK: 'orakel-publish',
     });
+  });
+
+  it('a tag padrão é opcional, mas o driver local a exige', () => {
+    const github = { ...runner, RELEASE_DRIVER: 'github', GITHUB_RELEASE_TOKEN: token };
+    expect(
+      parseBuildRunnerEnv({ ...github, SITE_BUILDER_TAG: undefined }).SITE_BUILDER_TAG,
+    ).toBeUndefined();
+    expect(
+      parseBuildRunnerEnv({ ...github, SITE_BUILDER_TAG: '' }).SITE_BUILDER_TAG,
+    ).toBeUndefined();
+    expect(() => parseBuildRunnerEnv({ ...runner, SITE_BUILDER_TAG: undefined })).toThrow(
+      /SITE_BUILDER_TAG/,
+    );
+    expect(() => parseBuildRunnerEnv({ ...runner, SITE_BUILDER_TAG: '' })).toThrow(
+      /SITE_BUILDER_TAG/,
+    );
   });
 
   it('cada alvo exige o próprio destino', () => {

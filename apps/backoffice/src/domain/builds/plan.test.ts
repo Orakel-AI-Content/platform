@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BuildTarget } from './builds.ts';
-import { RENDER_LIMITS, planBuild, planRollback, type BuildSettings } from './plan.ts';
+import {
+  RENDER_LIMITS,
+  planBuild,
+  planRollback,
+  SITE_WITHOUT_RELEASE,
+  type BuildSettings,
+} from './plan.ts';
 
 const target: BuildTarget = {
   siteId: 'exemplo-a',
@@ -25,6 +31,10 @@ const settings: BuildSettings = {
   s3: { endpoint: 'http://s3:8333', accessKeyId: 'k', secretAccessKey: 's' },
 };
 
+/** Como na VPS: sem SITE_BUILDER_TAG. */
+const withoutTag: BuildSettings = { ...settings };
+delete withoutTag.defaultTag;
+
 describe('planBuild', () => {
   it('sem release registrada, usa a tag padrão; com release, a do site', () => {
     expect(planBuild(target, settings, 'r').image).toBe(
@@ -34,6 +44,15 @@ describe('planBuild', () => {
       release: '1.2.0',
       image: 'ghcr.io/orakel-ai-content/site-builder:1.2.0',
     });
+  });
+
+  it('sem release e sem tag padrão, o plano sai sem versão nem imagem (recusa na etapa image)', () => {
+    expect(planBuild(target, withoutTag, 'r')).toMatchObject({ release: null, image: null });
+    expect(planBuild({ ...target, release: '1.2.0' }, withoutTag, 'r')).toMatchObject({
+      release: '1.2.0',
+      image: 'ghcr.io/orakel-ai-content/site-builder:1.2.0',
+    });
+    expect(SITE_WITHOUT_RELEASE).toBe('site sem versão: use Atualizar para a mais recente');
   });
 
   it('o token de deploy só vai para o publish; o do build, só para o render', () => {
@@ -75,6 +94,13 @@ describe('planRollback', () => {
     expect(planRollback({ ...target, release: '1.2.0' }, settings, version, 'r')).toMatchObject({
       release: '1.2.0',
       image: 'ghcr.io/orakel-ai-content/site-builder:1.2.0',
+    });
+  });
+
+  it('sem release e sem tag padrão, o rollback sai sem versão nem imagem', () => {
+    expect(planRollback(target, withoutTag, version, 'r')).toMatchObject({
+      release: null,
+      image: null,
     });
   });
 

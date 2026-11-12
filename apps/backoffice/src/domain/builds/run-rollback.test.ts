@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ContainerRuntime } from './runtime.ts';
 import { failedFile, fakeRuntime, rollbackOk } from './fake-runtime.ts';
+import { SITE_WITHOUT_RELEASE } from './plan.ts';
 import { runRollback, type RollbackPlan } from './run-rollback.ts';
 
 const version = '20261001T120000Z-abcdef12';
@@ -20,6 +21,20 @@ let clock = 0;
 const now = () => (clock += 100);
 
 describe('runRollback', () => {
+  it('site sem versão: falha permanente, sem criar container nem volume', async () => {
+    const fake = fakeRuntime({ rollback: { file: rollbackOk() } });
+    const outcome = await runRollback(
+      { ...plan, release: null, image: null },
+      { runtime: fake.runtime, now },
+    );
+    expect(outcome).toEqual({
+      status: 'failed',
+      failure: { kind: 'permanent', message: SITE_WITHOUT_RELEASE },
+    });
+    expect(fake.started).toEqual([]);
+    expect(fake.volumes.created).toEqual([]);
+  });
+
   it('roda um único container rollback na rede publish, no volume próprio', async () => {
     const fake = fakeRuntime({ rollback: { file: rollbackOk() } });
     const outcome = await runRollback(plan, { runtime: fake.runtime, now });
