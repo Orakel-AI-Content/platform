@@ -55,6 +55,8 @@ const rollout = (sites: RolloutSite[], overrides: Partial<Rollout> = {}): Rollou
   requestedBy: 'operacao@orakel.local',
   startedAt: new Date('2026-11-12T12:00Z'),
   finishedAt: null,
+  interruptedBy: null,
+  interruptedAt: null,
   sites: sites.map((s, position) => ({ ...s, position })),
   ...overrides,
 });
