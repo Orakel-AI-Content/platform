@@ -21,7 +21,13 @@ import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome } from './run-build.ts';
 import type { RollbackOutcome } from './run-rollback.ts';
-import { buildNow, recordQueuedBuild, scheduleRollback, type QueuedRun } from './schedule.ts';
+import {
+  buildNow,
+  recordQueuedBuild,
+  removeQueuedBuildJob,
+  scheduleRollback,
+  type QueuedRun,
+} from './schedule.ts';
 import { clearMassUnpublish, markPublished, pauseSite, setActiveVersion } from './site-state.ts';
 
 export type BuildTarget = {
