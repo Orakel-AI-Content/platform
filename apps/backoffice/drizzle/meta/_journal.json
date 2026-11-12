@@ -169,6 +169,13 @@
       "when": 1794493124943,
       "tag": "0023_estado_herdado_da_release",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794505047548,
+      "tag": "0024_estado_da_previa",
+      "breakpoints": true
     }
   ]
 }
