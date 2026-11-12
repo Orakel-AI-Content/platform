@@ -87,9 +87,13 @@ export const BuildRunnerEnvSchema = z
   .object({
     /** API do Docker, sempre pelo docker-socket-proxy (ADR 0011 da raiz). */
     DOCKER_HOST: z.string().regex(/^(tcp|http):\/\/[^/]+$/, 'Use tcp://host:porta'),
-    /** Imagem sem tag; a tag é a release do site (ou SITE_BUILDER_TAG antes da primeira). */
+    /** Imagem sem tag; a tag é a release do site. */
     SITE_BUILDER_IMAGE: z.string().min(1),
-    SITE_BUILDER_TAG: z.string().min(1).default('local'),
+    /**
+     * Tag usada pelo site ainda sem release (só no local e no E2E). Sem ela, site sem versão é
+     * recusado no build; obrigatória com RELEASE_DRIVER=local, que etiqueta essa imagem.
+     */
+    SITE_BUILDER_TAG: optional(z.string().min(1)),
     BUILD_EXPORT_NETWORK: z.string().min(1).default('orakel-export'),
     BUILD_PUBLISH_NETWORK: z.string().min(1).default('orakel-publish'),
     /** API de exportação vista da rede export. */
@@ -137,6 +141,10 @@ export const BuildRunnerEnvSchema = z
   .refine((env) => env.RELEASE_DRIVER !== 'github' || env.GITHUB_RELEASE_TOKEN !== undefined, {
     message: 'Defina GITHUB_RELEASE_TOKEN, ou RELEASE_DRIVER=local para gerar versão sem o GitHub',
     path: ['GITHUB_RELEASE_TOKEN'],
+  })
+  .refine((env) => env.RELEASE_DRIVER !== 'local' || env.SITE_BUILDER_TAG !== undefined, {
+    message: 'Defina SITE_BUILDER_TAG com RELEASE_DRIVER=local (a imagem que vira a versão)',
+    path: ['SITE_BUILDER_TAG'],
   });
 
 export type BuildRunnerEnv = z.infer<typeof BuildRunnerEnvSchema>;
