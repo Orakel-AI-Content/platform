@@ -1,7 +1,7 @@
 'use client';
 
-import type { Issue } from '@orakel/content-model';
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
+import { useFormContext } from 'react-hook-form';
 import * as z from 'zod';
 
 import { SchemaForm, type FieldProps, type SchemaFormIssue } from '@/components/forms/SchemaForm';
@@ -9,20 +9,22 @@ import type { FormActionResult } from '@/components/shared/actionResult.ts';
 import { CONTENT_STATUS_LABEL } from '@/components/shared/siteLabels.ts';
 import { SECTION_HINT_CLASS, SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import Alert from '@/components/ui/Alert';
+import { Button } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 // Painel da tela de revisão (#75), ao lado da visualização a partir de `xl` e abaixo dela antes
-// (#373): erros de validação da release, checklist e aprovação. A página decide permissão e estado no servidor e passa os itens do
+// (#373): checagens automáticas (`checks`, workspace#87), checklist e aprovação. A página decide permissão e estado no servidor e passa os itens do
 // checklist (REVIEW_CHECKLIST, do domínio, que não pode ir para o bundle do cliente); o
 // domínio confere tudo de novo ao aprovar. Visual do Ecme (#277): o conteúdo em `Card`s, com as
 // cores do `@theme`; o `<aside>` fica por fora para manter o landmark. O checklist tem cartão
-// próprio, com "Aprovar" no rodapé dele (#333). As duas seções são seções da tela (`h2`, como
-// "Dados" e "Blocos" na versão, #372); o `<aside>` tem o nome por `aria-label`, sem `h2` oculto,
-// e a prévia em nova aba é ação do cabeçalho da página. Os problemas de validação e o aviso de
-// bloqueio ficam no `Alert` de erro do Ecme (#444), sem `role="alert"`: chegam no carregamento,
-// não são retorno de uma ação. Abaixo do checklist, "Devolver ao editor" (#598) em cartão próprio,
+// próprio, com "Aprovar" no rodapé dele (#333) e "Marcar todos" no topo, que só marca as caixas,
+// sem enviar. As seções são seções da tela (`h2`, como "Dados" e "Blocos" na versão, #372); o
+// `<aside>` tem o nome por `aria-label`, sem `h2` oculto, e a prévia em nova aba é ação do
+// cabeçalho da página. A validação da release é um item das checagens (`erro`): só ela bloqueia
+// "Aprovar" (`blocked`), com o aviso no `Alert` de erro do Ecme (#444), sem `role="alert"`: chega
+// no carregamento, não é retorno de uma ação. Abaixo do checklist, "Devolver ao editor" (#598) em cartão próprio,
 // com o comentário obrigatório: não depende do checklist nem da validação, porque devolver não
 // leva nada ao site. Decidida a versão (aprovada ou devolvida), os dois formulários saem.
 
@@ -54,6 +56,22 @@ function CommentField({ id, ref, value, onChange, invalid, required, describedBy
 
 const RETURN_FIELDS = { comment: (props: FieldProps) => <CommentField {...props} /> };
 
+/** Marca as caixas do checklist no estado do formulário (`FormProvider` do `SchemaForm`). */
+function MarkAll({ keys }: { keys: readonly string[] }) {
+  const { setValue } = useFormContext();
+  return (
+    <Button
+      type="button"
+      size="sm"
+      onClick={() => {
+        for (const key of keys) setValue(key, true, { shouldDirty: true, shouldValidate: true });
+      }}
+    >
+      Marcar todos
+    </Button>
+  );
+}
+
 function checklistSchema(items: readonly ChecklistItem[]) {
   return z.object(
     Object.fromEntries(
@@ -68,7 +86,8 @@ function checklistSchema(items: readonly ChecklistItem[]) {
 export function ReviewPanel({
   version,
   status,
-  issues,
+  checks,
+  blocked,
   checklist,
   canApprove,
   approve,
@@ -76,8 +95,10 @@ export function ReviewPanel({
 }: {
   version: number;
   status: ContentListItem['status'];
-  /** Problemas de validação da versão contra a release do site (`reviewIssues`). */
-  issues: readonly Pick<Issue, 'message'>[];
+  /** Seção de checagens automáticas (`ReviewChecks`), no topo do painel. */
+  checks?: ReactNode;
+  /** Alguma checagem com `erro` (a validação da release): "Aprovar" fica desabilitado. */
+  blocked: boolean;
   checklist: readonly ChecklistItem[];
   /** `content.publish` (aprovar e devolver), decidido no servidor. */
   canApprove: boolean;
@@ -90,7 +111,6 @@ export function ReviewPanel({
   const [decided, setDecided] = useState(false);
   const inReview = status === 'em_revisao';
   const open = canApprove && inReview && !decided;
-  const blocked = issues.length > 0;
   const checklistTitle = (
     <h2 id={`${id}-checklist`} className={SECTION_TITLE_CLASS}>
       Checklist
@@ -99,24 +119,7 @@ export function ReviewPanel({
 
   return (
     <aside aria-label={`Revisão da versão ${version}`} className="flex flex-col gap-4">
-      <Card>
-        <section aria-labelledby={`${id}-issues`} className="space-y-2">
-          <h2 id={`${id}-issues`} className={SECTION_TITLE_CLASS}>
-            Validação da release
-          </h2>
-          {blocked ? (
-            <Alert type="danger" showIcon duration={0}>
-              <ul className="list-disc space-y-1 pl-5 text-sm">
-                {issues.map((issue) => (
-                  <li key={issue.message}>{issue.message}</li>
-                ))}
-              </ul>
-            </Alert>
-          ) : (
-            <p className={SECTION_HINT_CLASS}>Nenhum problema de validação.</p>
-          )}
-        </section>
-      </Card>
+      {checks}
 
       <section aria-labelledby={`${id}-checklist`}>
         {open ? (
@@ -127,11 +130,14 @@ export function ReviewPanel({
             card={{
               intro: (
                 <>
-                  {checklistTitle}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    {checklistTitle}
+                    <MarkAll keys={checklist.map((item) => item.key)} />
+                  </div>
                   {blocked && (
                     <Alert type="danger" showIcon duration={0}>
                       <p id={`${id}-blocked`} className="text-sm">
-                        Corrija os problemas de validação antes de aprovar.
+                        Corrija os erros das checagens automáticas antes de aprovar.
                       </p>
                     </Alert>
                   )}
