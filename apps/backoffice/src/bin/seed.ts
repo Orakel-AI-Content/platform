@@ -3,10 +3,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseSnapshotLine, type SnapshotLine } from '@orakel/content-model/v1';
+import { and, inArray, isNull, ne } from 'drizzle-orm';
 
-import { getDb } from '../db/client.ts';
+import { getDb, type Db } from '../db/client.ts';
+import { sites } from '../db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../domain/access/rbac.ts';
 import { upsertUser } from '../domain/access/users.ts';
+import { buildNow } from '../domain/builds/schedule.ts';
 import { importSnapshot } from '../domain/import/import-snapshot.ts';
 import {
   listSiteSeeds,
@@ -69,6 +72,30 @@ export async function readFixture(site: string): Promise<SnapshotLine[]> {
     });
 }
 
+/**
+ * Pede o primeiro build dos sites sem publicação (`activeVersionId` nulo), pela mesma fila do
+ * "Publicar agora", com o sistema como quem pediu. Site pausado fica de fora, como no botão.
+ * Só enfileira: quem roda é o build-runner. Devolve os sites enfileirados.
+ */
+export async function queueFirstBuilds(db: Db, siteIds: readonly string[]): Promise<string[]> {
+  if (siteIds.length === 0) return [];
+  return db.transaction(async (tx) => {
+    const pending = await tx
+      .select({ id: sites.id })
+      .from(sites)
+      .where(
+        and(
+          inArray(sites.id, [...siteIds]),
+          isNull(sites.activeVersionId),
+          ne(sites.state, 'pausado'),
+        ),
+      )
+      .orderBy(sites.id);
+    for (const { id } of pending) await buildNow(tx, id, SYSTEM_ACTOR.email);
+    return pending.map(({ id }) => id);
+  });
+}
+
 /** Erro do armazenamento com a pista do bucket que costuma faltar. */
 function bucketHint(site: string) {
   return (error: unknown): never => {
@@ -82,14 +109,17 @@ function bucketHint(site: string) {
 // Dados do ambiente local: usuários de teste, os dois sites das fixtures (os E2E dependem
 // deles) e os sites completos de infra/local/seeds/<site>/, com imagens de verdade.
 // Idempotente: site que já existe não é importado de novo, mas as imagens dele são gravadas
-// de novo no bucket quando faltam (o S3 pode ter sido recriado sem o banco).
+// de novo no bucket quando faltam (o S3 pode ter sido recriado sem o banco). No fim, o site
+// ainda sem publicação ganha o primeiro build na fila do Backoffice (queueFirstBuilds).
 if (import.meta.main) {
   await runProcess('backoffice-seed', async (logger) => {
     const { pool, db } = getDb();
     const local = await readLocalSites();
     const store = s3ObjectStore(createS3Client(getEnv()));
+    const seeded: string[] = [];
     for (const user of TEST_USERS) await upsertUser(db, user);
     for (const site of FIXTURES) {
+      seeded.push(site);
       const lines = withLocalDomains(await readFixture(site), local);
       // As fixtures não trazem imagem: uma lisa por variante, para o site não ficar sem.
       const placeholders = await storeMediaPlaceholders(store, site, lines).catch(bucketHint(site));
@@ -104,6 +134,7 @@ if (import.meta.main) {
     for (const dir of await listSiteSeeds(LOCAL_SEEDS_DIR)) {
       const seed = await readSiteSeed(dir);
       const site = seed.config.siteId;
+      seeded.push(site);
       // O bucket media-<site> é criado pelo s3-init a partir do sites.json (ADR 0013). As
       // variantes que já existem são mantidas: repetir só grava as que faltam.
       const media = await processSeedMedia(store, dir, seed).catch(bucketHint(site));
@@ -117,6 +148,9 @@ if (import.meta.main) {
       });
       if (!result.ok) throw new Error(`Seed de ${site}: ${JSON.stringify(result.issues)}`);
       logger.info({ siteId: site, media: media.lines.length }, 'site importado');
+    }
+    for (const siteId of await queueFirstBuilds(db, seeded)) {
+      logger.info({ siteId }, 'site sem publicação; build na fila');
     }
     await pool.end();
   });
