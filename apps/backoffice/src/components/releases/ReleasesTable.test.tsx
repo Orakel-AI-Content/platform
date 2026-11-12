@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
+import type { PreviewState } from '@/domain/preview/preview.ts';
 import type { ReleaseRecord } from '@/domain/releases/releases.ts';
 
 import { ReleasesTable } from './ReleasesTable.tsx';
@@ -14,6 +15,7 @@ import { ReleasesTable } from './ReleasesTable.tsx';
 // Registro de releases (#509): tag e data no fuso da operação, a mais recente primeiro; busca
 // pela tag com o estado na URL (router.replace simulado); sem releases, o estado vazio. Estado
 // do pipeline, "Tentar de novo", "Descartar" e o polling enquanto há release no pipeline (#665).
+// Versão da prévia: a tag "Prévia", o aviso do estado e o polling enquanto ela atualiza (#710).
 
 const navigation = vi.hoisted(() => {
   let search = '';
@@ -116,6 +118,17 @@ const pipeline: ReleaseRecord[] = [
     pipelineState: 'descartada',
   }),
 ];
+
+const previewState = (overrides: Partial<PreviewState> = {}): PreviewState => ({
+  status: 'no_ar',
+  currentRelease: '1.9.0',
+  targetRelease: null,
+  failureReason: null,
+  updatedAt: new Date('2026-11-12T12:00Z'),
+  ...overrides,
+});
+
+const notice = () => screen.getByRole('status', { name: 'Estado da prévia' }).textContent;
 
 const rowOf = (tag: string) =>
   screen.getAllByRole('row').find((r) => r.textContent?.startsWith(tag)) as HTMLElement;
@@ -316,5 +329,109 @@ describe('ReleasesTable', () => {
     expect(screen.getByText('Nenhuma release registrada.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Gerar nova versão' })).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  describe('prévia', () => {
+    const previewTags = () =>
+      screen
+        .getAllByRole('row')
+        .slice(1)
+        .filter((row) => within(row).getAllByRole('cell')[0]?.textContent?.endsWith('Prévia'))
+        .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+
+    it('no ar, marca só a release da prévia, sem aviso', () => {
+      render(<ReleasesTable rows={rows} preview={previewState()} />);
+
+      expect(previewTags()).toEqual(['1.9.0Prévia']);
+      expect(notice()).toBe('');
+    });
+
+    it('sem o estado da prévia, nenhuma linha tem a tag', () => {
+      render(<ReleasesTable rows={rows} />);
+
+      expect(previewTags()).toEqual([]);
+      expect(screen.getByRole('status', { name: 'Estado da prévia' }).textContent).toBe('');
+    });
+
+    it('atualizando, avisa o alvo e a tag segue na versão que está no ar', () => {
+      render(
+        <ReleasesTable
+          rows={rows}
+          preview={previewState({ status: 'atualizando', targetRelease: '1.10.0' })}
+        />,
+      );
+
+      expect(notice()).toBe('Prévia atualizando para 1.10.0.');
+      expect(previewTags()).toEqual(['1.9.0Prévia']);
+    });
+
+    it('falhou, avisa o motivo e a versão que continua no ar', () => {
+      render(
+        <ReleasesTable
+          rows={rows}
+          preview={previewState({
+            status: 'falhou',
+            targetRelease: '1.10.0',
+            failureReason: 'o healthcheck não respondeu',
+          })}
+        />,
+      );
+
+      expect(notice()).toContain('A troca para 1.10.0 falhou: o healthcheck não respondeu.');
+      expect(notice()).toContain('A prévia continua na versão 1.9.0.');
+    });
+
+    it('sem versão, avisa que a prévia não tem versão, também sem releases', () => {
+      const preview = previewState({ status: 'sem_versao', currentRelease: null });
+      render(<ReleasesTable rows={[]} preview={preview} />);
+
+      expect(notice()).toBe('A prévia não tem versão: nenhuma release passou por um build ok.');
+      expect(screen.getByText('Nenhuma release registrada.')).toBeTruthy();
+    });
+
+    it('atualizando, relê sem release no pipeline até a prévia ficar no ar', async () => {
+      vi.useFakeTimers();
+      const status = vi
+        .fn()
+        .mockResolvedValueOnce({
+          rows,
+          inUse: [],
+          preview: previewState({ status: 'atualizando', targetRelease: '1.10.0' }),
+        })
+        .mockResolvedValueOnce({
+          rows,
+          inUse: [],
+          preview: previewState({ currentRelease: '1.10.0' }),
+        });
+      render(
+        <ReleasesTable
+          rows={rows}
+          preview={previewState({ status: 'atualizando', targetRelease: '1.10.0' })}
+          status={status}
+          pollMs={1000}
+        />,
+      );
+      expect(notice()).toBe('Prévia atualizando para 1.10.0.');
+
+      await act(() => vi.advanceTimersByTimeAsync(1000));
+      expect(notice()).toBe('Prévia atualizando para 1.10.0.');
+
+      await act(() => vi.advanceTimersByTimeAsync(1000));
+      expect(notice()).toBe('');
+      expect(previewTags()).toEqual(['1.10.0Prévia']);
+
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      expect(status).toHaveBeenCalledTimes(2);
+    });
+
+    it('no ar e sem release no pipeline, não relê', async () => {
+      vi.useFakeTimers();
+      const status = vi.fn();
+      render(<ReleasesTable rows={rows} preview={previewState()} status={status} pollMs={1000} />);
+
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+
+      expect(status).not.toHaveBeenCalled();
+    });
   });
 });

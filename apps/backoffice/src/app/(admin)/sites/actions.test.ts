@@ -10,6 +10,7 @@ import {
   registerG1Action,
   rollbackSiteAction,
   resumeSiteAction,
+  retreatLifecycleAction,
   revertReleaseAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   updateSiteConfig: vi.fn(),
   revalidatePath: vi.fn(),
   advanceLifecycle: vi.fn(),
+  retreatLifecycle: vi.fn(),
   resumeSite: vi.fn(),
   pauseSiteManually: vi.fn(),
   rebuildOnRelease: vi.fn(),
@@ -54,6 +56,7 @@ vi.mock('@/domain/builds/builds.ts', () => ({
 }));
 vi.mock('@/domain/builds/site-state.ts', () => ({
   advanceLifecycle: mocks.advanceLifecycle,
+  retreatLifecycle: mocks.retreatLifecycle,
   resumeSite: mocks.resumeSite,
   pauseSiteManually: mocks.pauseSiteManually,
   rebuildOnRelease: mocks.rebuildOnRelease,
@@ -144,7 +147,9 @@ describe('Server Actions da página do site', () => {
     expect(await setBuildWindowAction('exemplo-a', { buildWindowSeconds: 30 })).toMatchObject({
       ok: false,
     });
+    expect(await retreatLifecycleAction('exemplo-a', 'zona_ativa')).toMatchObject({ ok: false });
     expect(mocks.advanceLifecycle).not.toHaveBeenCalled();
+    expect(mocks.retreatLifecycle).not.toHaveBeenCalled();
     expect(mocks.registerPolicyTrigger).not.toHaveBeenCalled();
     expect(mocks.setBuildWindow).not.toHaveBeenCalled();
     expect(await setDailyPublishLimitAction('exemplo-a', { dailyPublishLimit: 5 })).toMatchObject({
@@ -171,6 +176,17 @@ describe('Server Actions da página do site', () => {
       message:
         'zona_ativa só pode ser marcada a partir de infra_aplicada; o site está em cadastrado',
     });
+
+    const undo =
+      'zona_ativa só pode ser desmarcada com o site em zona_ativa; o site está em publicado';
+    mocks.retreatLifecycle.mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'site.lifecycle_undo_order', message: undo, path: ['lifecycle'] }],
+    });
+    expect(await retreatLifecycleAction('exemplo-a', 'zona_ativa')).toEqual({
+      ok: false,
+      message: undo,
+    });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -190,6 +206,13 @@ describe('Server Actions da página do site', () => {
       'exemplo-a',
       'infra_aplicada',
     );
+
+    mocks.retreatLifecycle.mockResolvedValue(done);
+    expect(await retreatLifecycleAction('exemplo-a', 'zona_ativa')).toEqual({
+      ok: true,
+      message: 'Zona ativa desmarcada.',
+    });
+    expect(mocks.retreatLifecycle).toHaveBeenCalledWith({}, operacao, 'exemplo-a', 'zona_ativa');
 
     expect(await registerG1Action('exemplo-a', { note: '  Políticas publicadas ' })).toEqual({
       ok: true,

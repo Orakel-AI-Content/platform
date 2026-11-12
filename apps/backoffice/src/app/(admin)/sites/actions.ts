@@ -31,6 +31,7 @@ import {
   pauseSiteManually,
   rebuildOnRelease,
   resumeSite,
+  retreatLifecycle,
   revertRelease,
   setBuildWindow,
   setDailyPublishLimit,
@@ -139,6 +140,18 @@ export async function advanceLifecycleAction(
     siteId,
     (tx, actor) => advanceLifecycle(tx, actor, siteId, step),
     `${STEP_LABEL[step]} marcada.`,
+  );
+}
+
+/** "Desmarcar" a etapa manual atual: volta só à anterior (a ordem e a corrida são do domínio). */
+export async function retreatLifecycleAction(
+  siteId: string,
+  step: ManualLifecycleStep,
+): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => retreatLifecycle(tx, actor, siteId, step),
+    `${STEP_LABEL[step]} desmarcada.`,
   );
 }
 
