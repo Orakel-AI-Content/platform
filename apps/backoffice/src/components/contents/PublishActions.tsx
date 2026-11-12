@@ -53,6 +53,7 @@ export function PublishActions({
   return (
     <>
       <ScheduleDialog
+        size="sm"
         disabled={scope.pending}
         onSchedule={(at) => scope.run(() => schedule(at.toISOString()))}
       />

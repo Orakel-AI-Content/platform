@@ -17,13 +17,14 @@ export const SCHEDULE_TIME_ZONE = 'America/Sao_Paulo';
 
 export function ScheduleDialog({
   label = 'Agendar',
-  size = 'sm',
+  size,
   disabled = false,
   describedBy,
   onSchedule,
 }: {
   /** Rótulo do botão que abre o Dialog (inclusive o do envio em curso). */
   label?: string;
+  /** Tamanho do botão que abre o Dialog; sem ele, o do formulário ou o padrão. */
   size?: ButtonProps['size'];
   /** Ação indisponível (envio em curso ou bloqueio); o motivo vai em `describedBy`. */
   disabled?: boolean;
