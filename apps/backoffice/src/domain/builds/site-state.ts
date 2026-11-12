@@ -362,6 +362,17 @@ export async function promoteForRollout(
   });
 }
 
+/**
+ * Build da troca de versão publicado: o site da atualização de todos os sites sai de
+ * `promovendo` e volta a `ativo`. Site que já saiu de `promovendo` (pausado no meio) fica como está.
+ */
+export async function finishPromotion(tx: Executor, siteId: string): Promise<void> {
+  await tx
+    .update(sites)
+    .set({ state: 'ativo' })
+    .where(and(eq(sites.id, siteId), eq(sites.state, 'promovendo')));
+}
+
 /** Primeira publicação bem-sucedida: o site passa a `publicado`. */
 export async function markPublished(tx: Executor, siteId: string): Promise<void> {
   await tx
