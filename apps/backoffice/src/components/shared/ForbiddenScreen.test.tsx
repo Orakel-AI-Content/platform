@@ -35,6 +35,22 @@ describe('tela de permissão', () => {
     ).toBe('/sites');
   });
 
+  it('o motivo do estado substitui o de papel (#751)', () => {
+    render(
+      <ForbiddenScreen
+        action="content.amend"
+        reason="Só a versão em revisão pode ser corrigida; a versão 3 está com o status Aprovado."
+        back={{ href: '/sites/exemplo-a/revisao/1', label: 'Voltar à revisão' }}
+      />,
+    );
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Só a versão em revisão pode ser corrigida; a versão 3 está com o status Aprovado.',
+    );
+    expect(screen.getByRole('link', { name: 'Voltar à revisão' }).getAttribute('href')).toBe(
+      '/sites/exemplo-a/revisao/1',
+    );
+  });
+
   it('lista todos os papéis da matriz que permitem a ação', () => {
     expect(forbiddenReason('site.read')).toBe(
       'Ver os sites exige o papel admin, editor, revisor ou operacao.',
