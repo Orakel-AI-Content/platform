@@ -7,6 +7,8 @@ import { contentVersions, reviews } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import {
+  type ContentEdit,
+  type NewBlock,
   listContentVersions,
   submitForReview,
   updateContent,
@@ -17,6 +19,7 @@ import {
   pendingReturn,
   returnVersion,
   REVIEW_CHECKLIST,
+  reviewChecks,
   reviewIssues,
 } from '../../src/domain/reviews/reviews.ts';
 import type * as Sites from '../../src/domain/sites/sites.ts';
@@ -353,6 +356,104 @@ describe('validação para a tela de revisão', () => {
       issues: [{ code: 'forbidden' }],
     });
     expect(await reviewIssues(db, role('revisor'), SITE, 999)).toMatchObject({
+      issues: [{ code: 'content.not_found' }],
+    });
+  });
+});
+
+describe('checagens de conteúdo para a tela de revisão', () => {
+  const link = (href: string): NewBlock => ({
+    new: true,
+    type: 'text',
+    content: [
+      {
+        type: 'paragraph',
+        children: [{ type: 'link', href, children: [{ type: 'text', text: href }] }],
+      },
+    ],
+  });
+
+  /** Nova versão do conteúdo 1 com `changes`, enviada para revisão. */
+  async function submit(changes: Partial<ContentEdit>): Promise<number> {
+    const last = (await versions(1)).at(-1);
+    if (last === undefined) throw new Error('conteúdo 1 sem versão');
+    const saved = await db.transaction((tx) =>
+      updateContent(tx, SYSTEM_ACTOR, SITE, 1, { ...last.data, ...changes }),
+    );
+    if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
+    await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, 1));
+    return saved.value.version;
+  }
+
+  const checksOf = async (actor = role('revisor')) => {
+    const result = await reviewChecks(db, actor, SITE, 1);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value;
+  };
+  const byKey = async (key: string) => (await checksOf()).checks.find((item) => item.key === key);
+
+  beforeEach(async () => {
+    const imported = await importSnapshot(db, SYSTEM_ACTOR, await readFixture('exemplo-b'));
+    if (!imported.ok) throw new Error(JSON.stringify(imported.issues));
+  });
+
+  it('link para conteúdo no ar, categoria, autor, institucional e redirect não avisa; caminho inexistente avisa no bloco', async () => {
+    const version = await submit({
+      blocks: [
+        link('/rotina-da-manha/'),
+        link('/quem-somos'),
+        link('/categoria/guias/'),
+        link('/autor/ana-souza/'),
+        link('/sobre/'),
+        link('/guia-antigo/'),
+        link('/nao-existe/'),
+        link('/arroz-de-forno/'),
+      ],
+    });
+
+    const result = await checksOf();
+
+    expect(result.version).toBe(version);
+    expect(result.checks.find((item) => item.key === 'links_internos')).toMatchObject({
+      level: 'aviso',
+      findings: [{ path: ['blocks', 6] }, { path: ['blocks', 7] }],
+    });
+  });
+
+  it('título igual ao de outro conteúdo do site avisa; igual ao de outro site não', async () => {
+    await submit({ title: 'Uma rotina da manhã possível' });
+    expect(await byKey('titulo_duplicado')).toMatchObject({
+      level: 'aviso',
+      findings: [{ path: ['title'] }],
+    });
+
+    await submit({ title: 'Arroz de forno sem complicação' });
+    expect(await byKey('titulo_duplicado')).toMatchObject({ level: 'ok', findings: [] });
+  });
+
+  it('só a validação da release é erro, e a aprovação continua barrando só ela', async () => {
+    const version = await submit({ description: undefined, taxonomyIds: [2] });
+    release.override = withoutFaq;
+
+    const { checks } = await checksOf();
+
+    expect(checks.find((item) => item.key === 'descricao')?.level).toBe('aviso');
+    expect(checks.find((item) => item.key === 'categoria')?.level).toBe('aviso');
+    expect(checks.filter((item) => item.level === 'erro').map((item) => item.key)).toEqual([
+      'validacao_release',
+    ]);
+    expect(await approve(1, version)).toMatchObject({ ok: false });
+    release.override = undefined;
+    expect(await approve(1, version)).toMatchObject({ ok: true });
+  });
+
+  it('sem papel, forbidden; conteúdo inexistente, not_found', async () => {
+    expect(await reviewChecks(db, { email: 'x@orakel.local', roles: [] }, SITE, 1)).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
+    expect(await reviewChecks(db, role('revisor'), SITE, 999)).toMatchObject({
+      ok: false,
       issues: [{ code: 'content.not_found' }],
     });
   });
