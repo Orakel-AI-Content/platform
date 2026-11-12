@@ -169,6 +169,18 @@ export async function setCurrentStage(
 }
 
 /**
+ * A tentativa `rodando` tem pedido de cancelamento ("Cancelar", gravado por `cancelBuild`)? O
+ * build-runner consulta durante a execução para matar o container e fechar a linha `cancelado`.
+ */
+export async function buildCancelRequested(db: Executor, buildId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ at: builds.cancelRequestedAt })
+    .from(builds)
+    .where(and(eq(builds.id, buildId), eq(builds.status, 'rodando')));
+  return row?.at != null;
+}
+
+/**
  * A linha `na_fila` do job, de build ou de rollback: o id do job é único entre as tasks e o
  * índice `builds_queued_job_unique` garante uma só.
  */
@@ -257,36 +269,55 @@ export type BuildClosing = {
   massUnpublishDeclaredAt?: Date | null;
 };
 
-/** Fecha a linha da tentativa com o resultado e aplica o efeito no site e nas mudanças pendentes. */
+/** Colunas que fecham a linha, conforme o desfecho da tentativa. */
+function closingFields(outcome: BuildOutcome) {
+  switch (outcome.status) {
+    case 'ok':
+      return {
+        status: 'ok' as const,
+        pendingChangeIds: outcome.render.pendingChangeIds,
+        pages: outcome.render.pages,
+        files: outcome.render.files,
+        versionId: outcome.publish.versionId,
+        cacheKey: outcome.publish.cacheKey,
+        renderMs: outcome.renderMs,
+        publishMs: outcome.publishMs,
+      };
+    case 'cancelled':
+      return {
+        status: 'cancelado' as const,
+        pages: outcome.render?.pages ?? null,
+        files: outcome.render?.files ?? null,
+        renderMs: outcome.renderMs ?? null,
+        publishMs: outcome.publishMs ?? null,
+      };
+    case 'failed':
+      return {
+        status: 'failed' as const,
+        failedStage: outcome.stage,
+        failureKind: outcome.failure.kind,
+        failureMessage: outcome.failure.message,
+        logTail: outcome.logTail ?? null,
+        pendingChangeIds: outcome.render?.pendingChangeIds ?? [],
+        pages: outcome.render?.pages ?? null,
+        files: outcome.render?.files ?? null,
+        renderMs: outcome.renderMs ?? null,
+        publishMs: outcome.publishMs ?? null,
+      };
+  }
+}
+
+/**
+ * Fecha a linha da tentativa com o resultado e aplica o efeito no site e nas mudanças pendentes.
+ * A cancelada fecha `cancelado`, sem efeito: o site não é pausado e as mudanças continuam
+ * pendentes; quem pediu e quando já estão na linha (`cancelBuild`).
+ */
 export async function recordBuild(
   tx: Executor,
   run: BuildClosing,
   outcome: BuildOutcome,
 ): Promise<number> {
-  const result =
-    outcome.status === 'ok'
-      ? {
-          status: 'ok' as const,
-          pendingChangeIds: outcome.render.pendingChangeIds,
-          pages: outcome.render.pages,
-          files: outcome.render.files,
-          versionId: outcome.publish.versionId,
-          cacheKey: outcome.publish.cacheKey,
-          renderMs: outcome.renderMs,
-          publishMs: outcome.publishMs,
-        }
-      : {
-          status: 'failed' as const,
-          failedStage: outcome.stage,
-          failureKind: outcome.failure.kind,
-          failureMessage: outcome.failure.message,
-          logTail: outcome.logTail ?? null,
-          pendingChangeIds: outcome.render?.pendingChangeIds ?? [],
-          pages: outcome.render?.pages ?? null,
-          files: outcome.render?.files ?? null,
-          renderMs: outcome.renderMs ?? null,
-          publishMs: outcome.publishMs ?? null,
-        };
+  const result = closingFields(outcome);
   const closed = await tx
     .update(builds)
     .set({ ...result, finishedAt: new Date() })
@@ -314,7 +345,7 @@ export async function recordBuild(
     await setActiveVersion(tx, run.siteId, outcome.publish.versionId);
     const declaredAt = run.massUnpublishDeclaredAt ?? null;
     if (declaredAt !== null) await clearMassUnpublish(tx, run.siteId, declaredAt);
-  } else if (outcome.failure.kind === 'permanent') {
+  } else if (outcome.status === 'failed' && outcome.failure.kind === 'permanent') {
     await pauseSite(
       tx,
       run.siteId,

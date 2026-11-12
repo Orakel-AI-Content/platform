@@ -218,4 +218,108 @@ describe('runBuild', () => {
       failure: { kind: 'transient' },
     });
   });
+
+  describe('cancelamento', () => {
+    it('pedido durante a espera: mata o container, termina cancelled e remove containers e volume', async () => {
+      const fake = fakeRuntime({ render: { running: true } });
+      let asked = 0;
+      const outcome = await runBuild(plan, {
+        runtime: fake.runtime,
+        now,
+        // Não há pedido nas consultas antes do render; aparece na espera.
+        cancelRequested: () => Promise.resolve(++asked > 2),
+      });
+      expect(outcome).toMatchObject({ status: 'cancelled', stage: 'render' });
+      expect(outcome).not.toHaveProperty('logTail');
+      expect(fake.killed).toEqual(['orakel-render-exemplo-a-7-1']);
+      expect(fake.removed).toEqual(['orakel-render-exemplo-a-7-1']);
+      expect(fake.volumes.removed).toEqual(['orakel-build-exemplo-a-7-1']);
+      expect(fake.started).toHaveLength(1);
+    });
+
+    it('pedido visto depois do render impede o publish e guarda o que o render produziu', async () => {
+      const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+      let asked = 0;
+      const outcome = await runBuild(plan, {
+        runtime: fake.runtime,
+        now,
+        cancelRequested: () => Promise.resolve(++asked > 1),
+      });
+      expect(outcome).toMatchObject({
+        status: 'cancelled',
+        stage: 'publish',
+        render: { pages: 12 },
+      });
+      expect(fake.started.map((s) => s.command[0])).toEqual(['render']);
+      expect(fake.killed).toEqual([]);
+      expect(fake.volumes.removed).toEqual(['orakel-build-exemplo-a-7-1']);
+    });
+
+    it('pedido antes do render: nenhum container nem volume é criado', async () => {
+      const fake = fakeRuntime({ render: { file: renderOk() } });
+      const outcome = await runBuild(plan, {
+        runtime: fake.runtime,
+        now,
+        cancelRequested: () => Promise.resolve(true),
+      });
+      expect(outcome).toMatchObject({ status: 'cancelled', stage: 'render' });
+      expect(fake.started).toEqual([]);
+      expect(fake.volumes.created).toEqual([]);
+    });
+
+    it('container que sai antes de o pedido ser visto fecha com o resultado real', async () => {
+      const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+      let asked = 0;
+      const outcome = await runBuild(plan, {
+        runtime: fake.runtime,
+        now,
+        // Pedido só depois da última consulta (antes do publish).
+        cancelRequested: () => Promise.resolve(++asked > 2),
+      });
+      expect(outcome.status).toBe('ok');
+      const failing = fakeRuntime({ render: { exitCode: 10 } });
+      const failed = await runBuild(plan, {
+        runtime: failing.runtime,
+        now,
+        cancelRequested: () => Promise.resolve(false),
+      });
+      expect(failed).toMatchObject({ status: 'failed', stage: 'render' });
+    });
+
+    it('a espera é feita em fatias e o prazo da etapa continua valendo', async () => {
+      const fake = fakeRuntime({ render: { running: true } });
+      const waits: number[] = [];
+      const wait = fake.runtime.wait.bind(fake.runtime);
+      fake.runtime.wait = (id, ms) => {
+        waits.push(ms);
+        return wait(id, ms);
+      };
+      let t = 0;
+      const outcome = await runBuild(
+        { ...plan, render: { ...plan.render, timeoutMs: 12_000 } },
+        {
+          runtime: fake.runtime,
+          // Cada fatia "dura" o que pediu.
+          now: () => (t += waits.at(-1) ?? 0),
+          cancelRequested: () => Promise.resolve(false),
+        },
+      );
+      expect(waits.every((ms) => ms <= 5_000)).toBe(true);
+      expect(outcome).toMatchObject({ status: 'failed', failure: { kind: 'transient' } });
+      expect(fake.killed).toEqual(['orakel-render-exemplo-a-7-1']);
+    });
+
+    it('erro ao ler o pedido só vai para o log e o build segue', async () => {
+      const logs: string[] = [];
+      const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+      const outcome = await runBuild(plan, {
+        runtime: fake.runtime,
+        now,
+        log: (msg) => logs.push(msg),
+        cancelRequested: () => Promise.reject(new Error('banco fora')),
+      });
+      expect(outcome.status).toBe('ok');
+      expect(logs.some((m) => m.includes('banco fora'))).toBe(true);
+    });
+  });
 });

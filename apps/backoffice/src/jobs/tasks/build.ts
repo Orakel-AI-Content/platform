@@ -2,6 +2,7 @@ import type { Task } from 'graphile-worker';
 
 import type { Db } from '../../db/client.ts';
 import {
+  buildCancelRequested,
   cancelQueuedBuild,
   loadBuildTarget,
   queueRetry,
@@ -40,7 +41,8 @@ function siteIdOf(payload: unknown): string {
  * a linha `na_fila` do job fecha como `cancelado`. Cada tentativa é uma linha em `builds`: a
  * `na_fila` do agendamento é promovida a `rodando` e fechada com o resultado. A transitória
  * deixa a próxima tentativa `na_fila` e lança para o Graphile Worker repetir; a permanente
- * pausa o site (recordBuild) e encerra o job.
+ * pausa o site (recordBuild) e encerra o job. O "Cancelar" de uma tentativa `rodando` é visto
+ * pelo `runBuild` durante a espera do container: a linha fecha `cancelado` e o job termina.
  */
 export function createBuildTask(deps: BuildTaskDeps): Task {
   const now = deps.now ?? Date.now;
@@ -78,6 +80,7 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
       now,
       log: (msg) => log.warn(msg),
       onStage: (stage) => setCurrentStage(deps.db, buildId, stage),
+      cancelRequested: () => buildCancelRequested(deps.db, buildId),
     });
     const retried = outcome.status === 'failed' && outcome.failure.kind === 'transient';
     await deps.db.transaction(async (tx) => {
@@ -96,6 +99,11 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
         `build de ${siteId} publicado: versão ${outcome.publish.versionId}, ` +
           `${outcome.render.pages} páginas, render ${outcome.renderMs} ms, publish ${outcome.publishMs} ms`,
       );
+      return;
+    }
+    if (outcome.status === 'cancelled') {
+      // Não é falha: o job termina sem lançar, e o Graphile Worker não repete.
+      log.info(`build de ${siteId} cancelado a pedido no ${outcome.stage}`);
       return;
     }
     const message = `build de ${siteId} falhou no ${outcome.stage} (${outcome.failure.kind}): ${outcome.failure.message}`;

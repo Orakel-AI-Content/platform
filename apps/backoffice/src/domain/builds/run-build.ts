@@ -2,7 +2,9 @@
 // sucesso, container publish na rede publish. O resultado vem dos arquivos do volume
 // (contrato do @orakel/build-contract); o código de saída só decide quando o arquivo falta.
 // A troca de etapa é avisada a quem chamou (que a grava na linha `rodando`); na falha, o fim do
-// log do container da etapa é lido antes de ele sair. Containers e volume são sempre removidos.
+// log do container da etapa é lido antes de ele sair. O pedido de cancelamento (marca na linha
+// `rodando`) é consultado durante a espera de cada container e antes de cada etapa: havendo pedido,
+// o container é morto e a execução termina `cancelled`. Containers e volume são sempre removidos.
 import {
   BUILD_DIR,
   EXIT_CODES,
@@ -15,7 +17,12 @@ import {
 } from '@orakel/build-contract';
 
 import type { BUILD_STAGES } from '../../db/schema/index.ts';
-import { readLogTail, type ContainerRuntime, type ContainerSpec } from './runtime.ts';
+import {
+  readLogTail,
+  type ContainerRuntime,
+  type ContainerSpec,
+  type WaitResult,
+} from './runtime.ts';
 
 export type BuildStage = (typeof BUILD_STAGES)[number];
 
@@ -50,7 +57,18 @@ export type BuildOutcome =
       render?: RenderOk;
       renderMs?: number;
       publishMs?: number;
+    }
+  | {
+      status: 'cancelled';
+      /** Etapa em que o pedido foi visto. */
+      stage: BuildStage;
+      render?: RenderOk;
+      renderMs?: number;
+      publishMs?: number;
     };
+
+/** Intervalo máximo entre duas consultas do pedido de cancelamento enquanto um container roda. */
+export const CANCEL_CHECK_MS = 5_000;
 
 type Deps = {
   runtime: ContainerRuntime;
@@ -58,6 +76,11 @@ type Deps = {
   log?: (msg: string) => void;
   /** Troca de etapa (image, render, publish). Erro dele só vai para o `log`. */
   onStage?: (stage: BuildStage) => Promise<void>;
+  /**
+   * Há pedido de cancelamento? Consultado a cada `CANCEL_CHECK_MS` na espera do container e
+   * antes de cada etapa. Erro dele só vai para o `log` e conta como "não".
+   */
+  cancelRequested?: () => Promise<boolean>;
 };
 
 /** Falha sem arquivo de resultado: o código de saída classifica (10 permanente; o resto, não). */
@@ -87,11 +110,40 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
     });
   }
 
+  async function cancelled(): Promise<boolean> {
+    if (deps.cancelRequested === undefined) return false;
+    return deps.cancelRequested().catch((error: unknown) => {
+      deps.log?.(`Pedido de cancelamento de ${plan.runId} não lido: ${String(error)}`);
+      return false;
+    });
+  }
+
+  /**
+   * Espera o container até ele sair, o prazo da etapa acabar ou haver pedido de cancelamento.
+   * Sem `cancelRequested`, uma espera só; com ele, fatias de até `CANCEL_CHECK_MS`.
+   */
+  async function waitStage(
+    id: string,
+    timeoutMs: number,
+  ): Promise<WaitResult | { cancelled: true }> {
+    if (deps.cancelRequested === undefined) return runtime.wait(id, timeoutMs);
+    const deadline = now() + timeoutMs;
+    for (;;) {
+      const remaining = deadline - now();
+      const waited = await runtime.wait(id, Math.max(0, Math.min(CANCEL_CHECK_MS, remaining)));
+      if (!('timedOut' in waited)) return waited;
+      if (now() >= deadline) return waited;
+      if (await cancelled()) return { cancelled: true };
+    }
+  }
+
   /** Roda uma etapa e devolve o arquivo de resultado lido do volume. */
   async function stage(
     name: 'render' | 'publish',
     stagePlan: StagePlan,
-  ): Promise<{ ok: true; text: string } | { ok: false; failure: Failure }> {
+  ): Promise<
+    { ok: true; text: string } | { ok: false; failure: Failure } | { ok: false; cancelled: true }
+  > {
     const id = await runtime.start({
       name: `orakel-${name}-${plan.runId}`,
       image: plan.image,
@@ -103,7 +155,11 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
       labels: { ...labels, 'orakel.stage': name },
     });
     stageContainers.set(name, id);
-    const waited = await runtime.wait(id, stagePlan.timeoutMs);
+    const waited = await waitStage(id, stagePlan.timeoutMs);
+    if ('cancelled' in waited) {
+      await runtime.kill(id);
+      return { ok: false, cancelled: true };
+    }
     if ('timedOut' in waited) {
       await runtime.kill(id);
       return {
@@ -141,12 +197,14 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
     }
 
     current = 'render';
+    if (await cancelled()) return { status: 'cancelled', stage: 'render' };
     await enter('render');
     const startedAt = now();
     await runtime.createVolume(volume, labels);
 
     const rendered = await stage('render', plan.render);
     renderMs = now() - startedAt;
+    if ('cancelled' in rendered) return { status: 'cancelled', stage: 'render', renderMs };
     if (!rendered.ok)
       return { status: 'failed', stage: 'render', failure: rendered.failure, renderMs };
     const parsed = ResultSchema.safeParse(JSON.parse(rendered.text));
@@ -164,10 +222,14 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
     render = parsed.data;
 
     current = 'publish';
+    if (await cancelled()) return { status: 'cancelled', stage: 'publish', render, renderMs };
     await enter('publish');
     const publishStart = now();
     const published = await stage('publish', plan.publish);
     const publishMs = now() - publishStart;
+    if ('cancelled' in published) {
+      return { status: 'cancelled', stage: 'publish', render, renderMs, publishMs };
+    }
     if (!published.ok) {
       return {
         status: 'failed',
@@ -210,7 +272,7 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
       ...(render && { render }),
       ...(renderMs !== undefined && { renderMs }),
     }));
-    if (outcome.status === 'ok') return outcome;
+    if (outcome.status !== 'failed') return outcome;
     const id = stageContainers.get(outcome.stage);
     const logTail = id === undefined ? undefined : await readLogTail(runtime, id, deps.log);
     return logTail === undefined ? outcome : { ...outcome, logTail };
