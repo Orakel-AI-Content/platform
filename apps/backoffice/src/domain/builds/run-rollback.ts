@@ -12,14 +12,16 @@ import {
   type RollbackResult,
 } from '@orakel/build-contract';
 
+import { SITE_WITHOUT_RELEASE } from './plan.ts';
 import { readLogTail, type ContainerRuntime } from './runtime.ts';
 
 export type RollbackPlan = {
   siteId: string;
   /** Versão já publicada que deve voltar a ficar ativa. */
   versionId: string;
-  release: string;
-  image: string;
+  /** Nulas no site sem versão: o rollback recusa com `SITE_WITHOUT_RELEASE`. */
+  release: string | null;
+  image: string | null;
   /** Sufixo único dos nomes de volume e container. */
   runId: string;
   network: string;
@@ -59,12 +61,16 @@ export async function runRollback(plan: RollbackPlan, deps: Deps): Promise<Rollb
   const elapsed = () => (startedAt === undefined ? {} : { durationMs: now() - startedAt });
 
   async function attempt(): Promise<RollbackOutcome> {
-    if (!(await runtime.imageExists(plan.image))) {
+    const { image } = plan;
+    if (image === null) {
+      return { status: 'failed', failure: { kind: 'permanent', message: SITE_WITHOUT_RELEASE } };
+    }
+    if (!(await runtime.imageExists(image))) {
       return {
         status: 'failed',
         failure: {
           kind: 'permanent',
-          message: `A imagem ${plan.image} não está no host (o rollback não baixa imagens)`,
+          message: `A imagem ${image} não está no host (o rollback não baixa imagens)`,
         },
       };
     }
@@ -73,7 +79,7 @@ export async function runRollback(plan: RollbackPlan, deps: Deps): Promise<Rollb
     await runtime.createVolume(volume, labels);
     container = await runtime.start({
       name: `orakel-rollback-${plan.runId}`,
-      image: plan.image,
+      image,
       command: ['rollback'],
       env: plan.env,
       network: plan.network,

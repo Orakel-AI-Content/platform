@@ -73,7 +73,9 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
       attempt,
       startedAt,
     });
-    log.info(`build de ${siteId} na release ${plan.release} (tentativa ${attempt})`);
+    log.info(
+      `build de ${siteId} na release ${plan.release ?? '(sem versão)'} (tentativa ${attempt})`,
+    );
 
     const outcome = await runBuild(plan, {
       runtime: deps.runtime,

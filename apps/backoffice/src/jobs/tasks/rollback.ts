@@ -62,7 +62,7 @@ export function createRollbackTask(deps: BuildTaskDeps): Task {
       run: { kind: 'rollback', versionId },
     });
     log.info(
-      `rollback de ${siteId} para ${versionId} na release ${plan.release} (tentativa ${attempt})`,
+      `rollback de ${siteId} para ${versionId} na release ${plan.release ?? '(sem versão)'} (tentativa ${attempt})`,
     );
 
     const outcome = await runRollback(plan, {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { failedFile, fakeRuntime, publishOk, renderOk } from './fake-runtime.ts';
+import { SITE_WITHOUT_RELEASE } from './plan.ts';
 import { runBuild, type BuildPlan } from './run-build.ts';
 
 const plan: BuildPlan = {
@@ -28,6 +29,22 @@ describe('runBuild', () => {
       ['render', 'orakel-export', 'orakel-build-exemplo-a-7-1'],
       ['publish', 'orakel-publish', 'orakel-build-exemplo-a-7-1'],
     ]);
+  });
+
+  it('site sem versão: falha permanente na etapa image, sem tocar o runtime', async () => {
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    const outcome = await runBuild(
+      { ...plan, release: null, image: null },
+      { runtime: fake.runtime, now },
+    );
+    expect(outcome).toEqual({
+      status: 'failed',
+      stage: 'image',
+      failure: { kind: 'permanent', message: SITE_WITHOUT_RELEASE },
+    });
+    expect(fake.started).toEqual([]);
+    expect(fake.pulled).toEqual([]);
+    expect(fake.volumes.created).toEqual([]);
   });
 
   it('sempre remove containers e volume, também na falha', async () => {

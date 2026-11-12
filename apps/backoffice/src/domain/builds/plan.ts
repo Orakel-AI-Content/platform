@@ -7,8 +7,11 @@ import type { RollbackPlan } from './run-rollback.ts';
 
 export type BuildSettings = {
   image: string;
-  /** Tag usada enquanto o site não tem release registrada. */
-  defaultTag: string;
+  /**
+   * Tag usada enquanto o site não tem release registrada (só no local e no E2E). Sem ela, o site
+   * sem versão é recusado.
+   */
+  defaultTag?: string;
   exportNetwork: string;
   publishNetwork: string;
   exportApiUrl: string;
@@ -27,6 +30,21 @@ export const PUBLISH_TIMEOUT_MS = 10 * 60_000;
 /** O rollback só troca a versão ativa no alvo: bem mais curto que o publish. */
 export const ROLLBACK_TIMEOUT_MS = 5 * 60_000;
 
+/**
+ * Motivo da recusa do site sem release e sem tag padrão: a etapa `image` falha permanente com
+ * ele, e o site é pausado até alguém atualizar a versão.
+ */
+export const SITE_WITHOUT_RELEASE = 'site sem versão: use Atualizar para a mais recente';
+
+/** Release do site, ou a tag padrão; nula quando não há nenhuma das duas. */
+export function resolveRelease(target: BuildTarget, defaultTag: string | undefined): string | null {
+  return target.release ?? defaultTag ?? null;
+}
+
+function imageOf(settings: BuildSettings, release: string | null): string | null {
+  return release === null ? null : `${settings.image}:${release}`;
+}
+
 /** Alvo do deploy e o acesso a ele: o mesmo para o publish e o rollback, sem divergir. */
 function deployEnv(settings: BuildSettings): Record<string, string> {
   return settings.deploy.target === 'local'
@@ -39,11 +57,11 @@ function deployEnv(settings: BuildSettings): Record<string, string> {
 }
 
 export function planBuild(target: BuildTarget, settings: BuildSettings, runId: string): BuildPlan {
-  const release = target.release ?? settings.defaultTag;
+  const release = resolveRelease(target, settings.defaultTag);
   return {
     siteId: target.siteId,
     release,
-    image: `${settings.image}:${release}`,
+    image: imageOf(settings, release),
     runId,
     render: {
       network: settings.exportNetwork,
@@ -52,7 +70,7 @@ export function planBuild(target: BuildTarget, settings: BuildSettings, runId: s
       env: {
         SITE_ID: target.siteId,
         SITE_DOMAIN: target.domain,
-        RELEASE: release,
+        RELEASE: release ?? '',
         EXPORT_API_URL: settings.exportApiUrl,
         EXPORT_BUILD_TOKEN: settings.exportBuildToken,
         PAGE_DROP_TOLERANCE: String(settings.pageDropTolerance),
@@ -86,12 +104,12 @@ export function planRollback(
   versionId: string,
   runId: string,
 ): RollbackPlan {
-  const release = target.release ?? settings.defaultTag;
+  const release = resolveRelease(target, settings.defaultTag);
   return {
     siteId: target.siteId,
     versionId,
     release,
-    image: `${settings.image}:${release}`,
+    image: imageOf(settings, release),
     runId,
     network: settings.publishNetwork,
     timeoutMs: ROLLBACK_TIMEOUT_MS,

@@ -59,6 +59,11 @@ export function createCheckReleaseImageTask(
 
     try {
       if (deps.driver.kind === 'local') {
+        // O env exige SITE_BUILDER_TAG com o driver local; a guarda só estreita o tipo.
+        if (deps.settings.defaultTag === undefined) {
+          await fail('RELEASE_DRIVER=local sem SITE_BUILDER_TAG');
+          return;
+        }
         const source = `${deps.settings.image}:${deps.settings.defaultTag}`;
         if (!(await deps.runtime.imageExists(source))) {
           await fail(missingLocalImageReason(source));

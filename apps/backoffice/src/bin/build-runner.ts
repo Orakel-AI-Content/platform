@@ -13,7 +13,7 @@ import { runProcess } from './run-process.ts';
 function settingsFrom(env: Env, runner: BuildRunnerEnv): BuildSettings {
   return {
     image: runner.SITE_BUILDER_IMAGE,
-    defaultTag: runner.SITE_BUILDER_TAG,
+    ...(runner.SITE_BUILDER_TAG !== undefined && { defaultTag: runner.SITE_BUILDER_TAG }),
     exportNetwork: runner.BUILD_EXPORT_NETWORK,
     publishNetwork: runner.BUILD_PUBLISH_NETWORK,
     exportApiUrl: runner.BUILD_EXPORT_API_URL,

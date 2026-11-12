@@ -24,6 +24,7 @@ import {
   type ContainerSpec,
   type WaitResult,
 } from './runtime.ts';
+import { SITE_WITHOUT_RELEASE } from './plan.ts';
 
 export type BuildStage = (typeof BUILD_STAGES)[number];
 
@@ -36,8 +37,9 @@ type StagePlan = {
 
 export type BuildPlan = {
   siteId: string;
-  release: string;
-  image: string;
+  /** Nulas no site sem versão: a etapa `image` recusa com `SITE_WITHOUT_RELEASE`. */
+  release: string | null;
+  image: string | null;
   /** Sufixo único dos nomes de volume e containers. */
   runId: string;
   render: StagePlan;
@@ -149,12 +151,13 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
   async function stage(
     name: 'render' | 'publish',
     stagePlan: StagePlan,
+    image: string,
   ): Promise<
     { ok: true; text: string } | { ok: false; failure: Failure } | { ok: false; cancelled: true }
   > {
     const id = await runtime.start({
       name: `orakel-${name}-${plan.runId}`,
-      image: plan.image,
+      image,
       command: [name],
       env: stagePlan.env,
       network: stagePlan.network,
@@ -190,15 +193,23 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
 
   async function attempt(): Promise<BuildOutcome> {
     await enter('image');
-    if (!(await runtime.imageExists(plan.image))) {
-      await runtime.pullImage(plan.image);
-      if (!(await runtime.imageExists(plan.image))) {
+    const { image } = plan;
+    if (image === null) {
+      return {
+        status: 'failed',
+        stage: 'image',
+        failure: { kind: 'permanent', message: SITE_WITHOUT_RELEASE },
+      };
+    }
+    if (!(await runtime.imageExists(image))) {
+      await runtime.pullImage(image);
+      if (!(await runtime.imageExists(image))) {
         return {
           status: 'failed',
           stage: 'image',
           failure: {
             kind: 'permanent',
-            message: `A imagem ${plan.image} não está no host e o pull não a trouxe`,
+            message: `A imagem ${image} não está no host e o pull não a trouxe`,
           },
         };
       }
@@ -210,7 +221,7 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
     const startedAt = now();
     await runtime.createVolume(volume, labels);
 
-    const rendered = await stage('render', plan.render);
+    const rendered = await stage('render', plan.render, image);
     renderMs = now() - startedAt;
     if ('cancelled' in rendered) return { status: 'cancelled', stage: 'render', renderMs };
     if (!rendered.ok)
@@ -233,7 +244,7 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
     if (await cancelled()) return { status: 'cancelled', stage: 'publish', render, renderMs };
     await enter('publish');
     const publishStart = now();
-    const published = await stage('publish', plan.publish);
+    const published = await stage('publish', plan.publish, image);
     const publishMs = now() - publishStart;
     if ('cancelled' in published) {
       return { status: 'cancelled', stage: 'publish', render, renderMs, publishMs };
