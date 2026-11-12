@@ -115,6 +115,44 @@ describe('painel de etapas', () => {
     ]);
   });
 
+  it('sem as ações de operação (sem operations.run), nenhum botão e os estados de sempre', () => {
+    renderPanel({ state: 'pausado', pausedReason: 'falha permanente no render' });
+
+    expect(screen.queryAllByRole('button')).toEqual([]);
+    expect([0, 1, 2, 3, 4].map(description)).toEqual([
+      'Infra aplicada e zona ativa',
+      '1.4.0',
+      'Publicação concluída em 11/10/2026, 14:02 BRT',
+      'v41 · 120 páginas · no ar desde 11/10/2026, 14:02 BRT, por ana@orakel.local',
+      'Pausado: falha permanente no render',
+    ]);
+  });
+
+  it('com as ações, cada uma abaixo do estado da sua etapa', () => {
+    render(
+      <SitePublicationSteps
+        site={SITE}
+        instance={INSTANCE}
+        activity={activity(null, [BUILD_OK])}
+        actions={{
+          versao: <button type="button">Versão</button>,
+          build: <button type="button">Build</button>,
+          no_ar: <button type="button">No ar</button>,
+          site: <button type="button">Site</button>,
+        }}
+      />,
+    );
+
+    expect(items().map((item) => within(item).queryByRole('button')?.textContent)).toEqual([
+      undefined,
+      'Versão',
+      'Build',
+      'No ar',
+      'Site',
+    ]);
+    expect(description(1)).toBe('1.4.0Versão');
+  });
+
   it('na fila, a etapa Build mostra "na fila" com o horário previsto no fuso do site', () => {
     renderPanel({}, activity(QUEUED, [BUILD_OK]));
 
