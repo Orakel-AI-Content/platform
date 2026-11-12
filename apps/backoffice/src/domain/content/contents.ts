@@ -39,7 +39,7 @@ import { requireRole, type Actor } from '../access/rbac.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 import { carryConfirmations } from '../reviews/confirmations.ts';
 import { enqueueLinkCheck } from '../reviews/link-checks.ts';
-import { lockVersionInReview } from '../reviews/reviews.ts';
+import { lockVersionInReview } from '../reviews/version-guard.ts';
 import { checkWrite, type WriteOptions } from './write.ts';
 
 type Status = (typeof CONTENT_STATUSES)[number];

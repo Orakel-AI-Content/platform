@@ -10,7 +10,7 @@ import {
   refused,
   REVIEW_CHECKLIST,
   type ReviewChecklistKey,
-} from './reviews.ts';
+} from './version-guard.ts';
 
 // Confirmações humanas da revisão gravadas por versão (#749): o revisor marca e desmarca cada
 // item de REVIEW_CHECKLIST, ou todos, e o que marcou sobrevive a recarregar a tela. Só a versão
