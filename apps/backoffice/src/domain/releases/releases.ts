@@ -5,7 +5,14 @@ import type { Executor } from '../../db/client.ts';
 import { releases, sites } from '../../db/schema/index.ts';
 import type { RELEASE_IMAGE_STATUSES, RELEASE_PIPELINE_STATES } from '../../db/schema/releases.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
-import { nextVersion, RELEASE_BUMPS, type ReleaseBump } from './next-version.ts';
+import {
+  compare,
+  nextVersion,
+  parse,
+  RELEASE_BUMPS,
+  type ReleaseBump,
+  type Version,
+} from './next-version.ts';
 
 // Registro de versões do site-builder (L1): "Gerar nova versão" (`requestNewRelease`) cria a
 // release antes de ela existir no GHCR, em `gerando`, com o número calculado pela tabela
@@ -394,4 +401,25 @@ export async function listReleases(db: Executor, actor: Actor): Promise<Result<R
     .from(releases)
     .orderBy(desc(releases.registeredAt), desc(releases.tag));
   return { ok: true, value: rows };
+}
+
+/**
+ * Mais recente das releases `disponivel`, em ordem numérica (1.10.0 > 1.9.0), ou `null` sem
+ * nenhuma. Tags fora do formato X.Y.Z são ignoradas. Leitura interna, sem `Actor`: quem chama
+ * (página do site, cadastro) já autorizou.
+ */
+export async function latestAvailableRelease(db: Executor): Promise<string | null> {
+  const rows = await db
+    .select({ tag: releases.tag })
+    .from(releases)
+    .where(eq(releases.pipelineState, 'disponivel'));
+
+  let latest: { tag: string; version: Version } | undefined;
+  for (const { tag } of rows) {
+    const version = parse(tag);
+    if (version !== undefined && (latest === undefined || compare(version, latest.version) > 0)) {
+      latest = { tag, version };
+    }
+  }
+  return latest?.tag ?? null;
 }
