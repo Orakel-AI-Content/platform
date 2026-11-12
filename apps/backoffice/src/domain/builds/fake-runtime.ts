@@ -5,7 +5,10 @@ import type { ContainerRuntime, ContainerSpec } from './runtime.ts';
 export type FakeStage = { exitCode?: number; file?: unknown; timedOut?: boolean };
 
 export function fakeRuntime(options: {
+  /** A imagem está no host? */
   image?: boolean;
+  /** O pull traz a imagem (`ok`), não traz (`absent`) ou lança (`error`). Padrão: `absent`. */
+  pull?: 'ok' | 'absent' | 'error';
   render?: FakeStage;
   publish?: FakeStage;
   rollback?: FakeStage;
@@ -15,6 +18,8 @@ export function fakeRuntime(options: {
   const removed: string[] = [];
   const volumes = { created: [] as string[], removed: [] as string[] };
   const killed: string[] = [];
+  const pulled: string[] = [];
+  let present = options.image ?? true;
   const stageOf = (id: string) =>
     id.startsWith('orakel-render')
       ? options.render
@@ -23,7 +28,13 @@ export function fakeRuntime(options: {
         : options.publish;
 
   const runtime: ContainerRuntime = {
-    imageExists: () => Promise.resolve(options.image ?? true),
+    imageExists: () => Promise.resolve(present),
+    pullImage(image) {
+      pulled.push(image);
+      if (options.pull === 'error') return Promise.reject(new Error('manifest unknown'));
+      if (options.pull === 'ok') present = true;
+      return Promise.resolve();
+    },
     createVolume(name) {
       if (options.failOn === 'createVolume') return Promise.reject(new Error('daemon fora'));
       volumes.created.push(name);
@@ -57,7 +68,7 @@ export function fakeRuntime(options: {
       return Promise.resolve();
     },
   };
-  return { runtime, started, removed, volumes, killed };
+  return { runtime, started, removed, volumes, killed, pulled };
 }
 
 export const renderOk = (site = 'exemplo-a', pendingChangeIds: number[] = [1, 2]) => ({
