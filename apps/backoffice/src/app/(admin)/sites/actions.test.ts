@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   advanceLifecycleAction,
+  cancelBuildAction,
   createSiteAction,
   pauseSiteAction,
   rebuildOnReleaseAction,
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   pauseSiteManually: vi.fn(),
   rebuildOnRelease: vi.fn(),
   requestRollback: vi.fn(),
+  cancelBuild: vi.fn(),
   setBuildWindow: vi.fn(),
   setDailyPublishLimit: vi.fn(),
   registerPolicyTrigger: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock('@/db/client.ts', () => ({
 vi.mock('@/domain/builds/builds.ts', () => ({
   requestBuildNow: vi.fn(),
   requestRollback: mocks.requestRollback,
+  cancelBuild: mocks.cancelBuild,
 }));
 vi.mock('@/domain/builds/site-state.ts', () => ({
   advanceLifecycle: mocks.advanceLifecycle,
@@ -352,6 +355,45 @@ describe('Server Actions da página do site', () => {
       message: 'Rollback de exemplo-a para v-antiga enfileirado.',
     });
     expect(mocks.requestRollback).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a', 'v-antiga');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('"Cancelar" só delega ao domínio; a recusa vira a mensagem, sem revalidar', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await cancelBuildAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.cancelBuild).not.toHaveBeenCalled();
+
+    mocks.cancelBuild.mockResolvedValueOnce({
+      ok: false,
+      issues: [
+        {
+          code: 'build.not_open',
+          message: 'O site exemplo-a não tem publicação na fila nem em andamento',
+          path: [],
+        },
+      ],
+    });
+    expect(await cancelBuildAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'O site exemplo-a não tem publicação na fila nem em andamento',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+
+    mocks.cancelBuild.mockResolvedValueOnce({ ok: true, value: 'cancelado' });
+    expect(await cancelBuildAction('exemplo-a')).toEqual({
+      ok: true,
+      message: 'Publicação de exemplo-a cancelada.',
+    });
+    mocks.cancelBuild.mockResolvedValueOnce({ ok: true, value: 'pedido' });
+    expect(await cancelBuildAction('exemplo-a')).toEqual({
+      ok: true,
+      message: 'Cancelamento da publicação em andamento de exemplo-a pedido.',
+    });
+    expect(mocks.cancelBuild).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });
 

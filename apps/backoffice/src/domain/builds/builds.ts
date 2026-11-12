@@ -12,6 +12,7 @@ import type { Executor } from '../../db/client.ts';
 import {
   builds,
   FINISHED_BUILD_STATUSES,
+  OPEN_BUILD_STATUSES,
   pendingChanges,
   sites,
   type BuildStatus,
@@ -377,6 +378,76 @@ export async function requestBuildNow(
   return { ok: true, value: undefined };
 }
 
+const notFound = (siteId: string) => ({
+  ok: false as const,
+  issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+});
+
+/**
+ * Desfecho do "Cancelar": `cancelado` quando a publicação estava na fila e saiu dela;
+ * `pedido` quando já rodava e o pedido ficou marcado na linha, para o build-runner agir.
+ */
+export type BuildCancellation = 'cancelado' | 'pedido';
+
+/**
+ * "Cancelar" a publicação aberta do site. Na fila (job livre): tira o job da fila e fecha a
+ * linha `cancelado`, com quem e quando. Rodando (ou job já pego pelo build-runner): só grava
+ * quem e quando na linha, que continua aberta. Com uma `rodando` e outra `na_fila` (pedido
+ * durante o build), age na da fila. Não é falha: não pausa o site nem baixa mudanças
+ * pendentes, e o próximo agendamento abre outra linha `na_fila`. Reversão não é cancelável.
+ */
+export async function cancelBuild(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  now: Date = new Date(),
+): Promise<Result<BuildCancellation>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+  const [site] = await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, siteId));
+  if (site === undefined) return notFound(siteId);
+
+  const open = await tx
+    .select({ id: builds.id, status: builds.status, jobId: builds.jobId })
+    .from(builds)
+    .where(
+      and(
+        eq(builds.siteId, siteId),
+        eq(builds.kind, 'build'),
+        inArray(builds.status, OPEN_BUILD_STATUSES),
+      ),
+    )
+    .orderBy(builds.id)
+    .for('update');
+  const row = open.find((r) => r.status === 'na_fila') ?? open.find((r) => r.status === 'rodando');
+  if (row === undefined) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'build.not_open',
+          message: `O site ${siteId} não tem publicação na fila nem em andamento`,
+          path: [],
+        },
+      ],
+    };
+  }
+
+  const request = { cancelRequestedBy: actor.email, cancelRequestedAt: now };
+  const removed =
+    row.status === 'na_fila' &&
+    (row.jobId === null || (await removeQueuedBuildJob(tx, siteId, row.jobId)));
+  if (removed) {
+    await tx
+      .update(builds)
+      .set({ ...request, status: 'cancelado', finishedAt: now })
+      .where(eq(builds.id, row.id));
+    return { ok: true, value: 'cancelado' };
+  }
+  await tx.update(builds).set(request).where(eq(builds.id, row.id));
+  return { ok: true, value: 'pedido' };
+}
+
 /** Versão já publicada que o site pode voltar a ter no ar ("Reverter"). */
 export type RollbackVersion = {
   versionId: string;
@@ -385,11 +456,6 @@ export type RollbackVersion = {
   /** Fim do build mais recente que publicou a versão. */
   finishedAt: Date;
 };
-
-const notFound = (siteId: string) => ({
-  ok: false as const,
-  issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
-});
 
 /** Versões dos builds `ok` do site, da mais recente para a mais antiga, sem a que está no ar. */
 export async function listRollbackVersions(
