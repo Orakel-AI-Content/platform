@@ -45,6 +45,7 @@ import { applyServerIssues } from '@/components/shared/applyServerIssues.ts';
 import { ErrorSummary } from '@/components/shared/ErrorSummary.tsx';
 import { BLOCK_TYPE_LABEL } from '@/components/shared/siteLabels.ts';
 import { blockSummary, blockText } from '@/components/contents/blockSummary.ts';
+import { CONTENT_META_LABELS } from '@/components/contents/contentLabels.ts';
 import { IconButton } from '@/components/shared/IconButton';
 import { Button } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -70,23 +71,6 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 // nota ligada a ele diz por quê; o formulário não envia, nem pelo Enter num campo.
 // Na criação (#590), o slug acompanha o título até a pessoa editar o slug; o título e a descrição
 // para buscadores mostram quantos caracteres têm.
-
-const META_LABELS: Record<string, string> = {
-  kind: 'Tipo',
-  'kind=article': 'Artigo',
-  'kind=page': 'Página',
-  slug: 'Slug',
-  title: 'Título',
-  description: 'Descrição',
-  authorIds: 'Autores',
-  taxonomyIds: 'Taxonomias',
-  coverMediaId: 'Capa',
-  publishedAt: 'Data de publicação',
-  seo: 'SEO',
-  'seo.title': 'Título para buscadores',
-  'seo.description': 'Descrição para buscadores',
-  'seo.canonical': 'Endereço canônico',
-};
 
 const META_HINTS: Record<string, string> = {
   slug: 'Minúsculas, números e hífens.',
@@ -465,7 +449,7 @@ export function ContentEditor({
                 </h2>
                 <SchemaFields
                   schema={ContentMetaSchema}
-                  labels={META_LABELS}
+                  labels={CONTENT_META_LABELS}
                   hints={{ ...META_HINTS, publishedAt: `Horário de ${timeZone}` }}
                   // O tipo não muda depois de criado; `updatedAt` é do site, não do editor; o
                   // SEO tem cartão próprio, recolhível.
@@ -497,7 +481,7 @@ export function ContentEditor({
                   <SchemaFields
                     schema={ContentMetaSchema.shape.seo}
                     prefix="seo"
-                    labels={META_LABELS}
+                    labels={CONTENT_META_LABELS}
                     fields={metaFields}
                   />
                 </div>

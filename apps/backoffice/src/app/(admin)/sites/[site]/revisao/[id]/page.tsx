@@ -2,11 +2,14 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { noRead } from '@/components/shared/ForbiddenScreen';
+import { ReviewChecks } from '@/components/review/ReviewChecks';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
+import { hasError, reviewCheckItems } from '@/components/review/reviewCheckItems.ts';
 import { CONTENT_STATUS_LABEL, CONTENT_STATUS_TAG } from '@/components/shared/siteLabels.ts';
 import { StateTag } from '@/components/sites/SiteStatus';
 import { can } from '@/domain/access/rbac.ts';
-import { REVIEW_CHECKLIST, reviewIssues } from '@/domain/reviews/reviews.ts';
+import { linkCheckFor } from '@/domain/reviews/link-checks.ts';
+import { REVIEW_CHECKLIST, reviewChecks } from '@/domain/reviews/reviews.ts';
 import { DETAIL_SUMMARY_CLASS } from '@/components/shared/detailSummary.ts';
 import { DetailLayout } from '@/components/shared/DetailLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -36,8 +39,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 /**
- * Tela de revisão (#75): a versão mais recente na visualização do site (iframe) e, ao lado, os
- * erros de validação da release, o checklist, a aprovação e a devolução ao editor (#598). Ler exige site.read; aprovar só
+ * Tela de revisão (#75): a versão mais recente na visualização do site (iframe) e, ao lado, as
+ * checagens automáticas (workspace#87: as calculadas na leitura e a dos links externos, gravada
+ * pelo job), o checklist, a aprovação e a devolução ao editor (#598). Ler exige site.read; aprovar só
  * aparece com content.publish, e o domínio confere tudo de novo. Tela de detalhe do guia (#373),
  * na ordem invertida do `CustomerDetails`: a prévia é o conteúdo principal, com a largura do
  * `main`, e o painel fica abaixo dela até `xl` e ao lado a partir dele.
@@ -58,9 +62,13 @@ export default async function ReviewPage({ params }: Params) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return noRead;
   }
-  const validation = await reviewIssues(db, actor, siteId, contentId);
-  if (!validation.ok) return noRead;
   const latest = versions.value.at(-1)!;
+  const [checks, links] = await Promise.all([
+    reviewChecks(db, actor, siteId, contentId),
+    linkCheckFor(db, actor, { siteId, contentId, version: latest.version }),
+  ]);
+  if (!checks.ok || !links.ok) return noRead;
+  const items = reviewCheckItems(checks.value.checks, links.value, latest.data.blocks);
   const preview = previewUrl(site.id, latest.data);
 
   return (
@@ -100,7 +108,8 @@ export default async function ReviewPage({ params }: Params) {
           <ReviewPanel
             version={latest.version}
             status={latest.status}
-            issues={validation.value.issues.map(({ message }) => ({ message }))}
+            checks={<ReviewChecks items={items} />}
+            blocked={hasError(items)}
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
             canApprove={can(actor, 'content.publish')}
             approve={approveAction.bind(null, site.id, contentId, latest.version)}
