@@ -3,9 +3,9 @@
 // mesmo molde do lib/docker.ts. O token só vai no cabeçalho; nenhuma mensagem de erro o repete.
 
 type Options = {
-  /** PAT fine-grained (GITHUB_TOKEN). */
+  /** PAT fine-grained (GITHUB_RELEASE_TOKEN). */
   token: string;
-  /** `dono/nome` (GITHUB_REPOSITORY). */
+  /** `dono/nome` (GITHUB_RELEASE_REPOSITORY). */
   repository: string;
   baseUrl?: string;
   fetch?: typeof fetch;
@@ -106,7 +106,7 @@ export function githubClient(options: Options): GitHubClient {
     }
     const message =
       status === 401
-        ? 'O GitHub recusou a credencial: o GITHUB_TOKEN está inválido ou expirou'
+        ? 'O GitHub recusou a credencial: o GITHUB_RELEASE_TOKEN está inválido ou expirou'
         : status === 403
           ? `A credencial do GitHub não tem permissão: precisa de actions:write e contents:read em ${repo}`
           : status === 404

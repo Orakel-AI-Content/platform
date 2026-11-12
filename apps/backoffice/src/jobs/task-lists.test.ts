@@ -6,7 +6,7 @@ import type { BuildSettings } from '../domain/builds/plan.ts';
 import type { ContainerRuntime } from '../domain/builds/runtime.ts';
 import { resolveModel } from '../domain/generation/generate.ts';
 import type { ObjectStore } from '../domain/media/store.ts';
-import { CHECK_RELEASE_IMAGE_TASK } from '../domain/releases/releases.ts';
+import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
 import { buildRunnerTasks, WORKER_CRONTAB, workerTasks } from './task-lists.ts';
 
 describe('backoffice-worker', () => {
@@ -36,11 +36,12 @@ describe('backoffice-worker', () => {
 });
 
 describe('build-runner', () => {
-  it('só o build-runner registra a conferência da imagem das releases, o job que fala com o Docker', () => {
+  it('só o build-runner registra a conferência da imagem e o run das releases (Docker e GitHub)', () => {
     const runner = buildRunnerTasks({
       db: {} as Db,
       runtime: {} as ContainerRuntime,
       settings: {} as BuildSettings,
+      github: undefined,
     });
     const worker = workerTasks({
       db: {} as Db,
@@ -50,8 +51,9 @@ describe('build-runner', () => {
     });
 
     expect(Object.keys(runner).sort()).toEqual(
-      ['build', CHECK_RELEASE_IMAGE_TASK, 'rollback'].sort(),
+      ['build', CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK, 'rollback'].sort(),
     );
     expect(Object.keys(worker)).not.toContain(CHECK_RELEASE_IMAGE_TASK);
+    expect(Object.keys(worker)).not.toContain(RELEASE_RUN_TASK);
   });
 });

@@ -104,11 +104,11 @@ export const BuildRunnerEnvSchema = z
      * repositório do release.yml. Dispara e acompanha o run da release; sem ele, "Gerar nova
      * versão" falha com motivo, e o build-runner sobe do mesmo jeito (local).
      */
-    GITHUB_TOKEN: optional(
+    GITHUB_RELEASE_TOKEN: optional(
       z.string().regex(/^github_pat_[A-Za-z0-9_]+$/, 'Use um PAT fine-grained (github_pat_…)'),
     ),
     /** Repositório do release.yml (`dono/nome`). */
-    GITHUB_REPOSITORY: blankAsUndefined(
+    GITHUB_RELEASE_REPOSITORY: blankAsUndefined(
       z
         .string()
         .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, 'Use dono/nome')

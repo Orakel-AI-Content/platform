@@ -110,6 +110,9 @@ services:
       DEPLOY_TARGET: ${DEPLOY_TARGET:?defina DEPLOY_TARGET}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      # PAT do GitHub só aqui (ADR 0022 da raiz): dispara e acompanha o release.yml.
+      GITHUB_RELEASE_TOKEN: ${GITHUB_RELEASE_TOKEN:-}
+      GITHUB_RELEASE_REPOSITORY: ${GITHUB_RELEASE_REPOSITORY:-}
     networks: [internal, docker]
     depends_on:
       backoffice-migrate:

@@ -145,7 +145,7 @@ describe('release-run', () => {
     expect(mocks.recordReleaseRunFailed).not.toHaveBeenCalled();
   });
 
-  it('sem GITHUB_TOKEN, a release falha com motivo legível', async () => {
+  it('sem GITHUB_RELEASE_TOKEN, a release falha com motivo legível', async () => {
     mocks.loadReleaseRun.mockResolvedValue({ pipelineState: 'gerando', runId: null });
     await run(undefined);
 

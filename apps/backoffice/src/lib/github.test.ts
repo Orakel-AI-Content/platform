@@ -132,7 +132,7 @@ describe('githubClient', () => {
       [404, false],
       [422, false],
     ]);
-    expect(errors[0]?.message).toMatch(/GITHUB_TOKEN está inválido ou expirou/);
+    expect(errors[0]?.message).toMatch(/GITHUB_RELEASE_TOKEN está inválido ou expirou/);
     expect(errors[1]?.message).toMatch(
       /actions:write e contents:read em Orakel-AI-Content\/platform/,
     );

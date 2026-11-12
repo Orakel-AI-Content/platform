@@ -18,11 +18,11 @@ export const RELEASE_REF = 'main';
 export const RELEASE_POLL_MS = 30_000;
 
 export const MISSING_TOKEN_REASON =
-  'A credencial do GitHub não está configurada: defina GITHUB_TOKEN no build-runner';
+  'A credencial do GitHub não está configurada: defina GITHUB_RELEASE_TOKEN no build-runner';
 
 export type ReleaseRunTaskDeps = {
   db: Executor;
-  /** `undefined` sem GITHUB_TOKEN: a release falha com motivo, e o build-runner sobe igual. */
+  /** `undefined` sem GITHUB_RELEASE_TOKEN: a release falha com motivo, e o build-runner sobe igual. */
   github: GitHubClient | undefined;
   now?: () => number;
 };
