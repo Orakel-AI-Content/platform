@@ -1,8 +1,8 @@
 import type { Result } from '@orakel/content-model';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { releases } from '../../db/schema/index.ts';
+import { releases, sites } from '../../db/schema/index.ts';
 import type { RELEASE_IMAGE_STATUSES, RELEASE_PIPELINE_STATES } from '../../db/schema/releases.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { nextVersion, RELEASE_BUMPS, type ReleaseBump } from './next-version.ts';
@@ -12,7 +12,8 @@ import { nextVersion, RELEASE_BUMPS, type ReleaseBump } from './next-version.ts'
 // (`nextVersion`), e enfileira o run do release.yml; a ação "Reconstruir na release X" escolhe
 // entre as registradas. Tabela operacional, fora do snapshot. Com o CI verde, a imagem é baixada
 // e conferida no host (não no GHCR) por um job do build-runner, o único com acesso ao Docker
-// (ADR 0011 da raiz). Editar e remover estão fora do escopo atual.
+// (ADR 0011 da raiz). "Tentar de novo" (`retryRelease`) e "Descartar" (`discardRelease`) só
+// mudam o estado; editar e remover estão fora do escopo atual.
 
 export type ReleaseImageStatus = (typeof RELEASE_IMAGE_STATUSES)[number];
 export type ReleasePipelineState = (typeof RELEASE_PIPELINE_STATES)[number];
@@ -166,6 +167,105 @@ export async function requestReleaseImageCheck(
   }
   await scheduleImageCheck(tx, found.tag);
   return { ok: true, value: undefined };
+}
+
+const rejected = (code: string, message: string): Result<never> => ({
+  ok: false,
+  issues: [{ code, message, path: ['tag'] }],
+});
+
+const notFound = (tag: string) =>
+  rejected('release.not_found', `A release ${tag} não está registrada`);
+
+const notFailed = (tag: string) =>
+  rejected(
+    'release.not_failed',
+    `A release ${tag} não falhou; só uma release que falhou pode ser tentada de novo`,
+  );
+
+/**
+ * "Tentar de novo": a release em `falhou` volta à etapa que falhou, com o mesmo número e sem o
+ * motivo, e o job dessa etapa entra na fila, na transação de quem pede. A etapa sai do estado
+ * gravado: só o download que falha grava `imageStatus = 'ausente'` (o CI não toca nele). Falha no
+ * CI volta a `gerando` sem `runId` nem `runUrl`, para o `release-run` disparar um run novo em
+ * vez de consultar o que falhou; falha no pull volta a `baixando`.
+ */
+export async function retryRelease(
+  tx: Executor,
+  actor: Actor,
+  tag: string,
+): Promise<Result<ReleaseRecord>> {
+  const allowed = requireRole(actor, 'release.promote');
+  if (!allowed.ok) return allowed;
+
+  const [found] = await tx
+    .select({ pipelineState: releases.pipelineState, imageStatus: releases.imageStatus })
+    .from(releases)
+    .where(eq(releases.tag, tag));
+  if (found === undefined) return notFound(tag);
+  if (found.pipelineState !== 'falhou') return notFailed(tag);
+
+  const pullFailed = found.imageStatus === 'ausente';
+  // Condicional em `falhou`: outro pedido simultâneo que já retomou ou descartou vence.
+  const [updated] = await tx
+    .update(releases)
+    .set(
+      pullFailed
+        ? { pipelineState: 'baixando', failureReason: null }
+        : { pipelineState: 'gerando', failureReason: null, runId: null, runUrl: null },
+    )
+    .where(and(eq(releases.tag, tag), eq(releases.pipelineState, 'falhou')))
+    .returning(RECORD_COLUMNS);
+  if (updated === undefined) return notFailed(tag);
+  await (pullFailed ? scheduleImageCheck(tx, tag) : scheduleReleaseRun(tx, tag));
+  return { ok: true, value: updated };
+}
+
+/**
+ * "Descartar": a release vai a `descartada`, em qualquer estado, se nenhum site a usa
+ * (`sites.release`). Os jobs do run e do download ignoram release fora da etapa deles, então
+ * descartar no meio do pipeline não precisa cancelar job. O número continua contando para o
+ * próximo (`requestNewRelease` lê todas as tags).
+ */
+export async function discardRelease(
+  tx: Executor,
+  actor: Actor,
+  tag: string,
+): Promise<Result<ReleaseRecord>> {
+  const allowed = requireRole(actor, 'release.promote');
+  if (!allowed.ok) return allowed;
+
+  const [found] = await tx
+    .select({ pipelineState: releases.pipelineState })
+    .from(releases)
+    .where(eq(releases.tag, tag));
+  if (found === undefined) return notFound(tag);
+  const alreadyDiscarded = rejected(
+    'release.already_discarded',
+    `A release ${tag} já foi descartada`,
+  );
+  if (found.pipelineState === 'descartada') return alreadyDiscarded;
+
+  const using = await tx
+    .select({ id: sites.id })
+    .from(sites)
+    .where(eq(sites.release, tag))
+    .orderBy(asc(sites.id));
+  if (using.length > 0) {
+    const ids = using.map((s) => s.id).join(', ');
+    return rejected(
+      'release.in_use',
+      `A release ${tag} está em uso por ${ids}; troque a versão desses sites antes de descartar`,
+    );
+  }
+
+  const [updated] = await tx
+    .update(releases)
+    .set({ pipelineState: 'descartada' })
+    .where(and(eq(releases.tag, tag), ne(releases.pipelineState, 'descartada')))
+    .returning(RECORD_COLUMNS);
+  if (updated === undefined) return alreadyDiscarded;
+  return { ok: true, value: updated };
 }
 
 // Acompanhamento do run pelo job `release-run` (build-runner, sem ator). Toda transição parte

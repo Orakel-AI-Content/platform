@@ -100,9 +100,15 @@ export const BuildRunnerEnvSchema = z
     CLOUDFLARE_API_TOKEN: optional(z.string().min(32)),
     CLOUDFLARE_ACCOUNT_ID: optional(z.string().regex(/^[0-9a-f]{32}$/)),
     /**
+     * Como "Gerar nova versão" produz a imagem (ADR 0023 da raiz): `github` dispara o release.yml
+     * e baixa a imagem do GHCR; `local` dá o CI como concluído e etiqueta a imagem
+     * `SITE_BUILDER_IMAGE:SITE_BUILDER_TAG` do host (compose local, sem serviço externo).
+     */
+    RELEASE_DRIVER: blankAsUndefined(z.enum(['github', 'local']).default('github')),
+    /**
      * PAT fine-grained do GitHub (ADR 0022 da raiz): `actions:write` e `contents:read` só no
-     * repositório do release.yml. Dispara e acompanha o run da release; sem ele, "Gerar nova
-     * versão" falha com motivo, e o build-runner sobe do mesmo jeito (local).
+     * repositório do release.yml. Dispara e acompanha o run da release; obrigatório com
+     * RELEASE_DRIVER=github.
      */
     GITHUB_RELEASE_TOKEN: optional(
       z.string().regex(/^github_pat_[A-Za-z0-9_]+$/, 'Use um PAT fine-grained (github_pat_…)'),
@@ -127,7 +133,11 @@ export const BuildRunnerEnvSchema = z
       message: 'Defina CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID com DEPLOY_TARGET=cloudflare',
       path: ['DEPLOY_TARGET'],
     },
-  );
+  )
+  .refine((env) => env.RELEASE_DRIVER !== 'github' || env.GITHUB_RELEASE_TOKEN !== undefined, {
+    message: 'Defina GITHUB_RELEASE_TOKEN, ou RELEASE_DRIVER=local para gerar versão sem o GitHub',
+    path: ['GITHUB_RELEASE_TOKEN'],
+  });
 
 export type BuildRunnerEnv = z.infer<typeof BuildRunnerEnvSchema>;
 

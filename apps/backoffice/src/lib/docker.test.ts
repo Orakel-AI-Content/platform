@@ -238,4 +238,55 @@ describe('dockerRuntime', () => {
       ).rejects.toBeInstanceOf(RuntimeError);
     });
   });
+
+  describe('tagImage', () => {
+    it('etiqueta SITE_BUILDER_IMAGE:<origem> como SITE_BUILDER_IMAGE:<alvo>', async () => {
+      const { fn, calls } = fakeFetch({
+        'POST /images/ghcr.io/orakel-ai-content/site-builder:local/tag': [
+          new Response(null, { status: 201 }),
+        ],
+      });
+      await dockerRuntime({ host, siteBuilderImage, fetch: fn }).tagImage(
+        'ghcr.io/orakel-ai-content/site-builder:local',
+        'ghcr.io/orakel-ai-content/site-builder:1.4.0',
+      );
+      expect(calls.map((c) => [c.method, c.url])).toEqual([
+        [
+          'POST',
+          'http://docker-socket-proxy:2375/images/ghcr.io/orakel-ai-content/site-builder:local/tag?repo=ghcr.io%2Forakel-ai-content%2Fsite-builder&tag=1.4.0',
+        ],
+      ]);
+    });
+
+    it.each([
+      ['ghcr.io/outro/site-builder:local', 'ghcr.io/orakel-ai-content/site-builder:1.4.0'],
+      ['ghcr.io/orakel-ai-content/site-builder:local', 'ghcr.io/outro/site-builder:1.4.0'],
+      ['ghcr.io/orakel-ai-content/site-builder:local', 'ghcr.io/orakel-ai-content/site-builder'],
+      [
+        'ghcr.io/orakel-ai-content/site-builder:local',
+        'ghcr.io/orakel-ai-content/site-builder:1.4.0&repo=alpine',
+      ],
+      ['ghcr.io/orakel-ai-content/site-builder:1/../x', 'ghcr.io/orakel-ai-content/site-builder:1'],
+    ])('recusa %s → %s sem chamar o Docker', async (source, target) => {
+      const { fn, calls } = fakeFetch({});
+      await expect(
+        dockerRuntime({ host, siteBuilderImage, fetch: fn }).tagImage(source, target),
+      ).rejects.toThrow(/tag recusado/);
+      expect(calls).toEqual([]);
+    });
+
+    it('origem ausente (404) ou recusa do proxy vira RuntimeError', async () => {
+      const { fn } = fakeFetch({
+        'POST /images/ghcr.io/orakel-ai-content/site-builder:local/tag': [
+          json({ message: 'No such image' }, 404),
+        ],
+      });
+      await expect(
+        dockerRuntime({ host, siteBuilderImage, fetch: fn }).tagImage(
+          'ghcr.io/orakel-ai-content/site-builder:local',
+          'ghcr.io/orakel-ai-content/site-builder:1.4.0',
+        ),
+      ).rejects.toThrow(RuntimeError);
+    });
+  });
 });

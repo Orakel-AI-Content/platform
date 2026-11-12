@@ -5,7 +5,7 @@ import type * as ReleasesModule from '../../domain/releases/releases.ts';
 
 import type { Executor } from '../../db/client.ts';
 import { GitHubError, type GitHubClient } from '../../lib/github.ts';
-import { createReleaseRunTask, MISSING_TOKEN_REASON, RELEASE_POLL_MS } from './release-run.ts';
+import { createReleaseRunTask, RELEASE_POLL_MS, type ReleaseDriver } from './release-run.ts';
 
 // As transições são espionadas; o banco de verdade fica no contrato (releases.contract.test.ts).
 const mocks = vi.hoisted(() => ({
@@ -56,8 +56,9 @@ function fakeGitHub(responses: {
   return { dispatchWorkflow, getRun };
 }
 
-const run = (github: GitHubClient | undefined, h = helpers()) =>
-  createReleaseRunTask({ db, github, now: () => NOW })({ tag: '1.2.0' }, asHelpers(h));
+const runWith = (driver: ReleaseDriver, h = helpers()) =>
+  createReleaseRunTask({ db, driver, now: () => NOW })({ tag: '1.2.0' }, asHelpers(h));
+const run = (github: GitHubClient, h = helpers()) => runWith({ kind: 'github', github }, h);
 
 describe('release-run', () => {
   it('sem run, dispara o release.yml da main com a versão e grava o run com a próxima consulta', async () => {
@@ -145,11 +146,21 @@ describe('release-run', () => {
     expect(mocks.recordReleaseRunFailed).not.toHaveBeenCalled();
   });
 
-  it('sem GITHUB_RELEASE_TOKEN, a release falha com motivo legível', async () => {
+  it('driver local: leva a release a baixando sem chamar o GitHub nem gravar run (ADR 0023)', async () => {
     mocks.loadReleaseRun.mockResolvedValue({ pipelineState: 'gerando', runId: null });
-    await run(undefined);
+    await runWith({ kind: 'local' });
 
-    expect(mocks.recordReleaseRunFailed).toHaveBeenCalledWith(db, '1.2.0', MISSING_TOKEN_REASON);
+    expect(mocks.recordReleaseRunSucceeded).toHaveBeenCalledWith(db, '1.2.0');
+    expect(mocks.recordReleaseRunStarted).not.toHaveBeenCalled();
+    expect(mocks.scheduleReleaseRunCheck).not.toHaveBeenCalled();
+    expect(mocks.recordReleaseRunFailed).not.toHaveBeenCalled();
+  });
+
+  it('driver local: release fora de gerando é ignorada', async () => {
+    mocks.loadReleaseRun.mockResolvedValue({ pipelineState: 'descartada', runId: null });
+    await runWith({ kind: 'local' });
+
+    expect(mocks.recordReleaseRunSucceeded).not.toHaveBeenCalled();
   });
 
   it('recusa do GitHub (401/403/422) vira falhou com a mensagem do cliente', async () => {

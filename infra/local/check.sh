@@ -118,6 +118,9 @@ expect "POST exec recusado" "$(proxy POST /containers/qualquer/exec)" '403|405'
 # Pull liberado (ADR 0021): nome inválido, o daemon recusa sem ir ao registry (400/500, não 403).
 expect "POST pull aceito" "$(proxy POST '/images/create?fromImage=orakel-check%20invalido&tag=x')" '400|500'
 expect "GET de redes recusado" "$(proxy GET /networks)" '403|405'
+# Tag liberada só no local (ADR 0023): imagem inexistente, o daemon responde 404 (não 403).
+expect "POST tag aceito (só local)" "$(proxy POST '/images/orakel-check-inexistente/tag?repo=orakel-check&tag=x')" '404'
+expect "POST tag ausente da VPS" "$(grep -c 'images/\.+/tag' infra/vps/compose.yaml)" '0'
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures verificação(ões) falharam." >&2

@@ -27,6 +27,7 @@ export function fakeRuntime(options: {
   const volumes = { created: [] as string[], removed: [] as string[] };
   const killed: string[] = [];
   const pulled: string[] = [];
+  const tagged: { source: string; target: string }[] = [];
   let present = options.image ?? true;
   const stageOf = (id: string) =>
     id.startsWith('orakel-render')
@@ -41,6 +42,11 @@ export function fakeRuntime(options: {
       pulled.push(image);
       if (options.pull === 'error') return Promise.reject(new Error('manifest unknown'));
       if (options.pull === 'ok') present = true;
+      return Promise.resolve();
+    },
+    tagImage(source, target) {
+      tagged.push({ source, target });
+      present = true;
       return Promise.resolve();
     },
     createVolume(name) {
@@ -88,7 +94,7 @@ export function fakeRuntime(options: {
       return Promise.resolve();
     },
   };
-  return { runtime, started, removed, volumes, killed, pulled };
+  return { runtime, started, removed, volumes, killed, pulled, tagged };
 }
 
 export const renderOk = (site = 'exemplo-a', pendingChangeIds: number[] = [1, 2]) => ({

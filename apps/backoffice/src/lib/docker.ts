@@ -13,7 +13,7 @@ import { firstTarFile } from './tar.ts';
 type Options = {
   /** DOCKER_HOST: tcp://docker-socket-proxy:2375. */
   host: string;
-  /** SITE_BUILDER_IMAGE (sem tag): única imagem que `pullImage` aceita baixar. */
+  /** SITE_BUILDER_IMAGE (sem tag): única imagem que `pullImage` e `tagImage` aceitam. */
   siteBuilderImage: string;
   pollMs?: number;
   fetch?: typeof fetch;
@@ -108,6 +108,16 @@ export function dockerRuntime(options: Options): ContainerRuntime {
     return info.State;
   }
 
+  /** Tag de `SITE_BUILDER_IMAGE:<tag>`; outra imagem é recusada antes de chegar ao Docker. */
+  function siteBuilderTag(image: string, operation: 'pull' | 'tag'): string {
+    const prefix = `${options.siteBuilderImage}:`;
+    const tag = image.startsWith(prefix) ? image.slice(prefix.length) : undefined;
+    if (tag === undefined || !TAG.test(tag)) {
+      throw new Error(`${operation} recusado: ${image} não é ${prefix}<tag>`);
+    }
+    return tag;
+  }
+
   return {
     async imageExists(image) {
       const response = await call('GET', `/images/${image}/json`, undefined, [404]);
@@ -116,11 +126,7 @@ export function dockerRuntime(options: Options): ContainerRuntime {
     },
 
     async pullImage(image) {
-      const prefix = `${options.siteBuilderImage}:`;
-      const tag = image.startsWith(prefix) ? image.slice(prefix.length) : undefined;
-      if (tag === undefined || !TAG.test(tag)) {
-        throw new Error(`pull recusado: ${image} não é ${prefix}<tag>`);
-      }
+      const tag = siteBuilderTag(image, 'pull');
       const response = await call(
         'POST',
         `/images/create?fromImage=${encodeURIComponent(options.siteBuilderImage)}&tag=${encodeURIComponent(tag)}`,
@@ -151,6 +157,16 @@ export function dockerRuntime(options: Options): ContainerRuntime {
       }
       const message = pullError(pending + decoder.decode());
       if (message !== undefined) throw failed(message);
+    },
+
+    async tagImage(source, target) {
+      siteBuilderTag(source, 'tag');
+      const tag = siteBuilderTag(target, 'tag');
+      const response = await call(
+        'POST',
+        `/images/${source}/tag?repo=${encodeURIComponent(options.siteBuilderImage)}&tag=${encodeURIComponent(tag)}`,
+      );
+      await response.body?.cancel();
     },
 
     async createVolume(name, labels) {

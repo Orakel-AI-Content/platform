@@ -17,13 +17,16 @@ export const RELEASE_REF = 'main';
 /** Intervalo entre as consultas ao run: o CI leva minutos, e cada consulta é uma requisição. */
 export const RELEASE_POLL_MS = 30_000;
 
-export const MISSING_TOKEN_REASON =
-  'A credencial do GitHub não está configurada: defina GITHUB_RELEASE_TOKEN no build-runner';
+/**
+ * Como a release produz a imagem (RELEASE_DRIVER, ADR 0023 da raiz). `github`: dispara e
+ * acompanha o release.yml, e o download baixa a imagem do GHCR. `local`: o CI conta como
+ * concluído na hora, sem rede, e o download etiqueta a imagem do host.
+ */
+export type ReleaseDriver = { kind: 'github'; github: GitHubClient } | { kind: 'local' };
 
 export type ReleaseRunTaskDeps = {
   db: Executor;
-  /** `undefined` sem GITHUB_RELEASE_TOKEN: a release falha com motivo, e o build-runner sobe igual. */
-  github: GitHubClient | undefined;
+  driver: ReleaseDriver;
   now?: () => number;
 };
 
@@ -51,7 +54,7 @@ export function runFailureReason(conclusion: string | null): string {
 
 /**
  * Dispara o release.yml da release em `gerando` e acompanha o run (build-runner, o único com o
- * PAT, ADR 0022 da raiz). Cada execução faz uma chamada só: dispara (e grava o run) ou consulta;
+ * PAT, ADR 0022 da raiz); com o driver local, só leva a release a `baixando`. Cada execução faz uma chamada só: dispara (e grava o run) ou consulta;
  * se o run não terminou, o job se reagenda para daqui a `RELEASE_POLL_MS`, sem dormir no worker.
  * Sucesso leva a `baixando` com o download na fila; falha, cancelamento ou recusa do GitHub, a
  * `falhou` com o motivo. Rede e 5xx lançam para o Graphile Worker repetir; na última tentativa,
@@ -75,15 +78,17 @@ export function createReleaseRunTask(deps: ReleaseRunTaskDeps): Task {
       await recordReleaseRunFailed(deps.db, tag, reason);
       log.warn(`release ${tag} falhou: ${reason}`);
     };
-    if (deps.github === undefined) {
-      await fail(MISSING_TOKEN_REASON);
+    if (deps.driver.kind === 'local') {
+      await recordReleaseRunSucceeded(deps.db, tag);
+      log.info(`release ${tag}: driver local, CI dado como concluído, imagem na fila`);
       return;
     }
+    const { github } = deps.driver;
 
     try {
       const nextCheckAt = new Date(now() + RELEASE_POLL_MS);
       if (found.runId === null) {
-        const run = await deps.github.dispatchWorkflow(RELEASE_WORKFLOW, RELEASE_REF, {
+        const run = await github.dispatchWorkflow(RELEASE_WORKFLOW, RELEASE_REF, {
           version: tag,
         });
         await recordReleaseRunStarted(deps.db, tag, run, nextCheckAt);
@@ -91,7 +96,7 @@ export function createReleaseRunTask(deps: ReleaseRunTaskDeps): Task {
         return;
       }
 
-      const run = await deps.github.getRun(found.runId);
+      const run = await github.getRun(found.runId);
       if (run.status !== 'completed') {
         await scheduleReleaseRunCheck(deps.db, tag, nextCheckAt);
         return;
