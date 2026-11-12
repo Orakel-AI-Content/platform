@@ -5,6 +5,7 @@ import {
   releasesStatusAction,
   requestNewReleaseAction,
   retryReleaseAction,
+  startRolloutAction,
 } from './actions.ts';
 
 // As actions só traduzem: sessão → recusa, Result do domínio → mensagem, sucesso → revalida
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   requestNewRelease: vi.fn(),
   retryRelease: vi.fn(),
   discardRelease: vi.fn(),
+  startRollout: vi.fn(),
   loadReleasesSnapshot: vi.fn(),
   revalidatePath: vi.fn(),
 }));
@@ -29,6 +31,7 @@ vi.mock('@/domain/releases/releases.ts', () => ({
   retryRelease: mocks.retryRelease,
   discardRelease: mocks.discardRelease,
 }));
+vi.mock('@/domain/releases/rollout.ts', () => ({ startRollout: mocks.startRollout }));
 vi.mock('./snapshot.ts', () => ({ loadReleasesSnapshot: mocks.loadReleasesSnapshot }));
 
 const operacao = { email: 'operacao@orakel.local', roles: ['operacao'] };
@@ -36,6 +39,45 @@ const operacao = { email: 'operacao@orakel.local', roles: ['operacao'] };
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.currentActor.mockResolvedValue({ ok: true, value: operacao });
+});
+
+describe('startRolloutAction', () => {
+  it('sem sessão, recusa sem chamar o domínio', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await startRolloutAction()).toMatchObject({ ok: false });
+    expect(mocks.startRollout).not.toHaveBeenCalled();
+  });
+
+  it('inicia pelo domínio, anuncia a versão devolvida e revalida a lista', async () => {
+    mocks.startRollout.mockResolvedValue({ ok: true, value: { targetRelease: '1.5.0' } });
+
+    expect(await startRolloutAction()).toEqual({
+      ok: true,
+      message: 'Atualização para 1.5.0 iniciada pelo primeiro site.',
+    });
+    expect(mocks.startRollout).toHaveBeenCalledWith({}, operacao);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/releases');
+  });
+
+  it('a recusa do domínio volta com a mensagem dele, sem revalidar', async () => {
+    mocks.startRollout.mockResolvedValue({
+      ok: false,
+      issues: [
+        {
+          code: 'rollout.already_open',
+          message: 'Já existe uma atualização de todos os sites em andamento',
+          path: [],
+        },
+      ],
+    });
+
+    expect(await startRolloutAction()).toEqual({
+      ok: false,
+      message: 'Já existe uma atualização de todos os sites em andamento',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
 });
 
 describe('requestNewReleaseAction', () => {

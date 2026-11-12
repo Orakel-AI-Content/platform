@@ -42,9 +42,12 @@ para recriar o site, remova-o do banco (ou `pnpm local:reset`) e rode o seed de 
 
 Já tinha um `.env.local`? Compare com o `.env.example` e acrescente as variáveis novas
 (backoffice, Access local e o bloco "Ambiente local"); o compose avisa qual falta. Apague ou
-comente `BLOG_PREVIEW_UPSTREAM`: sem ela, `preview.orakel.localhost` vai para o container
-`blog-preview`. No Linux, o `compose.sh` usa o gid do dono de `/var/run/docker.sock` como
-`DOCKER_SOCKET_GID` (o `0` do `.env.example` é o do Docker Desktop); outro valor só pelo shell.
+comente `BLOG_PREVIEW_UPSTREAM`: sem ela, `preview.orakel.localhost` vai para a prévia que o
+`build-runner` sobe (apelido `blog-preview`). Pilha subida quando a prévia ainda era serviço do
+compose? O container órfão disputa o apelido: remova-o com
+`infra/local/compose.sh up -d --remove-orphans`. No Linux, o `compose.sh` usa o gid do dono de
+`/var/run/docker.sock` como `DOCKER_SOCKET_GID` (o `0` do `.env.example` é o do Docker
+Desktop); outro valor só pelo shell.
 
 Outro arquivo de ambiente (ex.: uma cópia do `.env.example` para testar):
 `ORAKEL_ENV_FILE=/caminho/env pnpm local:check` — vale para o `compose.sh` e os scripts.
@@ -278,7 +281,7 @@ backoffice). O site precisa de um contexto editorial (aba Contextos) e de um aut
 
 ## Redes
 
-`orakel-internal` (serviços da VPS), `orakel-export` (API de exportação, `blog-preview` e
+`orakel-internal` (serviços da VPS e a prévia), `orakel-export` (API de exportação, a prévia e
 `render`; sem internet), `orakel-publish` (`publish`, `edge-local`, S3), `orakel-docker`
 (`build-runner` e `docker-socket-proxy`) e `orakel-edge` (Caddy, `edge-local`, ClickHouse, S3).
 O ClickHouse também fica na `orakel-internal`, para o `backoffice-worker` (ADR 0018).
