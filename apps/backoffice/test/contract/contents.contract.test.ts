@@ -25,10 +25,9 @@ import {
 } from '../../src/domain/content/contents.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { unpublishContent } from '../../src/domain/publications/unpublish.ts';
-import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { createVolumeSite, seedContents } from '../volume.ts';
-import { profileQueries, resetDatabase, setupDatabase } from './helpers.ts';
+import { confirmAndApprove, profileQueries, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Edição de conteúdo (#40): versões imutáveis, `n` dos blocos só do servidor e leituras.
 
@@ -590,14 +589,7 @@ describe('leituras de conteúdo', () => {
     await edit(3, { ...(await latest(3)), title: 'Quem somos (2)' });
     await submit(3);
     const approved = await db.transaction((tx) =>
-      approveVersion(
-        tx,
-        { email: 'revisor@orakel.local', roles: ['revisor'] },
-        SITE,
-        3,
-        2,
-        REVIEW_CHECKLIST.map((item) => item.key),
-      ),
+      confirmAndApprove(tx, { email: 'revisor@orakel.local', roles: ['revisor'] }, SITE, 3, 2),
     );
     if (!approved.ok) throw new Error(JSON.stringify(approved.issues));
     const [review] = await db.select().from(reviews);

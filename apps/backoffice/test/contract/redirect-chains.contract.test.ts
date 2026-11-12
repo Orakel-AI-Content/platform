@@ -18,8 +18,7 @@ import {
   configureDailyPublishLimit,
   publishVersion,
 } from '../../src/domain/publications/publish.ts';
-import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
-import { resetDatabase, setupDatabase } from './helpers.ts';
+import { confirmAndApprove, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Troca de endereço na publicação: 301 do caminho antigo, sem cadeias, e recusa do slug em
 // uso ao salvar e ao publicar (#489, workspace#20). Na fixture exemplo-a, o conteúdo 1 está
@@ -29,7 +28,6 @@ let db: Db;
 let close: () => Promise<void>;
 
 const SITE = 'exemplo-a';
-const ALL = REVIEW_CHECKLIST.map((item) => item.key);
 const REVISOR: Actor = { email: 'revisor@orakel.local', roles: ['revisor'] };
 
 beforeAll(async () => {
@@ -73,7 +71,7 @@ async function approved(contentId: number, slug: string): Promise<number> {
   if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
   await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
   const ok = await db.transaction((tx) =>
-    approveVersion(tx, REVISOR, SITE, contentId, saved.value.version, ALL),
+    confirmAndApprove(tx, REVISOR, SITE, contentId, saved.value.version),
   );
   if (!ok.ok) throw new Error(JSON.stringify(ok.issues));
   return saved.value.version;
