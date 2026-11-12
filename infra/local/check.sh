@@ -115,7 +115,8 @@ proxy() { # método, caminho
 }
 expect "GET /version liberado" "$(proxy GET /version)" '200'
 expect "POST exec recusado" "$(proxy POST /containers/qualquer/exec)" '403|405'
-expect "POST pull recusado" "$(proxy POST /images/create)" '403|405'
+# Pull liberado (ADR 0021): nome inválido, o daemon recusa sem ir ao registry (400/500, não 403).
+expect "POST pull aceito" "$(proxy POST '/images/create?fromImage=orakel-check%20invalido&tag=x')" '400|500'
 expect "GET de redes recusado" "$(proxy GET /networks)" '403|405'
 
 if [ "$failures" -gt 0 ]; then
