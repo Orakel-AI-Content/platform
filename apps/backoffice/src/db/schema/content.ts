@@ -1,5 +1,6 @@
 import type { Content, Menu } from '@orakel/content-model/v1';
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -187,6 +188,40 @@ export const reviews = pgTable('reviews', {
   comment: text(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Checagem dos links externos de uma versão (#745): nasce na transação que leva a versão a
+ * `em_revisao`, com `finishedAt` nulo enquanto o job não termina ("verificando").
+ */
+export const contentLinkChecks = pgTable(
+  'content_link_checks',
+  {
+    siteId: siteId(),
+    contentId: integer().notNull(),
+    version: integer().notNull(),
+    requestedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.contentId, t.version] })],
+);
+
+/**
+ * Resultado por link externo da versão (#745): o bloco onde está (`n`), se respondeu e, se
+ * não, o motivo. Um link fora do ar é aviso: nunca impede a aprovação.
+ */
+export const contentLinkResults = pgTable(
+  'content_link_results',
+  {
+    siteId: siteId(),
+    contentId: integer().notNull(),
+    version: integer().notNull(),
+    blockN: integer().notNull(),
+    url: text().notNull(),
+    ok: boolean().notNull(),
+    reason: text(),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.contentId, t.version, t.blockN, t.url] })],
+);
 
 /**
  * Publicações (workspace#20): uma linha por ação de publicar, com quem e quando. Operacional,

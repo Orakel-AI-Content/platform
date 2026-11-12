@@ -37,6 +37,7 @@ import {
 import { allocateId } from '../../db/site-ids.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
+import { enqueueLinkCheck } from '../reviews/link-checks.ts';
 import { checkWrite, type WriteOptions } from './write.ts';
 
 type Status = (typeof CONTENT_STATUSES)[number];
@@ -364,7 +365,8 @@ export async function updateContent(
  * Envia para revisão: a versão mais recente, em `rascunho`, passa a `em_revisao`. Muda só o
  * `status` (os dados da versão continuam imutáveis, ADR 0015) e não registra mudança
  * pendente: o status não entra no snapshot. A linha de `contents` fica travada, como na
- * edição: o envio não marca uma versão que outra gravação acabou de substituir.
+ * edição: o envio não marca uma versão que outra gravação acabou de substituir. Na mesma
+ * transação, enfileira a checagem dos links externos da versão (#745).
  */
 export async function submitForReview(
   tx: Executor,
@@ -412,6 +414,7 @@ export async function submitForReview(
         eq(contentVersions.version, latest.version),
       ),
     );
+  await enqueueLinkCheck(tx, { siteId, contentId, version: latest.version });
   return { ok: true, value: { version: latest.version } };
 }
 
