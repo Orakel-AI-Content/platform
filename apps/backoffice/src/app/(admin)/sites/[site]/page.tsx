@@ -16,7 +16,7 @@ import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
 import { listRollbackVersions, previousVersion, siteActivity } from '@/domain/builds/builds.ts';
 import { countContentsByStatus } from '@/domain/content/contents.ts';
-import { listReleases } from '@/domain/releases/releases.ts';
+import { latestAvailableRelease, listReleases } from '@/domain/releases/releases.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
 import { readSiteInstance, redirectUsageFor } from '@/domain/sites/sites.ts';
 import { DetailLayout } from '@/components/shared/DetailLayout';
@@ -49,7 +49,9 @@ export const dynamic = 'force-dynamic';
  * estado atual à esquerda e, à direita, o `Card` com as abas Publicação (o painel de etapas e,
  * embaixo, a atividade do site com o status ao vivo, para todos os perfis, #637, #638, #647), G1,
  * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). As ações de operação
- * (operations.run, #648) ficam nas etapas do painel: "Reconstruir na release" na Versão,
+ * (operations.run, #648) ficam nas etapas do painel: "Atualizar para a mais recente" (#690, só com
+ * release disponível mais recente que a do site, mostrada a todos numa Tag) e "Reconstruir na
+ * release" na Versão,
  * "Publicar agora" na Build (com "Cancelar" ao lado na fila e no lugar dele em andamento,
  * #649), "Desfazer última publicação" (com versão anterior, #649) e "Escolher outra versão" na No
  * ar e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", com a recusa logo
@@ -81,6 +83,10 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   const versions = canOperate ? await listRollbackVersions(db, actor, siteId) : undefined;
   // O destino do "Desfazer última publicação" (#649): só mostrado; sem ele, a ação não aparece.
   const previous = canOperate ? await previousVersion(db, actor, siteId) : undefined;
+  // A release `disponivel` mais recente (#690), só quando difere da do site: a mesma condição dá a
+  // Tag "disponível" na etapa Versão (para todos) e o "Atualizar para a mais recente".
+  const latest = await latestAvailableRelease(db);
+  const newerRelease = latest !== null && latest !== site.release ? latest : null;
 
   // Dica e estado das abas de G1, janela e limite (o nome da aba é o título): com permissão, o corpo do
   // cartão do formulário (gerado do schema, botões no rodapé, #333); sem, um cartão só de leitura.
@@ -150,6 +156,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
       site={{
         lifecycle: site.lifecycle,
         release: site.release,
+        newerRelease,
         activeVersionId: site.activeVersionId,
         state: site.state,
         pausedReason: site.pausedReason,
@@ -172,7 +179,12 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
       actions={
         canOperate
           ? {
-              versao: <SiteOperationButton operation="rebuild" />,
+              versao: (
+                <span className="flex flex-wrap gap-2">
+                  <SiteOperationButton operation="update" />
+                  <SiteOperationButton operation="rebuild" />
+                </span>
+              ),
               build: <SiteOperationButton operation="publish" />,
               cancel: <SiteOperationButton operation="cancel" />,
               no_ar: (
@@ -241,6 +253,11 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                   undo={
                     previous?.ok && previous.value !== null
                       ? { version: previous.value, action: undoLastPublishAction }
+                      : undefined
+                  }
+                  update={
+                    newerRelease !== null
+                      ? { tag: newerRelease, action: rebuildOnReleaseAction.bind(null, site.id) }
                       : undefined
                   }
                 >

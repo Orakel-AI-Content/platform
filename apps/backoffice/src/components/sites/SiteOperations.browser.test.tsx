@@ -18,6 +18,7 @@ import { SitePublicationSteps } from './SitePublicationSteps.tsx';
 // confirmação de hoje com o foco preso, a action só roda depois de confirmar, e fechar devolve
 // o foco ao botão da etapa. "Cancelar" e "Desfazer última publicação" (#649) seguem o mesmo
 // caminho; quando a publicação cancelada fecha, o foco fica no "Publicar agora" da etapa.
+// "Atualizar para a mais recente" (#690) também.
 
 const RELEASES = [{ tag: '1.3.0', imageStatus: 'disponivel' as const }];
 const VERSIONS = [
@@ -51,6 +52,7 @@ type Actions = {
   rollback: ReturnType<typeof ok>;
   cancel: ReturnType<typeof ok>;
   undo: ReturnType<typeof ok>;
+  update: ReturnType<typeof ok>;
 };
 
 const allActions = (): Actions => ({
@@ -60,6 +62,7 @@ const allActions = (): Actions => ({
   rollback: ok(),
   cancel: ok(),
   undo: ok(),
+  update: ok(),
 });
 
 function Panel({
@@ -84,6 +87,7 @@ function Panel({
         rollback={{ versions: VERSIONS, action: actions.rollback }}
         cancel={actions.cancel}
         undo={{ version: VERSIONS[0]!, action: actions.undo }}
+        update={{ tag: '1.3.0', action: actions.update }}
       >
         <SitePublicationSteps
           site={{
@@ -97,7 +101,12 @@ function Panel({
           instance={{ activePages: 120, activeSince: null }}
           activity={activity}
           actions={{
-            versao: <SiteOperationButton operation="rebuild" />,
+            versao: (
+              <span className="flex flex-wrap gap-2">
+                <SiteOperationButton operation="update" />
+                <SiteOperationButton operation="rebuild" />
+              </span>
+            ),
             build: <SiteOperationButton operation="publish" />,
             cancel: <SiteOperationButton operation="cancel" />,
             no_ar: (
@@ -161,6 +170,13 @@ const CASES = [
     button: 'Desfazer última publicação exemplo-a',
     dialog: 'Desfazer a última publicação de exemplo-a?',
     confirm: 'Desfazer',
+    paused: false,
+  },
+  {
+    operation: 'update',
+    button: 'Atualizar para a mais recente exemplo-a',
+    dialog: 'Atualizar exemplo-a para a versão 1.3.0?',
+    confirm: 'Atualizar',
     paused: false,
   },
 ] as const;

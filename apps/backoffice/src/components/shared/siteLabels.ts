@@ -206,6 +206,16 @@ export const PUBLICATION_STEP_LABEL: Record<PublicationStep, string> = {
   site: 'Site',
 };
 
+/** Estado da etapa "Versão" (#690): a release em uso, ou que o site ainda não tem nenhuma. */
+export function releaseInUseText(release: string | null): string {
+  return release === null ? 'Nenhuma versão' : `${release} em uso`;
+}
+
+/** A `Tag` da etapa "Versão" (#690) quando há release disponível mais recente que a do site. */
+export function releaseAvailableText(tag: string): string {
+  return `${tag} disponível`;
+}
+
 /** Estado da etapa "Infra e zona" a partir do ciclo de vida (#647). */
 export const INFRA_STEP_TEXT: Record<SiteSummary['lifecycle'], string> = {
   cadastrado: 'Infra e zona pendentes',

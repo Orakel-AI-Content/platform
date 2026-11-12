@@ -37,10 +37,11 @@ import {
 // uma ao `SiteOperationsAlert`, logo abaixo do painel. A página só monta o escopo com
 // operations.run. "Cancelar" (#649) fica na Build ao lado de "Publicar agora" com publicação na
 // fila e no lugar dele em andamento; "Desfazer última publicação" fica ao lado de "Escolher outra
-// versão".
+// versão". "Atualizar para a mais recente" (#690) fica na Versão, antes do "Reconstruir", só quando
+// há release disponível mais recente que a do site.
 
 export type SiteOperation =
-  'publish' | 'pause' | 'resume' | 'rebuild' | 'rollback' | 'cancel' | 'undo';
+  'publish' | 'pause' | 'resume' | 'rebuild' | 'rollback' | 'cancel' | 'undo' | 'update';
 
 /** "Pausar" com o motivo informado, já ligado ao site. */
 export type PauseSite = (reason: string) => Promise<ActionResult>;
@@ -68,6 +69,11 @@ export type SiteOperationsProps = {
    * a resolve de novo ao executar), e a action. Sem versão anterior, a página não passa.
    */
   undo?: { version: RollbackVersion; action: SiteAction };
+  /**
+   * "Atualizar para a mais recente" (#690): a release `disponivel` mais recente, já resolvida pela
+   * página (só quando difere da do site), e a action de reconstruir, já ligada ao site.
+   */
+  update?: { tag: string; action: RebuildOnRelease };
 };
 
 type Scope = {
@@ -90,6 +96,7 @@ const LABEL: Record<SiteOperation, { idle: string; pending: string }> = {
   rollback: { idle: 'Escolher outra versão', pending: 'Revertendo…' },
   cancel: { idle: 'Cancelar', pending: 'Cancelando…' },
   undo: { idle: 'Desfazer última publicação', pending: 'Desfazendo…' },
+  update: { idle: 'Atualizar para a mais recente', pending: 'Atualizando…' },
 };
 
 /** Se a operação vale para o site agora: publicar e pausar fora da pausa, retomar só pausado. */
@@ -109,12 +116,14 @@ function available(operations: SiteOperationsProps, operation: SiteOperation): b
       return operations.cancel !== undefined;
     case 'undo':
       return operations.undo !== undefined;
+    case 'update':
+      return operations.update !== undefined;
   }
 }
 
 /**
- * As ações de operação do site: `publish`, `pause`, `resume`, `rebuild`, `rollback`, `cancel` e
- * `undo` só vêm de quem tem
+ * As ações de operação do site: `publish`, `pause`, `resume`, `rebuild`, `rollback`, `cancel`,
+ * `undo` e `update` só vêm de quem tem
  * operations.run. Uma ação de cada vez: enquanto uma está na fila, todos os botões ficam
  * `aria-disabled` (não `disabled`: o diálogo fecha antes da resposta, e o foco volta ao botão
  * que o abriu).
@@ -145,6 +154,7 @@ export function SiteOperationsScope({
     rollback,
     cancel,
     undo,
+    update,
   } = operations;
 
   const openFrom = (operation: SiteOperation, trigger: HTMLElement) => {
@@ -255,6 +265,23 @@ export function SiteOperationsScope({
         >
           <p>O site no ar volta para a versão anterior:</p>
           <p className="mt-2 font-semibold">{previousVersionText(undo.version, timeZone)}</p>
+        </ConfirmDialog>
+      )}
+      {update && (
+        <ConfirmDialog
+          isOpen={open === 'update'}
+          type="danger"
+          title={`Atualizar ${siteId} para a versão ${update.tag}?`}
+          confirmText="Atualizar"
+          confirmButtonProps={dangerConfirmButtonProps}
+          onCancel={close}
+          onConfirm={() => execute('update', () => update.action(update.tag))}
+          onAfterClose={afterClose}
+        >
+          <p>
+            O site passa a usar a versão {update.tag}, o build entra na fila já e o site no ar muda.
+            {paused && ' O site sai da pausa.'}
+          </p>
         </ConfirmDialog>
       )}
     </SiteOperationsContext>

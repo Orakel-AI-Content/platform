@@ -99,7 +99,7 @@ describe('painel de etapas', () => {
     expect(screen.getByRole('list', { name: 'Etapas da publicação' }).tagName).toBe('OL');
     expect(items().map(spokenText)).toEqual([
       'Infra e zonaInfra aplicada e zona ativa (concluída)',
-      'Versão1.4.0 (concluída)',
+      'Versão1.4.0 em uso (concluída)',
       'BuildPublicação concluída em 11/10/2026, 14:02 BRT (concluída)',
       'No arv41 · 120 páginas · no ar desde 11/10/2026, 14:02 BRT, por ana@orakel.local (concluída)',
       'SiteAtivo (concluída)',
@@ -121,7 +121,7 @@ describe('painel de etapas', () => {
     expect(screen.queryAllByRole('button')).toEqual([]);
     expect([0, 1, 2, 3, 4].map(description)).toEqual([
       'Infra aplicada e zona ativa',
-      '1.4.0',
+      '1.4.0 em uso',
       'Publicação concluída em 11/10/2026, 14:02 BRT',
       'v41 · 120 páginas · no ar desde 11/10/2026, 14:02 BRT, por ana@orakel.local',
       'Pausado: falha permanente no render',
@@ -156,7 +156,7 @@ describe('painel de etapas', () => {
       'No ar',
       'Site',
     ]);
-    expect(description(1)).toBe('1.4.0Versão');
+    expect(description(1)).toBe('1.4.0 em usoVersão');
   });
 
   it('na fila, a etapa Build mostra "na fila" com o horário previsto no fuso do site', () => {
@@ -226,6 +226,26 @@ describe('painel de etapas', () => {
     expect(description(0)).toBe('Infra e zona pendentesMarcar infra aplicada');
     expect(items()[0]?.contains(screen.getByRole('button'))).toBe(true);
     expect(items()[0]?.getAttribute('aria-current')).toBe('step');
-    expect(description(1)).toBe('Nenhuma release');
+    expect(description(1)).toBe('Nenhuma versão');
+  });
+
+  it('com release mais recente disponível, a Versão diz a em uso e a Tag da mais recente (#690)', () => {
+    renderPanel({ newerRelease: '1.5.0' });
+
+    expect(description(1)).toBe('1.4.0 em uso·1.5.0 disponível');
+    expect(spokenText(items()[1]!)).toBe('Versão1.4.0 em uso1.5.0 disponível (concluída)');
+  });
+
+  it('já na mais recente, a Versão mostra só a em uso, sem Tag (#690)', () => {
+    renderPanel({ newerRelease: null });
+
+    expect(description(1)).toBe('1.4.0 em uso');
+  });
+
+  it('sem versão e com uma disponível, "Nenhuma versão" e a Tag (#690)', () => {
+    renderPanel({ release: null, newerRelease: '1.5.0' });
+
+    expect(description(1)).toBe('Nenhuma versão·1.5.0 disponível');
+    expect(items()[1]?.classList).toContain('step-item-pending');
   });
 });
