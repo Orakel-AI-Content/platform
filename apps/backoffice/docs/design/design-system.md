@@ -465,7 +465,7 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   escrita à mão.
 - **Corpo:** `flex flex-col xl:flex-row gap-4`, com o resumo à esquerda, num `Card`, e o
   conteúdo à direita num `Card className="w-full"`, ou num `Card` com `Tabs` quando há mais de
-  uma seção (na página do site, o `SiteTabs`: Ciclo de vida, Builds, G1, Janela e Limite; o
+  uma seção (na página do site, o `SiteTabs`: Ciclo de vida, Histórico, G1, Janela e Limite; o
   nome da aba é o título da seção, e um formulário dentro dela é o `SchemaForm` com `card`, de
   botões `size: 'sm'`; acima dele, na mesma coluna, os cartões de conteúdo, ver "Métricas").
   Abaixo de `xl`, empilha. Largura `list-width` (a versão, sem resumo ao lado, fica em
@@ -496,10 +496,17 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   (`SiteSummaryCard`) tem só o estado atual, sem botões: o domínio é link para
   `https://<domínio>` em nova aba, e "Mudanças pendentes" leva à tela de pendências quando
   passa de zero, com a divisão por origem embaixo, em duas colunas. Com os cartões de conteúdo
-  na coluna da direita, a 1440 × 900 o resumo inteiro cabe na primeira tela. Os últimos builds ficam na aba "Builds", no
+  na coluna da direita, a 1440 × 900 o resumo inteiro cabe na primeira tela. A atividade do
+  site fica na aba "Histórico" (#637; era a "Builds"), para todos os perfis, no
   `SiteBuildsTable` (`src/components/sites/SiteBuildsTable.tsx`): a `Table` do Ecme direto,
-  não o `DataTable` (são 5 linhas, sem busca nem paginação), com Status (`StateTag`), Data (no
-  fuso do site), Release e Versão; sem builds, o `EmptyState` "Nenhum build ainda.".
+  não o `DataTable` (até 50 linhas de `siteActivity`, sem busca, ordem nem paginação), com
+  Tipo (publicação, reversão, troca de versão, pausa, retomada), Status (`StateTag`, só nas
+  execuções; "—" nos eventos), Quem, Quando (no fuso do site) e Versão; sem itens, o
+  `EmptyState` "Nenhuma atividade ainda.". A linha de uma falha tem o `IconButton` "Ver
+  detalhe" e abre, pelo botão ou pelo clique na linha, o `Drawer` à direita
+  (`SiteExecutionDrawer`) com quando, quem pediu, etapa, mensagem e o fim do log num `<pre>`
+  rolável e focável; o foco volta ao botão da linha. A linha não é focável: a tabela continua
+  tabela para o leitor de tela.
 - **Eventos em ordem cronológica:** `Timeline` (`src/components/ui/Timeline`) para uma lista
   de acontecimentos que cresce com o tempo (o histórico de publicações do site), um
   `Timeline.Item` por evento. Para etapas de ordem fixa, com estado e atual, é o `Steps`

@@ -7,20 +7,21 @@ import { Tabs } from '@/components/ui/Tabs';
 
 /**
  * Lado direito da página do site (#370): o `Card` com `Tabs` do `CustomerDetails` do Ecme, com
- * Ciclo de vida, Builds (os últimos, no `SiteBuildsTable`, #595), G1, Janela de agrupamento e
+ * Ciclo de vida, Histórico (execuções e eventos do site, no `SiteBuildsTable`, #637; era a aba
+ * "Builds" do #595), G1, Janela de agrupamento e
  * Limite diário (#490). Cliente porque o `Tabs` é; a página (Server
  * Component) passa o conteúdo de cada aba pronto. A aba inativa desmonta o conteúdo, como no
  * template.
  */
 export function SiteTabs({
   lifecycle,
-  builds,
+  history,
   g1,
   buildWindow,
   dailyLimit,
 }: {
   lifecycle: ReactNode;
-  builds: ReactNode;
+  history: ReactNode;
   g1: ReactNode;
   buildWindow: ReactNode;
   dailyLimit: ReactNode;
@@ -30,7 +31,7 @@ export function SiteTabs({
       <Tabs defaultValue="ciclo">
         <Tabs.TabList aria-label="Seções do site">
           <Tabs.TabNav value="ciclo">Ciclo de vida</Tabs.TabNav>
-          <Tabs.TabNav value="builds">Builds</Tabs.TabNav>
+          <Tabs.TabNav value="historico">Histórico</Tabs.TabNav>
           <Tabs.TabNav value="g1">G1 (indexação)</Tabs.TabNav>
           <Tabs.TabNav value="janela">Janela de agrupamento</Tabs.TabNav>
           <Tabs.TabNav value="limite">Limite diário</Tabs.TabNav>
@@ -38,8 +39,8 @@ export function SiteTabs({
         <Tabs.TabContent value="ciclo" className="pt-4">
           {lifecycle}
         </Tabs.TabContent>
-        <Tabs.TabContent value="builds" className="pt-4">
-          {builds}
+        <Tabs.TabContent value="historico" className="pt-4">
+          {history}
         </Tabs.TabContent>
         <Tabs.TabContent value="g1" className="pt-4">
           {g1}

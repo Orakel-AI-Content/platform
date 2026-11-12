@@ -523,6 +523,8 @@ export const SITE_HISTORY_LIMIT = 50;
  * histórico que une as execuções terminadas de `builds` (builds e rollbacks, inclusive
  * cancelados) aos eventos de `site_events`. Cada tabela é lida até o limite, e as duas listas
  * são intercaladas pelo horário e cortadas no limite. A execução aberta fica fora do histórico.
+ * Exige só `site.read`: a aba "Histórico" aparece para todos os perfis, como a "Builds" que ela
+ * substitui (#637), inclusive a mensagem e o fim do log das falhas.
  */
 export async function siteActivity(
   db: Executor,
@@ -530,7 +532,7 @@ export async function siteActivity(
   siteId: string,
   limit = SITE_HISTORY_LIMIT,
 ): Promise<Result<SiteActivity>> {
-  const allowed = requireRole(actor, 'operations.run');
+  const allowed = requireRole(actor, 'site.read');
   if (!allowed.ok) return allowed;
   const [site] = await db.select({ id: sites.id }).from(sites).where(eq(sites.id, siteId));
   if (site === undefined) return notFound(siteId);

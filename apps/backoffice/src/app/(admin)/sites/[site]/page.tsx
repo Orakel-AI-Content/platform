@@ -18,7 +18,7 @@ import { SiteTabs } from '@/components/sites/SiteTabs';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
-import { listRollbackVersions } from '@/domain/builds/builds.ts';
+import { listRollbackVersions, siteActivity } from '@/domain/builds/builds.ts';
 import { countContentsByStatus } from '@/domain/content/contents.ts';
 import { listReleases } from '@/domain/releases/releases.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
@@ -48,8 +48,9 @@ export const dynamic = 'force-dynamic';
  * (#595): no cabeçalho, "Editar configuração" (site.configure) e as ações de operação
  * (operations.run): "Publicar agora" ou, pausado, "Retomar", e o "Mais ações" com "Reconstruir
  * na release" e "Reverter", com o erro logo abaixo do cabeçalho. Embaixo, o resumo só com o
- * estado atual à esquerda e, à direita, o `Card` com as abas Ciclo de vida, Builds, G1, Janela
- * de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo
+ * estado atual à esquerda e, à direita, o `Card` com as abas Ciclo de vida, Histórico (a
+ * atividade do site, para todos os perfis, #637), G1, Janela de agrupamento e Limite diário
+ * (#490; empilham abaixo de `xl`). Lê o site pelo
  * sitePageContext (a mesma busca do layout), os gatilhos e o uso de redirects, que vira um aviso
  * acima do resumo quando o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do
  * limite só aparecem com site.configure, e o domínio confere de novo.
@@ -66,6 +67,8 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   if (!instance.ok) return noRead;
   const contentCounts = await countContentsByStatus(db, actor, siteId);
   if (!contentCounts.ok) return noRead;
+  const activity = await siteActivity(db, actor, siteId);
+  if (!activity.ok) return noRead;
   const canConfigure = can(actor, 'site.configure');
   const canOperate = can(actor, 'operations.run');
   // As releases do "Reconstruir" (#515): listá-las exige release.promote, que a operação e o
@@ -209,9 +212,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                 <LifecycleSteps current={site.lifecycle} />
               )
             }
-            builds={
-              <SiteBuildsTable builds={instance.value.recentBuilds} timeZone={site.timeZone} />
-            }
+            history={<SiteBuildsTable history={activity.value.history} timeZone={site.timeZone} />}
             g1={
               !g1 && canConfigure ? (
                 <RegisterG1Form intro={g1Intro} action={registerG1Action.bind(null, site.id)} />

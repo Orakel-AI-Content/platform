@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { BUILD_KINDS, BUILD_STAGES, SITE_EVENT_KINDS } from '@/db/schema/operations.ts';
+
 import {
+  BUILD_STAGE_LABEL,
   BUILD_STATUS_LABEL,
+  HISTORY_KIND_LABEL,
   BUILD_STATUS_VARIANT,
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_TAG,
@@ -65,6 +69,21 @@ describe('duração da janela de agrupamento (#147)', () => {
     expect(formatDuration(90)).toBe('90 s (1 min 30 s)');
     expect(formatDuration(3661)).toBe('3661 s (1 h 1 min 1 s)');
     expect(formatDuration(3605)).toBe('3605 s (1 h 5 s)');
+  });
+});
+
+describe('histórico do site (#637)', () => {
+  it('tem rótulo para cada tipo de execução e de evento, sem repetir', () => {
+    expect(Object.keys(HISTORY_KIND_LABEL).sort()).toEqual(
+      [...BUILD_KINDS, ...SITE_EVENT_KINDS].sort(),
+    );
+    const labels = Object.values(HISTORY_KIND_LABEL);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('tem rótulo para cada etapa do build', () => {
+    expect(Object.keys(BUILD_STAGE_LABEL).sort()).toEqual([...BUILD_STAGES].sort());
+    for (const label of Object.values(BUILD_STAGE_LABEL)) expect(label).not.toBe('');
   });
 });
 

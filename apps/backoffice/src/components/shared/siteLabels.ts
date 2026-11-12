@@ -1,6 +1,7 @@
 import type { Block } from '@orakel/content-model/v1';
 
-import type { BuildStatus } from '@/db/schema/operations.ts';
+import type { BuildKind, BuildStatus, SiteEventKind } from '@/db/schema/operations.ts';
+import type { BuildStage } from '@/domain/builds/run-build.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { PendingOrigin } from '@/domain/pending-changes/record.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
@@ -123,6 +124,22 @@ export const BUILD_STATUS_VARIANT: Record<BuildStatus, StateTagColor> = {
   ok: 'bg-success',
   failed: 'bg-error',
   cancelado: 'bg-gray-600',
+};
+
+/** Tipo de um item do histórico do site (#637): as execuções de `builds` e os eventos do site. */
+export const HISTORY_KIND_LABEL: Record<BuildKind | SiteEventKind, string> = {
+  build: 'Publicação',
+  rollback: 'Reversão',
+  pausa: 'Pausa',
+  retomada: 'Retomada',
+  troca_de_versao: 'Troca de versão',
+};
+
+/** Etapa de uma execução de build, no detalhe de uma falha (#637). */
+export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {
+  image: 'Imagem',
+  render: 'Renderização',
+  publish: 'Publicação',
 };
 
 const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
