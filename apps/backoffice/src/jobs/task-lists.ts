@@ -7,7 +7,7 @@ import { INGEST_TASK } from '../domain/media/upload.ts';
 import { VARIANTS_TASK } from '../domain/media/variants.ts';
 import { ROLLBACK_TASK } from '../domain/builds/schedule.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../domain/publications/schedule.ts';
-import { CHECK_RELEASE_IMAGE_TASK } from '../domain/releases/releases.ts';
+import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
 import {
   createAggregateAudienceTask,
   type AggregateAudienceTaskDeps,
@@ -23,6 +23,7 @@ import { createIngestMediaTask } from './tasks/ingest-media.ts';
 import { createMediaReprocessTask } from './tasks/media-reprocess.ts';
 import { createMediaVariantsTask, type MediaVariantsTaskDeps } from './tasks/media-variants.ts';
 import { createPublishScheduledTask } from './tasks/publish-scheduled.ts';
+import { createReleaseRunTask, type ReleaseRunTaskDeps } from './tasks/release-run.ts';
 import { createRollbackTask } from './tasks/rollback.ts';
 
 export type WorkerTaskDeps = MediaVariantsTaskDeps &
@@ -53,13 +54,17 @@ export const WORKER_CRONTAB = [
 
 /**
  * O build-runner executa builds e rollbacks (fila `build:<site>`) e a conferência da imagem
- * das releases, os únicos jobs que falam com o Docker; concorrência 2.
+ * das releases, os únicos jobs que falam com o Docker, e o run do release.yml, o único que usa
+ * a credencial do GitHub (ADR 0022 da raiz); concorrência 2.
  */
-export function buildRunnerTasks(deps: BuildTaskDeps): TaskList {
+export function buildRunnerTasks(
+  deps: BuildTaskDeps & Pick<ReleaseRunTaskDeps, 'github'>,
+): TaskList {
   return {
     build: createBuildTask(deps),
     [ROLLBACK_TASK]: createRollbackTask(deps),
     [CHECK_RELEASE_IMAGE_TASK]: createCheckReleaseImageTask(deps),
+    [RELEASE_RUN_TASK]: createReleaseRunTask(deps),
   };
 }
 export const BUILD_RUNNER_CONCURRENCY = 2;

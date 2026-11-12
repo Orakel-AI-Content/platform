@@ -6,6 +6,7 @@ import { recoverInterruptedBuilds } from '../domain/builds/recover.ts';
 import { getBuildRunnerEnv, getEnv, type BuildRunnerEnv, type Env } from '../env.ts';
 import { BUILD_RUNNER_CONCURRENCY, buildRunnerTasks } from '../jobs/task-lists.ts';
 import { dockerRuntime } from '../lib/docker.ts';
+import { githubClient } from '../lib/github.ts';
 import { runProcess } from './run-process.ts';
 
 function settingsFrom(env: Env, runner: BuildRunnerEnv): BuildSettings {
@@ -53,11 +54,25 @@ await runProcess('build-runner', async (logger) => {
         siteBuilderImage: runner.SITE_BUILDER_IMAGE,
       }),
       settings: settingsFrom(getEnv(), runner),
+      github:
+        runner.GITHUB_RELEASE_TOKEN === undefined
+          ? undefined
+          : githubClient({
+              token: runner.GITHUB_RELEASE_TOKEN,
+              repository: runner.GITHUB_RELEASE_REPOSITORY,
+            }),
     }),
     concurrency: BUILD_RUNNER_CONCURRENCY,
   });
   logger.info(
-    { deployTarget: runner.DEPLOY_TARGET, image: runner.SITE_BUILDER_IMAGE },
+    {
+      deployTarget: runner.DEPLOY_TARGET,
+      image: runner.SITE_BUILDER_IMAGE,
+      github:
+        runner.GITHUB_RELEASE_TOKEN === undefined
+          ? 'sem credencial'
+          : runner.GITHUB_RELEASE_REPOSITORY,
+    },
     'build-runner no ar',
   );
   await worker.promise;

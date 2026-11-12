@@ -99,6 +99,21 @@ export const BuildRunnerEnvSchema = z
     EDGE_LOCAL_URL: optional(z.url()),
     CLOUDFLARE_API_TOKEN: optional(z.string().min(32)),
     CLOUDFLARE_ACCOUNT_ID: optional(z.string().regex(/^[0-9a-f]{32}$/)),
+    /**
+     * PAT fine-grained do GitHub (ADR 0022 da raiz): `actions:write` e `contents:read` só no
+     * repositório do release.yml. Dispara e acompanha o run da release; sem ele, "Gerar nova
+     * versão" falha com motivo, e o build-runner sobe do mesmo jeito (local).
+     */
+    GITHUB_RELEASE_TOKEN: optional(
+      z.string().regex(/^github_pat_[A-Za-z0-9_]+$/, 'Use um PAT fine-grained (github_pat_…)'),
+    ),
+    /** Repositório do release.yml (`dono/nome`). */
+    GITHUB_RELEASE_REPOSITORY: blankAsUndefined(
+      z
+        .string()
+        .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, 'Use dono/nome')
+        .default('Orakel-AI-Content/platform'),
+    ),
   })
   .refine((env) => env.DEPLOY_TARGET !== 'local' || env.EDGE_LOCAL_URL !== undefined, {
     message: 'Defina EDGE_LOCAL_URL com DEPLOY_TARGET=local',

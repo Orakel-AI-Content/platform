@@ -69,7 +69,8 @@ Regras de evolução: aditiva dentro de uma versão; mudança incompatível cria
 versão; o parse ignora campos desconhecidos. Versão do site-builder pelo
 `release.yml` (`workflow_dispatch` com `version`), que publica a imagem `site-builder:X.Y.Z` e
 cria a tag `site-builder-vX.Y.Z` (major = muda o schema
-da API ou exige migração de configuração; ADR 0018).
+da API ou exige migração de configuração; ADR 0018). Quem dispara é o job `release-run` do
+`build-runner`, o único processo com o PAT do GitHub, que acompanha o run até o fim (ADR 0022).
 
 ## Mapa das unidades
 
