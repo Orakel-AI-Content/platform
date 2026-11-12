@@ -23,6 +23,8 @@ import {
   requestBuildNow,
   requestRollback,
   requestUndoLastPublish,
+  siteActivity,
+  type SiteActivity,
 } from '@/domain/builds/builds.ts';
 import {
   advanceLifecycle,
@@ -45,6 +47,18 @@ export async function publishNow(siteId: string): Promise<ActionResult> {
   return result.ok
     ? { ok: true, message: `Build de ${siteId} enfileirado.` }
     : { ok: false, message: result.issues[0]?.message ?? 'Não foi possível enfileirar o build.' };
+}
+
+/**
+ * Status e histórico do site (#635), para a página consultar enquanto há execução aberta.
+ * Só leitura: o papel e o site são conferidos pelo domínio. `null` sem sessão, permissão ou
+ * site, como as leituras de polling (`uploadStatusAction`).
+ */
+export async function siteActivityAction(siteId: string): Promise<SiteActivity | null> {
+  const actor = await currentActor();
+  if (!actor.ok) return null;
+  const result = await siteActivity(getDb().db, actor.value, siteId);
+  return result.ok ? result.value : null;
 }
 
 /** Issues do domínio no formato serializável do formulário (o `path` aponta o campo). */

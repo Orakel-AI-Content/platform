@@ -21,6 +21,7 @@ import {
   loadBuildTarget,
   recentBuilds,
   requestBuildNow,
+  siteActivity,
 } from '../../src/domain/builds/builds.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
 import {
@@ -1450,5 +1451,169 @@ describe('reconstruir na release', () => {
     expect(await site()).toMatchObject({ release: null, state: 'pausado' });
     expect(await buildJobs()).toEqual([]);
     expect(await events()).toEqual([]);
+  });
+});
+
+describe('atividade do site', () => {
+  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+  const at = (minute: number) => new Date(Date.UTC(2026, 10, 11, 12, minute));
+  const activity = (limit?: number) => siteActivity(db, operacao, 'exemplo-a', limit);
+
+  /** Grava uma execução fechada do site, terminada no minuto dado. */
+  const closedRun = (minute: number, values: Partial<typeof builds.$inferInsert> = {}) =>
+    db
+      .insert(builds)
+      .values({
+        siteId: 'exemplo-a',
+        attempt: 1,
+        status: 'ok',
+        release: '1.0.0',
+        requestedBy: 'system',
+        startedAt: at(minute),
+        finishedAt: at(minute),
+        ...values,
+      })
+      .returning({ id: builds.id });
+
+  const event = (minute: number, values: Omit<typeof siteEvents.$inferInsert, 'siteId'>) =>
+    db.insert(siteEvents).values({ siteId: 'exemplo-a', createdAt: at(minute), ...values });
+
+  it('com a publicação na fila, a aberta é na_fila com o horário previsto e o solicitante', async () => {
+    const [queued] = await db.select().from(builds).where(eq(builds.status, 'na_fila'));
+    expect(queued?.scheduledFor).toBeInstanceOf(Date);
+    expect(await activity()).toEqual({
+      ok: true,
+      value: {
+        open: {
+          id: queued?.id,
+          kind: 'build',
+          status: 'na_fila',
+          currentStage: null,
+          scheduledFor: queued?.scheduledFor,
+          startedAt: null,
+          requestedBy: 'system',
+          cancelRequestedAt: null,
+        },
+        history: [],
+      },
+    });
+  });
+
+  it('rodando, a aberta traz a etapa corrente, e vem antes da na_fila de um pedido durante o build', async () => {
+    await db
+      .update(builds)
+      .set({ status: 'rodando', release: '1.0.0', startedAt: at(1), currentStage: 'render' })
+      .where(eq(builds.status, 'na_fila'));
+    await db.insert(builds).values({
+      siteId: 'exemplo-a',
+      attempt: 1,
+      status: 'na_fila',
+      requestedBy: operacao.email,
+      scheduledFor: at(2),
+    });
+    const result = await activity();
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        open: { status: 'rodando', currentStage: 'render', startedAt: at(1) },
+        history: [],
+      },
+    });
+  });
+
+  it('sem nada aberto, não há execução aberta', async () => {
+    await clearQueue();
+    expect(await activity()).toEqual({ ok: true, value: { open: null, history: [] } });
+  });
+
+  it('o histórico une execuções e eventos, do mais recente ao mais antigo, com tipo, quem, quando e resultado', async () => {
+    await clearQueue();
+    await closedRun(1, { versionId: 'v1' });
+    await event(2, { kind: 'pausa', requestedBy: operacao.email, reason: 'manutenção' });
+    await event(3, { kind: 'retomada', requestedBy: operacao.email });
+    await closedRun(4, { kind: 'rollback', versionId: 'v0', requestedBy: operacao.email });
+    await event(5, {
+      kind: 'troca_de_versao',
+      requestedBy: operacao.email,
+      previousRelease: '1.0.0',
+      release: '1.1.0',
+    });
+    await closedRun(6, { status: 'cancelado', release: null, cancelRequestedBy: operacao.email });
+
+    const result = await activity();
+    if (!result.ok) throw new Error('consulta recusada');
+    expect(result.value.open).toBeNull();
+    expect(
+      result.value.history.map((item) => [item.type, item.kind, item.requestedBy, item.at]),
+    ).toEqual([
+      ['execucao', 'build', 'system', at(6)],
+      ['evento', 'troca_de_versao', operacao.email, at(5)],
+      ['execucao', 'rollback', operacao.email, at(4)],
+      ['evento', 'retomada', operacao.email, at(3)],
+      ['evento', 'pausa', operacao.email, at(2)],
+      ['execucao', 'build', 'system', at(1)],
+    ]);
+    expect(result.value.history).toEqual([
+      expect.objectContaining({ status: 'cancelado', cancelRequestedBy: operacao.email }),
+      expect.objectContaining({ previousRelease: '1.0.0', release: '1.1.0' }),
+      expect.objectContaining({ status: 'ok', versionId: 'v0', failure: null }),
+      expect.objectContaining({ kind: 'retomada' }),
+      expect.objectContaining({ reason: 'manutenção' }),
+      expect.objectContaining({ status: 'ok', versionId: 'v1', release: '1.0.0', failure: null }),
+    ]);
+  });
+
+  it('o item de uma falha traz a etapa, a mensagem e o fim do log', async () => {
+    await clearQueue();
+    await closedRun(1, {
+      status: 'failed',
+      failedStage: 'render',
+      failureKind: 'permanent',
+      failureMessage: 'página sem título',
+      logTail: 'linha 1\nlinha 2',
+    });
+    const result = await activity();
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        history: [
+          {
+            type: 'execucao',
+            status: 'failed',
+            failure: {
+              stage: 'render',
+              kind: 'permanent',
+              message: 'página sem título',
+              logTail: 'linha 1\nlinha 2',
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it('com mais itens que o limite, traz exatamente o limite, só os mais recentes', async () => {
+    await clearQueue();
+    for (const minute of [1, 3, 5]) await closedRun(minute);
+    for (const minute of [2, 4, 6]) {
+      await event(minute, { kind: 'retomada', requestedBy: operacao.email });
+    }
+    const result = await activity(4);
+    if (!result.ok) throw new Error('consulta recusada');
+    expect(result.value.history.map((item) => item.at)).toEqual([at(6), at(5), at(4), at(3)]);
+  });
+
+  it('sem operations.run recusa com forbidden; site inexistente, com site.not_found', async () => {
+    for (const role of ['editor', 'revisor'] as const) {
+      const actor = { email: `${role}@orakel.local`, roles: [role] };
+      expect(await siteActivity(db, actor, 'exemplo-a')).toMatchObject({
+        ok: false,
+        issues: [{ code: 'forbidden' }],
+      });
+    }
+    expect(await siteActivity(db, operacao, 'nao-existe')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
   });
 });
