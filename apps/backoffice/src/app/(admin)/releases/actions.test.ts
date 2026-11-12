@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { recheckReleaseImageAction, requestNewReleaseAction } from './actions.ts';
+import {
+  discardReleaseAction,
+  releasesStatusAction,
+  requestNewReleaseAction,
+  retryReleaseAction,
+} from './actions.ts';
 
 // As actions só traduzem: sessão → recusa, Result do domínio → mensagem, sucesso → revalida
 // a lista. Regras e permissão estão no contrato (`releases.contract.test.ts`).
@@ -8,7 +13,9 @@ import { recheckReleaseImageAction, requestNewReleaseAction } from './actions.ts
 const mocks = vi.hoisted(() => ({
   currentActor: vi.fn(),
   requestNewRelease: vi.fn(),
-  requestReleaseImageCheck: vi.fn(),
+  retryRelease: vi.fn(),
+  discardRelease: vi.fn(),
+  loadReleasesSnapshot: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -19,8 +26,10 @@ vi.mock('@/db/client.ts', () => ({
 }));
 vi.mock('@/domain/releases/releases.ts', () => ({
   requestNewRelease: mocks.requestNewRelease,
-  requestReleaseImageCheck: mocks.requestReleaseImageCheck,
+  retryRelease: mocks.retryRelease,
+  discardRelease: mocks.discardRelease,
 }));
+vi.mock('./snapshot.ts', () => ({ loadReleasesSnapshot: mocks.loadReleasesSnapshot }));
 
 const operacao = { email: 'operacao@orakel.local', roles: ['operacao'] };
 
@@ -65,35 +74,73 @@ describe('requestNewReleaseAction', () => {
   });
 });
 
-describe('recheckReleaseImageAction', () => {
+// "Tentar de novo" e "Descartar" traduzem do mesmo jeito: sessão, recusa do domínio e sucesso.
+describe.each([
+  {
+    name: 'retryReleaseAction',
+    action: retryReleaseAction,
+    domain: () => mocks.retryRelease,
+    refusal: { code: 'release.not_failed', message: 'A release 1.0.0 não falhou' },
+    success: 'Versão 1.0.0: a geração recomeçou.',
+  },
+  {
+    name: 'discardReleaseAction',
+    action: discardReleaseAction,
+    domain: () => mocks.discardRelease,
+    refusal: {
+      code: 'release.in_use',
+      message:
+        'A release 1.0.0 está em uso por blog-a; troque a versão desses sites antes de descartar',
+    },
+    success: 'Versão 1.0.0 descartada.',
+  },
+])('$name', ({ action, domain, refusal, success }) => {
   it('sem sessão, recusa sem chamar o domínio', async () => {
     mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
 
-    expect(await recheckReleaseImageAction('1.0.0')).toMatchObject({ ok: false });
-    expect(mocks.requestReleaseImageCheck).not.toHaveBeenCalled();
+    expect(await action('1.0.0')).toMatchObject({ ok: false });
+    expect(domain()).not.toHaveBeenCalled();
   });
 
-  it('enfileira a conferência pelo domínio e revalida a lista', async () => {
-    mocks.requestReleaseImageCheck.mockResolvedValue({ ok: true, value: undefined });
+  it('chama o domínio com a tag e revalida a lista', async () => {
+    domain().mockResolvedValue({ ok: true, value: { tag: '1.0.0' } });
 
-    expect(await recheckReleaseImageAction('1.0.0')).toEqual({
-      ok: true,
-      message: 'Conferência da imagem 1.0.0 enfileirada; recarregue a lista para ver o resultado.',
-    });
-    expect(mocks.requestReleaseImageCheck).toHaveBeenCalledWith({}, operacao, '1.0.0');
+    expect(await action('1.0.0')).toEqual({ ok: true, message: success });
+    expect(domain()).toHaveBeenCalledWith({}, operacao, '1.0.0');
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/releases');
   });
 
-  it('a recusa do domínio (sem release.promote) volta como erro, sem revalidar', async () => {
-    mocks.requestReleaseImageCheck.mockResolvedValue({
+  it('a recusa do domínio volta como erro, sem revalidar', async () => {
+    domain().mockResolvedValue({ ok: false, issues: [{ ...refusal, path: ['tag'] }] });
+
+    expect(await action('1.0.0')).toEqual({ ok: false, message: refusal.message });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe('releasesStatusAction', () => {
+  it('sem sessão, não lê nada', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await releasesStatusAction()).toBeUndefined();
+    expect(mocks.loadReleasesSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('devolve as releases e as tags em uso, sem revalidar', async () => {
+    const snapshot = { rows: [{ tag: '1.0.0', pipelineState: 'gerando' }], inUse: ['0.9.0'] };
+    mocks.loadReleasesSnapshot.mockResolvedValue({ ok: true, value: snapshot });
+
+    expect(await releasesStatusAction()).toEqual(snapshot);
+    expect(mocks.loadReleasesSnapshot).toHaveBeenCalledWith(expect.anything(), operacao);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('a recusa de permissão vira `undefined`', async () => {
+    mocks.loadReleasesSnapshot.mockResolvedValue({
       ok: false,
       issues: [{ code: 'forbidden', message: 'Sem permissão para release.promote', path: [] }],
     });
 
-    expect(await recheckReleaseImageAction('1.0.0')).toEqual({
-      ok: false,
-      message: 'Sem permissão para release.promote',
-    });
-    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    expect(await releasesStatusAction()).toBeUndefined();
   });
 });

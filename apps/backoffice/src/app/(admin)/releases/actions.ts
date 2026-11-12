@@ -4,9 +4,12 @@ import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
+import type { ReleasesSnapshot } from '@/components/releases/ReleasesTable.tsx';
 import { getDb } from '@/db/client.ts';
 import type { ReleaseBump } from '@/domain/releases/next-version.ts';
-import { requestNewRelease, requestReleaseImageCheck } from '@/domain/releases/releases.ts';
+import { discardRelease, requestNewRelease, retryRelease } from '@/domain/releases/releases.ts';
+
+import { loadReleasesSnapshot } from './snapshot.ts';
 
 /**
  * "Gerar nova versão": o domínio calcula o número pelo tipo de mudança, grava a release em
@@ -26,21 +29,42 @@ export async function requestNewReleaseAction(bump: ReleaseBump): Promise<Action
 }
 
 /**
- * "Reconferir" da lista: enfileira de novo a conferência da imagem site-builder da release. A
- * conferência roda no build-runner (ADR 0011 da raiz); permissão e tag ficam no domínio.
+ * "Tentar de novo" de uma release em `falhou`: o domínio a devolve à etapa que falhou, com o
+ * mesmo número, e enfileira o job dessa etapa (`retryRelease`).
  */
-export async function recheckReleaseImageAction(tag: string): Promise<ActionResult> {
+export async function retryReleaseAction(tag: string): Promise<ActionResult> {
   const actor = await currentActor();
   if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
-  const result = await getDb().db.transaction((tx) =>
-    requestReleaseImageCheck(tx, actor.value, tag),
-  );
+  const result = await getDb().db.transaction((tx) => retryRelease(tx, actor.value, tag));
   if (!result.ok) {
-    return { ok: false, message: result.issues[0]?.message ?? 'Não foi possível reconferir.' };
+    return { ok: false, message: result.issues[0]?.message ?? 'Não foi possível tentar de novo.' };
   }
   revalidatePath('/releases');
-  return {
-    ok: true,
-    message: `Conferência da imagem ${tag} enfileirada; recarregue a lista para ver o resultado.`,
-  };
+  return { ok: true, message: `Versão ${tag}: a geração recomeçou.` };
+}
+
+/**
+ * "Descartar": o domínio recusa a release que algum site usa (`release.in_use`), mesmo que a
+ * tela, defasada, tenha mostrado o botão (`discardRelease`).
+ */
+export async function discardReleaseAction(tag: string): Promise<ActionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
+  const result = await getDb().db.transaction((tx) => discardRelease(tx, actor.value, tag));
+  if (!result.ok) {
+    return { ok: false, message: result.issues[0]?.message ?? 'Não foi possível descartar.' };
+  }
+  revalidatePath('/releases');
+  return { ok: true, message: `Versão ${tag} descartada.` };
+}
+
+/**
+ * Leitura da lista para o polling da tela, a mesma da página (`loadReleasesSnapshot`).
+ * `undefined` sem sessão ou sem permissão; o polling tenta de novo no próximo tique.
+ */
+export async function releasesStatusAction(): Promise<ReleasesSnapshot | undefined> {
+  const actor = await currentActor();
+  if (!actor.ok) return undefined;
+  const result = await loadReleasesSnapshot(getDb().db, actor.value);
+  return result.ok ? result.value : undefined;
 }
