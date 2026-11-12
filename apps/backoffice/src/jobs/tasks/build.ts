@@ -14,6 +14,7 @@ import { planBuild, type BuildSettings } from '../../domain/builds/plan.ts';
 import { runBuild } from '../../domain/builds/run-build.ts';
 import type { ContainerRuntime } from '../../domain/builds/runtime.ts';
 import { retryRunAt } from '../../domain/builds/schedule.ts';
+import { schedulePreviewReconcile } from '../../domain/preview/preview.ts';
 import { isLastAttempt } from './last-attempt.ts';
 
 export type BuildTaskDeps = {
@@ -91,6 +92,8 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
         { buildId, siteId, massUnpublishDeclaredAt: target.massUnpublishDeclaredAt },
         outcome,
       );
+      // A prévia segue a maior release com build ok (domain/preview).
+      if (outcome.status === 'ok') await schedulePreviewReconcile(tx);
       if (retried && !isLastAttempt(helpers)) {
         await queueRetry(tx, buildId, retryRunAt(helpers.job.run_at, attempt, new Date(now())));
       }
