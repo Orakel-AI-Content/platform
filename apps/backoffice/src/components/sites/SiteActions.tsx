@@ -1,10 +1,12 @@
 'use client';
 
-import { createContext, use, type ReactNode } from 'react';
+import { createContext, use, useState, type ReactNode } from 'react';
 
 import { SchemaForm } from '@/components/forms/SchemaForm';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
+import ConfirmDialog from '@/components/shared/ConfirmDialog.tsx';
+import { INFRA_STEP_TEXT } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
@@ -38,6 +40,12 @@ const NEXT_STEP = {
 
 type Step = (typeof NEXT_STEP)[keyof typeof NEXT_STEP]['step'];
 
+/** Etapa manual que "Desmarcar" volta, com a anterior que o site passa a ter. */
+const UNDO_STEP = {
+  infra_aplicada: { label: 'infra aplicada', back: 'cadastrado' },
+  zona_ativa: { label: 'zona ativa', back: 'infra_aplicada' },
+} as const satisfies Record<Step, unknown>;
+
 const LifecycleActionContext = createContext<ReturnType<typeof useActionResult> | null>(null);
 
 /**
@@ -56,29 +64,76 @@ export function LifecycleActionScope({ children }: { children: ReactNode }) {
 }
 
 /**
- * Só o próximo passo manual válido; `publicado` vem do build. Sem passo manual não renderiza
- * nada (zona ativa e publicado). Fica dentro de um `LifecycleActionScope`.
+ * Só o próximo passo manual válido ("Marcar…") e o caminho de volta da etapa manual atual
+ * ("Desmarcar", com confirmação; #714); `publicado` vem do build e não se desmarca. Sem nenhum
+ * dos dois (publicado) não renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de
+ * qualquer um vai ao mesmo Alert.
  */
 export function LifecycleAction({
   lifecycle,
   action,
+  undo,
 }: {
   lifecycle: SiteSummary['lifecycle'];
   action: (step: Step) => Promise<ActionResult>;
+  undo: (step: Step) => Promise<ActionResult>;
 }) {
   const scope = use(LifecycleActionContext);
+  const [confirming, setConfirming] = useState(false);
+  const [running, setRunning] = useState<'next' | 'undo' | null>(null);
   if (scope === null) throw new Error('LifecycleAction fora de um LifecycleActionScope.');
-  if (lifecycle !== 'cadastrado' && lifecycle !== 'infra_aplicada') return null;
-  const next = NEXT_STEP[lifecycle];
+  const next =
+    lifecycle === 'cadastrado' || lifecycle === 'infra_aplicada' ? NEXT_STEP[lifecycle] : null;
+  const current = lifecycle === 'infra_aplicada' || lifecycle === 'zona_ativa' ? lifecycle : null;
+  if (next === null && current === null) return null;
+  const pending = (kind: 'next' | 'undo') => scope.pending && running === kind;
+
   return (
-    <Button
-      type="button"
-      size="sm"
-      disabled={scope.pending}
-      onClick={() => scope.run(() => action(next.step))}
-    >
-      {scope.pending ? next.pendingLabel : next.label}
-    </Button>
+    <span className="flex flex-wrap gap-2">
+      {next && (
+        <Button
+          type="button"
+          size="sm"
+          disabled={scope.pending}
+          onClick={() => {
+            setRunning('next');
+            scope.run(() => action(next.step));
+          }}
+        >
+          {pending('next') ? next.pendingLabel : next.label}
+        </Button>
+      )}
+      {current && (
+        <>
+          <Button
+            type="button"
+            size="sm"
+            disabled={scope.pending}
+            onClick={() => setConfirming(true)}
+          >
+            {pending('undo') ? 'Desmarcando…' : 'Desmarcar'}
+            <span className="sr-only"> {UNDO_STEP[current].label}</span>
+          </Button>
+          <ConfirmDialog
+            isOpen={confirming}
+            type="warning"
+            title={`Desmarcar ${UNDO_STEP[current].label}?`}
+            confirmText="Desmarcar"
+            onCancel={() => setConfirming(false)}
+            onConfirm={() => {
+              setConfirming(false);
+              setRunning('undo');
+              scope.run(() => undo(current));
+            }}
+          >
+            <p>
+              A etapa volta para "{INFRA_STEP_TEXT[UNDO_STEP[current].back]}". Se o provedor ainda
+              confirmar a infra e a zona, a próxima conferência automática marca a etapa de novo.
+            </p>
+          </ConfirmDialog>
+        </>
+      )}
+    </span>
   );
 }
 
