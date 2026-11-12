@@ -10,7 +10,7 @@ import {
   reviews,
 } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
-import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
+import { GENERATOR_ACTOR, SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
   countContentsByStatus,
   countReviewQueues,
@@ -601,6 +601,55 @@ describe('leituras de conteúdo', () => {
     expect(result.value.map((v) => [v.version, v.approval])).toEqual([
       [1, null],
       [2, { reviewer: 'revisor@orakel.local', approvedAt: review?.createdAt }],
+    ]);
+  });
+
+  it('cada versão traz o e-mail de quem a criou, generator no gerador e nulo nas antigas (#748)', async () => {
+    const page = (slug: string): ContentEdit => ({
+      kind: 'page',
+      slug,
+      title: slug,
+      authorIds: [],
+      taxonomyIds: [],
+      publishedAt: '2026-10-06T12:00:00-03:00',
+      blocks: [newText('um')],
+    });
+    const editor = { email: 'editor@orakel.local', roles: ['editor' as const] };
+    const other = { email: 'outro@orakel.local', roles: ['editor' as const] };
+    const created = await db.transaction((tx) => createContent(tx, editor, SITE, page('autoria')));
+    if (!created.ok) throw new Error(JSON.stringify(created.issues));
+    await edit(created.value.id, { ...(await latest(created.value.id)), title: 'Editada' }, other);
+    const generated = await db.transaction((tx) =>
+      createContent(tx, GENERATOR_ACTOR, SITE, page('gerada')),
+    );
+    if (!generated.ok) throw new Error(JSON.stringify(generated.issues));
+    // Versão anterior à coluna: o autor fica nulo.
+    await edit(3, { ...(await latest(3)), title: 'Quem somos (2)' }, editor);
+    await db
+      .update(contentVersions)
+      .set({ createdBy: null })
+      .where(
+        and(
+          eq(contentVersions.siteId, SITE),
+          eq(contentVersions.contentId, 3),
+          eq(contentVersions.version, 1),
+        ),
+      );
+
+    const authorship = async (contentId: number) => {
+      const result = await listContentVersions(db, SYSTEM_ACTOR, SITE, contentId);
+      if (!result.ok) throw new Error(JSON.stringify(result.issues));
+      return result.value.map((v) => [v.version, v.createdBy]);
+    };
+
+    expect(await authorship(created.value.id)).toEqual([
+      [1, 'editor@orakel.local'],
+      [2, 'outro@orakel.local'],
+    ]);
+    expect(await authorship(generated.value.id)).toEqual([[1, 'generator']]);
+    expect(await authorship(3)).toEqual([
+      [1, null],
+      [2, 'editor@orakel.local'],
     ]);
   });
 
