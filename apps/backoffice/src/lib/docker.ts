@@ -1,5 +1,5 @@
 // API do Docker por HTTP (fetch), sempre pelo docker-socket-proxy (ADR 0011 da raiz): só as
-// rotas da lista do proxy. Sem cliente pronto: são nove chamadas, e assim nenhuma rota fora
+// rotas da lista do proxy. Sem cliente pronto: são dez chamadas, e assim nenhuma rota fora
 // da lista entra por engano. O fim do container é acompanhado por consulta periódica, sem
 // conexão longa (o render pode passar dos limites de tempo do fetch).
 import {

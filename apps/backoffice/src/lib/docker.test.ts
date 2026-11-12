@@ -129,7 +129,7 @@ describe('dockerRuntime', () => {
     const { fn, calls } = fakeFetch({
       'GET /containers/abc/logs': [new Response(body, { status: 200 })],
     });
-    expect(await dockerRuntime({ host, fetch: fn }).logsTail('abc', 200)).toBe(
+    expect(await dockerRuntime({ host, siteBuilderImage, fetch: fn }).logsTail('abc', 200)).toBe(
       'render: 12 páginas\nerro: ç',
     );
     expect(calls).toEqual([
