@@ -65,6 +65,7 @@ const TABLES = [
   'pending_changes',
   'content_link_results',
   'content_link_checks',
+  'review_confirmations',
   'reviews',
   'publications',
   'content_versions',
