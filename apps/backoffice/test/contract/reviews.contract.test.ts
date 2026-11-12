@@ -7,6 +7,8 @@ import { contentVersions, reviews } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import {
+  type ContentEdit,
+  type NewBlock,
   listContentVersions,
   submitForReview,
   updateContent,
@@ -17,6 +19,7 @@ import {
   pendingReturn,
   returnVersion,
   REVIEW_CHECKLIST,
+  reviewChecks,
   reviewIssues,
 } from '../../src/domain/reviews/reviews.ts';
 import type * as Sites from '../../src/domain/sites/sites.ts';
@@ -154,6 +157,82 @@ describe('aprovar a versão em revisão', () => {
       issues: [{ code: 'review.checklist_incomplete' }],
     });
     expect(await db.select().from(reviews)).toEqual([]);
+  });
+
+  it('o checklist tem só as três confirmações humanas; as chaves que saíram são recusadas', async () => {
+    const version = await draft(1);
+
+    expect(ALL).toEqual([
+      'valor_original',
+      'politicas_anuncios_afiliados',
+      'visualizacao_conferida',
+    ]);
+    for (const removed of ['descricao_imagens', 'imagens_decorativas_marcadas']) {
+      expect(await approve(1, version, [...ALL, removed])).toMatchObject({
+        ok: false,
+        issues: [{ code: 'review.checklist_incomplete', path: ['checklist'] }],
+      });
+    }
+    expect(await db.select().from(reviews)).toEqual([]);
+    expect(await approve(1, version, ALL)).toMatchObject({ ok: true });
+  });
+
+  it('imagem sem descrição continua impedindo a aprovação, pela validação da release', async () => {
+    const version = await draft(1);
+    const current = (await versions(1)).at(-1);
+    if (current === undefined) throw new Error('conteúdo 1 sem versão');
+    // Gravada direto: a edição já recusa a imagem sem alt; aqui a versão em revisão a carrega.
+    const image = {
+      n: 9999,
+      type: 'image',
+      mediaId: 1,
+    } as unknown as (typeof current.data.blocks)[number];
+    await db
+      .update(contentVersions)
+      .set({ data: { ...current.data, blocks: [...current.data.blocks, image] } })
+      .where(
+        and(
+          eq(contentVersions.siteId, SITE),
+          eq(contentVersions.contentId, 1),
+          eq(contentVersions.version, version),
+        ),
+      );
+
+    const result = await approve(1, version, ALL);
+
+    expect(result).toMatchObject({ ok: false });
+    expect(!result.ok && result.issues.some((issue) => issue.code.startsWith('schema.'))).toBe(
+      true,
+    );
+    expect(await db.select().from(reviews)).toEqual([]);
+    expect((await versions(1)).at(-1)?.status).toBe('em_revisao');
+  });
+
+  it('revisão gravada com os cinco itens antigos continua legível', async () => {
+    const version = await draft(1);
+    const legacy = [
+      'valor_original',
+      'politicas_anuncios_afiliados',
+      'descricao_imagens',
+      'visualizacao_conferida',
+      'imagens_decorativas_marcadas',
+    ];
+    await db.insert(reviews).values({
+      siteId: SITE,
+      contentId: 1,
+      version,
+      reviewer: 'revisor@orakel.local',
+      checklist: legacy,
+    });
+
+    const [row] = await db.select().from(reviews);
+    const listed = await listContentVersions(db, SYSTEM_ACTOR, SITE, 1);
+
+    expect(row?.checklist).toEqual(legacy);
+    if (!listed.ok) throw new Error(JSON.stringify(listed.issues));
+    expect(listed.value.find((v) => v.version === version)?.approval).toMatchObject({
+      reviewer: 'revisor@orakel.local',
+    });
   });
 
   it('recusa versão que não é a mais recente e versão fora de em_revisao', async () => {
@@ -353,6 +432,104 @@ describe('validação para a tela de revisão', () => {
       issues: [{ code: 'forbidden' }],
     });
     expect(await reviewIssues(db, role('revisor'), SITE, 999)).toMatchObject({
+      issues: [{ code: 'content.not_found' }],
+    });
+  });
+});
+
+describe('checagens de conteúdo para a tela de revisão', () => {
+  const link = (href: string): NewBlock => ({
+    new: true,
+    type: 'text',
+    content: [
+      {
+        type: 'paragraph',
+        children: [{ type: 'link', href, children: [{ type: 'text', text: href }] }],
+      },
+    ],
+  });
+
+  /** Nova versão do conteúdo 1 com `changes`, enviada para revisão. */
+  async function submit(changes: Partial<ContentEdit>): Promise<number> {
+    const last = (await versions(1)).at(-1);
+    if (last === undefined) throw new Error('conteúdo 1 sem versão');
+    const saved = await db.transaction((tx) =>
+      updateContent(tx, SYSTEM_ACTOR, SITE, 1, { ...last.data, ...changes }),
+    );
+    if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
+    await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, 1));
+    return saved.value.version;
+  }
+
+  const checksOf = async (actor = role('revisor')) => {
+    const result = await reviewChecks(db, actor, SITE, 1);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value;
+  };
+  const byKey = async (key: string) => (await checksOf()).checks.find((item) => item.key === key);
+
+  beforeEach(async () => {
+    const imported = await importSnapshot(db, SYSTEM_ACTOR, await readFixture('exemplo-b'));
+    if (!imported.ok) throw new Error(JSON.stringify(imported.issues));
+  });
+
+  it('link para conteúdo no ar, categoria, autor, institucional e redirect não avisa; caminho inexistente avisa no bloco', async () => {
+    const version = await submit({
+      blocks: [
+        link('/rotina-da-manha/'),
+        link('/quem-somos'),
+        link('/categoria/guias/'),
+        link('/autor/ana-souza/'),
+        link('/sobre/'),
+        link('/guia-antigo/'),
+        link('/nao-existe/'),
+        link('/arroz-de-forno/'),
+      ],
+    });
+
+    const result = await checksOf();
+
+    expect(result.version).toBe(version);
+    expect(result.checks.find((item) => item.key === 'links_internos')).toMatchObject({
+      level: 'aviso',
+      findings: [{ path: ['blocks', 6] }, { path: ['blocks', 7] }],
+    });
+  });
+
+  it('título igual ao de outro conteúdo do site avisa; igual ao de outro site não', async () => {
+    await submit({ title: 'Uma rotina da manhã possível' });
+    expect(await byKey('titulo_duplicado')).toMatchObject({
+      level: 'aviso',
+      findings: [{ path: ['title'] }],
+    });
+
+    await submit({ title: 'Arroz de forno sem complicação' });
+    expect(await byKey('titulo_duplicado')).toMatchObject({ level: 'ok', findings: [] });
+  });
+
+  it('só a validação da release é erro, e a aprovação continua barrando só ela', async () => {
+    const version = await submit({ description: undefined, taxonomyIds: [2] });
+    release.override = withoutFaq;
+
+    const { checks } = await checksOf();
+
+    expect(checks.find((item) => item.key === 'descricao')?.level).toBe('aviso');
+    expect(checks.find((item) => item.key === 'categoria')?.level).toBe('aviso');
+    expect(checks.filter((item) => item.level === 'erro').map((item) => item.key)).toEqual([
+      'validacao_release',
+    ]);
+    expect(await approve(1, version)).toMatchObject({ ok: false });
+    release.override = undefined;
+    expect(await approve(1, version)).toMatchObject({ ok: true });
+  });
+
+  it('sem papel, forbidden; conteúdo inexistente, not_found', async () => {
+    expect(await reviewChecks(db, { email: 'x@orakel.local', roles: [] }, SITE, 1)).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
+    expect(await reviewChecks(db, role('revisor'), SITE, 999)).toMatchObject({
+      ok: false,
       issues: [{ code: 'content.not_found' }],
     });
   });

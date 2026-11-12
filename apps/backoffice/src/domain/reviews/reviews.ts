@@ -1,16 +1,31 @@
 import type { Issue, Result } from '@orakel/content-model';
-import { and, desc, eq, gte, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ne, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { contents, contentVersions, reviews } from '../../db/schema/index.ts';
+import {
+  authors,
+  contents,
+  contentVersions,
+  redirects,
+  reviews,
+  taxonomies,
+} from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
-import { validateContentData } from '../content/contents.ts';
-import { resourcesFor } from '../sites/sites.ts';
+import { listLiveContents, validateContentData } from '../content/contents.ts';
+import { currentConfig, resourcesFor } from '../sites/sites.ts';
+import {
+  computeReviewChecks,
+  sitePaths,
+  type ReviewCheck,
+  type ReviewCheckContext,
+} from './checks.ts';
 
 /**
- * Checklist da aprovação, fixo no código: RN-CON-02 (valor original, políticas de anúncios e
- * afiliados, descrição das imagens, visualização conferida) e P14 (imagens decorativas
- * marcadas). Aprovar exige todos os itens marcados.
+ * Checklist da aprovação, fixo no código: só as confirmações que dependem de julgamento humano
+ * (RN-CON-02: valor original, políticas de anúncios e afiliados, visualização conferida).
+ * Descrição das imagens (RN-CON-02) e imagens decorativas marcadas (P14) saíram: o schema do
+ * bloco de imagem as garante e a validação da release barra a aprovação (ADR 0021). Aprovar
+ * exige todos os itens marcados; chave fora desta lista, inclusive as que saíram, é recusada.
  */
 export const REVIEW_CHECKLIST = [
   {
@@ -21,12 +36,10 @@ export const REVIEW_CHECKLIST = [
     key: 'politicas_anuncios_afiliados',
     label: 'Conforme as políticas de conteúdo dos programas de anúncios e afiliados',
   },
-  { key: 'descricao_imagens', label: 'Descrição em todas as imagens de conteúdo' },
   {
     key: 'visualizacao_conferida',
     label: 'Visualização conferida: o conteúdo como vai ficar no site',
   },
-  { key: 'imagens_decorativas_marcadas', label: 'Imagens decorativas marcadas como tal' },
 ] as const;
 
 export type ReviewChecklistKey = (typeof REVIEW_CHECKLIST)[number]['key'];
@@ -88,6 +101,79 @@ export async function reviewIssues(
     value: {
       version: latest.version,
       issues: await validationIssues(db, siteId, contentId, latest.data),
+    },
+  };
+}
+
+/** Contexto do site para as checagens: caminhos que existem, categorias e títulos dos outros. */
+async function reviewCheckContext(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+): Promise<Result<ReviewCheckContext>> {
+  const live = await listLiveContents(db, actor, siteId);
+  if (!live.ok) return live;
+  const [taxonomyRows, authorRows, redirectRows, config, titleRows] = await Promise.all([
+    db
+      .select({ id: taxonomies.id, kind: taxonomies.kind, slug: taxonomies.slug })
+      .from(taxonomies)
+      .where(eq(taxonomies.siteId, siteId)),
+    db.select({ slug: authors.slug }).from(authors).where(eq(authors.siteId, siteId)),
+    db.select({ from: redirects.from }).from(redirects).where(eq(redirects.siteId, siteId)),
+    currentConfig(db, siteId),
+    // Versão mais recente de cada outro conteúdo do site, em qualquer status.
+    db
+      .selectDistinctOn([contentVersions.contentId], {
+        contentId: contentVersions.contentId,
+        title: sql<string>`${contentVersions.data}->>'title'`,
+      })
+      .from(contentVersions)
+      .where(and(eq(contentVersions.siteId, siteId), ne(contentVersions.contentId, contentId)))
+      .orderBy(asc(contentVersions.contentId), desc(contentVersions.version)),
+  ]);
+  return {
+    ok: true,
+    value: {
+      paths: sitePaths({
+        liveSlugs: live.value.filter((item) => item.id !== contentId).map((item) => item.slug),
+        taxonomies: taxonomyRows,
+        authorSlugs: authorRows.map((row) => row.slug),
+        config,
+        redirectFroms: redirectRows.map((row) => row.from),
+      }),
+      categoryIds: new Set(
+        taxonomyRows.filter((row) => row.kind === 'category').map((row) => row.id),
+      ),
+      otherTitles: titleRows,
+    },
+  };
+}
+
+/**
+ * Checagens automáticas da versão mais recente para a tela de revisão (`checks.ts`):
+ * calculadas a cada leitura, nunca gravadas. Só os problemas da validação são `erro`, e
+ * continuam sendo o que barra `approveVersion`; o resto é `aviso`. Exige `site.read`.
+ */
+export async function reviewChecks(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+): Promise<Result<{ version: number; checks: ReviewCheck[] }>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+
+  const latest = await latestVersion(db, siteId, contentId);
+  if (latest === undefined) return { ok: false, issues: [notFound(siteId, contentId)] };
+  const context = await reviewCheckContext(db, actor, siteId, contentId);
+  if (!context.ok) return context;
+  const issues = await validationIssues(db, siteId, contentId, latest.data);
+  return {
+    ok: true,
+    value: {
+      version: latest.version,
+      checks: computeReviewChecks(latest.data, issues, context.value),
     },
   };
 }

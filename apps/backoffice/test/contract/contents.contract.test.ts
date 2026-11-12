@@ -1,9 +1,14 @@
 import { RESOURCES, type Block, type Content } from '@orakel/content-model/v1';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { contents, contentVersions, reviews } from '../../src/db/schema/index.ts';
+import {
+  contentLinkChecks,
+  contents,
+  contentVersions,
+  reviews,
+} from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { GENERATOR_ACTOR, SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
@@ -308,6 +313,34 @@ describe('enviar para revisão (#72)', () => {
     expect(after[1]?.data).toEqual(before?.data);
     expect(after[1]?.createdAt).toEqual(before?.createdAt);
     expect(await unresolvedPendingChangeIds(db, SITE)).toEqual(pending);
+  });
+
+  it('enfileira a checagem de links externos da versão na mesma transação (#745)', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+
+    await submit(1);
+
+    const { rows } = await db.execute<{ payload: unknown; key: string }>(
+      sql`select j.payload, j.key from graphile_worker._private_jobs j
+        join graphile_worker._private_tasks t on t.id = j.task_id
+        where t.identifier = 'check-content-links'`,
+    );
+    expect(rows).toEqual([
+      { payload: { siteId: SITE, contentId: 1, version: 2 }, key: `content-links:${SITE}:1:2` },
+    ]);
+    expect(await db.select().from(contentLinkChecks)).toMatchObject([
+      { siteId: SITE, contentId: 1, version: 2, finishedAt: null },
+    ]);
+  });
+
+  it('envio recusado não enfileira a checagem de links (#745)', async () => {
+    expect(await submit(2)).toMatchObject({ ok: false });
+
+    const { rows } = await db.execute(
+      sql`select 1 from graphile_worker.jobs where task_identifier = 'check-content-links'`,
+    );
+    expect(rows).toEqual([]);
+    expect(await db.select().from(contentLinkChecks)).toEqual([]);
   });
 
   it('recusa versão mais recente fora de rascunho e conteúdo inexistente', async () => {

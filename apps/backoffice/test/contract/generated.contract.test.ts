@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
@@ -74,6 +74,17 @@ describe('conteúdo do gerador', () => {
     expect(rows.map((row) => [row.version, row.status])).toEqual([[1, 'em_revisao']]);
     const queue = await listReviewQueue(db, revisor, SITE);
     expect(queue.ok && queue.value.map((item) => item.id)).toContain(created.value.id);
+  });
+
+  it('enfileira a checagem de links externos da versão 1 na mesma transação (#745)', async () => {
+    const id = await generate();
+
+    const { rows } = await db.execute<{ payload: unknown }>(
+      sql`select j.payload from graphile_worker._private_jobs j
+        join graphile_worker._private_tasks t on t.id = j.task_id
+        where t.identifier = 'check-content-links'`,
+    );
+    expect(rows).toEqual([{ payload: { siteId: SITE, contentId: id, version: 1 } }]);
   });
 
   it('o ator do gerador recebe forbidden ao aprovar e ao publicar', async () => {

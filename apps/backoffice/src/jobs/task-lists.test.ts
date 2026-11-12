@@ -9,6 +9,7 @@ import { resolveModel } from '../domain/generation/generate.ts';
 import type { ObjectStore } from '../domain/media/store.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
+import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
 import type { ZoneChecker } from '../lib/cloudflare.ts';
 import { buildRunnerTasks, WORKER_CRONTAB, workerTasks } from './task-lists.ts';
 
@@ -46,6 +47,19 @@ describe('backoffice-worker', () => {
     expect(Object.keys(tasks)).toContain('heartbeat');
     expect(tasks[CHECK_SITE_INFRA_TASK]).toBeTypeOf('function');
   });
+
+  it('registra a checagem de links externos no worker, que tem saída para a internet', () => {
+    const tasks = workerTasks({
+      db: {} as Db,
+      store: {} as ObjectStore,
+      generation: { model: resolveModel('fixture'), pricing: {} },
+      api: { url: 'http://backoffice-web:3000', token: 'g'.repeat(32) },
+      zones: {} as ZoneChecker,
+    });
+
+    expect(LINK_CHECK_TASK).toBe('check-content-links');
+    expect(tasks[LINK_CHECK_TASK]).toBeTypeOf('function');
+  });
 });
 
 describe('build-runner', () => {
@@ -77,5 +91,6 @@ describe('build-runner', () => {
     expect(Object.keys(worker)).not.toContain(CHECK_RELEASE_IMAGE_TASK);
     expect(Object.keys(worker)).not.toContain(RELEASE_RUN_TASK);
     expect(Object.keys(worker)).not.toContain(RECONCILE_PREVIEW_TASK);
+    expect(Object.keys(runner)).not.toContain(LINK_CHECK_TASK);
   });
 });
