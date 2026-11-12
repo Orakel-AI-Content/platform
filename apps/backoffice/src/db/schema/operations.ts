@@ -31,6 +31,7 @@ export const pendingChanges = pgTable('pending_changes', {
 
 /** Tipo da execução: o build do site ou a reversão para uma versão já publicada. */
 export const BUILD_KINDS = ['build', 'rollback'] as const;
+export type BuildKind = (typeof BUILD_KINDS)[number];
 /**
  * Estados da execução. `na_fila` e `rodando` são linhas abertas (sem `finishedAt`); `ok`,
  * `failed` e `cancelado` são fechadas. `ok` e `failed` são os valores gravados desde a L3.

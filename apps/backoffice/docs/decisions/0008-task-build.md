@@ -59,6 +59,16 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
   (`greatest(now, run_at) + exp(least(attempts, 10))` s, `retryRunAt`), sem ler a fila; na
   última tentativa, não abre. `release` aceita nulo enquanto a linha está `na_fila`: a tag
   padrão só existe no build-runner e a release é a que o plano usa ao promover.
+- **Rollback como execução (#632):** o "Reverter" grava, na transação do `add_job` do
+  `rollback` (`scheduleRollback`), a linha `kind = rollback` `na_fila` com `requested_by` = o
+  e-mail de quem pediu e `version_id` = a versão de destino, desde a fila. A task `rollback`
+  segue o mesmo ciclo do build e as mesmas funções (`startBuild`, `cancelQueuedBuild`,
+  `queueRetry`, por tipo): promove a linha a `rodando`, `recordRollback` a fecha como `ok`
+  (ativando a versão na mesma transação) ou `failed` com `failure_kind`/`failure_message` e
+  `failed_stage` nulo (um único container, sem etapa), e a transitória abre a tentativa
+  seguinte `na_fila` com o mesmo destino. A falha permanente não pausa o site. Sem tabela
+  própria nem coluna nova: as consultas de build já filtram `kind = build`, então uma linha de
+  rollback nunca vira versão do "Reverter", referência da trava ou último build.
 - **Falhas:** transitória lança e o Graphile Worker repete (até 5, backoff exponencial);
   permanente pausa o site com `<etapa>: <motivo>`; site pausado não é construído.
 - **Estado do site:** `src/domain/builds/site-state.ts` grava só colunas operacionais, sem
@@ -94,10 +104,11 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
 - **Recuperação na partida (#453):** o Graphile Worker só solta a trava de um worker morto
   depois de 4 h, e a fila `build:<site>` deixaria o site sem build até lá. Antes do `run()`, o
   `build-runner` chama `recoverInterruptedBuilds` (`src/domain/builds/recover.ts`): a linha
-  `rodando` de cada job `build` travado (mesmo `job_id` e `attempt`) é fechada como
-  `failed`/`transient` ("build interrompido…"), sem inserir outra; só quando o processo morreu
-  antes de gravá-la a linha é inserida já fechada (com `started_at` = `locked_at`), e os donos das travas dos jobs `build` e das
-  filas `build:%` são liberados com `graphile_worker.force_unlock_workers`, numa transação. O
+  `rodando` de cada job `build` ou `rollback` travado (mesmo `job_id`, `attempt` e `kind`) é
+  fechada como `failed`/`transient` ("build interrompido…" ou "rollback interrompido…"), sem
+  inserir outra; só quando o processo morreu antes de gravá-la a linha é inserida já fechada
+  (com `started_at` = `locked_at` e, no rollback, a versão de destino da linha `na_fila` do
+  job), e os donos das travas dos jobs `build` e `rollback` e das filas `build:%` são liberados com `graphile_worker.force_unlock_workers`, numa transação. O
   job volta à fila com a tentativa já contada; a política de retry segue igual. Toda trava
   presente na partida é tratada como de um processo morto, o que só vale enquanto houver um
   `build-runner` por ambiente (dois em paralelo exigem rever esta decisão). Travas das outras

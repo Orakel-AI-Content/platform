@@ -39,10 +39,10 @@ function settingsFrom(env: Env, runner: BuildRunnerEnv): BuildSettings {
 await runProcess('build-runner', async (logger) => {
   const runner = getBuildRunnerEnv();
   const { pool, db } = getDb();
-  // Antes de pegar jobs: build de um runner que morreu no meio da tentativa vira falha
+  // Antes de pegar jobs: build ou rollback de um runner que morreu no meio da tentativa vira falha
   // transitória e a fila build:<site> é liberada (o Graphile Worker só a solta depois de 4 h).
   for (const build of await recoverInterruptedBuilds(db, runner.SITE_BUILDER_TAG)) {
-    logger.warn(build, `build de ${build.siteId} interrompido; fila liberada`);
+    logger.warn(build, `${build.kind} de ${build.siteId} interrompido; fila liberada`);
   }
   const worker = await run({
     pgPool: pool,

@@ -23,8 +23,16 @@ export function effectiveBuildWindowMs(siteSeconds: number | null): number {
   return siteSeconds === null ? processSettings().buildWindowMs : siteSeconds * 1000;
 }
 
-/** Job de build como o `add_job` o devolve: o mesmo job quando o pedido cai num já na fila. */
+/** Job como o `add_job` o devolve: o mesmo job quando o pedido de build cai num já na fila. */
 type QueuedJob = { id: string; attempts: number; runAt: Date };
+
+type AddedJob = { id: string; attempts: number; run_at: Date | string };
+
+function queuedJob(siteId: string, rows: AddedJob[]): QueuedJob {
+  const [job] = rows;
+  if (job === undefined) throw new Error(`Execução de ${siteId} não foi enfileirada`);
+  return { id: job.id, attempts: job.attempts, runAt: new Date(job.run_at) };
+}
 
 async function addBuildJob(
   tx: Executor,
@@ -32,7 +40,7 @@ async function addBuildJob(
   runAt: Date,
   mode: 'preserve_run_at' | 'replace',
 ): Promise<QueuedJob> {
-  const { rows } = await tx.execute<{ id: string; attempts: number; run_at: Date | string }>(sql`
+  const { rows } = await tx.execute<AddedJob>(sql`
     select id::text as id, attempts, run_at from graphile_worker.add_job(
       identifier => 'build',
       payload => ${JSON.stringify({ siteId })}::json,
@@ -42,34 +50,38 @@ async function addBuildJob(
       job_key => ${`build:${siteId}`},
       job_key_mode => ${mode}
     )`);
-  const [job] = rows;
-  if (job === undefined) throw new Error(`Build de ${siteId} não foi enfileirado`);
-  return { id: job.id, attempts: job.attempts, runAt: new Date(job.run_at) };
+  return queuedJob(siteId, rows);
 }
+
+/** Tipo da linha e, no rollback, a versão de destino. */
+export type QueuedRun = { kind: 'build' } | { kind: 'rollback'; versionId: string };
 
 /**
  * Grava a linha `na_fila` do job, ou atualiza a que ele já tem (índice único parcial em
  * `job_id`): pedidos que caem no mesmo job caem na mesma linha. `requestedBy` só troca quando
  * o pedido regrava o horário ("Publicar agora"); o agendamento automático mantém quem pediu.
+ * Sem `run`, a linha é de build.
  */
 export async function recordQueuedBuild(
   tx: Executor,
   siteId: string,
   job: QueuedJob,
   requestedBy: string,
-  options: { replaceRequester: boolean },
+  options: { replaceRequester: boolean; run?: QueuedRun },
 ): Promise<void> {
   const attempt = job.attempts + 1;
+  const run = options.run ?? { kind: 'build' };
   await tx
     .insert(builds)
     .values({
       siteId,
-      kind: 'build',
+      kind: run.kind,
       jobId: job.id,
       attempt,
       status: 'na_fila',
       requestedBy,
       scheduledFor: job.runAt,
+      ...(run.kind === 'rollback' && { versionId: run.versionId }),
     })
     .onConflictDoUpdate({
       target: builds.jobId,
@@ -157,7 +169,8 @@ export function retryRunAt(runAt: Date, attempts: number, now: Date): Date {
 export const ROLLBACK_TASK = 'rollback';
 
 /**
- * Enfileira o rollback do site para a versão pedida, para já. Mesma fila do build
+ * Enfileira o rollback do site para a versão pedida, para já, e grava a linha `na_fila` dele
+ * (tipo rollback, quem pediu, versão de destino) na mesma transação. Mesma fila do build
  * (`build:<site>`): os dois nunca rodam ao mesmo tempo. Sem `job_key`: o do build agruparia
  * ou substituiria o pedido.
  */
@@ -165,12 +178,17 @@ export async function scheduleRollback(
   tx: Executor,
   siteId: string,
   versionId: string,
+  requestedBy: string,
 ): Promise<void> {
-  await tx.execute(sql`
-    select graphile_worker.add_job(
+  const { rows } = await tx.execute<AddedJob>(sql`
+    select id::text as id, attempts, run_at from graphile_worker.add_job(
       identifier => ${ROLLBACK_TASK},
       payload => ${JSON.stringify({ siteId, versionId })}::json,
       queue_name => ${`build:${siteId}`},
       max_attempts => 5
     )`);
+  await recordQueuedBuild(tx, siteId, queuedJob(siteId, rows), requestedBy, {
+    replaceRequester: false,
+    run: { kind: 'rollback', versionId },
+  });
 }
