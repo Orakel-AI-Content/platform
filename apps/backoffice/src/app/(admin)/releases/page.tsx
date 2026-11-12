@@ -23,7 +23,7 @@ export const metadata = { title: 'Releases' };
  * Registro de versões do site-builder (#509), só para quem promove release (admin e operação): tag,
  * data de registro e estado do pipeline ao vivo, com "Tentar de novo" e "Descartar" (#665), e
  * "Gerar nova versão" (#664), com o próximo número de cada tipo calculado aqui sobre as tags
- * listadas (todas, as descartadas inclusive). Lista no padrão do template, como `/sites`: título, ação, toolbar e
+ * listadas (todas, as descartadas inclusive), e a versão em que a prévia está (#710). Lista no padrão do template, como `/sites`: título, ação, toolbar e
  * tabela no cartão.
  */
 export default async function ReleasesPage() {
@@ -52,6 +52,7 @@ export default async function ReleasesPage() {
           <ReleasesTable
             rows={snapshot.value.rows}
             inUse={snapshot.value.inUse}
+            preview={snapshot.value.preview}
             retry={retryReleaseAction}
             discard={discardReleaseAction}
             status={releasesStatusAction}
