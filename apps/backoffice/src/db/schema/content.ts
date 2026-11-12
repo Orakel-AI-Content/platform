@@ -181,7 +181,10 @@ export const reviews = pgTable('reviews', {
   version: integer().notNull(),
   /** E-mail de quem revisou. */
   reviewer: text().notNull(),
-  /** Chaves de `REVIEW_CHECKLIST` marcadas; vazio na devolução. */
+  /**
+   * Chaves de `REVIEW_CHECKLIST` marcadas; vazio na devolução. Linhas antigas guardam as chaves
+   * do checklist da época, inclusive as que saíram (ADR 0021), sem migração.
+   */
   checklist: jsonb().$type<string[]>().notNull(),
   decision: text({ enum: REVIEW_DECISIONS }).notNull().default('aprovado'),
   /** O que corrigir, na devolução; nulo na aprovação. */

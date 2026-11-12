@@ -21,9 +21,11 @@ import {
 } from './checks.ts';
 
 /**
- * Checklist da aprovação, fixo no código: RN-CON-02 (valor original, políticas de anúncios e
- * afiliados, descrição das imagens, visualização conferida) e P14 (imagens decorativas
- * marcadas). Aprovar exige todos os itens marcados.
+ * Checklist da aprovação, fixo no código: só as confirmações que dependem de julgamento humano
+ * (RN-CON-02: valor original, políticas de anúncios e afiliados, visualização conferida).
+ * Descrição das imagens (RN-CON-02) e imagens decorativas marcadas (P14) saíram: o schema do
+ * bloco de imagem as garante e a validação da release barra a aprovação (ADR 0021). Aprovar
+ * exige todos os itens marcados; chave fora desta lista, inclusive as que saíram, é recusada.
  */
 export const REVIEW_CHECKLIST = [
   {
@@ -34,12 +36,10 @@ export const REVIEW_CHECKLIST = [
     key: 'politicas_anuncios_afiliados',
     label: 'Conforme as políticas de conteúdo dos programas de anúncios e afiliados',
   },
-  { key: 'descricao_imagens', label: 'Descrição em todas as imagens de conteúdo' },
   {
     key: 'visualizacao_conferida',
     label: 'Visualização conferida: o conteúdo como vai ficar no site',
   },
-  { key: 'imagens_decorativas_marcadas', label: 'Imagens decorativas marcadas como tal' },
 ] as const;
 
 export type ReviewChecklistKey = (typeof REVIEW_CHECKLIST)[number]['key'];

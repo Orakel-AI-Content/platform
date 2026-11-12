@@ -159,6 +159,82 @@ describe('aprovar a versão em revisão', () => {
     expect(await db.select().from(reviews)).toEqual([]);
   });
 
+  it('o checklist tem só as três confirmações humanas; as chaves que saíram são recusadas', async () => {
+    const version = await draft(1);
+
+    expect(ALL).toEqual([
+      'valor_original',
+      'politicas_anuncios_afiliados',
+      'visualizacao_conferida',
+    ]);
+    for (const removed of ['descricao_imagens', 'imagens_decorativas_marcadas']) {
+      expect(await approve(1, version, [...ALL, removed])).toMatchObject({
+        ok: false,
+        issues: [{ code: 'review.checklist_incomplete', path: ['checklist'] }],
+      });
+    }
+    expect(await db.select().from(reviews)).toEqual([]);
+    expect(await approve(1, version, ALL)).toMatchObject({ ok: true });
+  });
+
+  it('imagem sem descrição continua impedindo a aprovação, pela validação da release', async () => {
+    const version = await draft(1);
+    const current = (await versions(1)).at(-1);
+    if (current === undefined) throw new Error('conteúdo 1 sem versão');
+    // Gravada direto: a edição já recusa a imagem sem alt; aqui a versão em revisão a carrega.
+    const image = {
+      n: 9999,
+      type: 'image',
+      mediaId: 1,
+    } as unknown as (typeof current.data.blocks)[number];
+    await db
+      .update(contentVersions)
+      .set({ data: { ...current.data, blocks: [...current.data.blocks, image] } })
+      .where(
+        and(
+          eq(contentVersions.siteId, SITE),
+          eq(contentVersions.contentId, 1),
+          eq(contentVersions.version, version),
+        ),
+      );
+
+    const result = await approve(1, version, ALL);
+
+    expect(result).toMatchObject({ ok: false });
+    expect(!result.ok && result.issues.some((issue) => issue.code.startsWith('schema.'))).toBe(
+      true,
+    );
+    expect(await db.select().from(reviews)).toEqual([]);
+    expect((await versions(1)).at(-1)?.status).toBe('em_revisao');
+  });
+
+  it('revisão gravada com os cinco itens antigos continua legível', async () => {
+    const version = await draft(1);
+    const legacy = [
+      'valor_original',
+      'politicas_anuncios_afiliados',
+      'descricao_imagens',
+      'visualizacao_conferida',
+      'imagens_decorativas_marcadas',
+    ];
+    await db.insert(reviews).values({
+      siteId: SITE,
+      contentId: 1,
+      version,
+      reviewer: 'revisor@orakel.local',
+      checklist: legacy,
+    });
+
+    const [row] = await db.select().from(reviews);
+    const listed = await listContentVersions(db, SYSTEM_ACTOR, SITE, 1);
+
+    expect(row?.checklist).toEqual(legacy);
+    if (!listed.ok) throw new Error(JSON.stringify(listed.issues));
+    expect(listed.value.find((v) => v.version === version)?.approval).toMatchObject({
+      reviewer: 'revisor@orakel.local',
+    });
+  });
+
   it('recusa versão que não é a mais recente e versão fora de em_revisao', async () => {
     const reviewed = await draft(1);
     await draft(1, false);
