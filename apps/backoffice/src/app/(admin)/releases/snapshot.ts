@@ -3,13 +3,15 @@ import type { Result } from '@orakel/content-model';
 import type { ReleasesSnapshot } from '@/components/releases/ReleasesTable.tsx';
 import type { Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
+import { readPreviewState } from '@/domain/preview/preview.ts';
 import { listReleases } from '@/domain/releases/releases.ts';
 import { listSites } from '@/domain/sites/sites.ts';
 
 /**
  * O que a lista de Releases mostra, lido pela página e pelo polling (`releasesStatusAction`): as
- * releases e as tags que algum site usa (`sites.release`), que escondem o "Descartar". Recusa
- * de permissão vem de `listReleases` (todo papel com `release.promote` tem `site.read`).
+ * releases, as tags que algum site usa (`sites.release`), que escondem o "Descartar", e o estado
+ * da prévia (#710). Recusa de permissão vem de `listReleases` (todo papel com `release.promote`
+ * tem `site.read`); o estado da prévia, que não checa permissão, só é lido depois dela.
  */
 export async function loadReleasesSnapshot(
   db: Executor,
@@ -22,5 +24,6 @@ export async function loadReleasesSnapshot(
   const inUse = new Set(
     sites.value.flatMap((site) => (site.release === null ? [] : [site.release])),
   );
-  return { ok: true, value: { rows: releases.value, inUse: [...inUse] } };
+  const preview = await readPreviewState(db);
+  return { ok: true, value: { rows: releases.value, inUse: [...inUse], preview } };
 }
