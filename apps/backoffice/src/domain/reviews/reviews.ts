@@ -344,21 +344,13 @@ async function approveThen(
   siteId: string,
   contentId: number,
   version: number,
-  checklist: readonly string[],
   publish: (savepoint: Executor) => Promise<Result<Omit<ApprovalOutcome, 'reviewId'>>>,
 ): Promise<Result<ApprovalOutcome>> {
   const allowed = requireRole(actor, 'content.publish');
   if (!allowed.ok) return allowed;
   try {
     return await tx.transaction(async (savepoint) => {
-      const approved = await approveVersion(
-        savepoint,
-        actor,
-        siteId,
-        contentId,
-        version,
-        checklist,
-      );
+      const approved = await approveVersion(savepoint, actor, siteId, contentId, version);
       if (!approved.ok) throw new DecisionAborted(approved.issues);
       const published = await publish(savepoint);
       if (!published.ok) throw new DecisionAborted(published.issues);
@@ -421,11 +413,10 @@ export async function approveAndPublish(
   siteId: string,
   contentId: number,
   version: number,
-  checklist: readonly string[],
   options: { now?: Date } = {},
 ): Promise<Result<ApprovalOutcome>> {
   const now = options.now ?? new Date();
-  return approveThen(tx, actor, siteId, contentId, version, checklist, async (savepoint) => {
+  return approveThen(tx, actor, siteId, contentId, version, async (savepoint) => {
     const published = await publishVersion(savepoint, actor, siteId, contentId, version, { now });
     if (published.ok) {
       return {
@@ -454,12 +445,11 @@ export async function approveAndSchedule(
   siteId: string,
   contentId: number,
   version: number,
-  checklist: readonly string[],
   at: Date,
   options: { now?: Date } = {},
 ): Promise<Result<ApprovalOutcome>> {
   const now = options.now ?? new Date();
-  return approveThen(tx, actor, siteId, contentId, version, checklist, async (savepoint) => {
+  return approveThen(tx, actor, siteId, contentId, version, async (savepoint) => {
     const scheduled = await schedulePublication(savepoint, actor, siteId, contentId, version, at, {
       now,
     });

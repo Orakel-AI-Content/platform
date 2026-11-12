@@ -3,7 +3,13 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { contentVersions, publications, reviews, sites } from '../../src/db/schema/index.ts';
+import {
+  contentVersions,
+  publications,
+  reviewConfirmations,
+  reviews,
+  sites,
+} from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import {
@@ -15,6 +21,11 @@ import {
 } from '../../src/domain/content/contents.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../../src/domain/publications/schedule.ts';
+import {
+  reviewConfirmations as readConfirmations,
+  setAllConfirmations,
+  setConfirmation,
+} from '../../src/domain/reviews/confirmations.ts';
 import {
   approveAndPublish,
   approveAndSchedule,
@@ -466,25 +477,19 @@ describe('aprovar e publicar ou agendar numa decisão só (#759)', () => {
     );
   }
 
-  const publishNow = (
-    contentId: number,
-    version: number,
-    checklist: readonly string[] = ALL,
-    actor = role('revisor'),
-  ) =>
-    db.transaction((tx) =>
-      approveAndPublish(tx, actor, SITE, contentId, version, checklist, { now: NOW }),
-    );
+  /** Nova versão em revisão, com as três confirmações gravadas pelo revisor. */
+  async function ready(contentId: number): Promise<number> {
+    const version = await draft(contentId);
+    await confirm(contentId, version);
+    return version;
+  }
 
-  const scheduleAt = (
-    contentId: number,
-    version: number,
-    when: Date,
-    checklist: readonly string[] = ALL,
-    actor = role('revisor'),
-  ) =>
+  const publishNow = (contentId: number, version: number, actor = role('revisor')) =>
+    db.transaction((tx) => approveAndPublish(tx, actor, SITE, contentId, version, { now: NOW }));
+
+  const scheduleAt = (contentId: number, version: number, when: Date, actor = role('revisor')) =>
     db.transaction((tx) =>
-      approveAndSchedule(tx, actor, SITE, contentId, version, checklist, when, { now: NOW }),
+      approveAndSchedule(tx, actor, SITE, contentId, version, when, { now: NOW }),
     );
 
   const publicationsOf = (contentId: number) =>
@@ -507,7 +512,7 @@ describe('aprovar e publicar ou agendar numa decisão só (#759)', () => {
   });
 
   it('com vaga no dia, publica: versão publicado, linha em publications e mudança pendente', async () => {
-    const version = await draft(1);
+    const version = await ready(1);
     const pending = await unresolvedPendingChangeIds(db, SITE);
 
     const result = await publishNow(1, version);
@@ -528,7 +533,7 @@ describe('aprovar e publicar ou agendar numa decisão só (#759)', () => {
   it('com o dia cheio, agenda no primeiro dia de São Paulo com vaga, no horário da decisão', async () => {
     await fillDay('2026-11-04', 2);
     await fillDay('2026-11-05', 2);
-    const version = await draft(1);
+    const version = await ready(1);
     const pending = await unresolvedPendingChangeIds(db, SITE);
     const expected = at('2026-11-06');
 
@@ -547,7 +552,7 @@ describe('aprovar e publicar ou agendar numa decisão só (#759)', () => {
   });
 
   it('agenda no horário escolhido; com o dia cheio, no próximo dia com vaga, no mesmo horário', async () => {
-    const free = await draft(1);
+    const free = await ready(1);
     expect(await scheduleAt(1, free, at('2026-11-06', '10:30'))).toMatchObject({
       ok: true,
       value: { outcome: 'scheduled', at: at('2026-11-06', '10:30'), overflowed: false },
@@ -555,7 +560,7 @@ describe('aprovar e publicar ou agendar numa decisão só (#759)', () => {
     expect((await versions(1)).find((v) => v.version === free)?.status).toBe('agendado');
 
     await fillDay('2026-11-07', 2);
-    const full = await draft(3);
+    const full = await ready(3);
     const result = await scheduleAt(3, full, at('2026-11-07', '10:30'));
 
     expect(result).toMatchObject({
@@ -576,10 +581,12 @@ describe('aprovar e publicar ou agendar numa decisão só (#759)', () => {
     });
 
     const version = await draft(3);
-    expect(await publishNow(3, version, ALL.slice(1))).toMatchObject({
+    await confirm(3, version, ALL.slice(1));
+    expect(await publishNow(3, version)).toMatchObject({
       ok: false,
       issues: [{ code: 'review.checklist_incomplete' }],
     });
+    await confirm(3, version, ALL.slice(0, 1));
     expect(await scheduleAt(3, version, NOW)).toMatchObject({
       ok: false,
       issues: [{ code: 'publication.schedule_not_future' }],
@@ -608,7 +615,7 @@ describe('aprovar e publicar ou agendar numa decisão só (#759)', () => {
       new Date(Date.UTC(2026, 10, 4 + n)).toISOString().slice(0, 10),
     );
     for (const day of days) await fillDay(day, 1);
-    const version = await draft(1);
+    const version = await ready(1);
 
     expect(await publishNow(1, version)).toMatchObject({
       ok: false,
@@ -620,11 +627,11 @@ describe('aprovar e publicar ou agendar numa decisão só (#759)', () => {
   it.each(['editor', 'operacao'] as const)('%s não aprova e publica nem agenda', async (name) => {
     const version = await draft(1);
 
-    expect(await publishNow(1, version, ALL, role(name))).toMatchObject({
+    expect(await publishNow(1, version, role(name))).toMatchObject({
       ok: false,
       issues: [{ code: 'forbidden' }],
     });
-    expect(await scheduleAt(1, version, at('2026-11-06'), ALL, role(name))).toMatchObject({
+    expect(await scheduleAt(1, version, at('2026-11-06'), role(name))).toMatchObject({
       ok: false,
       issues: [{ code: 'forbidden' }],
     });
