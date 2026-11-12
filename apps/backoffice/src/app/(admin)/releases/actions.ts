@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
-import type { ReleasesSnapshot } from '@/components/releases/ReleasesTable.tsx';
+import type { ReleasesSnapshot } from '@/components/releases/useReleasesSnapshot.ts';
 import { getDb } from '@/db/client.ts';
 import type { ReleaseBump } from '@/domain/releases/next-version.ts';
 import { discardRelease, requestNewRelease, retryRelease } from '@/domain/releases/releases.ts';

@@ -1,6 +1,6 @@
 import type { Result } from '@orakel/content-model';
 
-import type { ReleasesSnapshot } from '@/components/releases/ReleasesTable.tsx';
+import type { ReleasesSnapshot } from '@/components/releases/useReleasesSnapshot.ts';
 import type { Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
 import { readPreviewState } from '@/domain/preview/preview.ts';

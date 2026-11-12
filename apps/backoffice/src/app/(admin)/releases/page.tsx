@@ -7,12 +7,7 @@ import { ListHeader } from '@/components/shared/PageHeader';
 import { getDb } from '@/db/client.ts';
 import { nextVersion } from '@/domain/releases/next-version.ts';
 
-import {
-  discardReleaseAction,
-  releasesStatusAction,
-  requestNewReleaseAction,
-  retryReleaseAction,
-} from './actions.ts';
+import { discardReleaseAction, requestNewReleaseAction, retryReleaseAction } from './actions.ts';
 import { loadReleasesSnapshot } from './snapshot.ts';
 
 export const dynamic = 'force-dynamic';
@@ -55,7 +50,6 @@ export default async function ReleasesPage() {
             preview={snapshot.value.preview}
             retry={retryReleaseAction}
             discard={discardReleaseAction}
-            status={releasesStatusAction}
             emptyAction={generate}
             labelledBy="releases-title"
           />

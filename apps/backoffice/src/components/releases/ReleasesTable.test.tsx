@@ -14,8 +14,8 @@ import { ReleasesTable } from './ReleasesTable.tsx';
 
 // Registro de releases (#509): tag e data no fuso da operação, a mais recente primeiro; busca
 // pela tag com o estado na URL (router.replace simulado); sem releases, o estado vazio. Estado
-// do pipeline, "Tentar de novo", "Descartar" e o polling enquanto há release no pipeline (#665).
-// Versão da prévia: a tag "Prévia", o aviso do estado e o polling enquanto ela atualiza (#710).
+// do pipeline, "Tentar de novo" e "Descartar" (#665). Versão da prévia: a tag "Prévia" e o aviso
+// do estado (#710). O polling é da tela (`useReleasesSnapshot.test.tsx`, #703).
 
 const navigation = vi.hoisted(() => {
   let search = '';
@@ -258,69 +258,6 @@ describe('ReleasesTable', () => {
     );
   });
 
-  it('com release gerando ou baixando, relê a lista até nenhuma ficar no pipeline', async () => {
-    vi.useFakeTimers();
-    const generating = [release({ tag: '3.0.0', pipelineState: 'gerando' })];
-    const status = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: [release({ tag: '3.0.0', pipelineState: 'baixando' })],
-        inUse: [],
-      })
-      .mockResolvedValueOnce({
-        rows: [release({ tag: '3.0.0', pipelineState: 'disponivel' })],
-        inUse: [],
-      });
-    render(<ReleasesTable rows={generating} status={status} pollMs={1000} />);
-    expect(stateOf('3.0.0')).toMatch(/^Gerando/);
-
-    await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(stateOf('3.0.0')).toMatch(/^Baixando/);
-
-    await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(stateOf('3.0.0')).toBe('Disponível');
-
-    await act(() => vi.advanceTimersByTimeAsync(5000));
-    expect(status).toHaveBeenCalledTimes(2);
-  });
-
-  it('sem release no pipeline, não relê a lista', async () => {
-    vi.useFakeTimers();
-    const status = vi.fn();
-    render(<ReleasesTable rows={rows} status={status} pollMs={1000} />);
-
-    await act(() => vi.advanceTimersByTimeAsync(5000));
-
-    expect(status).not.toHaveBeenCalled();
-  });
-
-  it('as linhas novas da página substituem as do polling', async () => {
-    vi.useFakeTimers();
-    const status = vi.fn().mockResolvedValue({
-      rows: [release({ tag: '3.0.0', pipelineState: 'baixando' })],
-      inUse: [],
-    });
-    const { rerender } = render(
-      <ReleasesTable
-        rows={[release({ tag: '3.0.0', pipelineState: 'gerando' })]}
-        status={status}
-        pollMs={1000}
-      />,
-    );
-    await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(stateOf('3.0.0')).toMatch(/^Baixando/);
-
-    rerender(
-      <ReleasesTable
-        rows={[release({ tag: '3.0.0', pipelineState: 'descartada' })]}
-        status={status}
-        pollMs={1000}
-      />,
-    );
-
-    expect(stateOf('3.0.0')).toBe('Descartada');
-  });
-
   it('sem releases, o estado vazio com a ação', () => {
     render(
       <ReleasesTable rows={[]} emptyAction={<button type="button">Gerar nova versão</button>} />,
@@ -387,51 +324,6 @@ describe('ReleasesTable', () => {
 
       expect(notice()).toBe('A prévia não tem versão: nenhuma release passou por um build ok.');
       expect(screen.getByText('Nenhuma release registrada.')).toBeTruthy();
-    });
-
-    it('atualizando, relê sem release no pipeline até a prévia ficar no ar', async () => {
-      vi.useFakeTimers();
-      const status = vi
-        .fn()
-        .mockResolvedValueOnce({
-          rows,
-          inUse: [],
-          preview: previewState({ status: 'atualizando', targetRelease: '1.10.0' }),
-        })
-        .mockResolvedValueOnce({
-          rows,
-          inUse: [],
-          preview: previewState({ currentRelease: '1.10.0' }),
-        });
-      render(
-        <ReleasesTable
-          rows={rows}
-          preview={previewState({ status: 'atualizando', targetRelease: '1.10.0' })}
-          status={status}
-          pollMs={1000}
-        />,
-      );
-      expect(notice()).toBe('Prévia atualizando para 1.10.0.');
-
-      await act(() => vi.advanceTimersByTimeAsync(1000));
-      expect(notice()).toBe('Prévia atualizando para 1.10.0.');
-
-      await act(() => vi.advanceTimersByTimeAsync(1000));
-      expect(notice()).toBe('');
-      expect(previewTags()).toEqual(['1.10.0Prévia']);
-
-      await act(() => vi.advanceTimersByTimeAsync(5000));
-      expect(status).toHaveBeenCalledTimes(2);
-    });
-
-    it('no ar e sem release no pipeline, não relê', async () => {
-      vi.useFakeTimers();
-      const status = vi.fn();
-      render(<ReleasesTable rows={rows} preview={previewState()} status={status} pollMs={1000} />);
-
-      await act(() => vi.advanceTimersByTimeAsync(5000));
-
-      expect(status).not.toHaveBeenCalled();
     });
   });
 });
