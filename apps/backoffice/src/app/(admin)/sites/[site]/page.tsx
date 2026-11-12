@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react';
-
 import { RedirectUsageAlert } from '@/components/sites/RedirectUsageAlert';
 import { SiteContentMetrics } from '@/components/sites/SiteContentMetrics';
 import {
@@ -9,7 +7,7 @@ import {
   RegisterG1Form,
 } from '@/components/sites/SiteActions';
 import { formatDateTime, formatDuration } from '@/components/shared/siteLabels.ts';
-import { SiteOperations, SiteOperationsScope } from '@/components/sites/SiteOperations';
+import { SiteOperationButton, SiteOperationsScope } from '@/components/sites/SiteOperations';
 import { SitePublicationTab } from '@/components/sites/SitePublicationTab';
 import { SiteSummaryCard } from '@/components/sites/SiteSummaryCard';
 import { SiteTabs } from '@/components/sites/SiteTabs';
@@ -44,12 +42,13 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Página do site na tela de detalhe do guia (#370), no layout do `CustomerDetails` do Ecme
- * (#595): no cabeçalho, "Editar configuração" (site.configure) e as ações de operação
- * (operations.run): "Publicar agora" ou, pausado, "Retomar", e o "Mais ações" com "Reconstruir
- * na release" e "Reverter", com o erro logo abaixo do cabeçalho. Embaixo, o resumo só com o
+ * (#595): no cabeçalho, só "Editar configuração" (site.configure). Embaixo, o resumo só com o
  * estado atual à esquerda e, à direita, o `Card` com as abas Publicação (o painel de etapas e,
  * embaixo, a atividade do site com o status ao vivo, para todos os perfis, #637, #638, #647), G1,
- * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). Lê o site pelo
+ * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). As ações de operação
+ * (operations.run, #648) ficam nas etapas do painel: "Reconstruir na release" na Versão,
+ * "Publicar agora" na Build, "Escolher outra versão" na No ar e, pausado, "Retomar" na linha
+ * Site, com a recusa logo abaixo do painel. Lê o site pelo
  * sitePageContext (a mesma busca do layout), os gatilhos e o uso de redirects, que vira um aviso
  * acima do resumo quando o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do
  * limite só aparecem com site.configure, e o domínio confere de novo.
@@ -139,47 +138,46 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
       Editar configuração
     </ButtonLink>
   ) : undefined;
-  const header = (action?: ReactNode) => (
-    <PageHeader id="site-title" trail={siteTrail(site)} title={site.name} action={action} />
+  const publication = (
+    <SitePublicationTab
+      site={{
+        lifecycle: site.lifecycle,
+        release: site.release,
+        activeVersionId: site.activeVersionId,
+        state: site.state,
+        pausedReason: site.pausedReason,
+        timeZone: site.timeZone,
+      }}
+      instance={{
+        activePages: instance.value.activePages,
+        activeSince: instance.value.activeSince,
+      }}
+      activity={activity.value}
+      status={siteActivityAction.bind(null, site.id)}
+      lifecycleAction={
+        canConfigure ? (
+          <LifecycleAction
+            lifecycle={site.lifecycle}
+            action={advanceLifecycleAction.bind(null, site.id)}
+          />
+        ) : undefined
+      }
+      actions={
+        canOperate
+          ? {
+              versao: <SiteOperationButton operation="rebuild" />,
+              build: <SiteOperationButton operation="publish" />,
+              no_ar: <SiteOperationButton operation="rollback" />,
+              site: <SiteOperationButton operation="resume" />,
+            }
+          : undefined
+      }
+    />
   );
 
   return (
     <section aria-labelledby="site-title" className="list-width space-y-4">
-      {canOperate ? (
-        <SiteOperationsScope>
-          {header(
-            <>
-              {edit}
-              <SiteOperations
-                siteId={site.id}
-                paused={site.state === 'pausado'}
-                release={site.release}
-                timeZone={site.timeZone}
-                publish={publishNow}
-                resume={resumeSiteAction}
-                rebuild={
-                  releases?.ok
-                    ? {
-                        releases: releases.value.map(({ tag, imageStatus }) => ({
-                          tag,
-                          imageStatus,
-                        })),
-                        action: rebuildOnReleaseAction.bind(null, site.id),
-                      }
-                    : undefined
-                }
-                rollback={
-                  versions?.ok
-                    ? { versions: versions.value, action: rollbackSiteAction.bind(null, site.id) }
-                    : undefined
-                }
-              />
-            </>,
-          )}
-        </SiteOperationsScope>
-      ) : (
-        header(edit)
-      )}
+      <PageHeader id="site-title" trail={siteTrail(site)} title={site.name} action={edit} />
       {redirects.ok && redirects.value.alert && <RedirectUsageAlert usage={redirects.value} />}
       <DetailLayout>
         <SiteSummaryCard site={site} instance={instance.value} g1Registered={g1 !== undefined} />
@@ -195,30 +193,36 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
           />
           <SiteTabs
             publication={
-              <SitePublicationTab
-                site={{
-                  lifecycle: site.lifecycle,
-                  release: site.release,
-                  activeVersionId: site.activeVersionId,
-                  state: site.state,
-                  pausedReason: site.pausedReason,
-                  timeZone: site.timeZone,
-                }}
-                instance={{
-                  activePages: instance.value.activePages,
-                  activeSince: instance.value.activeSince,
-                }}
-                activity={activity.value}
-                status={siteActivityAction.bind(null, site.id)}
-                lifecycleAction={
-                  canConfigure ? (
-                    <LifecycleAction
-                      lifecycle={site.lifecycle}
-                      action={advanceLifecycleAction.bind(null, site.id)}
-                    />
-                  ) : undefined
-                }
-              />
+              canOperate ? (
+                <SiteOperationsScope
+                  siteId={site.id}
+                  paused={site.state === 'pausado'}
+                  release={site.release}
+                  timeZone={site.timeZone}
+                  publish={publishNow}
+                  resume={resumeSiteAction}
+                  rebuild={
+                    releases?.ok
+                      ? {
+                          releases: releases.value.map(({ tag, imageStatus }) => ({
+                            tag,
+                            imageStatus,
+                          })),
+                          action: rebuildOnReleaseAction.bind(null, site.id),
+                        }
+                      : undefined
+                  }
+                  rollback={
+                    versions?.ok
+                      ? { versions: versions.value, action: rollbackSiteAction.bind(null, site.id) }
+                      : undefined
+                  }
+                >
+                  {publication}
+                </SiteOperationsScope>
+              ) : (
+                publication
+              )
             }
             g1={
               !g1 && canConfigure ? (

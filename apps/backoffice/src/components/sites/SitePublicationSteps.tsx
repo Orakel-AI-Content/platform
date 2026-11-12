@@ -23,6 +23,9 @@ export type PublicationSite = Pick<
 
 export type PublicationInstance = Pick<SiteInstance, 'activePages' | 'activeSince'>;
 
+/** A ação de cada etapa, abaixo do estado (#648); a de Infra e zona vem em `lifecycleAction`. */
+export type PublicationStepActions = Partial<Record<Exclude<PublicationStep, 'infra'>, ReactNode>>;
+
 type Step = { status: StepStatus; text: ReactNode };
 
 /** O último build terminado, no histórico (do mais recente ao mais antigo). */
@@ -100,17 +103,21 @@ function currentIndex(byStep: Record<PublicationStep, Step>, open: boolean): num
  * genérico ("concluída", "atual", "pendente", "com erro") em `sr-only`, sem repetir o texto.
  * A etapa Build segue a atividade que a aba relê durante uma execução (`SiteLiveActivity`):
  * "na fila" com o horário previsto, em andamento com a etapa ou o resultado do último build.
+ * As ações de operação (#648) vêm prontas em `actions`, uma por etapa, abaixo do estado, como o
+ * "Marcar…" de Infra e zona; o painel só as posiciona.
  */
 export function SitePublicationSteps({
   site,
   instance,
   activity,
   lifecycleAction,
+  actions = {},
 }: {
   site: PublicationSite;
   instance: PublicationInstance;
   activity: SiteActivity;
   lifecycleAction?: ReactNode;
+  actions?: PublicationStepActions;
 }) {
   const byStep = steps(site, instance, activity, lifecycleAction);
   return (
@@ -119,14 +126,22 @@ export function SitePublicationSteps({
       aria-label="Etapas da publicação"
       current={currentIndex(byStep, activity.open !== null)}
     >
-      {PUBLICATION_STEPS.map((step) => (
-        <Steps.Item
-          key={step}
-          status={byStep[step].status}
-          title={PUBLICATION_STEP_LABEL[step]}
-          description={<span className="block text-sm">{byStep[step].text}</span>}
-        />
-      ))}
+      {PUBLICATION_STEPS.map((step) => {
+        const action = step === 'infra' ? undefined : actions[step];
+        return (
+          <Steps.Item
+            key={step}
+            status={byStep[step].status}
+            title={PUBLICATION_STEP_LABEL[step]}
+            description={
+              <span className="block text-sm">
+                <span className="block">{byStep[step].text}</span>
+                {action && <span className="mt-2 block">{action}</span>}
+              </span>
+            }
+          />
+        );
+      })}
     </Steps>
   );
 }

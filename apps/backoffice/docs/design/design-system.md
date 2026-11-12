@@ -485,14 +485,16 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   (`grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-y-7 gap-x-4`); no diálogo da mídia (uma
   coluna) e nos "Dados" da versão, o padrão do `InfoList` (`gap-4`). Nunca a grade
   `grid-cols-[auto_1fr]`, que estoura a 375 px.
-- **Página do site** (#595): no cabeçalho, além de "Editar configuração", as ações de operação
-  (`SiteOperations`, `src/components/sites/SiteOperations.tsx`, só com operations.run): o botão
-  principal "Publicar agora" (no site pausado, "Retomar") e o `Dropdown` "Mais ações" com
-  "Reconstruir na release" (só com a lista de releases) e "Reverter" (só com a de versões),
-  como o `MoreActions` da lista de sites. Cada gatilho abre o diálogo de confirmação dele,
-  separado do botão (`isOpen`/`onCancel`/`onConfirm`/`onAfterClose`, como o
-  `PublishNowDialog`), e o foco volta ao gatilho. O sucesso vai ao toast e a recusa ao
-  `ActionAlert` logo abaixo do cabeçalho (`SiteOperationsScope`). O resumo
+- **Página do site** (#595): no cabeçalho, só "Editar configuração" (site.configure). As ações
+  de operação (`src/components/sites/SiteOperations.tsx`, só com operations.run) ficam nas
+  etapas da aba "Publicação" (#648), cada uma abaixo do estado da sua etapa (ver "Sequência de
+  etapas"). O `SiteOperationsScope`, em volta da aba, guarda o estado comum e monta uma vez o
+  diálogo de confirmação de cada ação, separado do botão
+  (`isOpen`/`onCancel`/`onConfirm`/`onAfterClose`, como o `PublishNowDialog`); cada etapa recebe
+  só o seu `SiteOperationButton` (`sm`, `dangerButtonClass`, o `siteId` em `sr-only` no nome), e
+  o foco volta a ele ao fechar. Uma ação de cada vez: enquanto uma está na fila, ela diz
+  ("Enfileirando…") e todos os botões ficam `aria-disabled`. O sucesso vai ao toast e a recusa
+  de qualquer uma ao `SiteOperationsAlert`, um `ActionAlert` só, logo abaixo do painel. O resumo
   (`SiteSummaryCard`) tem só o estado atual, sem botões: o domínio é link para
   `https://<domínio>` em nova aba, e "Mudanças pendentes" leva à tela de pendências quando
   passa de zero, com a divisão por origem embaixo, em duas colunas. Com os cartões de conteúdo
@@ -536,7 +538,12 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   A ação manual do ciclo de vida ("Marcar infra aplicada", "Marcar zona ativa") fica na
   `description` de Infra e zona (`LifecycleSteps`, com o texto do ciclo); sem `onChange`, as
   etapas não viram botões; o sucesso vai para o toast e o erro para o `ActionAlert` abaixo do
-  painel (`LifecycleActionScope`), que sobrevive à revalidação que troca o botão.
+  painel (`LifecycleActionScope`), que sobrevive à revalidação que troca o botão. As ações de
+  operação (#648) vêm prontas da página em `actions`, uma por etapa, abaixo do estado, como o
+  "Marcar…": "Reconstruir na release" na Versão (só com a lista de releases), "Publicar agora"
+  na Build (fora da pausa), "Escolher outra versão" na No ar (o "Reverter", só com a lista de
+  versões) e "Retomar" na linha Site (só pausado). Sem operations.run, o painel não tem botões
+  de operação e mostra os mesmos estados.
 
 ### Mídia
 
@@ -661,8 +668,11 @@ Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
   - "Remover" da mídia de um campo (capa, avatar);
   - "Remover link" do rich text: o popover fecha antes de abrir o diálogo;
   - "Descartar" do formulário de tela na criação (ver "Formulário");
-  - **ações que afetam o site publicado:** só "Publicar agora" (lista e página do site), que
-    muda o site no ar sem esperar a janela de agrupamento. Salvar configuração ou conteúdo,
+  - **ações que afetam o site publicado:** "Publicar agora" (lista e etapa Build da página do
+    site), que muda o site no ar sem esperar a janela de agrupamento; "Reconstruir na release"
+    (etapa Versão), que troca a release e enfileira um build; "Escolher outra versão" (etapa No
+    ar), que reverte o site no ar para uma versão anterior; e "Retomar" (linha Site), que tira o
+    site da pausa e enfileira o próximo build. Salvar configuração ou conteúdo,
     aprovar na revisão, as etapas do ciclo de vida, o G1 e a janela não confirmam: passam pela
     janela ou não mudam o que está no ar.
 

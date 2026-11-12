@@ -94,8 +94,17 @@ test(
 
     // Espera a página hidratar: um clique antes disso não chega ao onClick.
     await page.waitForLoadState('networkidle');
+    // As ações de operação ficam nas etapas da aba Publicação (#648), não no cabeçalho.
+    await expect(page.getByRole('button', { name: 'Mais ações: exemplo-a' })).toHaveCount(0);
+    const steps = page.getByRole('list', { name: 'Etapas da publicação' });
+    await expect(
+      steps.getByRole('listitem').filter({ hasText: 'No ar' }).getByRole('button'),
+    ).toHaveAccessibleName('Escolher outra versão exemplo-a');
     // Confirma num diálogo (#327): Cancelar não publica.
-    const publish = page.getByRole('button', { name: 'Publicar agora exemplo-a' });
+    const publish = steps
+      .getByRole('listitem')
+      .filter({ hasText: 'Build' })
+      .getByRole('button', { name: 'Publicar agora exemplo-a' });
     const dialog = page.getByRole('alertdialog', { name: 'Publicar exemplo-a agora?' });
     await publish.click();
     await dialog.getByRole('button', { name: 'Cancelar' }).click();
