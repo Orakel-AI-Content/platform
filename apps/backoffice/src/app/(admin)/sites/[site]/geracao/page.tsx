@@ -9,7 +9,7 @@ import { currentEditorialContext } from '@/domain/generation/editorial-contexts.
 import { listGenerationRuns } from '@/domain/generation/runs.ts';
 
 import { readAuthors, sitePageContext } from '../editorial-page.tsx';
-import { enqueueGenerationAction } from './actions.ts';
+import { enqueueGenerationAction, generationRunsAction } from './actions.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,7 @@ export const metadata = { title: 'Geração' };
  * Geração de artigos do site (R1, R5): o disparo, um tema por vez, acima da lista das
  * execuções com o custo. Ver exige site.read; disparar, content.write (o formulário só aparece
  * com ela, e o domínio confere de novo; sem contexto editorial, o aviso aparece para todos). A
- * lista não se atualiza sozinha: quem dispara recarrega.
+ * lista se relê sozinha enquanto há execução pendente (#779), e a concluída leva à revisão.
  */
 export default async function GenerationPage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
@@ -62,6 +62,7 @@ export default async function GenerationPage({ params }: { params: Promise<{ sit
             rows={runs.value}
             hasContext={current !== undefined}
             labelledBy="generation-runs-title"
+            status={generationRunsAction.bind(null, site.id)}
           />
         </section>
       </AdaptiveCard>
