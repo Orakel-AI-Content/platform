@@ -14,11 +14,11 @@ import {
 import { renderUi } from '../../../test/browser/render.tsx';
 
 // Cabeçalho de página e peças de estado em Chromium (#459; da vitrine, #388): a trilha nomeada
-// com o item atual em aria-current, as seis cores do StateTag, a etapa atual do ciclo com
-// aria-current="step" e a ação na etapa seguinte; por tema, o foco de 2px no --ring nos links e
+// com o item atual em aria-current, as seis cores do StateTag, o painel de etapas da aba
+// Publicação (#647) com a atual em aria-current="step" e a ação em Infra e zona; por tema, o foco de 2px no --ring nos links e
 // nas ações, e o axe em cada seção. A fixture é a seção da própria vitrine.
 
-const SECTIONS = ['PageHeader', 'StatusScreen', 'StateTag', 'LifecycleSteps'] as const;
+const SECTIONS = ['PageHeader', 'StatusScreen', 'StateTag', 'SitePublicationSteps'] as const;
 
 /** Põe o foco no h2 da seção, para o próximo Tab entrar nela. */
 function focusSection(region: Locator): void {
@@ -30,7 +30,7 @@ function focusSection(region: Locator): void {
 const currentStep = (list: Element) => list.querySelector('[aria-current="step"]')?.textContent;
 
 describe('cabeçalho e estados no navegador', () => {
-  it('trilha, status em seis cores e ciclo com a etapa atual', async () => {
+  it('trilha, status em seis cores e etapas com a atual', async () => {
     const screen = await renderUi(<StatesShowcase />);
 
     const header = screen.getByRole('region', { name: 'PageHeader' });
@@ -74,19 +74,16 @@ describe('cabeçalho e estados no navegador', () => {
     );
     expect(new Set(dots).size).toBe(7);
 
-    const steps = screen.getByRole('region', { name: 'LifecycleSteps' });
-    const [withAction, done] = steps.getByRole('list').elements();
-    expect(currentStep(withAction!)).toContain('Infra aplicada');
+    const steps = screen.getByRole('region', { name: 'SitePublicationSteps' });
+    const [withAction, running] = steps.getByRole('list').elements();
+    expect(currentStep(withAction!)).toContain('Infra e zona');
     expect(withAction!.querySelectorAll('button')).toHaveLength(1);
-    expect(currentStep(done!)).toContain('Publicado');
-    expect(done!.querySelectorAll('button')).toHaveLength(0);
+    expect(currentStep(running!)).toContain('Build');
+    expect(running!.querySelectorAll('button')).toHaveLength(0);
 
-    // A ação avança a etapa até a última, onde some.
-    const advance = steps.getByRole('button', { name: 'Avançar etapa' });
-    await advance.click();
-    await expect.poll(() => currentStep(withAction!)).toContain('Zona ativa');
-    await advance.click();
-    await expect.poll(() => currentStep(withAction!)).toContain('Publicado');
+    // A ação conclui Infra e zona e some; a atual passa à primeira etapa não concluída.
+    await steps.getByRole('button', { name: 'Avançar etapa' }).click();
+    await expect.poll(() => currentStep(withAction!)).toContain('Build');
     expect(steps.getByRole('button').elements()).toHaveLength(0);
   });
 });
@@ -113,16 +110,14 @@ describe.each(COLOR_SCHEMES)('cabeçalho e estados no navegador (%s)', (scheme) 
     await expect.element(back).toHaveFocus();
     expect(outline(back)).toEqual(focusRing());
 
-    const steps = region('LifecycleSteps');
+    const steps = region('SitePublicationSteps');
     const advance = steps.getByRole('button', { name: 'Avançar etapa' });
     focusSection(steps);
     await userEvent.keyboard('{Tab}');
     await expect.element(advance).toHaveFocus();
     expect(outline(advance)).toEqual(focusRing());
     await userEvent.keyboard('{Enter}');
-    await expect
-      .poll(() => currentStep(steps.getByRole('list').elements()[0]!))
-      .toContain('Zona ativa');
+    await expect.poll(() => currentStep(steps.getByRole('list').elements()[0]!)).toContain('Build');
 
     for (const name of SECTIONS) {
       expect(await audit(region(name)), name).toEqual([]);
