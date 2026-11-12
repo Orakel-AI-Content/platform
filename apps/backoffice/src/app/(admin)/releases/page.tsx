@@ -1,9 +1,8 @@
 import { currentActor } from '@/auth/request-actor.ts';
 import { NewReleaseDialog } from '@/components/releases/NewReleaseDialog';
-import { ReleasesTable } from '@/components/releases/ReleasesTable';
+import { ReleasesView } from '@/components/releases/ReleasesView';
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { backToSites, ForbiddenScreen } from '@/components/shared/ForbiddenScreen';
-import { ListHeader } from '@/components/shared/PageHeader';
 import { getDb } from '@/db/client.ts';
 import { nextVersion } from '@/domain/releases/next-version.ts';
 
@@ -12,6 +11,7 @@ import {
   releasesStatusAction,
   requestNewReleaseAction,
   retryReleaseAction,
+  startRolloutAction,
 } from './actions.ts';
 import { loadReleasesSnapshot } from './snapshot.ts';
 
@@ -23,8 +23,10 @@ export const metadata = { title: 'Releases' };
  * Registro de versões do site-builder (#509), só para quem promove release (admin e operação): tag,
  * data de registro e estado do pipeline ao vivo, com "Tentar de novo" e "Descartar" (#665), e
  * "Gerar nova versão" (#664), com o próximo número de cada tipo calculado aqui sobre as tags
- * listadas (todas, as descartadas inclusive), e a versão em que a prévia está (#710). Lista no padrão do template, como `/sites`: título, ação, toolbar e
- * tabela no cartão.
+ * listadas (todas, as descartadas inclusive), a versão em que a prévia está (#710) e
+ * "Atualizar todos os sites" com o cartão de progresso da última atualização (#703). Lista no
+ * padrão do template, como `/sites`: título, ações, cartão de progresso, toolbar e tabela no
+ * cartão, com um só polling (`ReleasesView`).
  */
 export default async function ReleasesPage() {
   const actor = await currentActor();
@@ -47,19 +49,15 @@ export default async function ReleasesPage() {
   return (
     <section aria-labelledby="releases-title" className="list-width space-y-4">
       <AdaptiveCard>
-        <div className="flex flex-col gap-4">
-          <ListHeader id="releases-title" title="Releases" action={generate} />
-          <ReleasesTable
-            rows={snapshot.value.rows}
-            inUse={snapshot.value.inUse}
-            preview={snapshot.value.preview}
-            retry={retryReleaseAction}
-            discard={discardReleaseAction}
-            status={releasesStatusAction}
-            emptyAction={generate}
-            labelledBy="releases-title"
-          />
-        </div>
+        <ReleasesView
+          snapshot={snapshot.value}
+          generate={generate}
+          startRollout={startRolloutAction}
+          retry={retryReleaseAction}
+          discard={discardReleaseAction}
+          status={releasesStatusAction}
+          titleId="releases-title"
+        />
       </AdaptiveCard>
     </section>
   );

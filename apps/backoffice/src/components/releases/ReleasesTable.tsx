@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, useTransition, type ReactNode } from 'react';
+import { useMemo, useState, useTransition, type ReactNode } from 'react';
 
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
@@ -15,7 +15,6 @@ import { formatDateTime, type StateTagColor } from '@/components/shared/siteLabe
 import { TwoLines } from '@/components/shared/TwoLines';
 import { useListTable } from '@/components/shared/useListTable';
 import type { ListConfig } from '@/components/shared/useListState.ts';
-import { usePolling } from '@/components/shared/usePolling.ts';
 import { StateTag } from '@/components/sites/SiteStatus';
 import Alert from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
@@ -40,23 +39,8 @@ const LIST: ListConfig = {
 /** Ação de uma linha sobre a release da tag ("Tentar de novo", "Descartar"). */
 export type ReleaseAction = (tag: string) => Promise<ActionResult>;
 
-/**
- * Releases, as tags que algum site usa e o estado da prévia: o que a página carrega e o polling
- * relê.
- */
-export type ReleasesSnapshot = { rows: ReleaseRecord[]; inUse: string[]; preview: PreviewState };
-
-/** Leitura do polling; `undefined` quando não deu para ler (o próximo tique tenta de novo). */
-export type ReleasesStatus = () => Promise<ReleasesSnapshot | undefined>;
-
-/** Intervalo do polling enquanto alguma release está no pipeline ou a prévia está atualizando. */
-export const RELEASES_POLL_MS = 3000;
-
 // Referência estável para o padrão: um `[]` novo a cada render trocaria as linhas sem parar.
 const NONE: string[] = [];
-
-/** Estados em que o pipeline anda sozinho: só com algum deles a lista se atualiza. */
-const IN_PIPELINE: ReadonlySet<ReleasePipelineState> = new Set(['gerando', 'baixando']);
 
 export const RELEASE_STATE_LABEL: Record<ReleasePipelineState, string> = {
   gerando: 'Gerando',
@@ -302,48 +286,14 @@ function columnsFor(
   ];
 }
 
-/** O que a tabela mostra; sem `preview` (a tabela sem a prévia), nem tag nem aviso. */
-type TableSnapshot = Omit<ReleasesSnapshot, 'preview'> & { preview: PreviewState | undefined };
-
-/**
- * Linhas da tabela e estado da prévia: os da página até o polling trazer outros. Quando a página
- * entrega dados novos (depois de `revalidatePath` de uma ação), eles substituem os do polling. O
- * polling só roda com alguma release em `gerando` ou `baixando` ou com a prévia `atualizando`.
- */
-function useReleasesSnapshot(
-  rows: ReleaseRecord[],
-  inUse: string[],
-  preview: PreviewState | undefined,
-  status: ReleasesStatus | undefined,
-  pollMs: number,
-): TableSnapshot {
-  const [source, setSource] = useState<TableSnapshot>({ rows, inUse, preview });
-  const [snapshot, setSnapshot] = useState<TableSnapshot>(source);
-  if (source.rows !== rows || source.inUse !== inUse || source.preview !== preview) {
-    const next = { rows, inUse, preview };
-    setSource(next);
-    setSnapshot(next);
-  }
-  const poll = useCallback(async () => {
-    const next = await status?.();
-    if (next !== undefined) setSnapshot(next);
-  }, [status]);
-  const active =
-    status !== undefined &&
-    (snapshot.preview?.status === 'atualizando' ||
-      snapshot.rows.some((release) => IN_PIPELINE.has(release.pipelineState)));
-  usePolling(active, poll, pollMs);
-  return snapshot;
-}
-
 /**
  * Registro de releases (#509): tag, data de registro e estado do pipeline que gera a versão
  * (#665), no DataTable do template, como as outras listas (busca, ordem e paginação no cliente,
  * estado na URL). Com `preview`, a release no ar na prévia ganha a tag "Prévia" e o topo, o aviso
- * do estado dela (#710). Com alguma release gerando ou baixando, ou com a prévia atualizando, a
- * lista se relê sozinha. Aviso da prévia, toolbar, erro
- * das ações e tabela vão no cartão da página, abaixo do `ListHeader`; o erro fica num Alert entre
- * a toolbar e a tabela, nunca na linha (#324). Sem releases, o estado vazio com a ação.
+ * do estado dela (#710). O polling é da tela (`useReleasesSnapshot`, #703): a tabela mostra o que
+ * recebe. Aviso da prévia, toolbar, erro das ações e tabela vão no cartão da página, abaixo do
+ * `ListHeader`; o erro fica num Alert entre a toolbar e a tabela, nunca na linha (#324). Sem
+ * releases, o estado vazio com a ação.
  */
 export function ReleasesTable({
   rows,
@@ -351,8 +301,6 @@ export function ReleasesTable({
   preview,
   retry,
   discard,
-  status,
-  pollMs = RELEASES_POLL_MS,
   emptyAction,
   labelledBy,
 }: {
@@ -365,36 +313,32 @@ export function ReleasesTable({
   retry?: ReleaseAction;
   /** Action de "Descartar". */
   discard?: ReleaseAction;
-  /** Leitura do polling; sem ela, a lista não se atualiza sozinha. */
-  status?: ReleasesStatus;
-  pollMs?: number;
   /** Ação principal da tela (gerar nova versão), repetida no estado vazio. */
   emptyAction?: ReactNode;
   /** Id do título da lista, que dá nome à tabela. */
   labelledBy?: string;
 }) {
-  const snapshot = useReleasesSnapshot(rows, inUse, preview, status, pollMs);
   const { error, report } = useActionResult();
   // O `report` muda a cada render; a referência estável não refaz as colunas por isso.
   const onResult = useCallbackRef(report);
-  const inUseSet = useMemo(() => new Set(snapshot.inUse), [snapshot.inUse]);
-  const previewRelease = snapshot.preview?.currentRelease ?? null;
+  const inUseSet = useMemo(() => new Set(inUse), [inUse]);
+  const previewRelease = preview?.currentRelease ?? null;
   const columns = useMemo(
     () => columnsFor({ retry, discard, inUse: inUseSet, onResult }, previewRelease),
     [retry, discard, inUseSet, onResult, previewRelease],
   );
-  const { list, tableProps } = useListTable({ config: LIST, columns, data: snapshot.rows });
-  if (snapshot.rows.length === 0) {
+  const { list, tableProps } = useListTable({ config: LIST, columns, data: rows });
+  if (rows.length === 0) {
     return (
       <>
-        <PreviewNotice preview={snapshot.preview} />
+        <PreviewNotice preview={preview} />
         <EmptyState action={emptyAction}>Nenhuma release registrada.</EmptyState>
       </>
     );
   }
   return (
     <>
-      <PreviewNotice preview={snapshot.preview} />
+      <PreviewNotice preview={preview} />
       <ListToolbar
         search={list.state.search}
         searchLabel="Buscar pela tag"
