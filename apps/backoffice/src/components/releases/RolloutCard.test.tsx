@@ -12,7 +12,8 @@ import { firstSiteId, RolloutButton, RolloutCard, rolloutProgress } from './Roll
 
 // "Atualizar todos os sites" (#703): o botão desabilitado sem release disponível ou com uma
 // atualização em andamento, a confirmação com a versão de destino e a recusa no diálogo; o
-// cartão com o estado de cada site, o primeiro marcado e os pausados à parte.
+// cartão com o estado de cada site, o primeiro marcado e os pausados à parte. "Interromper" (#704)
+// só em andamento, com a confirmação danger e a recusa no diálogo.
 
 const mocks = vi.hoisted(() => ({ pushSuccess: vi.fn() }));
 vi.mock('@/components/shared/ActionFeedback.tsx', async (importOriginal) => ({
@@ -114,7 +115,7 @@ describe('RolloutCard', () => {
       .map((item) => item.textContent);
 
   it('mostra versão, estado e "N de M", cada site com o estado e os pausados à parte', () => {
-    render(<RolloutCard rollout={sketch} />);
+    render(<RolloutCard rollout={sketch} interrupt={vi.fn()} />);
 
     expect(screen.getByRole('status', { name: 'Progresso da atualização' }).textContent).toBe(
       'Atualização para 1.5.0 · em andamento · 3 de 8',
@@ -135,6 +136,7 @@ describe('RolloutCard', () => {
   it('com um site em falha, a atualização falhou e o site aparece como falhou', () => {
     render(
       <RolloutCard
+        interrupt={vi.fn()}
         rollout={rollout(
           [site('site-a', 'atualizado'), site('site-b', 'falhou'), site('site-c', 'aguardando')],
           { state: 'falhou' },
@@ -151,6 +153,7 @@ describe('RolloutCard', () => {
   it('concluída, sem pausados, não mostra a linha dos não atualizados', () => {
     render(
       <RolloutCard
+        interrupt={vi.fn()}
         rollout={rollout([site('site-a', 'atualizado'), site('site-b', 'atualizado')], {
           state: 'concluida',
         })}
@@ -218,5 +221,84 @@ describe('RolloutButton', () => {
       'Já existe uma atualização de todos os sites em andamento',
     );
     expect(mocks.pushSuccess).not.toHaveBeenCalled();
+  });
+});
+
+describe('Interromper', () => {
+  const INTERRUPT_NAME = 'Interromper a atualização para a 1.5.0?';
+  const trigger = () => screen.getByRole('button', { name: 'Interromper' });
+
+  it.each(['concluida', 'falhou', 'interrompida'] as const)(
+    'com a atualização %s, não aparece',
+    (state) => {
+      render(
+        <RolloutCard
+          interrupt={vi.fn()}
+          rollout={rollout([site('site-a', 'atualizado')], { state })}
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Interromper' })).toBeNull();
+    },
+  );
+
+  it('em andamento, pede confirmação danger que explica o efeito; cancelar não chama a action', async () => {
+    const action = vi.fn();
+    render(<RolloutCard rollout={sketch} interrupt={action} />);
+
+    await userEvent.click(trigger());
+    const dialog = await screen.findByRole('alertdialog', { name: INTERRUPT_NAME });
+    expect(dialog.textContent).toContain(
+      'O site em andamento termina na versão 1.5.0 e nenhum outro começa.',
+    );
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(action).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  });
+
+  it('confirmado, chama a action, fecha e anuncia o sucesso', async () => {
+    const action = vi
+      .fn()
+      .mockResolvedValue({ ok: true, message: 'Atualização para 1.5.0 interrompida.' });
+    render(<RolloutCard rollout={sketch} interrupt={action} />);
+
+    await userEvent.click(trigger());
+    const dialog = await screen.findByRole('alertdialog', { name: INTERRUPT_NAME });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Interromper' }));
+
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(mocks.pushSuccess).toHaveBeenCalledWith('Atualização para 1.5.0 interrompida.');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+  });
+
+  it('interrompida no snapshot seguinte, o cartão mostra o estado e some o botão', () => {
+    const { rerender } = render(<RolloutCard rollout={sketch} interrupt={vi.fn()} />);
+    expect(trigger()).toBeTruthy();
+
+    rerender(<RolloutCard rollout={{ ...sketch, state: 'interrompida' }} interrupt={vi.fn()} />);
+
+    expect(screen.getByRole('status', { name: 'Progresso da atualização' }).textContent).toBe(
+      'Atualização para 1.5.0 · interrompida · 3 de 8',
+    );
+    expect(screen.queryByRole('button', { name: 'Interromper' })).toBeNull();
+  });
+
+  it('a recusa do domínio aparece no diálogo, que continua aberto', async () => {
+    const action = vi.fn().mockResolvedValue({
+      ok: false,
+      message: 'Não há atualização de todos os sites em andamento',
+    });
+    render(<RolloutCard rollout={sketch} interrupt={action} />);
+
+    await userEvent.click(trigger());
+    const dialog = await screen.findByRole('alertdialog', { name: INTERRUPT_NAME });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Interromper' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Não há atualização de todos os sites em andamento',
+    );
+    expect(mocks.pushSuccess).not.toHaveBeenCalled();
+    expect(screen.getByRole('alertdialog', { name: INTERRUPT_NAME })).toBeTruthy();
   });
 });

@@ -8,6 +8,7 @@ import { nextVersion } from '@/domain/releases/next-version.ts';
 
 import {
   discardReleaseAction,
+  interruptRolloutAction,
   releasesStatusAction,
   requestNewReleaseAction,
   retryReleaseAction,
@@ -53,6 +54,7 @@ export default async function ReleasesPage() {
           snapshot={snapshot.value}
           generate={generate}
           startRollout={startRolloutAction}
+          interruptRollout={interruptRolloutAction}
           retry={retryReleaseAction}
           discard={discardReleaseAction}
           status={releasesStatusAction}

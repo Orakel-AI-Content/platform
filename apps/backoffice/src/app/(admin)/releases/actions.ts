@@ -8,7 +8,7 @@ import type { ReleasesSnapshot } from '@/components/releases/useReleasesSnapshot
 import { getDb } from '@/db/client.ts';
 import type { ReleaseBump } from '@/domain/releases/next-version.ts';
 import { discardRelease, requestNewRelease, retryRelease } from '@/domain/releases/releases.ts';
-import { startRollout } from '@/domain/releases/rollout.ts';
+import { interruptRollout, startRollout } from '@/domain/releases/rollout.ts';
 
 import { loadReleasesSnapshot } from './snapshot.ts';
 
@@ -78,6 +78,28 @@ export async function startRolloutAction(): Promise<ActionResult> {
   return {
     ok: true,
     message: `Atualização para ${result.value.targetRelease} iniciada pelo primeiro site.`,
+  };
+}
+
+/**
+ * "Interromper" (#704): o domínio fecha a atualização em andamento como `interrompida`
+ * (`interruptRollout`); o site em andamento termina na versão nova e nenhum outro começa. Recusa
+ * (`rollout.not_open`) se ela já fechou, mesmo que a tela, defasada, tenha mostrado o botão.
+ */
+export async function interruptRolloutAction(): Promise<ActionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
+  const result = await getDb().db.transaction((tx) => interruptRollout(tx, actor.value));
+  if (!result.ok) {
+    return {
+      ok: false,
+      message: result.issues[0]?.message ?? 'Não foi possível interromper a atualização.',
+    };
+  }
+  revalidatePath('/releases');
+  return {
+    ok: true,
+    message: `Atualização para ${result.value.targetRelease} interrompida.`,
   };
 }
 
