@@ -58,4 +58,23 @@ describe('linhas do banco → entidades do contrato', () => {
     };
     expect(toContent({ contentId: 5, data })).toEqual({ id: 5, ...data });
   });
+
+  it('data automática vira a primeira publicação; definida ou sem publicação fica (ADR 0022)', () => {
+    const data = {
+      kind: 'article' as const,
+      slug: 'guia',
+      title: 'Guia',
+      authorIds: [],
+      taxonomyIds: [],
+      publishedAt: '2026-09-01T10:00:00-03:00',
+      blocks: [{ n: 1, type: 'toc' as const }],
+    };
+    const first = new Date('2026-11-04T13:00:00Z');
+    const at = (publishedAtAuto: boolean, firstPublishedAt: Date | null) =>
+      toContent({ contentId: 6, data, publishedAtAuto, firstPublishedAt }).publishedAt;
+    expect(at(true, first)).toBe('2026-11-04T13:00:00.000Z');
+    expect(at(false, first)).toBe(data.publishedAt);
+    expect(at(true, null)).toBe(data.publishedAt);
+    expect(data.publishedAt).toBe('2026-09-01T10:00:00-03:00');
+  });
 });

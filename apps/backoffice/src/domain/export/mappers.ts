@@ -51,6 +51,20 @@ export function toRedirect(row: Row<typeof redirects>): Redirect {
   };
 }
 
-export function toContent(row: Pick<Row<typeof contentVersions>, 'contentId' | 'data'>): Content {
-  return { id: row.contentId, ...row.data };
+/**
+ * Conteúdo da versão. Com a data de publicação automática e alguma publicação, `publishedAt` é
+ * a primeira publicação do conteúdo (no agendado, o horário marcado); senão, a data da versão
+ * (ADR 0022). Os dados da versão continuam intactos (ADR 0015).
+ */
+export function toContent(
+  row: Pick<Row<typeof contentVersions>, 'contentId' | 'data'> &
+    Partial<Pick<Row<typeof contentVersions>, 'publishedAtAuto'>> & {
+      firstPublishedAt?: Date | null;
+    },
+): Content {
+  const content: Content = { id: row.contentId, ...row.data };
+  if (row.publishedAtAuto === true && row.firstPublishedAt != null) {
+    content.publishedAt = row.firstPublishedAt.toISOString();
+  }
+  return content;
 }

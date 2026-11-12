@@ -1,6 +1,6 @@
 import type { Result } from '@orakel/content-model';
 import { SCHEMA_VERSION, type EndLine, type SnapshotLine } from '@orakel/content-model/v1';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import type { Db, Executor } from '../../db/client.ts';
 import {
@@ -9,6 +9,7 @@ import {
   media,
   mediaVariants,
   menus,
+  publications,
   redirects,
   taxonomies,
 } from '../../db/schema/index.ts';
@@ -112,12 +113,18 @@ export async function* snapshotLines(
 
   // Última versão de cada conteúdo na seleção (`published`: entre as de `LIVE_STATUSES`). O
   // despublicado sai depois do DISTINCT ON: filtrá-lo antes traria de volta a versão anterior
-  // à despublicação, nas duas seleções.
+  // à despublicação, nas duas seleções. A primeira publicação resolve a data automática
+  // (ADR 0022): o agendamento já grava a linha no horário marcado, e o cancelamento a remove.
   const versions = await tx
     .selectDistinctOn([contentVersions.contentId], {
       contentId: contentVersions.contentId,
       status: contentVersions.status,
       data: contentVersions.data,
+      publishedAtAuto: contentVersions.publishedAtAuto,
+      firstPublishedAt: sql<Date | null>`(
+        select min(p.published_at) from ${publications} p
+        where p.site_id = ${contentVersions.siteId} and p.content_id = ${contentVersions.contentId}
+      )`.mapWith(publications.publishedAt),
     })
     .from(contentVersions)
     .where(
