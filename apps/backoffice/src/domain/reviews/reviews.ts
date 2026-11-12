@@ -11,6 +11,12 @@ import {
   taxonomies,
 } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
+import {
+  nextPublicationSlot,
+  PUBLISH_SLOT_HORIZON_DAYS,
+  publishVersion,
+} from '../publications/publish.ts';
+import { schedulePublication } from '../publications/schedule.ts';
 import { listLiveContents, validateContentData } from '../content/contents.ts';
 import { currentConfig, resourcesFor } from '../sites/sites.ts';
 import {
@@ -283,6 +289,173 @@ export async function approveVersion(
   if (review === undefined) throw new Error('INSERT em reviews não devolveu o id');
   await setVersionStatus(tx, siteId, contentId, version, 'aprovado');
   return { ok: true, value: { reviewId: review.id } };
+}
+
+/**
+ * Desfecho da decisão do revisor (workspace#89): no ar agora ou agendado em `at`. `overflowed`
+ * diz que o dia pedido estava cheio e a publicação foi para a próxima vaga.
+ */
+export type ApprovalOutcome = {
+  reviewId: number;
+  publicationId: number;
+  outcome: 'published' | 'scheduled';
+  at: Date;
+  overflowed: boolean;
+};
+
+/** Interrompe o savepoint da decisão quando um passo é recusado: desfaz também a aprovação. */
+class DecisionAborted extends Error {
+  readonly issues: Issue[];
+
+  constructor(issues: Issue[]) {
+    super('Decisão do revisor interrompida');
+    this.issues = issues;
+  }
+}
+
+/**
+ * Aprova e, num savepoint, executa `publish`: qualquer recusa desfaz tudo, inclusive a
+ * aprovação, e volta como `Result`. O chamador confirma a transação mesmo com `ok: false`.
+ */
+async function approveThen(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  checklist: readonly string[],
+  publish: (savepoint: Executor) => Promise<Result<Omit<ApprovalOutcome, 'reviewId'>>>,
+): Promise<Result<ApprovalOutcome>> {
+  const allowed = requireRole(actor, 'content.publish');
+  if (!allowed.ok) return allowed;
+  try {
+    return await tx.transaction(async (savepoint) => {
+      const approved = await approveVersion(
+        savepoint,
+        actor,
+        siteId,
+        contentId,
+        version,
+        checklist,
+      );
+      if (!approved.ok) throw new DecisionAborted(approved.issues);
+      const published = await publish(savepoint);
+      if (!published.ok) throw new DecisionAborted(published.issues);
+      return {
+        ok: true as const,
+        value: { reviewId: approved.value.reviewId, ...published.value },
+      };
+    });
+  } catch (error) {
+    if (error instanceof DecisionAborted) return { ok: false, issues: error.issues };
+    throw error;
+  }
+}
+
+const isDailyLimit = (result: Result<unknown>): boolean =>
+  !result.ok && result.issues.some((issue) => issue.code === 'publication.daily_limit');
+
+/**
+ * Transbordo do limite diário: agenda na próxima vaga (`nextPublicationSlot`), no mesmo
+ * horário de `from`. Sem vaga no horizonte (inclusive com o limite `0`), `publication.no_slot`.
+ */
+async function scheduleOnNextSlot(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  from: Date,
+  now: Date,
+): Promise<Result<Omit<ApprovalOutcome, 'reviewId'>>> {
+  const at = await nextPublicationSlot(tx, siteId, from);
+  if (at === undefined) {
+    return refused(
+      'publication.no_slot',
+      `O site ${siteId} não tem vaga de publicação nos próximos ${PUBLISH_SLOT_HORIZON_DAYS} dias (dia de São Paulo)`,
+    );
+  }
+  const scheduled = await schedulePublication(tx, actor, siteId, contentId, version, at, { now });
+  if (!scheduled.ok) return scheduled;
+  return {
+    ok: true,
+    value: {
+      publicationId: scheduled.value.publicationId,
+      outcome: 'scheduled',
+      at,
+      overflowed: true,
+    },
+  };
+}
+
+/**
+ * Aprova e publica na hora, numa decisão só (workspace#89): `approveVersion` e depois
+ * `publishVersion`, duas transições (ADRs 0015 e 0017). Com o limite do dia de São Paulo
+ * atingido, agenda no primeiro dia seguinte com vaga, no mesmo horário de `now`. Qualquer
+ * recusa desfaz tudo, inclusive a aprovação.
+ */
+export async function approveAndPublish(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  checklist: readonly string[],
+  options: { now?: Date } = {},
+): Promise<Result<ApprovalOutcome>> {
+  const now = options.now ?? new Date();
+  return approveThen(tx, actor, siteId, contentId, version, checklist, async (savepoint) => {
+    const published = await publishVersion(savepoint, actor, siteId, contentId, version, { now });
+    if (published.ok) {
+      return {
+        ok: true,
+        value: {
+          publicationId: published.value.publicationId,
+          outcome: 'published',
+          at: now,
+          overflowed: false,
+        },
+      };
+    }
+    if (!isDailyLimit(published)) return published;
+    return scheduleOnNextSlot(savepoint, actor, siteId, contentId, version, now, now);
+  });
+}
+
+/**
+ * Aprova e agenda para `at`, numa decisão só (workspace#89): `approveVersion` e depois
+ * `schedulePublication`. Com o dia de São Paulo de `at` cheio, agenda no próximo dia com vaga,
+ * no mesmo horário de `at`. Qualquer recusa desfaz tudo, inclusive a aprovação.
+ */
+export async function approveAndSchedule(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  checklist: readonly string[],
+  at: Date,
+  options: { now?: Date } = {},
+): Promise<Result<ApprovalOutcome>> {
+  const now = options.now ?? new Date();
+  return approveThen(tx, actor, siteId, contentId, version, checklist, async (savepoint) => {
+    const scheduled = await schedulePublication(savepoint, actor, siteId, contentId, version, at, {
+      now,
+    });
+    if (scheduled.ok) {
+      return {
+        ok: true,
+        value: {
+          publicationId: scheduled.value.publicationId,
+          outcome: 'scheduled',
+          at,
+          overflowed: false,
+        },
+      };
+    }
+    if (!isDailyLimit(scheduled)) return scheduled;
+    return scheduleOnNextSlot(savepoint, actor, siteId, contentId, version, at, now);
+  });
 }
 
 /**
