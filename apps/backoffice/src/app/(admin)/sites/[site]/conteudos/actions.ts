@@ -19,26 +19,10 @@ import { cancelScheduledPublication, schedulePublication } from '@/domain/public
 import { unpublishContent, unpublishContents } from '@/domain/publications/unpublish.ts';
 import { resourcesFor } from '@/domain/sites/sites.ts';
 
+import { noSession, refused } from '../content-form-result.ts';
+
 // Ações do editor de conteúdo: permissão, validação e o `n` dos blocos ficam no domínio; a
 // validação usa os recursos da release do site (`resourcesFor`).
-
-/** Issues do domínio no formato serializável do editor (o `path` aponta o campo). */
-function refused(issues: readonly Issue[]): ContentFormResult {
-  return {
-    ok: false,
-    message: 'Não foi possível salvar o conteúdo.',
-    issues: issues.map((issue) => ({
-      path: issue.path.map((key) => (typeof key === 'number' ? key : String(key))),
-      message: issue.message,
-    })),
-  };
-}
-
-const noSession: ContentFormResult = {
-  ok: false,
-  message: 'Sessão inválida; entre de novo.',
-  issues: [],
-};
 
 /** Cria o conteúdo com a versão 1 em rascunho. */
 export async function createContentAction(

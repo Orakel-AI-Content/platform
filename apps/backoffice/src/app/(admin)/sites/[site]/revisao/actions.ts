@@ -3,13 +3,18 @@
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
+import type { ContentFormResult } from '@/components/contents/contentEditorValues.ts';
 import type { SchemaFormIssue } from '@/components/forms/SchemaForm';
 import type { FormActionResult } from '@/components/shared/actionResult.ts';
 import { getDb } from '@/db/client.ts';
+import { amendInReview, type ContentEdit } from '@/domain/content/contents.ts';
 import { setAllConfirmations, setConfirmation } from '@/domain/reviews/confirmations.ts';
 import { approveVersion, returnVersion } from '@/domain/reviews/reviews.ts';
+import { resourcesFor } from '@/domain/sites/sites.ts';
 
-// Ações da tela de revisão (#75, #598, #749): permissão, confirmações, comentário e validação da
+import { noSession, refused } from '../content-form-result.ts';
+
+// Ações da tela de revisão (#75, #598, #749, #751): permissão, confirmações, comentário e validação da
 // release ficam no domínio (confirmations.ts, approveVersion, returnVersion); aqui só a tradução
 // do Result para o painel.
 
@@ -126,6 +131,44 @@ export async function returnAction(
   }
   revalidateReview(siteId, contentId);
   return { ok: true, message: `Versão ${version} devolvida ao editor.` };
+}
+
+/**
+ * Corrige a versão que o revisor viu (#751): `amendInReview` grava a N+1 já em revisão e tira a
+ * vista da fila. O editor, no modo `amend`, volta à revisão no sucesso; a recusa (versão que
+ * saiu de revisão, permissão, validação) volta aos campos como na edição.
+ */
+export async function amendAction(
+  siteId: string,
+  contentId: number,
+  version: number,
+  input: ContentEdit,
+): Promise<ContentFormResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return noSession;
+  const result = await getDb().db.transaction(async (tx) =>
+    amendInReview(
+      tx,
+      actor.value,
+      siteId,
+      contentId,
+      version,
+      input,
+      await resourcesFor(tx, siteId),
+    ),
+  );
+  if (!result.ok) return refused(result.issues);
+  const { version: saved, created } = result.value;
+  if (!created) {
+    return {
+      ok: true,
+      message: `Nenhuma alteração; a versão ${saved} continua em revisão.`,
+      id: contentId,
+    };
+  }
+  revalidateReview(siteId, contentId);
+  revalidatePath(`/sites/${siteId}/conteudos`);
+  return { ok: true, message: `Correção salva na versão ${saved}.`, id: contentId };
 }
 
 /** A fila, a tela de revisão, o conteúdo e o editor mudam com a decisão. */
