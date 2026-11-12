@@ -10,8 +10,10 @@ import {
   activeBuild,
   lastBuilds,
   listRollbackVersions,
+  previousVersion,
   recentBuilds,
   requestRollback,
+  requestUndoLastPublish,
 } from '../../src/domain/builds/builds.ts';
 import { failedFile, fakeRuntime, rollbackOk } from '../../src/domain/builds/fake-runtime.ts';
 import type { FakeStage } from '../../src/domain/builds/fake-runtime.ts';
@@ -456,5 +458,120 @@ describe('reverter', () => {
       });
     }
     expect(await rollbackJobs()).toEqual([]);
+  });
+
+  describe('desfazer última publicação', () => {
+    // O beforeEach de cima publica OLDER (A) e depois CURRENT (B); B está no ar.
+    const older = {
+      versionId: OLDER,
+      release: 'local',
+      pages: 10,
+      finishedAt: new Date('2026-10-01T12:00:00Z'),
+    };
+
+    it('com A e depois B no ar, enfileira o rollback para A em nome de quem pediu', async () => {
+      expect(await previousVersion(db, operacao, 'exemplo-a')).toEqual({ ok: true, value: older });
+      expect(
+        await db.transaction((tx) => requestUndoLastPublish(tx, operacao, 'exemplo-a')),
+      ).toEqual({ ok: true, value: older });
+      expect(await rollbackJobs()).toEqual([
+        { queue_name: 'build:exemplo-a', payload: { siteId: 'exemplo-a', versionId: OLDER } },
+      ]);
+      expect(await rollbackRows()).toEqual([
+        expect.objectContaining({
+          kind: 'rollback',
+          status: 'na_fila',
+          versionId: OLDER,
+          requestedBy: REQUESTER,
+        }),
+      ]);
+    });
+
+    it('depois do rollback de B para A, a anterior é B, nunca a própria A', async () => {
+      await db.transaction((tx) => requestUndoLastPublish(tx, operacao, 'exemplo-a'));
+      const { rows } = await db.execute<{ id: string }>(sql`
+        select id::text from graphile_worker.jobs where task_identifier = 'rollback'`);
+      const fake = fakeRuntime({ rollback: { file: rollbackOk('exemplo-a', OLDER) } });
+      await createRollbackTask({ db, runtime: fake.runtime, settings })(
+        { siteId: 'exemplo-a', versionId: OLDER },
+        helpers(rows[0]?.id ?? ''),
+      );
+      expect((await site())?.activeVersionId).toBe(OLDER);
+
+      const previous = await previousVersion(db, operacao, 'exemplo-a');
+      expect(previous).toEqual({
+        ok: true,
+        value: {
+          versionId: CURRENT,
+          release: 'local',
+          pages: 10,
+          finishedAt: new Date('2026-10-20T12:00:00Z'),
+        },
+      });
+      expect(previous.ok && previous.value?.versionId).not.toBe(OLDER);
+    });
+
+    it('a anterior segue a ordem das idas ao ar, contando os rollbacks, e não a dos builds', async () => {
+      // Builds A, M e B; depois rollback para A e rollback para M: M no ar. Pela ordem dos
+      // builds a anterior seria B; pela das idas ao ar é A, que saiu do ar quando M voltou.
+      const MIDDLE = '20261010T120000Z-bbbbbbbb';
+      await build('exemplo-a', MIDDLE, '2026-10-10T12:00:00Z');
+      for (const [versionId, at] of [
+        [OLDER, '2026-10-25T12:00:00Z'],
+        [MIDDLE, '2026-10-26T12:00:00Z'],
+      ] as const) {
+        await db.insert(builds).values({
+          siteId: 'exemplo-a',
+          kind: 'rollback',
+          release: 'local',
+          attempt: 1,
+          status: 'ok',
+          versionId,
+          startedAt: new Date(at),
+          finishedAt: new Date(at),
+        });
+      }
+      await db.transaction((tx) => setActiveVersion(tx, 'exemplo-a', MIDDLE));
+      expect(await previousVersion(db, operacao, 'exemplo-a')).toEqual({ ok: true, value: older });
+    });
+
+    it.each([
+      ['só com a versão ativa publicada', true],
+      ['nunca publicado', false],
+    ])('site %s recusa com rollback.no_previous e não enfileira', async (_, published) => {
+      await db.delete(builds);
+      if (published) await build('exemplo-a', CURRENT, '2026-10-20T12:00:00Z');
+      else await db.update(sites).set({ activeVersionId: null }).where(eq(sites.id, 'exemplo-a'));
+      expect(await previousVersion(db, operacao, 'exemplo-a')).toEqual({ ok: true, value: null });
+      expect(
+        await db.transaction((tx) => requestUndoLastPublish(tx, operacao, 'exemplo-a')),
+      ).toMatchObject({ ok: false, issues: [{ code: 'rollback.no_previous' }] });
+      expect(await rollbackJobs()).toEqual([]);
+      expect(await rollbackRows()).toEqual([]);
+    });
+
+    it('recusa site inexistente', async () => {
+      expect(await previousVersion(db, operacao, 'nao-existe')).toMatchObject({
+        ok: false,
+        issues: [{ code: 'site.not_found' }],
+      });
+      expect(
+        await db.transaction((tx) => requestUndoLastPublish(tx, operacao, 'nao-existe')),
+      ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+    });
+
+    it('sem operations.run, a leitura e o pedido são recusados e nada é enfileirado', async () => {
+      for (const role of ['editor', 'revisor'] as const) {
+        const actor = { email: `${role}@orakel.local`, roles: [role] };
+        expect(await previousVersion(db, actor, 'exemplo-a')).toMatchObject({
+          ok: false,
+          issues: [{ code: 'forbidden' }],
+        });
+        expect(
+          await db.transaction((tx) => requestUndoLastPublish(tx, actor, 'exemplo-a')),
+        ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+      }
+      expect(await rollbackJobs()).toEqual([]);
+    });
   });
 });
