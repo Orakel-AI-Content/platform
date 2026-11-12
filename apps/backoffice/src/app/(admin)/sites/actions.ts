@@ -18,7 +18,7 @@ import {
 } from '@/components/sites/siteOperationForms.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
-import { requestBuildNow, requestRollback } from '@/domain/builds/builds.ts';
+import { cancelBuild, requestBuildNow, requestRollback } from '@/domain/builds/builds.ts';
 import {
   advanceLifecycle,
   pauseSiteManually,
@@ -89,10 +89,10 @@ export async function updateSiteConfigAction(
 }
 
 /** Ação operacional da página do site: o domínio decide, a resposta vira mensagem. */
-async function siteOperation(
+async function siteOperation<T>(
   siteId: string,
-  run: (tx: Executor, actor: Actor) => Promise<Result<void>>,
-  success: string,
+  run: (tx: Executor, actor: Actor) => Promise<Result<T>>,
+  success: string | ((value: T) => string),
 ): Promise<ActionResult> {
   const actor = await currentActor();
   if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
@@ -102,7 +102,7 @@ async function siteOperation(
   }
   revalidatePath('/sites');
   revalidatePath(`/sites/${siteId}`);
-  return { ok: true, message: success };
+  return { ok: true, message: typeof success === 'string' ? success : success(result.value) };
 }
 
 const STEP_LABEL: Record<ManualLifecycleStep, string> = {
@@ -164,6 +164,21 @@ export async function rollbackSiteAction(siteId: string, versionId: string): Pro
     siteId,
     (tx, actor) => requestRollback(tx, actor, siteId, versionId),
     `Rollback de ${siteId} para ${versionId} enfileirado.`,
+  );
+}
+
+/**
+ * "Cancelar" a publicação aberta do site: na fila, sai da fila; rodando, o pedido fica marcado
+ * para o build-runner. Papel, site e execução aberta são conferidos pelo domínio.
+ */
+export async function cancelBuildAction(siteId: string): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => cancelBuild(tx, actor, siteId),
+    (outcome) =>
+      outcome === 'cancelado'
+        ? `Publicação de ${siteId} cancelada.`
+        : `Cancelamento da publicação em andamento de ${siteId} pedido.`,
   );
 }
 

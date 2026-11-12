@@ -92,6 +92,13 @@ export const builds = pgTable(
     startedAt: timestamp({ withTimezone: true }),
     /** Nulo enquanto a linha está aberta (`builds_finished_check`). */
     finishedAt: timestamp({ withTimezone: true }),
+    /**
+     * Pedido de cancelamento ("Cancelar"): e-mail de quem pediu e quando. Na fila, a linha
+     * fecha `cancelado` na hora; rodando, continua `rodando` até o build-runner agir. Nulos no
+     * cancelamento do sistema (job ignorado por site pausado).
+     */
+    cancelRequestedBy: text(),
+    cancelRequestedAt: timestamp({ withTimezone: true }),
   },
   (t) => [
     index().on(t.siteId, t.finishedAt),

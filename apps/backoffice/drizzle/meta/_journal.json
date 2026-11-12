@@ -148,6 +148,13 @@
       "when": 1794439908955,
       "tag": "0020_build_na_fila",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794443751431,
+      "tag": "0021_cancelamento_do_build",
+      "breakpoints": true
     }
   ]
 }
