@@ -23,6 +23,7 @@ import {
   type SiteEventKind,
 } from '../../db/schema/index.ts';
 import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
+import { advanceRollout } from '../releases/rollout.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome, BuildStage } from './run-build.ts';
 import type { RollbackOutcome } from './run-rollback.ts';
@@ -301,6 +302,11 @@ export type BuildClosing = {
   siteId: string;
   /** Declaração de despublicação em massa que o plano usou; o sucesso a consome. */
   massUnpublishDeclaredAt?: Date | null;
+  /**
+   * Última tentativa do job: a falha transitória não volta a rodar e conta como falha na
+   * atualização de todos os sites. Sem ela, vale `false`.
+   */
+  lastAttempt?: boolean;
 };
 
 /** Colunas que fecham a linha, conforme o desfecho da tentativa. */
@@ -342,8 +348,8 @@ function closingFields(outcome: BuildOutcome) {
 }
 
 /**
- * Fecha a linha da tentativa com o resultado e aplica o efeito no site e nas mudanças pendentes.
- * A cancelada fecha `cancelado`, sem efeito: o site não é pausado e as mudanças continuam
+ * Fecha a linha da tentativa com o resultado e aplica o efeito no site e nas mudanças pendentes;
+ * na mesma transação, avança a atualização de todos os sites (`advanceRollout`). A cancelada fecha `cancelado`, sem efeito: o site não é pausado e as mudanças continuam
  * pendentes; quem pediu e quando já estão na linha (`cancelBuild`).
  */
 export async function recordBuild(
@@ -387,6 +393,12 @@ export async function recordBuild(
       outcome.failure.culprit,
     );
   }
+  await advanceRollout(tx, {
+    buildId: run.buildId,
+    siteId: run.siteId,
+    outcome,
+    lastAttempt: run.lastAttempt ?? false,
+  });
   return run.buildId;
 }
 

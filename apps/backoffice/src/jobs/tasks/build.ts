@@ -85,13 +85,14 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
       cancelRequested: () => buildCancelRequested(deps.db, buildId),
     });
     const retried = outcome.status === 'failed' && outcome.failure.kind === 'transient';
+    const lastAttempt = isLastAttempt(helpers);
     await deps.db.transaction(async (tx) => {
       await recordBuild(
         tx,
-        { buildId, siteId, massUnpublishDeclaredAt: target.massUnpublishDeclaredAt },
+        { buildId, siteId, massUnpublishDeclaredAt: target.massUnpublishDeclaredAt, lastAttempt },
         outcome,
       );
-      if (retried && !isLastAttempt(helpers)) {
+      if (retried && !lastAttempt) {
         await queueRetry(tx, buildId, retryRunAt(helpers.job.run_at, attempt, new Date(now())));
       }
     });
