@@ -552,7 +552,7 @@ export const SITE_HISTORY_LIMIT = 50;
  * histórico que une as execuções terminadas de `builds` (builds e rollbacks, inclusive
  * cancelados) aos eventos de `site_events`. Cada tabela é lida até o limite, e as duas listas
  * são intercaladas pelo horário e cortadas no limite. A execução aberta fica fora do histórico.
- * Exige só `site.read`: a aba "Histórico" aparece para todos os perfis, como a "Builds" que ela
+ * Exige só `site.read`: a aba "Publicação" (#647) aparece para todos os perfis, como a "Builds" que ela
  * substitui (#637), inclusive a mensagem e o fim do log das falhas.
  */
 export async function siteActivity(

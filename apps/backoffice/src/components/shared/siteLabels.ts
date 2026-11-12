@@ -151,7 +151,7 @@ const LIVE_RESULT_LABEL: Record<ExecutionHistoryItem['status'], string> = {
 };
 
 /**
- * Texto da faixa de status ao vivo da aba "Histórico" (#638): a execução aberta "na fila", com o
+ * Texto da faixa de status ao vivo da aba "Publicação" (#638, #647): a execução aberta "na fila", com o
  * horário previsto no fuso do site, ou "em andamento", com a etapa quando já há uma.
  */
 export function liveStatusText(open: OpenExecution, timeZone: string): string {
