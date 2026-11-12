@@ -19,7 +19,7 @@ vi.mock('@/db/client.ts', () => ({
 vi.mock('@/domain/reviews/reviews.ts', () => ({ approveVersion: mocks.approveVersion }));
 
 const revisor = { email: 'revisor@orakel.local', roles: ['revisor'] };
-const checklist = ['valor_original', 'descricao_imagens'];
+const checklist = ['valor_original', 'visualizacao_conferida'];
 
 beforeEach(() => {
   vi.clearAllMocks();

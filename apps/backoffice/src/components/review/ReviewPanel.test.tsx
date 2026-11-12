@@ -36,12 +36,10 @@ const checklist = [
     key: 'politicas_anuncios_afiliados',
     label: 'Conforme as políticas de conteúdo dos programas de anúncios e afiliados',
   },
-  { key: 'descricao_imagens', label: 'Descrição em todas as imagens de conteúdo' },
   {
     key: 'visualizacao_conferida',
     label: 'Visualização conferida: o conteúdo como vai ficar no site',
   },
-  { key: 'imagens_decorativas_marcadas', label: 'Imagens decorativas marcadas como tal' },
 ];
 
 type Props = ComponentProps<typeof ReviewPanel>;
@@ -61,7 +59,7 @@ const renderPanel = (props: Partial<Props> = {}) =>
   );
 
 describe('painel de revisão', () => {
-  it('mostra os 5 itens do checklist com os rótulos recebidos, como caixas de seleção', () => {
+  it('mostra os 3 itens do checklist com os rótulos recebidos, como caixas de seleção', () => {
     renderPanel();
 
     for (const item of checklist) {
