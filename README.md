@@ -99,8 +99,9 @@ mesmo com `BLOG_PREVIEW_UPSTREAM=host.docker.internal:4321`.
 | Subir o servidor do Lighthouse CI             | `infra/local/compose.sh --profile lighthouse up -d`         |
 
 Serviços mais usados nos logs: `backoffice-web`, `backoffice-worker`, `build-runner`,
-`blog-preview`, `caddy`, `edge-local`. Com um perfil ativo, repita o `--profile` no `ps`,
-`logs` e `down`.
+`caddy`, `edge-local`. Com um perfil ativo, repita o `--profile` no `ps`, `logs` e `down`. A
+prévia não é serviço do compose: é um container do `build-runner` na versão corrente
+(`docker logs -f orakel-preview-<versão>`; `docker ps --filter label=orakel.role=preview`).
 
 `ORAKEL_ENV_FILE=/caminho/env` faz o `compose.sh` e os scripts `local:*` usarem outro arquivo de
 ambiente (padrão: `.env.local`).
@@ -150,7 +151,8 @@ ambiente local, em [`local-setup.md`](docs/guides/local-setup.md#builds).
 
 É a imagem Docker que transforma o conteúdo do Backoffice em site: `render` gera o site
 estático, `publish` o envia para o alvo de deploy e `ssr` serve a visualização. Existe **uma
-imagem para todos os sites**; quem a executa é o `build-runner`, uma vez para cada site.
+imagem para todos os sites**; quem a executa é o `build-runner`, uma vez para cada site, e
+também a prévia, um container só na versão corrente.
 
 ### Imagem × build
 
