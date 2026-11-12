@@ -138,7 +138,6 @@ describe('activeNavigationKey', () => {
     ['/sites', 'sites'],
     ['/sites/novo', 'sites'],
     ['/releases', 'releases'],
-    ['/releases/nova', 'releases'],
   ])('%s → %s', (pathname, key) => {
     expect(activeNavigationKey(pathname)).toBe(key);
   });

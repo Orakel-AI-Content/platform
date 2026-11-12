@@ -3,32 +3,26 @@
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
-import type { ReleaseFormResult } from '@/components/releases/ReleaseForm';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { getDb } from '@/db/client.ts';
-import { registerRelease, requestReleaseImageCheck } from '@/domain/releases/releases.ts';
-import type { RegisterReleaseValue } from '@/domain/releases/tag.ts';
+import type { ReleaseBump } from '@/domain/releases/next-version.ts';
+import { requestNewRelease, requestReleaseImageCheck } from '@/domain/releases/releases.ts';
 
-/** Cadastro de release: formato, duplicata e permissão ficam no domínio (`registerRelease`). */
-export async function registerReleaseAction(
-  value: RegisterReleaseValue,
-): Promise<ReleaseFormResult> {
+/**
+ * "Gerar nova versão": o domínio calcula o número pelo tipo de mudança, grava a release em
+ * `gerando` e enfileira o run (`requestNewRelease`). A mensagem usa a tag devolvida, não a
+ * proposta da tela, que pode ter ficado para trás.
+ */
+export async function requestNewReleaseAction(bump: ReleaseBump): Promise<ActionResult> {
   const actor = await currentActor();
-  if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.', issues: [] };
-  // O valor vem do cliente: o domínio valida a tag de novo.
-  const result = await getDb().db.transaction((tx) => registerRelease(tx, actor.value, value.tag));
+  if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
+  // O valor vem do cliente: o domínio valida o tipo de novo.
+  const result = await getDb().db.transaction((tx) => requestNewRelease(tx, actor.value, bump));
   if (!result.ok) {
-    return {
-      ok: false,
-      message: 'Não foi possível registrar a release.',
-      issues: result.issues.map((issue) => ({
-        path: issue.path.map((key) => (typeof key === 'number' ? key : String(key))),
-        message: issue.message,
-      })),
-    };
+    return { ok: false, message: result.issues[0]?.message ?? 'Não foi possível gerar a versão.' };
   }
   revalidatePath('/releases');
-  return { ok: true, message: `Release ${result.value.tag} registrada.` };
+  return { ok: true, message: `Versão ${result.value.tag} pedida; a geração começou.` };
 }
 
 /**
