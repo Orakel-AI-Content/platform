@@ -1,5 +1,5 @@
 import type { Result } from '@orakel/content-model';
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { releases } from '../../db/schema/index.ts';
@@ -110,13 +110,15 @@ export async function registerRelease(
 
 /**
  * Enfileira o run do release.yml da release, na transação de quem pede. `job_key` por tag com
- * `replace`: pedidos repetidos antes de o job rodar viram um só.
+ * `replace`: pedidos repetidos antes de o job rodar viram um só. Com `runAt`, é o próprio job
+ * se reagendando para a próxima consulta ao run (o job em execução perde a chave e termina).
  */
-async function scheduleReleaseRun(tx: Executor, tag: string): Promise<void> {
+async function scheduleReleaseRun(tx: Executor, tag: string, runAt?: Date): Promise<void> {
   await tx.execute(sql`
     select graphile_worker.add_job(
       identifier => ${RELEASE_RUN_TASK},
       payload => ${JSON.stringify({ tag })}::json,
+      run_at => ${runAt?.toISOString() ?? null}::timestamptz,
       max_attempts => 5,
       job_key => ${`release-run:${tag}`},
       job_key_mode => 'replace'
@@ -219,6 +221,76 @@ export async function recordReleaseImageCheck(
     .update(releases)
     .set({ imageStatus: available ? 'disponivel' : 'ausente', imageCheckedAt: checkedAt })
     .where(eq(releases.tag, tag))
+    .returning({ tag: releases.tag });
+  return updated.length > 0;
+}
+
+// Acompanhamento do run pelo job `release-run` (build-runner, sem ator). Toda transição parte
+// de `gerando`: release descartada ou já adiante não muda, e a função devolve `false`.
+
+/** Estado do pipeline e run já disparado da release; `undefined` se não está registrada. */
+export async function loadReleaseRun(
+  db: Executor,
+  tag: string,
+): Promise<{ pipelineState: ReleasePipelineState; runId: string | null } | undefined> {
+  const [found] = await db
+    .select({ pipelineState: releases.pipelineState, runId: releases.runId })
+    .from(releases)
+    .where(eq(releases.tag, tag));
+  return found;
+}
+
+const generating = (tag: string) =>
+  and(eq(releases.tag, tag), eq(releases.pipelineState, 'gerando'));
+
+/** Grava o run disparado e agenda a primeira consulta, numa transação. */
+export async function recordReleaseRunStarted(
+  db: Executor,
+  tag: string,
+  run: { runId: string; runUrl: string },
+  nextCheckAt: Date,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const updated = await tx
+      .update(releases)
+      .set({ runId: run.runId, runUrl: run.runUrl })
+      .where(and(generating(tag), isNull(releases.runId)))
+      .returning({ tag: releases.tag });
+    if (updated.length === 0) return false;
+    await scheduleReleaseRun(tx, tag, nextCheckAt);
+    return true;
+  });
+}
+
+/** Run ainda em andamento: agenda a próxima consulta. */
+export async function scheduleReleaseRunCheck(db: Executor, tag: string, at: Date): Promise<void> {
+  await scheduleReleaseRun(db, tag, at);
+}
+
+/** CI verde: a release vai a `baixando` e o download da imagem entra na fila, juntos. */
+export async function recordReleaseRunSucceeded(db: Executor, tag: string): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const updated = await tx
+      .update(releases)
+      .set({ pipelineState: 'baixando', failureReason: null })
+      .where(generating(tag))
+      .returning({ tag: releases.tag });
+    if (updated.length === 0) return false;
+    await scheduleImageCheck(tx, tag);
+    return true;
+  });
+}
+
+/** CI vermelho, cancelado ou recusado pelo GitHub: `falhou` com o motivo. */
+export async function recordReleaseRunFailed(
+  db: Executor,
+  tag: string,
+  reason: string,
+): Promise<boolean> {
+  const updated = await db
+    .update(releases)
+    .set({ pipelineState: 'falhou', failureReason: reason })
+    .where(generating(tag))
     .returning({ tag: releases.tag });
   return updated.length > 0;
 }

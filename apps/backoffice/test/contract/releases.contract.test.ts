@@ -21,6 +21,8 @@ import {
 } from '../../src/domain/releases/releases.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { createCheckReleaseImageTask } from '../../src/jobs/tasks/check-release-image.ts';
+import { createReleaseRunTask, RELEASE_POLL_MS } from '../../src/jobs/tasks/release-run.ts';
+import type { GitHubClient, WorkflowRun } from '../../src/lib/github.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
 let db: Db;
@@ -510,5 +512,100 @@ describe('migração do estado do pipeline (#658)', () => {
       failureReason: null,
       requestedBy: null,
     });
+  });
+});
+
+describe('disparo e acompanhamento do run (#660)', () => {
+  const NOW = Date.parse('2026-11-11T12:00:00Z');
+  const runUrl = 'https://github.com/Orakel-AI-Content/platform/actions/runs/12345678901';
+
+  /** Roda a task release-run como o build-runner, com um GitHub falso. */
+  async function step(tag: string, github: Partial<GitHubClient>) {
+    const fake: GitHubClient = {
+      dispatchWorkflow: () => Promise.reject(new Error('dispatch inesperado')),
+      getRun: () => Promise.reject(new Error('getRun inesperado')),
+      ...github,
+    };
+    await createReleaseRunTask({ db, github: fake, now: () => NOW })({ tag }, helpers);
+  }
+  const completed = (conclusion: string): WorkflowRun => ({
+    status: 'completed',
+    conclusion,
+    runUrl,
+  });
+
+  async function runJobsAt() {
+    const { rows } = await db.execute<{ key: string | null; run_at: Date }>(sql`
+      select j.key, j.run_at
+      from graphile_worker._private_jobs j
+      join graphile_worker._private_tasks t on t.id = j.task_id
+      where t.identifier = ${RELEASE_RUN_TASK}
+      order by j.id`);
+    return rows.map((r) => ({ key: r.key, runAt: new Date(r.run_at) }));
+  }
+
+  it('dispara, grava o run e reagenda a consulta na mesma chave', async () => {
+    await requestNew(operacao, 'minor');
+
+    await step('0.1.0', {
+      dispatchWorkflow: () => Promise.resolve({ runId: '12345678901', runUrl }),
+    });
+
+    expect(await release('0.1.0')).toMatchObject({
+      pipelineState: 'gerando',
+      runId: '12345678901',
+      runUrl,
+    });
+    expect(await runJobsAt()).toEqual([
+      { key: 'release-run:0.1.0', runAt: new Date(NOW + RELEASE_POLL_MS) },
+    ]);
+  });
+
+  it('run em andamento só reagenda; com sucesso vai a baixando com o download na fila', async () => {
+    await requestNew(operacao, 'minor');
+    await db.update(releases).set({ runId: '12345678901', runUrl });
+
+    await step('0.1.0', {
+      getRun: () => Promise.resolve({ status: 'in_progress', conclusion: null, runUrl }),
+    });
+    expect(await release('0.1.0')).toMatchObject({ pipelineState: 'gerando' });
+    expect(await runJobsAt()).toEqual([
+      { key: 'release-run:0.1.0', runAt: new Date(NOW + RELEASE_POLL_MS) },
+    ]);
+    expect(await checkJobs()).toEqual([]);
+
+    await step('0.1.0', { getRun: () => Promise.resolve(completed('success')) });
+    expect(await release('0.1.0')).toMatchObject({
+      pipelineState: 'baixando',
+      failureReason: null,
+      runUrl,
+    });
+    expect(await checkJobs()).toEqual([
+      { payload: { tag: '0.1.0' }, key: 'release-image:0.1.0', max_attempts: 5 },
+    ]);
+  });
+
+  it('run com falha vai a falhou com o motivo, mantendo o link, sem download', async () => {
+    await requestNew(operacao, 'minor');
+    await db.update(releases).set({ runId: '12345678901', runUrl });
+
+    await step('0.1.0', { getRun: () => Promise.resolve(completed('failure')) });
+
+    expect(await release('0.1.0')).toMatchObject({
+      pipelineState: 'falhou',
+      failureReason: 'O CI do release.yml falhou; veja o run',
+      runUrl,
+    });
+    expect(await checkJobs()).toEqual([]);
+  });
+
+  it('release descartada no meio do caminho não muda', async () => {
+    await requestNew(operacao, 'minor');
+    await db.update(releases).set({ runId: '12345678901', runUrl, pipelineState: 'descartada' });
+
+    await step('0.1.0', { getRun: () => Promise.resolve(completed('success')) });
+
+    expect(await release('0.1.0')).toMatchObject({ pipelineState: 'descartada' });
+    expect(await checkJobs()).toEqual([]);
   });
 });
