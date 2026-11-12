@@ -48,7 +48,10 @@ await runProcess('build-runner', async (logger) => {
     pgPool: pool,
     taskList: buildRunnerTasks({
       db,
-      runtime: dockerRuntime({ host: runner.DOCKER_HOST }),
+      runtime: dockerRuntime({
+        host: runner.DOCKER_HOST,
+        siteBuilderImage: runner.SITE_BUILDER_IMAGE,
+      }),
       settings: settingsFrom(getEnv(), runner),
     }),
     concurrency: BUILD_RUNNER_CONCURRENCY,
