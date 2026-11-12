@@ -313,4 +313,139 @@ describe('dockerRuntime', () => {
       ).rejects.toThrow(RuntimeError);
     });
   });
+
+  describe('startService', () => {
+    const service = (image = 'ghcr.io/orakel-ai-content/site-builder:1.4.0') => ({
+      name: 'orakel-preview-1.4.0',
+      image,
+      command: ['ssr'],
+      env: { PORT: '4321' },
+      networks: [
+        { name: 'orakel-internal', aliases: ['blog-preview'] },
+        { name: 'orakel-export', aliases: ['blog-preview'] },
+      ],
+      healthcheck: {
+        test: ['CMD', 'node', '-e', '0'],
+        intervalMs: 10_000,
+        timeoutMs: 5000,
+        retries: 12,
+      },
+      labels: { 'orakel.preview': '1.4.0' },
+    });
+
+    it('cria pela API 1.44 nas duas redes, com apelido, healthcheck e restart, e o inicia', async () => {
+      const { fn, calls } = fakeFetch({
+        'POST /v1.44/containers/create': [json({ Id: 'svc' }, 201)],
+        'POST /containers/svc/start': [new Response(null, { status: 204 })],
+      });
+      const id = await dockerRuntime({ host, siteBuilderImage, fetch: fn }).startService(service());
+      expect(id).toBe('svc');
+      expect(calls.map((c) => [c.method, c.url])).toEqual([
+        [
+          'POST',
+          'http://docker-socket-proxy:2375/v1.44/containers/create?name=orakel-preview-1.4.0',
+        ],
+        ['POST', 'http://docker-socket-proxy:2375/containers/svc/start'],
+      ]);
+      expect(calls[0]?.body).toEqual({
+        Image: 'ghcr.io/orakel-ai-content/site-builder:1.4.0',
+        Cmd: ['ssr'],
+        Env: ['PORT=4321'],
+        Labels: { 'orakel.preview': '1.4.0' },
+        Healthcheck: {
+          Test: ['CMD', 'node', '-e', '0'],
+          Interval: 10e9,
+          Timeout: 5e9,
+          Retries: 12,
+        },
+        HostConfig: {
+          NetworkMode: 'orakel-internal',
+          RestartPolicy: { Name: 'unless-stopped' },
+          CapDrop: ['ALL'],
+          SecurityOpt: ['no-new-privileges:true'],
+        },
+        NetworkingConfig: {
+          EndpointsConfig: {
+            'orakel-internal': { Aliases: ['blog-preview'] },
+            'orakel-export': { Aliases: ['blog-preview'] },
+          },
+        },
+      });
+    });
+
+    it.each([
+      'ghcr.io/outro/site-builder:1.4.0',
+      'ghcr.io/orakel-ai-content/site-builder',
+      'ghcr.io/orakel-ai-content/site-builder@sha256:abc',
+      'alpine:3',
+    ])('recusa %s sem chamar o Docker', async (image) => {
+      const { fn, calls } = fakeFetch({});
+      await expect(
+        dockerRuntime({ host, siteBuilderImage, fetch: fn }).startService(service(image)),
+      ).rejects.toThrow(/serviço recusado/);
+      expect(calls).toEqual([]);
+    });
+
+    it('recusa serviço sem rede sem chamar o Docker', async () => {
+      const { fn, calls } = fakeFetch({});
+      await expect(
+        dockerRuntime({ host, siteBuilderImage, fetch: fn }).startService({
+          ...service(),
+          networks: [],
+        }),
+      ).rejects.toThrow(/sem rede/);
+      expect(calls).toEqual([]);
+    });
+
+    it('Engine sem a API 1.44 vira RuntimeError com o motivo do daemon', async () => {
+      const { fn } = fakeFetch({
+        'POST /v1.44/containers/create': [
+          json(
+            { message: 'client version 1.44 is too new. Maximum supported API version is 1.43' },
+            400,
+          ),
+        ],
+      });
+      const start = dockerRuntime({ host, siteBuilderImage, fetch: fn }).startService(service());
+      await expect(start).rejects.toBeInstanceOf(RuntimeError);
+      await expect(start).rejects.toThrow(/too new/);
+    });
+  });
+
+  describe('health', () => {
+    it.each([
+      [{ Running: true, Health: { Status: 'starting' } }, 'starting'],
+      [{ Running: true, Health: { Status: 'healthy' } }, 'healthy'],
+      [{ Running: true, Health: { Status: 'unhealthy' } }, 'unhealthy'],
+      [{ Running: false, Health: { Status: 'healthy' } }, 'unhealthy'],
+      [{ Running: true, Health: { Status: 'none' } }, 'unhealthy'],
+      [{ Running: true }, 'unhealthy'],
+    ])('estado %j → %s', async (state, expected) => {
+      const { fn, calls } = fakeFetch({ 'GET /containers/svc/json': [json({ State: state })] });
+      expect(await dockerRuntime({ host, siteBuilderImage, fetch: fn }).health('svc')).toBe(
+        expected,
+      );
+      expect(calls.map((c) => [c.method, c.url])).toEqual([
+        ['GET', 'http://docker-socket-proxy:2375/containers/svc/json'],
+      ]);
+    });
+
+    it('container inexistente (404) é absent, sem erro', async () => {
+      const { fn } = fakeFetch({
+        'GET /containers/svc/json': [json({ message: 'No such container' }, 404)],
+      });
+      expect(await dockerRuntime({ host, siteBuilderImage, fetch: fn }).health('svc')).toBe(
+        'absent',
+      );
+    });
+
+    it('recusa do proxy vira RuntimeError', async () => {
+      const { fn } = fakeFetch({
+        'GET /containers/svc/json': [new Response('Forbidden', { status: 403 })],
+      });
+      await expect(
+        dockerRuntime({ host, siteBuilderImage, fetch: fn }).health('svc'),
+      ).rejects.toBeInstanceOf(RuntimeError);
+    });
+  });
 });

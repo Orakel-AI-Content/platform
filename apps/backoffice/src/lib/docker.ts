@@ -1,5 +1,5 @@
 // API do Docker por HTTP (fetch), sempre pelo docker-socket-proxy (ADR 0011 da raiz): só as
-// rotas da lista do proxy. Sem cliente pronto: são dez chamadas, e assim nenhuma rota fora
+// rotas da lista do proxy. Sem cliente pronto: são poucas chamadas, e assim nenhuma rota fora
 // da lista entra por engano. O fim do container é acompanhado por consulta periódica, sem
 // conexão longa (o render pode passar dos limites de tempo do fetch).
 import {
@@ -7,6 +7,8 @@ import {
   RuntimeError,
   type ContainerRuntime,
   type ContainerSpec,
+  type ServiceHealth,
+  type ServiceSpec,
   type WaitResult,
 } from '../domain/builds/runtime.ts';
 import { firstTarFile } from './tar.ts';
@@ -116,7 +118,7 @@ export function dockerRuntime(options: Options): ContainerRuntime {
   }
 
   /** Tag de `SITE_BUILDER_IMAGE:<tag>`; outra imagem é recusada antes de chegar ao Docker. */
-  function siteBuilderTag(image: string, operation: 'pull' | 'tag'): string {
+  function siteBuilderTag(image: string, operation: 'pull' | 'tag' | 'serviço'): string {
     const prefix = `${options.siteBuilderImage}:`;
     const tag = image.startsWith(prefix) ? image.slice(prefix.length) : undefined;
     if (tag === undefined || !TAG.test(tag)) {
@@ -208,6 +210,56 @@ export function dockerRuntime(options: Options): ContainerRuntime {
       const { Id: id } = (await response.json()) as { Id: string };
       await call('POST', `/containers/${id}/start`);
       return id;
+    },
+
+    async startService(spec: ServiceSpec) {
+      siteBuilderTag(spec.image, 'serviço');
+      const [main] = spec.networks;
+      if (main === undefined) throw new Error(`serviço recusado: ${spec.name} sem rede`);
+      const ms = 1e6;
+      // Versionado: várias redes no create exigem a API 1.44 (Engine 25, ADR 0024 da raiz). Engine
+      // mais antigo recusa a versão, em vez de ligar o container a uma rede só.
+      const response = await call('POST', `/v1.44/containers/create?name=${spec.name}`, {
+        Image: spec.image,
+        Cmd: spec.command,
+        Env: Object.entries(spec.env).map(([key, value]) => `${key}=${value}`),
+        Labels: spec.labels,
+        Healthcheck: {
+          Test: spec.healthcheck.test,
+          Interval: spec.healthcheck.intervalMs * ms,
+          Timeout: spec.healthcheck.timeoutMs * ms,
+          Retries: spec.healthcheck.retries,
+        },
+        HostConfig: {
+          NetworkMode: main.name,
+          RestartPolicy: { Name: 'unless-stopped' },
+          CapDrop: ['ALL'],
+          SecurityOpt: ['no-new-privileges:true'],
+        },
+        NetworkingConfig: {
+          EndpointsConfig: Object.fromEntries(
+            spec.networks.map((network) => [network.name, { Aliases: network.aliases }]),
+          ),
+        },
+      });
+      const { Id: id } = (await response.json()) as { Id: string };
+      await call('POST', `/containers/${id}/start`);
+      return id;
+    },
+
+    async health(id): Promise<ServiceHealth> {
+      const response = await call('GET', `/containers/${id}/json`, undefined, [404]);
+      if (response.status === 404) {
+        await response.body?.cancel();
+        return 'absent';
+      }
+      const info = (await response.json()) as {
+        State: { Running: boolean; Health?: { Status: string } };
+      };
+      if (!info.State.Running) return 'unhealthy';
+      const status = info.State.Health?.Status;
+      // Sem healthcheck (`none` ou ausente) nunca conta como saudável.
+      return status === 'starting' || status === 'healthy' ? status : 'unhealthy';
     },
 
     async wait(id, timeoutMs): Promise<WaitResult> {

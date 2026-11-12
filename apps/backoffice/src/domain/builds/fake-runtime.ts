@@ -1,7 +1,13 @@
 // Runtime de containers falso para os testes do build: cada etapa (render, publish, rollback) tem o
 // código de saída, os arquivos que deixa no volume, o log que escreve, se estoura o tempo e se
-// fica rodando até ser morto.
-import { ImageUnavailableError, type ContainerRuntime, type ContainerSpec } from './runtime.ts';
+// fica rodando até ser morto. Containers de serviço (a prévia) têm a saúde lida de uma fila.
+import {
+  ImageUnavailableError,
+  type ContainerRuntime,
+  type ContainerSpec,
+  type ServiceHealth,
+  type ServiceSpec,
+} from './runtime.ts';
 
 export type FakeStage = {
   exitCode?: number;
@@ -23,7 +29,12 @@ export function fakeRuntime(options: {
   render?: FakeStage;
   publish?: FakeStage;
   rollback?: FakeStage;
-  failOn?: 'createVolume' | 'start' | 'logs';
+  /**
+   * Saúde lida pelo `health` de um container de serviço, uma por chamada; o último valor se
+   * repete. Padrão: `healthy`. Container de serviço removido, ou nunca criado, é `absent`.
+   */
+  health?: ServiceHealth[];
+  failOn?: 'createVolume' | 'start' | 'logs' | 'startService' | 'health';
 }) {
   const started: ContainerSpec[] = [];
   const removed: string[] = [];
@@ -31,6 +42,9 @@ export function fakeRuntime(options: {
   const killed: string[] = [];
   const pulled: string[] = [];
   const tagged: { source: string; target: string }[] = [];
+  const services: ServiceSpec[] = [];
+  const live = new Set<string>();
+  const healthQueue = [...(options.health ?? ['healthy'])];
   let present = options.image ?? true;
   const stageOf = (id: string) =>
     id.startsWith('orakel-render')
@@ -65,6 +79,20 @@ export function fakeRuntime(options: {
       started.push(spec);
       return Promise.resolve(spec.name);
     },
+    startService(spec) {
+      if (options.failOn === 'startService') return Promise.reject(new Error('proxy recusou'));
+      services.push(spec);
+      live.add(spec.name);
+      return Promise.resolve(spec.name);
+    },
+    health(id) {
+      if (options.failOn === 'health') return Promise.reject(new Error('proxy recusou'));
+      if (!live.has(id)) {
+        return Promise.resolve('absent' as const);
+      }
+      const current = healthQueue.length > 1 ? healthQueue.shift() : healthQueue[0];
+      return Promise.resolve(current ?? 'healthy');
+    },
     wait(id) {
       const stage = stageOf(id);
       if (stage?.running) {
@@ -93,6 +121,7 @@ export function fakeRuntime(options: {
     },
     removeContainer(id) {
       removed.push(id);
+      live.delete(id);
       return Promise.resolve();
     },
     removeVolume(name) {
@@ -100,7 +129,7 @@ export function fakeRuntime(options: {
       return Promise.resolve();
     },
   };
-  return { runtime, started, removed, volumes, killed, pulled, tagged };
+  return { runtime, started, services, removed, volumes, killed, pulled, tagged };
 }
 
 export const renderOk = (site = 'exemplo-a', pendingChangeIds: number[] = [1, 2]) => ({
