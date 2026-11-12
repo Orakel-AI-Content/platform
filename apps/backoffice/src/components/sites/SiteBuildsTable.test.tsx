@@ -10,10 +10,11 @@ import type { ExecutionHistoryItem, SiteHistoryItem } from '@/domain/builds/buil
 
 import { SiteBuildsTable } from './SiteBuildsTable.tsx';
 
-// Aba "Histórico" da página do site (#637): publicação, reversão, troca de versão, pausa e
-// retomada na ordem recebida, com Tipo, Status, Quem, Quando (no fuso do site) e Versão; a
-// linha de uma falha abre o painel de detalhe; sem itens, o estado vazio. Teclado e foco no
-// navegador, em `SiteBuildsTable.browser.test.tsx`.
+// Histórico da aba "Publicação" em linha do tempo (#651; era a tabela do #637): publicação,
+// reversão, cancelamento, troca de versão, pausa e retomada como itens, na ordem recebida, cada
+// um com título, status (nas execuções), quem, quando (no fuso do site) e versão; o item de uma
+// falha abre o painel de detalhe; sem itens, o estado vazio. Teclado e foco no navegador, em
+// `SiteBuildsTable.browser.test.tsx`.
 
 const execution = (
   over: Partial<ExecutionHistoryItem> & Pick<ExecutionHistoryItem, 'id' | 'at'>,
@@ -107,61 +108,47 @@ afterEach(async () => {
   app.remove();
 });
 
-function rows() {
-  const table = screen.getByRole('table', { name: 'Histórico do site' });
-  return within(table)
-    .getAllByRole('row')
-    .slice(1)
-    .map((row) =>
-      within(row)
-        .getAllByRole('cell')
-        .slice(0, 5)
-        .map((cell) => cell.textContent),
-    );
+/** Texto de cada item da linha do tempo: o conteúdo, sem o botão de detalhe. */
+function items() {
+  return within(screen.getByRole('list'))
+    .getAllByRole('listitem')
+    .map((item) => {
+      const [title, meta] = item.querySelectorAll('.timeline-item-content span.heading-text, p');
+      const tag = item.querySelector('.tag');
+      return [title?.textContent, tag?.textContent ?? null, meta?.textContent];
+    });
 }
 
 describe('SiteBuildsTable', () => {
-  it('uma linha por item, na ordem recebida, com tipo, status, quem, quando e versão', () => {
+  it('um item por acontecimento, na ordem recebida, com título, status, quem, quando e versão', () => {
     render(<SiteBuildsTable history={HISTORY} timeZone="America/Sao_Paulo" />, { container: app });
 
-    const table = screen.getByRole('table', { name: 'Histórico do site' });
-    expect(
-      within(table)
-        .getAllByRole('columnheader')
-        .map((th) => th.textContent),
-    ).toEqual(['Tipo', 'Status', 'Quem', 'Quando', 'Versão', 'Detalhe']);
-    expect(rows()).toEqual([
-      ['Publicação', 'Cancelado', 'ana@orakel.local', '11/10/2026, 14:02 BRT', '—'],
+    expect(items()).toEqual([
+      ['Publicação cancelada', 'Cancelado', 'ana@orakel.local · 11/10/2026, 14:02 BRT'],
       [
         'Reversão',
         'Publicado',
-        'joao@orakel.local',
-        '11/10/2026, 13:40 BRT',
-        '20261010T120000Z-bbbbbbbb',
+        'joao@orakel.local · 11/10/2026, 13:40 BRT · Versão 20261010T120000Z-bbbbbbbb',
       ],
-      ['Troca de versão', '—', 'ana@orakel.local', '11/10/2026, 13:20 BRT', '1.2.0 → 1.3.0'],
-      ['Pausa', '—', 'system', '11/10/2026, 13:10 BRT', '—'],
-      ['Publicação', 'Falhou', 'system', '11/10/2026, 13:09 BRT', '—'],
-      ['Retomada', '—', 'ana@orakel.local', '11/10/2026, 12:00 BRT', '—'],
+      ['Troca de versão', null, 'ana@orakel.local · 11/10/2026, 13:20 BRT · Versão 1.2.0 → 1.3.0'],
+      ['Pausa: falha permanente', null, 'system · 11/10/2026, 13:10 BRT'],
+      ['Publicação · falhou na etapa Publicação', 'Falhou', 'system · 11/10/2026, 13:09 BRT'],
+      ['Retomada', null, 'ana@orakel.local · 11/10/2026, 12:00 BRT'],
     ]);
   });
 
-  it('a reversão mostra quem pediu, quando e o resultado', () => {
+  it('o cancelamento mostra quem cancelou, não quem pediu', () => {
     render(<SiteBuildsTable history={HISTORY} timeZone="America/Sao_Paulo" />, { container: app });
 
-    const rollback = rows().find(([kind]) => kind === 'Reversão');
-    expect(rollback?.slice(0, 4)).toEqual([
-      'Reversão',
-      'Publicado',
-      'joao@orakel.local',
-      '11/10/2026, 13:40 BRT',
-    ]);
+    const [cancelled] = screen.getAllByRole('listitem');
+    expect(cancelled?.textContent).toContain('ana@orakel.local');
+    expect(cancelled?.textContent).not.toContain('system');
   });
 
   it('só a falha tem "Ver detalhe", que abre o painel com etapa, mensagem e log', async () => {
     render(<SiteBuildsTable history={HISTORY} timeZone="America/Sao_Paulo" />, { container: app });
 
-    const buttons = screen.getAllByRole('button', { name: /^Ver detalhe da falha/ });
+    const buttons = screen.getAllByRole('button', { name: /^Ver detalhe/ });
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Ver detalhe da falha de 11/10/2026, 13:09 BRT',
     ]);
@@ -173,17 +160,16 @@ describe('SiteBuildsTable', () => {
     expect(within(dialog).getByLabelText('Fim do log').textContent).toBe('deploy falhou');
   });
 
-  it('o clique na linha da falha também abre o painel', async () => {
-    render(<SiteBuildsTable history={HISTORY} timeZone="America/Sao_Paulo" />, { container: app });
-
-    await userEvent.click(screen.getByText('Falhou'));
-    expect(screen.getByRole('dialog', { name: 'Falha da publicação' })).toBeTruthy();
-  });
-
-  it('sem itens, o estado vazio no lugar da tabela', () => {
+  it('sem itens, o estado vazio no lugar da linha do tempo', () => {
     render(<SiteBuildsTable history={[]} timeZone="America/Sao_Paulo" />, { container: app });
 
     expect(screen.getByText('Nenhuma atividade ainda.')).toBeTruthy();
+    expect(screen.queryByRole('list')).toBeNull();
+  });
+
+  it('não usa mais a tabela', () => {
+    render(<SiteBuildsTable history={HISTORY} timeZone="America/Sao_Paulo" />, { container: app });
+
     expect(screen.queryByRole('table')).toBeNull();
   });
 });
