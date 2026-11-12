@@ -16,11 +16,13 @@ import {
   amendInReview,
   countContentsByStatus,
   countReviewQueues,
+  createAndSubmit,
   createContent,
   listContents,
   listContentVersions,
   listReviewQueue,
   submitForReview,
+  updateAndSubmit,
   updateContent,
   type ContentEdit,
   type EditBlock,
@@ -372,6 +374,113 @@ describe('enviar para revisão (#72)', () => {
       ok: true,
     });
   });
+});
+
+describe('salvar e enviar para revisão (#778)', () => {
+  const article: ContentEdit = {
+    kind: 'article',
+    slug: 'novo-artigo',
+    title: 'Novo artigo',
+    authorIds: [1],
+    taxonomyIds: [],
+    publishedAt: '2026-10-06T12:00:00-03:00',
+    blocks: [newText('corpo')],
+  };
+  const createSubmit = (input: ContentEdit, actor = SYSTEM_ACTOR) =>
+    db.transaction((tx) => createAndSubmit(tx, actor, SITE, input));
+  const editSubmit = (contentId: number, input: ContentEdit, actor = SYSTEM_ACTOR) =>
+    db.transaction((tx) => updateAndSubmit(tx, actor, SITE, contentId, input));
+  const linkCheckJobs = async () =>
+    (
+      await db.execute<{ payload: unknown }>(
+        sql`select j.payload from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+          where t.identifier = 'check-content-links'`,
+      )
+    ).rows.map((row) => row.payload);
+
+  it('criar e enviar grava a versão 1 já em_revisao e enfileira a checagem de links', async () => {
+    const result = await createSubmit(article);
+
+    expect(result).toEqual({ ok: true, value: { id: 4, version: 1 } });
+    expect((await versions(4)).map((v) => [v.version, v.status, v.createdBy])).toEqual([
+      [1, 'em_revisao', SYSTEM_ACTOR.email],
+    ]);
+    expect(await linkCheckJobs()).toEqual([{ siteId: SITE, contentId: 4, version: 1 }]);
+  });
+
+  it('criar e enviar recusado na gravação não grava conteúdo nem enfileira nada', async () => {
+    const before = await listContents(db, SYSTEM_ACTOR, SITE);
+
+    const result = await createSubmit({ ...article, authorIds: [99] });
+
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'semantic.references' }] });
+    expect(await listContents(db, SYSTEM_ACTOR, SITE)).toEqual(before);
+    expect(await linkCheckJobs()).toEqual([]);
+  });
+
+  it('editar e enviar grava a N+1 já em_revisao, com a N intacta', async () => {
+    const result = await editSubmit(1, { ...(await latest(1)), title: 'Guia revisado' });
+
+    expect(result).toEqual({ ok: true, value: { version: 2, created: true } });
+    expect((await versions(1)).map((v) => [v.version, v.status, v.data.title])).toEqual([
+      [1, 'publicado', expect.any(String)],
+      [2, 'em_revisao', 'Guia revisado'],
+    ]);
+    expect(await linkCheckJobs()).toEqual([{ siteId: SITE, contentId: 1, version: 2 }]);
+  });
+
+  it('editar sem alteração, com a mais recente em rascunho, envia essa versão sem criar outra', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+
+    const result = await editSubmit(1, await latest(1));
+
+    expect(result).toEqual({ ok: true, value: { version: 2, created: false } });
+    expect((await versions(1)).map((v) => [v.version, v.status])).toEqual([
+      [1, 'publicado'],
+      [2, 'em_revisao'],
+    ]);
+  });
+
+  it('editar sem alteração, com a mais recente fora de rascunho, recusa com not_draft e não grava', async () => {
+    const before = await versions(2);
+    const pending = await unresolvedPendingChangeIds(db, SITE);
+
+    const result = await editSubmit(2, await latest(2));
+
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'content.not_draft' }] });
+    expect(await versions(2)).toEqual(before);
+    expect(await unresolvedPendingChangeIds(db, SITE)).toEqual(pending);
+    expect(await linkCheckJobs()).toEqual([]);
+  });
+
+  it('editar e enviar recusado na gravação não grava a N+1', async () => {
+    const before = await versions(1);
+
+    const result = await editSubmit(1, { ...(await latest(1)), authorIds: [99] });
+
+    expect(result).toMatchObject({ ok: false, issues: [{ code: 'semantic.references' }] });
+    expect(await versions(1)).toEqual(before);
+    expect(await linkCheckJobs()).toEqual([]);
+  });
+
+  it.each(['revisor', 'operacao'] as const)(
+    '%s recebe forbidden e nada é gravado',
+    async (role) => {
+      const actor = { email: `${role}@orakel.local`, roles: [role] };
+      const before = await versions(1);
+
+      expect(await createSubmit(article, actor)).toMatchObject({
+        ok: false,
+        issues: [{ code: 'forbidden' }],
+      });
+      expect(
+        await editSubmit(1, { ...(await latest(1)), title: 'Guia revisado' }, actor),
+      ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+      expect(await versions(1)).toEqual(before);
+      expect(await listContents(db, SYSTEM_ACTOR, SITE)).toMatchObject({ value: { length: 3 } });
+    },
+  );
 });
 
 describe('fila de revisão (#72)', () => {
