@@ -11,18 +11,13 @@ import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { RebuildReleaseDialog, type RebuildRelease } from './RebuildReleaseDialog.tsx';
 
-// Reconstruir na release (#515): o Select das releases registradas começando na atual (ou na
-// mais recente) a cada abertura e o `onConfirm` com a tag escolhida. Com a imagem da release
-// escolhida ausente, o Alert de aviso sem travar o confirmar (#574). O diálogo não tem gatilho
+// "Escolher outra versão do motor" (o "Reconstruir na release" de #515): o Select das releases
+// disponíveis começando na atual (ou na mais recente) a cada abertura e o `onConfirm` com a tag
+// escolhida, sem aviso de imagem ausente (#691: a página só passa as `disponivel`). Sem gatilho
 // (#595): aqui, um botão de teste o abre; a action e o retorno ficam no `SiteOperations`. Foco e
 // axe no navegador, em `RebuildReleaseDialog.browser.test.tsx`.
 
-const RELEASES: RebuildRelease[] = [
-  { tag: '1.3.0', imageStatus: 'disponivel' },
-  { tag: '1.2.0', imageStatus: 'disponivel' },
-  { tag: '1.1.0', imageStatus: 'ausente' },
-];
-const MISSING = /A imagem site-builder:1\.1\.0 não estava no host/;
+const RELEASES: RebuildRelease[] = [{ tag: '1.3.0' }, { tag: '1.2.0' }, { tag: '1.1.0' }];
 const NAME = 'Reconstruir o site numa release?';
 
 let app: HTMLElement;
@@ -44,7 +39,7 @@ function Rebuild({
   return (
     <>
       <button ref={trigger} type="button" onClick={() => setOpen(true)}>
-        Reconstruir na release
+        Escolher outra versão do motor
       </button>
       <RebuildReleaseDialog
         current={current}
@@ -81,7 +76,7 @@ afterEach(async () => {
 });
 
 async function openDialog() {
-  await userEvent.click(screen.getByRole('button', { name: 'Reconstruir na release' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Escolher outra versão do motor' }));
   return screen.getByRole('alertdialog', { name: NAME });
 }
 
@@ -142,47 +137,31 @@ describe('reconstruir na release', () => {
     await waitFor(() => expect(action).toHaveBeenCalledWith('1.3.0'));
   });
 
-  it('sem nenhuma release registrada, o Reconstruir fica desabilitado', async () => {
+  it('sem nenhuma release disponível, o Reconstruir fica desabilitado', async () => {
     const action = vi.fn();
     render(<Rebuild onConfirm={action} current={null} releases={[]} />, { container: app });
 
     const dialog = await openDialog();
-    expect(dialog.textContent).toContain('Nenhuma release registrada');
+    expect(dialog.textContent).toContain('Nenhuma release disponível');
     expect(
       within(dialog).getByRole('button', { name: 'Reconstruir' }).hasAttribute('disabled'),
     ).toBe(true);
   });
 
-  it('com a imagem da release escolhida ausente, avisa e o Reconstruir continua habilitado', async () => {
+  it('escolhida outra release, confirma com ela e sem aviso de imagem', async () => {
     const action = vi.fn();
     render(<Rebuild onConfirm={action} />, { container: app });
 
     const dialog = await openDialog();
-    expect(within(dialog).queryByText(MISSING)).toBeNull();
     await userEvent.click(screen.getByRole('combobox', { name: 'Release' }));
     await userEvent.click(screen.getByText('1.1.0'));
 
-    expect(within(dialog).getByText(MISSING)).toBeTruthy();
-    const confirm = within(dialog).getByRole('button', { name: 'Reconstruir' });
-    expect(confirm.hasAttribute('disabled')).toBe(false);
-    await userEvent.click(confirm);
+    expect(dialog.textContent).toContain('site-builder:1.1.0');
+    expect(dialog.textContent).not.toContain('não estava no host');
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reconstruir' }));
 
     await waitFor(() => expect(action).toHaveBeenCalledWith('1.1.0'));
-  });
-
-  it('imagem não conferida não gera aviso', async () => {
-    render(
-      <Rebuild
-        onConfirm={vi.fn()}
-        current={null}
-        releases={[{ tag: '2.0.0', imageStatus: null }]}
-      />,
-      { container: app },
-    );
-
-    const dialog = await openDialog();
-    expect(dialog.textContent).toContain('site-builder:2.0.0');
-    expect(dialog.textContent).not.toContain('não estava no host');
   });
 
   it('cancelar fecha sem confirmar', async () => {
