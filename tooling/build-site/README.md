@@ -18,8 +18,8 @@ Rollback para uma versão já publicada (ADR 0009): `SITE_ID`, `VERSION_ID` (o `
 `publish.json`), `DEPLOY_TARGET` e o acesso ao alvo (`EDGE_LOCAL_URL` ou `CLOUDFLARE_*`) →
 `node src/cli.ts rollback`, que escreve `/build/rollback.json`.
 
-Render e publish pelas redes do compose local, como o `build-runner` fará (da raiz):
-`pnpm local:publish <site>` → `https://<site>.localhost`.
+No compose local, quem roda render e publish é o `build-runner` do Backoffice; para pedir o
+build de um site pelo terminal (da raiz): `pnpm local:publish <site>` → `https://<site>.localhost`.
 
 Contrato do volume `/build` (lido pelo backoffice e pelo edge-local): `@orakel/build-contract`.
 No ambiente local, o `build-runner` do backoffice roda o `render` e o `publish` sozinho a cada

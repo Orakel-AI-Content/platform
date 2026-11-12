@@ -33,16 +33,16 @@ Monorepo da plataforma Orakel AI: uma rede de 5 a 20 sites de conteúdo gerados 
 corepack enable
 pnpm install                   # dependências e git hooks (lefthook)
 cp .env.example .env.local     # valores locais; nunca commite .env.local
-pnpm local:images              # constrói as imagens backoffice, site-builder e edge-local
-pnpm local:up                  # sobe o compose, cria os buckets e migra o banco
-pnpm local:seed                # usuários de teste e os sites exemplo-a e exemplo-b
+pnpm local:up                  # constrói as imagens que faltam, sobe o compose, cria os buckets e migra o banco
+pnpm local:seed                # usuários de teste e sites de exemplo, com o primeiro build de cada um na fila
 pnpm local:trust               # confia na CA do Caddy (macOS; pede a senha) — depois feche o Chrome (⌘Q)
 pnpm local:check               # confere o ambiente inteiro
-pnpm local:publish exemplo-a   # build + publicação → https://exemplo-a.localhost
 ```
 
-Pronto: o Backoffice fica em https://admin.orakel.localhost (veja
-[Endereços e acessos](#endereços-e-acessos)).
+Pronto: o Backoffice fica em https://admin.orakel.localhost, e os sites de exemplo entram no ar
+(https://exemplo-a.localhost…) assim que o `build-runner` termina os builds que o seed pediu
+(veja [Endereços e acessos](#endereços-e-acessos)). Daí em diante, publicar e trocar versão é
+pelos botões do Backoffice ([Versão do site-builder e builds](#versão-do-site-builder-e-builds)).
 
 ## Comandos
 
@@ -82,21 +82,21 @@ mesmo com `BLOG_PREVIEW_UPSTREAM=host.docker.internal:4321`.
 
 ### Ambiente local (Docker)
 
-| Quero…                                        | Comando                                                     |
-| --------------------------------------------- | ----------------------------------------------------------- |
-| Subir o ambiente (e migrar o banco)           | `pnpm local:up`                                             |
-| Popular usuários de teste e sites de exemplo  | `pnpm local:seed`                                           |
-| Conferir se está tudo saudável                | `pnpm local:check`                                          |
-| Parar (mantém os dados)                       | `pnpm local:down`                                           |
-| Parar e **apagar os dados** (banco, buckets…) | `pnpm local:reset` — depois rode `pnpm local:trust` de novo |
-| Reconstruir as imagens                        | `pnpm local:images`                                         |
-| Ver os containers                             | `infra/local/compose.sh ps`                                 |
-| Acompanhar os logs de um serviço              | `infra/local/compose.sh logs -f <serviço>`                  |
-| Reiniciar um serviço                          | `infra/local/compose.sh restart <serviço>`                  |
-| Qualquer outro comando do compose             | `infra/local/compose.sh <args>`                             |
-| Abrir o Postgres no terminal                  | `psql postgres://orakel:orakel-local@localhost:5432/orakel` |
-| Subir GlitchTip e Healthchecks                | `infra/local/compose.sh --profile observability up -d`      |
-| Subir o servidor do Lighthouse CI             | `infra/local/compose.sh --profile lighthouse up -d`         |
+| Quero…                                          | Comando                                                     |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| Subir o ambiente (e migrar o banco)             | `pnpm local:up`                                             |
+| Popular usuários de teste e sites de exemplo    | `pnpm local:seed`                                           |
+| Conferir se está tudo saudável                  | `pnpm local:check`                                          |
+| Parar (mantém os dados)                         | `pnpm local:down`                                           |
+| Parar e **apagar os dados** (banco, buckets…)   | `pnpm local:reset` — depois rode `pnpm local:trust` de novo |
+| Reconstruir as imagens depois de mudar o código | `pnpm local:images`                                         |
+| Ver os containers                               | `infra/local/compose.sh ps`                                 |
+| Acompanhar os logs de um serviço                | `infra/local/compose.sh logs -f <serviço>`                  |
+| Reiniciar um serviço                            | `infra/local/compose.sh restart <serviço>`                  |
+| Qualquer outro comando do compose               | `infra/local/compose.sh <args>`                             |
+| Abrir o Postgres no terminal                    | `psql postgres://orakel:orakel-local@localhost:5432/orakel` |
+| Subir GlitchTip e Healthchecks                  | `infra/local/compose.sh --profile observability up -d`      |
+| Subir o servidor do Lighthouse CI               | `infra/local/compose.sh --profile lighthouse up -d`         |
 
 Serviços mais usados nos logs: `backoffice-web`, `backoffice-worker`, `build-runner`,
 `caddy`, `edge-local`. Com um perfil ativo, repita o `--profile` no `ps`, `logs` e `down`. A
@@ -108,14 +108,17 @@ ambiente (padrão: `.env.local`).
 
 ### Publicar e medir
 
-| Quero…                                            | Comando                                       |
-| ------------------------------------------------- | --------------------------------------------- |
-| Publicar um site sem passar pelo Backoffice       | `pnpm local:publish <site>`                   |
-| Gerar carga de pageviews e conferir no ClickHouse | `pnpm local:load [<site>]`                    |
-| Acompanhar os builds disparados pelo Backoffice   | `infra/local/compose.sh logs -f build-runner` |
+| Quero…                                               | Comando                                       |
+| ---------------------------------------------------- | --------------------------------------------- |
+| Pedir o build de um site ao Backoffice pelo terminal | `pnpm local:publish <site>`                   |
+| Gerar carga de pageviews e conferir no ClickHouse    | `pnpm local:load [<site>]`                    |
+| Acompanhar os builds disparados pelo Backoffice      | `infra/local/compose.sh logs -f build-runner` |
 
 Pelo Backoffice, toda gravação agenda o build do site; depois de `BUILD_WINDOW_SECONDS` (30 s no
-local) o site é publicado. Em `/sites`, "Publicar agora" antecipa o build.
+local) o site é publicado. Em `/sites/<site>`, "Publicar agora" antecipa o build. O
+`local:publish` faz o mesmo pedido pelo terminal: enfileira o build na fila do Backoffice,
+espera o `build-runner` terminar e sai com erro se o build falhar; o build fica no histórico do
+site, como qualquer outro.
 
 ### Testes E2E (Playwright)
 
@@ -173,7 +176,8 @@ Uma versão tem sempre o mesmo `X.Y.Z`, escrito de três jeitos:
 | Imagem (o CI publica)    | `ghcr.io/orakel-ai-content/site-builder:X.Y.Z` | `ghcr.io/orakel-ai-content/site-builder:1.2.0` |
 | Backoffice (`/releases`) | `X.Y.Z`, igual à tag da imagem, sem prefixo    | `1.2.0`                                        |
 
-O cadastro em `/releases` só aceita `X.Y.Z`: colar a tag Git (`site-builder-v1.2.0`) dá erro.
+Ninguém digita o número: "Gerar nova versão" propõe o próximo `X.Y.Z`, e o CI cria a tag e
+a imagem a partir dele.
 
 ### Passo a passo de uma versão nova
 
@@ -192,40 +196,49 @@ O cadastro em `/releases` só aceita `X.Y.Z`: colar a tag Git (`site-builder-v1.
 4. **Se falhar**, a linha fica em "Falhou" com o motivo: corrija a causa (a `main`, por
    exemplo) e use "Tentar de novo", que retoma a etapa que falhou com o mesmo número. Uma versão
    que nenhum site usa pode ser descartada ("Descartar"); o número dela não volta a ser usado.
-5. **Mova um site primeiro:** em `/sites/<site>`, "Escolher outra versão do motor" e escolha `X.Y.Z`.
+5. **Atualize os sites:** em `/releases`, "Atualizar todos os sites" leva a versão disponível
+   mais recente a todos, um por vez, começando pelo de menor audiência. O cartão de progresso
+   mostra cada site; se um build falhar, aquele site fica pausado na versão nova e nenhum outro
+   começa. "Interromper" encerra a atualização: o site em andamento termina, os demais ficam
+   onde estão. Para mover só um site, use "Atualizar para a mais recente" em `/sites/<site>`.
 6. **Observe** o resultado do build ("Último build" em `/sites`, logs do `build-runner`) e o
-   site no ar; estando tudo certo, mova os demais, um por um.
+   site no ar; se a versão nova trouxe o problema, "Voltar à versão anterior" no site.
+
+No ambiente local, "Gerar nova versão" não usa GitHub nem GHCR: a versão é uma cópia da imagem
+`site-builder:local` do momento (detalhes em
+[`local-setup.md`](docs/guides/local-setup.md#gerar-nova-versão)).
 
 ### Quando usar cada ação
 
-Todas ficam em `/sites/<site>`.
+"Gerar nova versão" e "Atualizar todos os sites" ficam em `/releases`; as demais, em
+`/sites/<site>`, aba "Publicação".
 
-| Quero…                                                        | Ação                             | O que acontece                                                                      |
-| ------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------- |
-| Trocar a versão do gerador de um site, ou voltar a uma antiga | "Escolher outra versão do motor" | Grava a versão no site, retoma o site se pausado e faz um build novo já             |
-| Desfazer a última troca de versão do gerador                  | "Voltar à versão anterior (X)"   | Igual ao anterior, na versão de onde o site veio; só aparece se ela está disponível |
-| Voltar o site no ar a uma versão publicada antes (rollback)   | "Reverter"                       | Reativa um deploy anterior, **sem rebuild**; a versão do gerador não muda           |
-| Publicar já o que mudou, sem esperar a janela de agrupamento  | "Publicar agora"                 | Antecipa o build na versão atual do site (não aparece com o site pausado)           |
+| Quero…                                                       | Ação                                                    | O que acontece                                                                       |
+| ------------------------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Criar uma versão nova do gerador                             | "Gerar nova versão" (`/releases`)                       | Propõe o número, dispara o pipeline e mostra o estado até "Disponível"               |
+| Levar a versão mais recente a todos os sites                 | "Atualizar todos os sites" (`/releases`)                | Atualiza um site por vez, do de menor audiência ao maior; para no primeiro que falha |
+| Parar uma atualização de todos os sites                      | "Interromper" (cartão de progresso)                     | O site em andamento termina na versão nova; nenhum outro começa                      |
+| Levar um site à versão mais recente                          | "Atualizar para a mais recente"                         | Só aparece com versão disponível mais recente que a do site; faz o build já          |
+| Desfazer a última troca de versão do gerador                 | "Voltar à versão anterior (X)"                          | Volta à versão de onde o site veio e faz o build; só aparece se ela está disponível  |
+| Trocar a versão do gerador de um site por qualquer outra     | "Escolher outra versão do motor"                        | Grava a versão no site, retoma o site se pausado e faz um build novo já              |
+| Voltar o site no ar a uma publicação anterior (rollback)     | "Desfazer última publicação" ou "Escolher outra versão" | Reativa um deploy anterior, **sem rebuild**; a versão do gerador não muda            |
+| Publicar já o que mudou, sem esperar a janela de agrupamento | "Publicar agora"                                        | Antecipa o build na versão atual do site (não aparece com o site pausado)            |
 
-Regra prática: o problema veio com a versão nova do gerador → "Voltar à versão anterior". O problema veio com um conteúdo publicado → "Reverter" enquanto corrige.
+Regra prática: o problema veio com a versão nova do gerador → "Voltar à versão anterior". O
+problema veio com um conteúdo publicado → "Desfazer última publicação" enquanto corrige.
 
 ### Comandos úteis
 
-| Quero…                                                                      | Comando                                                                                                    |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Criar uma versão nova do site-builder (dispara o `release.yml`)             | `gh workflow run release.yml --ref main -f version=X.Y.Z`                                                  |
-| Reconstruir as imagens locais depois de mudar o gerador                     | `pnpm local:images`                                                                                        |
-| Construir só a imagem `site-builder`, como o CI faz                         | `docker/bake.sh release`                                                                                   |
-| Conferir se a imagem `site-builder` gera e serve um site                    | `tooling/build-site/scripts/smoke.sh [imagem]`                                                             |
-| Subir o ambiente local                                                      | `pnpm local:up`                                                                                            |
-| Criar os sites de exemplo e os usuários de teste                            | `pnpm local:seed`                                                                                          |
-| Conferir se o ambiente está saudável antes de testar um build               | `pnpm local:check`                                                                                         |
-| Publicar um site direto, sem passar pelo Backoffice                         | `pnpm local:publish <site>`                                                                                |
-| Ver os builds rodando (e por que um falhou)                                 | `infra/local/compose.sh logs -f build-runner`                                                              |
-| Testar o "Escolher outra versão do motor" no local, sem publicar uma versão | `docker tag ghcr.io/orakel-ai-content/site-builder:local ghcr.io/orakel-ai-content/site-builder:X.Y.Z` (¹) |
-
-(¹) Cria no host local a imagem `X.Y.Z` a partir da que o `pnpm local:images` construiu; depois
-registre `X.Y.Z` em `/releases` e use "Escolher outra versão do motor" num site. Nada vai para o GHCR.
+| Quero…                                                                     | Comando                                        |
+| -------------------------------------------------------------------------- | ---------------------------------------------- |
+| Reconstruir as imagens locais depois de mudar o gerador                    | `pnpm local:images`                            |
+| Construir só a imagem `site-builder`, como o CI faz                        | `docker/bake.sh release`                       |
+| Conferir se a imagem `site-builder` gera e serve um site                   | `tooling/build-site/scripts/smoke.sh [imagem]` |
+| Subir o ambiente local                                                     | `pnpm local:up`                                |
+| Criar os sites de exemplo e os usuários de teste                           | `pnpm local:seed`                              |
+| Conferir se o ambiente está saudável antes de testar um build              | `pnpm local:check`                             |
+| Pedir o build de um site ao Backoffice pelo terminal e esperar o resultado | `pnpm local:publish <site>`                    |
+| Ver os builds rodando (e por que um falhou)                                | `infra/local/compose.sh logs -f build-runner`  |
 
 ## Endereços e acessos
 
@@ -235,7 +248,7 @@ Valores padrão do `.env.example`, só do ambiente local.
 | --------------------------------------------------------- | ------------------------------------- | ----------------------------------------- |
 | https://admin.orakel.localhost                            | Backoffice                            | Login de teste                            |
 | https://preview.orakel.localhost/exemplo-a/guia-completo/ | Visualização de rascunhos             | Login de teste                            |
-| https://exemplo-a.localhost · https://exemplo-b.localhost | Sites publicados                      | Público, depois do `local:publish`        |
+| https://exemplo-a.localhost · https://exemplo-b.localhost | Sites publicados                      | Público, depois do primeiro build         |
 | https://media.exemplo-a.localhost                         | Mídia do site                         | Público, só leitura                       |
 | https://s3.orakel.localhost                               | Console do SeaweedFS                  | Login de teste                            |
 | https://glitchtip.orakel.localhost                        | GlitchTip (perfil `observability`)    | Login de teste + conta na primeira visita |
@@ -258,7 +271,7 @@ Valores padrão do `.env.example`, só do ambiente local.
 | `ERR_CERT_AUTHORITY_INVALID` no Chrome     | `pnpm local:trust` e ⌘Q no Chrome (a CA muda a cada `local:reset`)                        |
 | `local:check` falha em "Serviços"          | `infra/local/compose.sh logs <serviço>` (`backoffice-migrate` e `s3-init` param sozinhos) |
 | Imagem quebrada num site local             | `pnpm local:check` e `pnpm local:seed`                                                    |
-| Aviso de plataforma `linux/amd64`          | `pnpm local:images`                                                                       |
+| Aviso de plataforma `linux/amd64`          | Imagens antigas: reconstrua com `pnpm local:images`                                       |
 | Porta ocupada                              | Libere 80, 443, 5432, 8123, 8333 ou 8788                                                  |
 | `ERR_PNPM_NO_MATURE_MATCHING_VERSION`      | A versão saiu há menos de 24 h; use a anterior no `catalog` ou espere                     |
 | Linux: `build-runner` sem acesso ao Docker | O `compose.sh` usa o gid de `/var/run/docker.sock`; outro: `DOCKER_SOCKET_GID` no shell   |
