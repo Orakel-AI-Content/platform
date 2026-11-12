@@ -506,7 +506,13 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   detalhe" e abre, pelo botão ou pelo clique na linha, o `Drawer` à direita
   (`SiteExecutionDrawer`) com quando, quem pediu, etapa, mensagem e o fim do log num `<pre>`
   rolável e focável; o foco volta ao botão da linha. A linha não é focável: a tabela continua
-  tabela para o leitor de tela.
+  tabela para o leitor de tela. Acima da tabela, a faixa de status ao vivo (#638,
+  `SiteLiveActivity`): um `Alert` do Ecme (`info`) com a execução aberta, "na fila" com o
+  horário previsto no fuso do site ou "em andamento" com a etapa, e, quando ela termina, o
+  resultado (`success`, `danger` ou `warning` para concluída, falhou ou cancelada). O `Alert`
+  fica dentro de um contêiner `role="status"` sempre montado, que anuncia cada mudança. Enquanto
+  há execução aberta, a aba relê faixa e tabela pela `siteActivityAction` a cada 3 s
+  (`usePolling`); sem execução aberta, não consulta e não mostra faixa.
 - **Eventos em ordem cronológica:** `Timeline` (`src/components/ui/Timeline`) para uma lista
   de acontecimentos que cresce com o tempo (o histórico de publicações do site), um
   `Timeline.Item` por evento. Para etapas de ordem fixa, com estado e atual, é o `Steps`

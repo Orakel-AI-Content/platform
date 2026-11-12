@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUILD_KINDS, BUILD_STAGES, SITE_EVENT_KINDS } from '@/db/schema/operations.ts';
+import type { ExecutionHistoryItem, OpenExecution } from '@/domain/builds/builds.ts';
 
 import {
   BUILD_STAGE_LABEL,
@@ -15,6 +16,8 @@ import {
   SITE_STATE_VARIANT,
   formatDateTime,
   formatDuration,
+  liveResultText,
+  liveStatusText,
 } from './siteLabels.ts';
 
 // Cada estado tem aparência própria dentro do seu grupo (#86): a variante não se repete e
@@ -84,6 +87,56 @@ describe('histórico do site (#637)', () => {
   it('tem rótulo para cada etapa do build', () => {
     expect(Object.keys(BUILD_STAGE_LABEL).sort()).toEqual([...BUILD_STAGES].sort());
     for (const label of Object.values(BUILD_STAGE_LABEL)) expect(label).not.toBe('');
+  });
+});
+
+describe('faixa de status ao vivo (#638)', () => {
+  const open: OpenExecution = {
+    id: 7,
+    kind: 'build',
+    status: 'na_fila',
+    currentStage: null,
+    scheduledFor: new Date('2026-10-01T12:00:00Z'),
+    startedAt: null,
+    requestedBy: 'system',
+    cancelRequestedAt: null,
+  };
+
+  it('na fila, com o horário previsto no fuso do site', () => {
+    expect(liveStatusText(open, 'America/Sao_Paulo')).toBe(
+      'Publicação na fila, prevista para 01/10/2026, 09:00 BRT',
+    );
+    expect(liveStatusText({ ...open, scheduledFor: null }, 'UTC')).toBe('Publicação na fila');
+  });
+
+  it('em andamento, com a etapa quando já há uma', () => {
+    const running = { ...open, status: 'rodando' as const, scheduledFor: null };
+    expect(liveStatusText(running, 'UTC')).toBe('Publicação em andamento');
+    expect(liveStatusText({ ...running, currentStage: 'render', kind: 'rollback' }, 'UTC')).toBe(
+      'Reversão em andamento, etapa: Renderização',
+    );
+  });
+
+  it('o resultado da execução que terminou', () => {
+    const item: ExecutionHistoryItem = {
+      type: 'execucao',
+      id: 7,
+      kind: 'build',
+      status: 'failed',
+      requestedBy: 'system',
+      cancelRequestedBy: null,
+      at: new Date('2026-10-01T12:00:00Z'),
+      release: '1.3.0',
+      versionId: null,
+      failure: null,
+    };
+    expect(liveResultText(item, 'UTC')).toBe('Publicação falhou em 01/10/2026, 12:00 UTC');
+    expect(liveResultText({ ...item, status: 'ok' }, 'UTC')).toBe(
+      'Publicação concluída em 01/10/2026, 12:00 UTC',
+    );
+    expect(liveResultText({ ...item, status: 'cancelado' }, 'UTC')).toBe(
+      'Publicação cancelada em 01/10/2026, 12:00 UTC',
+    );
   });
 });
 
