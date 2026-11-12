@@ -167,7 +167,7 @@ Uma versão tem sempre o mesmo `X.Y.Z`, escrito de três jeitos:
 
 | Onde aparece             | Forma                                          | Exemplo                                        |
 | ------------------------ | ---------------------------------------------- | ---------------------------------------------- |
-| Tag Git (você cria)      | `site-builder-vX.Y.Z`                          | `site-builder-v1.2.0`                          |
+| Tag Git (o CI cria)      | `site-builder-vX.Y.Z`                          | `site-builder-v1.2.0`                          |
 | Imagem (o CI publica)    | `ghcr.io/orakel-ai-content/site-builder:X.Y.Z` | `ghcr.io/orakel-ai-content/site-builder:1.2.0` |
 | Backoffice (`/releases`) | `X.Y.Z`, igual à tag da imagem, sem prefixo    | `1.2.0`                                        |
 
@@ -175,12 +175,14 @@ O cadastro em `/releases` só aceita `X.Y.Z`: colar a tag Git (`site-builder-v1.
 
 ### Passo a passo de uma versão nova
 
-1. **Crie e envie a tag** num commit da `main`:
-   `git tag site-builder-vX.Y.Z && git push origin site-builder-vX.Y.Z`. Merge na `main` não
-   cria versão; só a tag cria.
-2. **O `release.yml` roda:** confere que o último E2E completo da `main` terminou verde e, só
-   então, publica a imagem `site-builder:X.Y.Z` no GHCR. Se o E2E estiver vermelho (ou não
-   houver run concluído), ele se recusa e nada é publicado: corrija a `main` e rode de novo.
+1. **Dispare o `release.yml`** na `main` com o número `X.Y.Z`: é o que o Backoffice fará
+   (workspace#81); até lá, `gh workflow run release.yml --ref main -f version=X.Y.Z`. Merge
+   na `main` não cria versão, e push de tag não dispara nada: não crie a tag à mão.
+2. **O `release.yml` roda:** recusa número fora do formato `X.Y.Z` ou já usado, confere que o
+   último E2E completo da `main` terminou verde e, só então, publica a imagem
+   `site-builder:X.Y.Z` no GHCR e cria a tag `site-builder-vX.Y.Z`. Se o E2E estiver vermelho
+   (ou não houver run concluído), ele se recusa, nada é publicado e nenhuma tag é criada:
+   corrija a `main` e dispare de novo com o mesmo número.
 3. **Leve a imagem ao host** onde o `build-runner` roda (`docker pull …/site-builder:X.Y.Z`).
    O build não baixa imagens: sem ela no host, o build do site falha.
 4. **Registre a versão** em `/releases` → "Registrar release", com o valor `X.Y.Z`.
@@ -205,7 +207,7 @@ versão anterior. O problema veio com um conteúdo publicado → "Reverter" enqu
 
 | Quero…                                                              | Comando                                                                                                    |
 | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Criar uma versão nova do site-builder (dispara o `release.yml`)     | `git tag site-builder-vX.Y.Z && git push origin site-builder-vX.Y.Z`                                       |
+| Criar uma versão nova do site-builder (dispara o `release.yml`)     | `gh workflow run release.yml --ref main -f version=X.Y.Z`                                                  |
 | Reconstruir as imagens locais depois de mudar o gerador             | `pnpm local:images`                                                                                        |
 | Construir só a imagem `site-builder`, como o CI faz                 | `docker/bake.sh release`                                                                                   |
 | Conferir se a imagem `site-builder` gera e serve um site            | `tooling/build-site/scripts/smoke.sh [imagem]`                                                             |

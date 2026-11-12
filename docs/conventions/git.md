@@ -20,8 +20,10 @@ Consulte ao criar branch, commit, PR ou release.
 
 ## Versões do site-builder
 
-- Tag manual `site-builder-vX.Y.Z` na `main`; o `release.yml` publica a imagem
-  `site-builder:X.Y.Z`, e o Backoffice registra o valor `X.Y.Z` (ADR 0018).
+- O Backoffice dispara o `release.yml` (`workflow_dispatch`, input `version` = `X.Y.Z`) na
+  `main`; o workflow publica a imagem `site-builder:X.Y.Z` e só depois cria a tag Git
+  `site-builder-vX.Y.Z`. Ninguém cria a tag à mão, e push de tag não dispara nada
+  (ADR 0018).
 - **Major:** muda o schema da API ou exige migração de configuração.
 - **Minor:** funcionalidades. **Patch:** correções.
 - Merge na `main` não cria release. Imagens do backoffice e serviços são publicadas
