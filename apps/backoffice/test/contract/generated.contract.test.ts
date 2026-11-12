@@ -9,8 +9,8 @@ import { listReviewQueue, type ContentEdit } from '../../src/domain/content/cont
 import { createForReview } from '../../src/domain/content/generated.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { publishVersion } from '../../src/domain/publications/publish.ts';
-import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
-import { resetDatabase, setupDatabase } from './helpers.ts';
+import { approveVersion } from '../../src/domain/reviews/reviews.ts';
+import { confirmAndApprove, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Conteúdo do gerador (#539): a rota interna delega a `createForReview` com o
 // `GENERATOR_ACTOR`, que cria em revisão e nunca aprova nem publica (RN-GEN-02).
@@ -19,7 +19,6 @@ let db: Db;
 let close: () => Promise<void>;
 
 const SITE = 'exemplo-a';
-const ALL = REVIEW_CHECKLIST.map((item) => item.key);
 const revisor: Actor = { email: 'revisor@orakel.local', roles: ['revisor'] };
 
 beforeAll(async () => {
@@ -90,13 +89,11 @@ describe('conteúdo do gerador', () => {
   it('o ator do gerador recebe forbidden ao aprovar e ao publicar', async () => {
     const id = await generate();
 
-    const approval = await db.transaction((tx) =>
-      approveVersion(tx, GENERATOR_ACTOR, SITE, id, 1, ALL),
-    );
+    const approval = await db.transaction((tx) => approveVersion(tx, GENERATOR_ACTOR, SITE, id, 1));
     expect(approval).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
 
     // Mesmo com a versão aprovada por uma pessoa, o gerador não publica.
-    const approved = await db.transaction((tx) => approveVersion(tx, revisor, SITE, id, 1, ALL));
+    const approved = await db.transaction((tx) => confirmAndApprove(tx, revisor, SITE, id, 1));
     expect(approved.ok).toBe(true);
     const publication = await db.transaction((tx) =>
       publishVersion(tx, GENERATOR_ACTOR, SITE, id, 1),

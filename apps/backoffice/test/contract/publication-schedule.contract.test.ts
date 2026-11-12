@@ -19,10 +19,9 @@ import {
   schedulePublication,
   scheduledPublicationAt,
 } from '../../src/domain/publications/schedule.ts';
-import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { createPublishScheduledTask } from '../../src/jobs/tasks/publish-scheduled.ts';
-import { resetDatabase, setupDatabase } from './helpers.ts';
+import { confirmAndApprove, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Agendamento da publicação com job no backoffice-worker (#488, workspace#20 R3).
 
@@ -30,7 +29,6 @@ let db: Db;
 let close: () => Promise<void>;
 
 const SITE = 'exemplo-a';
-const ALL = REVIEW_CHECKLIST.map((item) => item.key);
 const role = (name: 'editor' | 'revisor'): Actor => ({
   email: `${name}@orakel.local`,
   roles: [name],
@@ -81,7 +79,7 @@ async function prepare(contentId: number, approve = true, slug?: string): Promis
   await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
   if (approve) {
     const approved = await db.transaction((tx) =>
-      approveVersion(tx, role('revisor'), SITE, contentId, saved.value.version, ALL),
+      confirmAndApprove(tx, role('revisor'), SITE, contentId, saved.value.version),
     );
     if (!approved.ok) throw new Error(JSON.stringify(approved.issues));
   }

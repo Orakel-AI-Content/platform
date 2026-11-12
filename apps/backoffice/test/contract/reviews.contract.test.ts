@@ -3,7 +3,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
-import { contentVersions, reviews } from '../../src/db/schema/index.ts';
+import { contentVersions, reviewConfirmations, reviews } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import {
@@ -14,6 +14,11 @@ import {
   updateContent,
 } from '../../src/domain/content/contents.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
+import {
+  reviewConfirmations as readConfirmations,
+  setAllConfirmations,
+  setConfirmation,
+} from '../../src/domain/reviews/confirmations.ts';
 import {
   approveVersion,
   pendingReturn,
@@ -27,6 +32,8 @@ import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
 // Aprovação da revisão (#73): checklist, validação pela release do site e registro em reviews.
+// Confirmações do checklist gravadas por versão (#749): marcar, desmarcar, ler, e a aprovação
+// que exige as três gravadas.
 // Devolução ao editor (#598): comentário obrigatório, volta a rascunho e a devolução pendente.
 
 // Recursos da release: `resourcesFor` devolve os RESOURCES até o registro por release
@@ -94,18 +101,173 @@ async function draft(contentId: number, submit = true): Promise<number> {
   return saved.value.version;
 }
 
-const approve = (
+const mark = (
   contentId: number,
   version: number,
-  checklist: readonly string[] = ALL,
+  key: string,
+  confirmed = true,
   actor = role('revisor'),
-) => db.transaction((tx) => approveVersion(tx, actor, SITE, contentId, version, checklist));
+) => db.transaction((tx) => setConfirmation(tx, actor, SITE, contentId, version, key, confirmed));
+
+/** Grava as confirmações `keys` na versão, como o revisor; falha o teste se alguma é recusada. */
+async function confirm(contentId: number, version: number, keys: readonly string[] = ALL) {
+  for (const key of keys) {
+    const marked = await mark(contentId, version, key);
+    if (!marked.ok) throw new Error(JSON.stringify(marked.issues));
+  }
+}
+
+const approve = (contentId: number, version: number, actor = role('revisor')) =>
+  db.transaction((tx) => approveVersion(tx, actor, SITE, contentId, version));
+
+async function confirmations(contentId: number, version: number) {
+  return db
+    .select()
+    .from(reviewConfirmations)
+    .where(
+      and(
+        eq(reviewConfirmations.siteId, SITE),
+        eq(reviewConfirmations.contentId, contentId),
+        eq(reviewConfirmations.version, version),
+      ),
+    );
+}
+
+describe('confirmações da revisão por versão (#749)', () => {
+  it('marcar grava a chave, quem marcou e quando; marcar de novo não duplica nem troca o autor', async () => {
+    const version = await draft(1);
+
+    expect(await mark(1, version, 'valor_original')).toEqual({
+      ok: true,
+      value: { confirmed: ['valor_original'] },
+    });
+    expect(await mark(1, version, 'valor_original', true, role('admin'))).toMatchObject({
+      ok: true,
+      value: { confirmed: ['valor_original'] },
+    });
+
+    const rows = await confirmations(1, version);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      siteId: SITE,
+      contentId: 1,
+      version,
+      key: 'valor_original',
+      confirmedBy: 'revisor@orakel.local',
+    });
+    expect(rows[0]?.confirmedAt).toBeInstanceOf(Date);
+  });
+
+  it('desmarcar remove a confirmação; marcar e desmarcar todas de uma vez', async () => {
+    const version = await draft(1);
+    await confirm(1, version, ['valor_original', 'visualizacao_conferida']);
+
+    expect(await mark(1, version, 'valor_original', false)).toEqual({
+      ok: true,
+      value: { confirmed: ['visualizacao_conferida'] },
+    });
+    expect((await confirmations(1, version)).map((row) => row.key)).toEqual([
+      'visualizacao_conferida',
+    ]);
+
+    const all = await db.transaction((tx) =>
+      setAllConfirmations(tx, role('revisor'), SITE, 1, version, true),
+    );
+    expect(all).toEqual({ ok: true, value: { confirmed: ALL } });
+    expect(await confirmations(1, version)).toHaveLength(3);
+
+    const none = await db.transaction((tx) =>
+      setAllConfirmations(tx, role('revisor'), SITE, 1, version, false),
+    );
+    expect(none).toEqual({ ok: true, value: { confirmed: [] } });
+    expect(await confirmations(1, version)).toEqual([]);
+  });
+
+  it('recusa chave fora do checklist, inclusive as que saíram', async () => {
+    const version = await draft(1);
+
+    for (const key of ['inventado', 'descricao_imagens', 'imagens_decorativas_marcadas']) {
+      expect(await mark(1, version, key)).toMatchObject({
+        ok: false,
+        issues: [{ code: 'review.unknown_confirmation', path: ['key'] }],
+      });
+    }
+    expect(await confirmations(1, version)).toEqual([]);
+  });
+
+  it('recusa versão que não é a mais recente, fora de em_revisao ou de conteúdo inexistente', async () => {
+    const reviewed = await draft(1);
+    await draft(1, false);
+    const latest = (await versions(1)).at(-1)?.version ?? 0;
+
+    for (const confirmed of [true, false]) {
+      expect(await mark(1, reviewed, 'valor_original', confirmed)).toMatchObject({
+        ok: false,
+        issues: [{ code: 'review.not_latest' }],
+      });
+      expect(await mark(1, latest, 'valor_original', confirmed)).toMatchObject({
+        ok: false,
+        issues: [{ code: 'review.not_in_review' }],
+      });
+      expect(await mark(999, 1, 'valor_original', confirmed)).toMatchObject({
+        ok: false,
+        issues: [{ code: 'content.not_found' }],
+      });
+    }
+    expect(await db.select().from(reviewConfirmations)).toEqual([]);
+  });
+
+  it.each(['editor', 'operacao'] as const)('%s não marca nem desmarca', async (name) => {
+    const version = await draft(1);
+    await confirm(1, version, ['valor_original']);
+
+    expect(await mark(1, version, 'visualizacao_conferida', true, role(name))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
+    expect(await mark(1, version, 'valor_original', false, role(name))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
+    const all = await db.transaction((tx) =>
+      setAllConfirmations(tx, role(name), SITE, 1, version, true),
+    );
+    expect(all).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect((await confirmations(1, version)).map((row) => row.key)).toEqual(['valor_original']);
+  });
+
+  it('ler devolve só as da versão pedida, na ordem do checklist; exige site.read', async () => {
+    const first = await draft(1);
+    await confirm(1, first, ['visualizacao_conferida', 'valor_original']);
+    const second = await draft(1);
+    await confirm(1, second, ['politicas_anuncios_afiliados']);
+
+    const read = (version: number, actor: Actor = role('editor')) =>
+      readConfirmations(db, actor, SITE, 1, version);
+
+    const old = await read(first);
+    if (!old.ok) throw new Error(JSON.stringify(old.issues));
+    expect(old.value.map((item) => item.key)).toEqual(['valor_original', 'visualizacao_conferida']);
+    expect(old.value[0]).toMatchObject({ confirmedBy: 'revisor@orakel.local' });
+    expect(old.value[0]?.confirmedAt).toBeInstanceOf(Date);
+    expect(await read(second)).toMatchObject({
+      ok: true,
+      value: [{ key: 'politicas_anuncios_afiliados' }],
+    });
+    expect(await read(second, { email: 'ninguem@orakel.local', roles: [] })).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
+  });
+});
 
 describe('aprovar a versão em revisão', () => {
   it('grava revisor, versão, checklist e data em reviews e deixa a versão aprovado', async () => {
     const version = await draft(1);
     const before = (await versions(1)).at(-1);
     const pending = await unresolvedPendingChangeIds(db, SITE);
+    // Marcadas fora da ordem: a revisão grava as chaves na ordem do checklist.
+    await confirm(1, version, [...ALL].reverse());
 
     const result = await approve(1, version);
 
@@ -128,6 +290,7 @@ describe('aprovar a versão em revisão', () => {
 
   it('com a release sem um bloco usado no conteúdo, devolve a issue e recusa a aprovação', async () => {
     const version = await draft(1);
+    await confirm(1, version);
     release.override = withoutFaq;
 
     const issues = await reviewIssues(db, role('editor'), SITE, 1);
@@ -145,36 +308,41 @@ describe('aprovar a versão em revisão', () => {
     expect((await versions(1)).at(-1)?.status).toBe('em_revisao');
   });
 
-  it('recusa checklist incompleto ou com item desconhecido', async () => {
+  it('recusa sem as três confirmações gravadas na versão, até a última ser marcada', async () => {
     const version = await draft(1);
 
-    expect(await approve(1, version, ALL.slice(1))).toMatchObject({
+    expect(await approve(1, version)).toMatchObject({
       ok: false,
       issues: [{ code: 'review.checklist_incomplete', path: ['checklist'] }],
     });
-    expect(await approve(1, version, [...ALL, 'inventado'])).toMatchObject({
+    await confirm(1, version, ALL.slice(1));
+    expect(await approve(1, version)).toMatchObject({
+      ok: false,
+      issues: [{ code: 'review.checklist_incomplete', path: ['checklist'] }],
+    });
+    expect(await db.select().from(reviews)).toEqual([]);
+
+    await confirm(1, version, ALL.slice(0, 1));
+    expect(await approve(1, version)).toMatchObject({ ok: true });
+  });
+
+  it('confirmações de outra versão não valem para a versão em revisão', async () => {
+    const old = await draft(1);
+    await confirm(1, old);
+    const version = await draft(1);
+
+    expect(await approve(1, version)).toMatchObject({
       ok: false,
       issues: [{ code: 'review.checklist_incomplete' }],
     });
-    expect(await db.select().from(reviews)).toEqual([]);
   });
 
-  it('o checklist tem só as três confirmações humanas; as chaves que saíram são recusadas', async () => {
-    const version = await draft(1);
-
+  it('o checklist tem só as três confirmações humanas', () => {
     expect(ALL).toEqual([
       'valor_original',
       'politicas_anuncios_afiliados',
       'visualizacao_conferida',
     ]);
-    for (const removed of ['descricao_imagens', 'imagens_decorativas_marcadas']) {
-      expect(await approve(1, version, [...ALL, removed])).toMatchObject({
-        ok: false,
-        issues: [{ code: 'review.checklist_incomplete', path: ['checklist'] }],
-      });
-    }
-    expect(await db.select().from(reviews)).toEqual([]);
-    expect(await approve(1, version, ALL)).toMatchObject({ ok: true });
   });
 
   it('imagem sem descrição continua impedindo a aprovação, pela validação da release', async () => {
@@ -198,7 +366,8 @@ describe('aprovar a versão em revisão', () => {
         ),
       );
 
-    const result = await approve(1, version, ALL);
+    await confirm(1, version);
+    const result = await approve(1, version);
 
     expect(result).toMatchObject({ ok: false });
     expect(!result.ok && result.issues.some((issue) => issue.code.startsWith('schema.'))).toBe(
@@ -258,8 +427,9 @@ describe('aprovar a versão em revisão', () => {
 
   it.each(['editor', 'operacao'] as const)('%s não aprova', async (name) => {
     const version = await draft(1);
+    await confirm(1, version);
 
-    expect(await approve(1, version, ALL, role(name))).toMatchObject({
+    expect(await approve(1, version, role(name))).toMatchObject({
       ok: false,
       issues: [{ code: 'forbidden' }],
     });
@@ -268,8 +438,9 @@ describe('aprovar a versão em revisão', () => {
 
   it.each(['admin', 'revisor'] as const)('%s aprova', async (name) => {
     const version = await draft(1);
+    await confirm(1, version);
 
-    expect(await approve(1, version, ALL, role(name))).toMatchObject({ ok: true });
+    expect(await approve(1, version, role(name))).toMatchObject({ ok: true });
   });
 });
 
@@ -351,6 +522,7 @@ describe('devolver ao editor (#598)', () => {
     const version = await draft(1);
     await giveBack(1, version);
     await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, 1));
+    await confirm(1, version);
     const approved = await approve(1, version);
     if (!approved.ok) throw new Error(JSON.stringify(approved.issues));
 
@@ -411,6 +583,7 @@ describe('devolução pendente', () => {
     const version = await draft(1);
     await giveBack(1, version);
     await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, 1));
+    await confirm(1, version);
     await approve(1, version);
 
     expect(await pendingOf()).toEqual({ ok: true, value: null });
@@ -509,6 +682,7 @@ describe('checagens de conteúdo para a tela de revisão', () => {
 
   it('só a validação da release é erro, e a aprovação continua barrando só ela', async () => {
     const version = await submit({ description: undefined, taxonomyIds: [2] });
+    await confirm(1, version);
     release.override = withoutFaq;
 
     const { checks } = await checksOf();

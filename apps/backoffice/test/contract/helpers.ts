@@ -6,8 +6,11 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { runMigrations } from 'graphile-worker';
 
-import { createDb, createPool, type Db } from '../../src/db/client.ts';
+import { createDb, createPool, type Db, type Executor } from '../../src/db/client.ts';
 import * as schema from '../../src/db/schema/index.ts';
+import type { Actor } from '../../src/domain/access/rbac.ts';
+import { setAllConfirmations } from '../../src/domain/reviews/confirmations.ts';
+import { approveVersion } from '../../src/domain/reviews/reviews.ts';
 
 // Banco dos testes de contrato: DATABASE_URL (no CI, o Postgres do job de contrato).
 // Cada arquivo migra (idempotente) e limpa as tabelas antes de cada teste. Antes de migrar,
@@ -93,6 +96,22 @@ export async function resetDatabase(db: Db): Promise<void> {
   await db.execute(sql.raw(`truncate ${TABLES.join(', ')} restart identity cascade`));
   await db.execute(sql`delete from graphile_worker._private_jobs`);
   await db.execute(sql`delete from graphile_worker._private_job_queues`);
+}
+
+/**
+ * Grava todas as confirmações do checklist na versão e a aprova (#749), como o revisor faz na
+ * tela: a recusa de qualquer dos dois passos volta como está.
+ */
+export async function confirmAndApprove(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+): ReturnType<typeof approveVersion> {
+  const confirmed = await setAllConfirmations(tx, actor, siteId, contentId, version, true);
+  if (!confirmed.ok) return confirmed;
+  return approveVersion(tx, actor, siteId, contentId, version);
 }
 
 type PlanNode = { 'Node Type': string; 'Relation Name'?: string; Plans?: PlanNode[] };
