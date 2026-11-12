@@ -26,7 +26,6 @@ vi.mock('@/domain/reviews/confirmations.ts', () => ({
 }));
 
 const revisor = { email: 'revisor@orakel.local', roles: ['revisor'] };
-const checklist = ['valor_original', 'visualizacao_conferida'];
 const forbidden = {
   ok: false,
   issues: [{ code: 'forbidden', message: 'Sem permissão para content.publish', path: [] }],
@@ -42,7 +41,7 @@ describe('aprovar na tela de revisão', () => {
   it('sem sessão não chama o domínio nem revalida', async () => {
     mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
 
-    expect(await approveAction('exemplo-a', 1, 2, checklist)).toEqual({
+    expect(await approveAction('exemplo-a', 1, 2)).toEqual({
       ok: false,
       message: 'Sessão inválida; entre de novo.',
       issues: [{ path: [], message: 'Sessão inválida; entre de novo.' }],
@@ -64,7 +63,7 @@ describe('aprovar na tela de revisão', () => {
       ],
     });
 
-    expect(await approveAction('exemplo-a', 1, 2, checklist)).toEqual({
+    expect(await approveAction('exemplo-a', 1, 2)).toEqual({
       ok: false,
       message: 'Não foi possível aprovar.',
       issues: [{ path: [], message: 'Marque todos os itens do checklist' }],
@@ -72,32 +71,15 @@ describe('aprovar na tela de revisão', () => {
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('recusa ao gravar uma chave não aprova', async () => {
-    mocks.setConfirmation.mockResolvedValue(forbidden);
-
-    expect(await approveAction('exemplo-a', 1, 2, checklist)).toMatchObject({
-      ok: false,
-      message: 'Não foi possível aprovar.',
-      issues: [{ path: [], message: 'Sem permissão para content.publish' }],
-    });
-    expect(mocks.setConfirmation).toHaveBeenCalledTimes(1);
-    expect(mocks.approveVersion).not.toHaveBeenCalled();
-  });
-
-  it('grava as chaves recebidas, aprova a versão vista e revalida a fila, a revisão e o conteúdo', async () => {
+  it('aprova a versão vista sem gravar confirmações e revalida a fila, a revisão e o conteúdo', async () => {
     mocks.approveVersion.mockResolvedValue({ ok: true, value: { reviewId: 9 } });
 
-    expect(await approveAction('exemplo-a', 1, 2, checklist)).toEqual({
+    expect(await approveAction('exemplo-a', 1, 2)).toEqual({
       ok: true,
       message: 'Versão 2 aprovada.',
     });
-    expect(mocks.setConfirmation.mock.calls).toEqual(
-      checklist.map((key) => [{}, revisor, 'exemplo-a', 1, 2, key, true]),
-    );
     expect(mocks.approveVersion).toHaveBeenCalledWith({}, revisor, 'exemplo-a', 1, 2);
-    expect(mocks.setConfirmation.mock.invocationCallOrder.at(-1)).toBeLessThan(
-      mocks.approveVersion.mock.invocationCallOrder[0] ?? 0,
-    );
+    expect(mocks.setConfirmation).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(1, '/sites/exemplo-a/revisao');
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(2, '/sites/exemplo-a/revisao/1');
     expect(mocks.revalidatePath).toHaveBeenNthCalledWith(3, '/sites/exemplo-a/conteudos/1');

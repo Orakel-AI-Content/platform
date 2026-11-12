@@ -64,15 +64,13 @@ function confirmResult(
 }
 
 /**
- * Aprova a versão que o revisor viu. A aprovação lê as confirmações gravadas (#749); até o
- * painel gravá-las a cada clique (#752), as chaves que ele envia são gravadas aqui, na mesma
- * transação, antes de aprovar.
+ * Aprova a versão que o revisor viu. As confirmações já estão gravadas, a cada marcação do
+ * painel (#752); a aprovação as lê do banco (#749).
  */
 export async function approveAction(
   siteId: string,
   contentId: number,
   version: number,
-  checklist: string[],
 ): Promise<ApproveResult> {
   const actor = await currentActor();
   if (!actor.ok) {
@@ -82,13 +80,9 @@ export async function approveAction(
       issues: [{ path: [], message: INVALID_SESSION }],
     };
   }
-  const result = await getDb().db.transaction(async (tx) => {
-    for (const key of checklist) {
-      const marked = await setConfirmation(tx, actor.value, siteId, contentId, version, key, true);
-      if (!marked.ok) return marked;
-    }
-    return approveVersion(tx, actor.value, siteId, contentId, version);
-  });
+  const result = await getDb().db.transaction((tx) =>
+    approveVersion(tx, actor.value, siteId, contentId, version),
+  );
   if (!result.ok) {
     // O checklist é um campo só no domínio; no formulário, o resumo acima dos itens.
     return {
