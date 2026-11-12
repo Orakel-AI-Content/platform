@@ -43,7 +43,7 @@ function fakeZones(byDomain: Record<string, ZoneStatus>) {
 
 function run(zones: ZoneChecker, payload: unknown = {}) {
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
-  const done = createCheckSiteInfraTask({ db, zones, now: () => NOW })(payload, {
+  const done = createCheckSiteInfraTask({ db, zones, now: () => new Date(NOW) })(payload, {
     logger,
   } as unknown as JobHelpers);
   return { done, logger };

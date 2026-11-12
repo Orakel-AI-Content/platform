@@ -889,7 +889,7 @@ describe('conferência automática da infra (#718)', () => {
           return Promise.resolve(byDomain[domain] ?? { kind: 'inexistente' });
         },
       },
-      now: () => at,
+      now: () => new Date(at),
     });
     const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     await task(payload, { logger } as unknown as JobHelpers);

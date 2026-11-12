@@ -8,7 +8,7 @@ export type CheckSiteInfraTaskDeps = {
   db: Db;
   /** Consulta da zona (Cloudflare ou edge-local, pelo DEPLOY_TARGET); falso nos testes. */
   zones: ZoneChecker;
-  now?: () => number;
+  now?: () => Date;
 };
 
 function siteIdOf(payload: unknown): string | undefined {
@@ -28,7 +28,7 @@ function siteIdOf(payload: unknown): string | undefined {
  * sem domínio é pulado sem gravar nada; erro num site não interrompe os outros.
  */
 export function createCheckSiteInfraTask(deps: CheckSiteInfraTaskDeps): Task {
-  const now = deps.now ?? Date.now;
+  const now = deps.now ?? (() => new Date());
   return async (payload, helpers) => {
     const log = helpers.logger;
     const targets = await sitesForInfraCheck(deps.db, siteIdOf(payload));
@@ -40,7 +40,7 @@ export function createCheckSiteInfraTask(deps: CheckSiteInfraTaskDeps): Task {
       }
       try {
         const status = await deps.zones.check(domain);
-        const checkedAt = new Date(now());
+        const checkedAt = now();
         const lifecycle = await deps.db.transaction((tx) =>
           recordInfraCheck(tx, siteId, status, checkedAt),
         );
