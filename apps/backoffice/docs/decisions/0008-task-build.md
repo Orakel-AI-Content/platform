@@ -69,6 +69,19 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
   seguinte `na_fila` com o mesmo destino. A falha permanente não pausa o site. Sem tabela
   própria nem coluna nova: as consultas de build já filtram `kind = build`, então uma linha de
   rollback nunca vira versão do "Reverter", referência da trava ou último build.
+- **Cancelar em andamento (#643):** o "Cancelar" (`cancelBuild`, no Next) de uma tentativa
+  `rodando` só grava `cancel_requested_by`/`cancel_requested_at` na linha; quem fala com o
+  Docker é o `build-runner`. A task passa ao `runBuild` a leitura dessa marca
+  (`buildCancelRequested`), consultada antes do render, antes do publish e, enquanto o container
+  da etapa roda, a cada `CANCEL_CHECK_MS` (5 s): a espera vira fatias de `runtime.wait` dentro
+  do prazo da etapa. Havendo pedido, o container é morto (`kill`, já liberado no proxy) e o
+  desfecho é `cancelled`, uma variante própria do `BuildOutcome` (não uma `Failure`):
+  `recordBuild` fecha a linha `cancelado`, sem pausar o site nem baixar mudanças pendentes, e a
+  task termina sem lançar, sem repetição nem linha `na_fila` nova. Pedido feito entre as etapas
+  impede a seguinte; container que já saiu antes de o pedido ser visto fecha com o resultado
+  real. Erro na leitura da marca só vai para o log. Containers e volume continuam sempre
+  removidos. Sem rota nova no proxy (ADR 0011 da raiz), sem migração; o pull da imagem não é
+  interrompido, e o rollback não é cancelável.
 - **Falhas:** transitória lança e o Graphile Worker repete (até 5, backoff exponencial);
   permanente pausa o site com `<etapa>: <motivo>`; site pausado não é construído.
 - **Estado do site:** `src/domain/builds/site-state.ts` grava só colunas operacionais, sem
@@ -94,6 +107,9 @@ Docker via `docker-socket-proxy` (ADR 0011 da raiz). Até aqui a task `build` s�
   esconderia um job que já está na fila.
 - Ler `graphile_worker.jobs` para o horário da repetição ou para o status: acopla o status à
   fila interna do Graphile.
+- Cancelar em andamento por `AbortSignal` no `ContainerRuntime.wait`: mudaria a interface, o
+  cliente Docker e o runtime falso para o mesmo efeito das fatias; job de cancelamento próprio:
+  outra task concorrendo com a que roda, sem acesso ao container dela.
 
 ## Consequências
 
