@@ -1125,6 +1125,44 @@ describe('SchemaForm: formulário em cartão (#333)', () => {
     );
     expect(screen.getAllByText('Recusado pelo domínio.').length).toBeGreaterThan(0);
   });
+
+  it('ações próprias no rodapé: rodam como o envio, desabilitam os botões e mostram a recusa no resumo', async () => {
+    const user = userEvent.setup();
+    let finish: (value: readonly { path: string[]; message: string }[]) => void = () => undefined;
+    const action = vi.fn(
+      () =>
+        new Promise<readonly { path: string[]; message: string }[]>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(
+      <SchemaForm
+        schema={schema}
+        defaultValues={{ seconds: 30 }}
+        labels={labels}
+        card={{
+          actions: ({ pending, run }) => (
+            <button type="button" disabled={pending} onClick={() => run(action)}>
+              Decidir
+            </button>
+          ),
+        }}
+        submitLabel="Salvar"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const footer = document.querySelector('.card-footer');
+    expect(footer?.contains(screen.getByRole('button', { name: 'Decidir' }))).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Decidir' }));
+    expect(action).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Decidir' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Salvar' })).toHaveProperty('disabled', true);
+
+    finish([{ path: [], message: 'Recusado pelo domínio.' }]);
+    expect(await screen.findByText('Recusado pelo domínio.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Salvar' })).toHaveProperty('disabled', false);
+  });
 });
 
 describe('SchemaForm: erro, dica e obrigatório no FormItem (#329)', () => {
