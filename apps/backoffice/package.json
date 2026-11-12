@@ -19,6 +19,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "LLM_MODEL=${LOCAL_LLM_MODEL:-fixture} node --env-file-if-exists=../../.env.local src/bin/migrate.ts",
     "db:seed": "LLM_MODEL=${LOCAL_LLM_MODEL:-fixture} node --env-file-if-exists=../../.env.local src/bin/seed.ts",
+    "site:publish": "LLM_MODEL=${LOCAL_LLM_MODEL:-fixture} node --env-file-if-exists=../../.env.local src/bin/publish.ts",
     "media:reprocess": "node --env-file-if-exists=../../.env.local src/bin/reprocess-media.ts",
     "audience:aggregate": "node --env-file-if-exists=../../.env.local src/bin/aggregate-audience.ts"
   },
