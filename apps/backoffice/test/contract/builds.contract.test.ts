@@ -13,8 +13,9 @@ import {
   sites,
 } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
-import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
+import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import {
+  cancelBuild,
   lastBuilds,
   listRollbackVersions,
   loadBuildTarget,
@@ -357,6 +358,180 @@ describe('linha na fila', () => {
         requestedBy: null,
       }),
     ]);
+  });
+});
+
+describe('cancelar a publicação', () => {
+  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+  const cancel = (actor: Actor = operacao, siteId = 'exemplo-a') =>
+    db.transaction((tx) => cancelBuild(tx, actor, siteId));
+
+  const rows = () => db.select().from(builds).orderBy(builds.id);
+  const buildJobIds = async () => {
+    const { rows: jobs } = await db.execute<{ id: string }>(
+      sql`select id::text as id from graphile_worker.jobs where task_identifier = 'build' order by id`,
+    );
+    return jobs.map((job) => job.id);
+  };
+  /** Como o worker: o job fica travado enquanto roda. */
+  const lockJob = (jobId: string | undefined) =>
+    db.execute(sql`update graphile_worker._private_jobs
+      set locked_at = now(), locked_by = 'worker' where id = ${jobId}::bigint`);
+  const publish = (slug: string) =>
+    db.transaction((tx) => createAuthor(tx, SYSTEM_ACTOR, 'exemplo-a', { slug, name: slug }));
+  const buildOk = async (versionId: string) => {
+    const fake = fakeRuntime({
+      render: { file: renderOk() },
+      publish: { file: { ...publishOk(), versionId } },
+    });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      await helpers(),
+    );
+  };
+
+  it('na fila: tira o job de build do site e fecha a linha como cancelado, sem abrir outra', async () => {
+    const [queued] = await rows();
+    expect(await buildJobIds()).toHaveLength(1);
+
+    expect(await cancel()).toEqual({ ok: true, value: 'cancelado' });
+
+    expect(await buildJobIds()).toEqual([]);
+    expect(await rows()).toEqual([
+      expect.objectContaining({
+        id: queued?.id,
+        status: 'cancelado',
+        cancelRequestedBy: 'o@orakel.local',
+        cancelRequestedAt: expect.any(Date) as Date,
+        finishedAt: expect.any(Date) as Date,
+      }),
+    ]);
+  });
+
+  it('depois de cancelar, as mudanças continuam pendentes e o próximo agendamento abre outra linha na_fila', async () => {
+    const pending = await unresolvedPendingChangeIds(db, 'exemplo-a');
+    expect(pending.length).toBeGreaterThan(0);
+    await cancel();
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(pending);
+
+    await publish('ana');
+    const [cancelled, next] = await rows();
+    expect(await rows()).toHaveLength(2);
+    expect(cancelled).toMatchObject({ status: 'cancelado' });
+    expect(next).toMatchObject({
+      status: 'na_fila',
+      requestedBy: 'system',
+      cancelRequestedBy: null,
+      cancelRequestedAt: null,
+    });
+    expect(await buildJobIds()).toEqual([next?.jobId]);
+  });
+
+  it('rodando: grava quem pediu e quando na linha, que continua rodando, e não tira o job', async () => {
+    const [queued] = await rows();
+    const [jobId] = await buildJobIds();
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    const during: { result: unknown; rows: unknown; jobs: string[] }[] = [];
+    const runtime = {
+      ...fake.runtime,
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
+        if (during.length === 0) {
+          await lockJob(jobId);
+          during.push({ result: await cancel(), rows: await rows(), jobs: await buildJobIds() });
+        }
+        return fake.runtime.wait(...args);
+      },
+    };
+    await createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, await helpers());
+
+    expect(during[0]).toEqual({
+      result: { ok: true, value: 'pedido' },
+      rows: [
+        expect.objectContaining({
+          id: queued?.id,
+          status: 'rodando',
+          finishedAt: null,
+          cancelRequestedBy: 'o@orakel.local',
+          cancelRequestedAt: expect.any(Date) as Date,
+        }),
+      ],
+      jobs: [jobId],
+    });
+  });
+
+  it('job já pego pelo build-runner, com a linha ainda na_fila: só grava o pedido e mantém a chave', async () => {
+    const [jobId] = await buildJobIds();
+    await lockJob(jobId);
+
+    expect(await cancel()).toEqual({ ok: true, value: 'pedido' });
+
+    const { rows: jobs } = await db.execute<{ key: string | null }>(
+      sql`select key from graphile_worker._private_jobs where id = ${jobId}::bigint`,
+    );
+    expect(jobs).toEqual([{ key: 'build:exemplo-a' }]);
+    expect(await rows()).toEqual([
+      expect.objectContaining({ status: 'na_fila', cancelRequestedBy: 'o@orakel.local' }),
+    ]);
+  });
+
+  it('com uma rodando e outra na_fila, fecha a da fila e não toca a que roda', async () => {
+    const [jobId] = await buildJobIds();
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    const during: unknown[] = [];
+    const runtime = {
+      ...fake.runtime,
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
+        if (during.length === 0) {
+          await lockJob(jobId);
+          await publish('ana');
+          during.push({ result: await cancel(), rows: await rows(), jobs: await buildJobIds() });
+        }
+        return fake.runtime.wait(...args);
+      },
+    };
+    await createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, await helpers());
+
+    expect(during[0]).toEqual({
+      result: { ok: true, value: 'cancelado' },
+      rows: [
+        expect.objectContaining({ jobId, status: 'rodando', cancelRequestedBy: null }),
+        expect.objectContaining({ status: 'cancelado', cancelRequestedBy: 'o@orakel.local' }),
+      ],
+      jobs: [jobId],
+    });
+  });
+
+  it('sem publicação aberta recusa com erro próprio; sem operations.run, com forbidden', async () => {
+    const editor = { email: 'e@orakel.local', roles: ['editor'] as const };
+    expect(await cancel(editor)).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await rows()).toEqual([expect.objectContaining({ status: 'na_fila' })]);
+
+    await clearQueue();
+    expect(await cancel()).toMatchObject({ ok: false, issues: [{ code: 'build.not_open' }] });
+    expect(await cancel(operacao, 'nao-existe')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
+  });
+
+  it('a linha cancelada não vira versão ativa, versão do "Reverter" nem pausa o site', async () => {
+    await buildOk('v-1');
+    await buildOk('v-2');
+    await publish('ana');
+    const read = async () => ({
+      site: await site(),
+      target: await loadBuildTarget(db, 'exemplo-a'),
+      rollback: await listRollbackVersions(db, operacao, 'exemplo-a'),
+      last: (await lastBuilds(db)).get('exemplo-a'),
+      recent: await recentBuilds(db, 'exemplo-a'),
+    });
+    const before = await read();
+    expect(before.site).toMatchObject({ state: 'ativo', activeVersionId: 'v-2' });
+
+    expect(await cancel()).toEqual({ ok: true, value: 'cancelado' });
+
+    expect(await read()).toEqual(before);
+    expect(await events()).toEqual([]);
   });
 });
 
