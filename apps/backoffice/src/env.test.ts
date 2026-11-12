@@ -6,6 +6,7 @@ import {
   parseBuildRunnerEnv,
   parseDatabaseEnv,
   parseEnv,
+  parseZoneCheckEnv,
 } from './env.ts';
 
 const valid = {
@@ -260,5 +261,55 @@ describe('parseAudienceEnv (#545)', () => {
     expect(findAudienceEnv({ AE_SQL_TRANSPORT: '', AE_SQL_URL: '' })).toBeUndefined();
     expect(findAudienceEnv(audience)).toEqual(audience);
     expect(() => findAudienceEnv({ AE_SQL_URL: audience.AE_SQL_URL })).toThrow(/AE_SQL_TRANSPORT/);
+  });
+});
+
+describe('parseZoneCheckEnv (workspace#85)', () => {
+  const zoneToken = 'z'.repeat(40);
+  const accountId = 'a'.repeat(32);
+
+  it('local exige EDGE_LOCAL_URL', () => {
+    expect(parseZoneCheckEnv({ EDGE_LOCAL_URL: 'http://edge-local:8081' })).toEqual({
+      DEPLOY_TARGET: 'local',
+      EDGE_LOCAL_URL: 'http://edge-local:8081',
+    });
+    expect(() => parseZoneCheckEnv({ DEPLOY_TARGET: 'local', EDGE_LOCAL_URL: '' })).toThrow(
+      /EDGE_LOCAL_URL/,
+    );
+  });
+
+  it('cloudflare exige o token só de leitura e a conta; o de deploy não serve', () => {
+    expect(
+      parseZoneCheckEnv({
+        DEPLOY_TARGET: 'cloudflare',
+        CLOUDFLARE_ZONE_READ_TOKEN: zoneToken,
+        CLOUDFLARE_ACCOUNT_ID: accountId,
+      }),
+    ).toMatchObject({ CLOUDFLARE_ZONE_READ_TOKEN: zoneToken, CLOUDFLARE_ACCOUNT_ID: accountId });
+    expect(() =>
+      parseZoneCheckEnv({
+        DEPLOY_TARGET: 'cloudflare',
+        CLOUDFLARE_API_TOKEN: zoneToken,
+        CLOUDFLARE_ACCOUNT_ID: accountId,
+      }),
+    ).toThrow(/CLOUDFLARE_ZONE_READ_TOKEN/);
+    expect(() =>
+      parseZoneCheckEnv({ DEPLOY_TARGET: 'cloudflare', CLOUDFLARE_ZONE_READ_TOKEN: zoneToken }),
+    ).toThrow(/CLOUDFLARE_ACCOUNT_ID/);
+  });
+
+  it('a mensagem de erro não repete o token', () => {
+    const short = 'segredo-curto';
+    expect(() =>
+      parseZoneCheckEnv({
+        DEPLOY_TARGET: 'cloudflare',
+        CLOUDFLARE_ZONE_READ_TOKEN: short,
+        CLOUDFLARE_ACCOUNT_ID: accountId,
+      }),
+    ).toThrow(/^(?![\s\S]*segredo-curto)[\s\S]*CLOUDFLARE_ZONE_READ_TOKEN/);
+  });
+
+  it('o ambiente do app não exige nenhuma variável da zona', () => {
+    expect(() => parseEnv(valid)).not.toThrow();
   });
 });

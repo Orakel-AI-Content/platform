@@ -88,6 +88,11 @@ services:
       # A task generate-article cria o artigo pela rota interna do backoffice-web (rede
       # internal), nunca pelo hostname público, que bloqueia /api/internal.
       GENERATOR_API_URL: http://backoffice-web:3000
+      # Conferência da zona do site (ADR 0025 da raiz): só leitura de zona, nunca o token de
+      # deploy, que fica no build-runner.
+      DEPLOY_TARGET: ${DEPLOY_TARGET:?defina DEPLOY_TARGET}
+      CLOUDFLARE_ZONE_READ_TOKEN: ${CLOUDFLARE_ZONE_READ_TOKEN:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
     depends_on:
       backoffice-migrate:
         condition: service_completed_successfully

@@ -219,6 +219,48 @@ export function findAudienceEnv(
   return parseAudienceEnv(source);
 }
 
+/**
+ * Só o backoffice-worker (workspace#85): conferir a zona do site (ADR 0025 da raiz). Fora do
+ * `EnvSchema` para o web nunca receber o token. `cloudflare` lê a zona com um token só de
+ * leitura (`CLOUDFLARE_ZONE_READ_TOKEN`), nunca com o de deploy; `local` pergunta ao edge-local.
+ */
+export const ZoneCheckEnvSchema = z
+  .object({
+    DEPLOY_TARGET: z.enum(['local', 'cloudflare']).default('local'),
+    EDGE_LOCAL_URL: optional(z.url()),
+    CLOUDFLARE_ZONE_READ_TOKEN: optional(z.string().min(32)),
+    CLOUDFLARE_ACCOUNT_ID: optional(z.string().regex(/^[0-9a-f]{32}$/)),
+  })
+  .refine((env) => env.DEPLOY_TARGET !== 'local' || env.EDGE_LOCAL_URL !== undefined, {
+    message: 'Defina EDGE_LOCAL_URL com DEPLOY_TARGET=local',
+    path: ['EDGE_LOCAL_URL'],
+  })
+  .refine(
+    (env) =>
+      env.DEPLOY_TARGET !== 'cloudflare' ||
+      (env.CLOUDFLARE_ZONE_READ_TOKEN !== undefined && env.CLOUDFLARE_ACCOUNT_ID !== undefined),
+    {
+      message:
+        'Defina CLOUDFLARE_ZONE_READ_TOKEN e CLOUDFLARE_ACCOUNT_ID com DEPLOY_TARGET=cloudflare',
+      path: ['DEPLOY_TARGET'],
+    },
+  );
+
+export type ZoneCheckEnv = z.infer<typeof ZoneCheckEnvSchema>;
+
+export function parseZoneCheckEnv(source: Record<string, string | undefined>): ZoneCheckEnv {
+  const parsed = ZoneCheckEnvSchema.safeParse(source);
+  if (parsed.success) return parsed.data;
+  // Só o caminho e a mensagem do schema: nunca o valor (o token).
+  const lines = parsed.error.issues.map((issue) => `- ${issue.path.join('.')}: ${issue.message}`);
+  throw new Error(`Variáveis da conferência da zona inválidas ou ausentes:\n${lines.join('\n')}`);
+}
+
+/** Ambiente da conferência da zona, lido sob demanda (só o worker). */
+export function getZoneCheckEnv(): ZoneCheckEnv {
+  return parseZoneCheckEnv(process.env);
+}
+
 let cached: Env | undefined;
 
 export function getEnv(): Env {
