@@ -9,12 +9,14 @@ import { ROLLBACK_TASK } from '../domain/builds/schedule.ts';
 import { CHECK_SITE_INFRA_TASK } from '../domain/builds/site-state.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../domain/publications/schedule.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
+import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
 import {
   createAggregateAudienceTask,
   type AggregateAudienceTaskDeps,
 } from './tasks/aggregate-audience.ts';
 import { createBuildTask, type BuildTaskDeps } from './tasks/build.ts';
+import { createCheckContentLinksTask } from './tasks/check-content-links.ts';
 import { createCheckReleaseImageTask } from './tasks/check-release-image.ts';
 import { createCheckSiteInfraTask, type CheckSiteInfraTaskDeps } from './tasks/check-site-infra.ts';
 import {
@@ -49,6 +51,7 @@ export function workerTasks(deps: WorkerTaskDeps): TaskList {
     [GENERATE_ARTICLE_TASK]: createGenerateArticleTask(deps),
     [AGGREGATE_AUDIENCE_TASK]: createAggregateAudienceTask(deps),
     [CHECK_SITE_INFRA_TASK]: createCheckSiteInfraTask(deps),
+    [LINK_CHECK_TASK]: createCheckContentLinksTask(deps),
   };
 }
 
