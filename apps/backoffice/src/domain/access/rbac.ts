@@ -9,6 +9,7 @@ export type Action =
   | 'site.read'
   | 'site.configure'
   | 'content.write'
+  | 'content.amend'
   | 'content.publish'
   | 'operations.run'
   | 'release.promote';
@@ -18,12 +19,15 @@ export const PERMISSIONS: Record<Role, readonly Action[]> = {
     'site.read',
     'site.configure',
     'content.write',
+    'content.amend',
     'content.publish',
     'operations.run',
     'release.promote',
   ],
   editor: ['site.read', 'content.write'],
-  revisor: ['site.read', 'content.publish'],
+  // `content.amend`: o revisor corrige o conteúdo só durante a revisão (ADR 0022), sem
+  // `content.write`, que cria e edita fora dela.
+  revisor: ['site.read', 'content.amend', 'content.publish'],
   operacao: ['site.read', 'site.configure', 'operations.run', 'release.promote'],
 };
 

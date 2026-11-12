@@ -13,6 +13,7 @@ describe('RBAC', () => {
   it.each<[Action, string[]]>([
     ['site.configure', ['admin', 'operacao']],
     ['content.write', ['admin', 'editor']],
+    ['content.amend', ['admin', 'revisor']],
     ['content.publish', ['admin', 'revisor']],
     ['operations.run', ['admin', 'operacao']],
     ['release.promote', ['admin', 'operacao']],
@@ -38,6 +39,7 @@ describe('RBAC', () => {
   it('o gerador escreve conteúdo, mas não aprova nem publica', () => {
     expect(can(GENERATOR_ACTOR, 'content.write')).toBe(true);
     expect(can(GENERATOR_ACTOR, 'content.publish')).toBe(false);
+    expect(can(GENERATOR_ACTOR, 'content.amend')).toBe(false);
   });
 
   it('cada papel da tabela existe no banco', () => {
