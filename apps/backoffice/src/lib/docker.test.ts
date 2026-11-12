@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { RuntimeError } from '../domain/builds/runtime.ts';
-import { dockerRuntime } from './docker.ts';
+import { demux, dockerRuntime } from './docker.ts';
 
 type Call = { method: string; url: string; body?: unknown };
 
@@ -108,6 +108,33 @@ describe('dockerRuntime', () => {
     expect(await runtime.readFile('abc', '/build/result.json')).toBeUndefined();
     await runtime.removeContainer('abc');
     await runtime.removeVolume('v');
+  });
+
+  it('lê o fim do log só por GET /containers/<id>/logs, sem os cabeçalhos dos quadros', async () => {
+    const frame = (stream: number, text: string) => {
+      const payload = new TextEncoder().encode(text);
+      const header = new Uint8Array(8);
+      header[0] = stream;
+      new DataView(header.buffer).setUint32(4, payload.length);
+      return [...header, ...payload];
+    };
+    const body = new Uint8Array([...frame(1, 'render: 12 páginas\n'), ...frame(2, 'erro: ç')]);
+    const { fn, calls } = fakeFetch({
+      'GET /containers/abc/logs': [new Response(body, { status: 200 })],
+    });
+    expect(await dockerRuntime({ host, fetch: fn }).logsTail('abc', 200)).toBe(
+      'render: 12 páginas\nerro: ç',
+    );
+    expect(calls).toEqual([
+      {
+        method: 'GET',
+        url: 'http://docker-socket-proxy:2375/containers/abc/logs?stdout=1&stderr=1&tail=200',
+      },
+    ]);
+  });
+
+  it('log sem quadros (container com TTY) volta como texto puro', () => {
+    expect(demux(new TextEncoder().encode('linha 1\nlinha 2'))).toBe('linha 1\nlinha 2');
   });
 
   it('recusa do proxy e rede fora viram RuntimeError (transitório)', async () => {

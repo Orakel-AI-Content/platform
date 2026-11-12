@@ -28,6 +28,8 @@ export interface ContainerRuntime {
   kill(id: string): Promise<void>;
   /** Lê um arquivo do container (ou do volume montado nele); `undefined` se não existir. */
   readFile(id: string, path: string): Promise<string | undefined>;
+  /** Últimas `lines` linhas do log do container (stdout e stderr), em texto. */
+  logsTail(id: string, lines: number): Promise<string>;
   /** Remove sem erro se já não existir. */
   removeContainer(id: string): Promise<void>;
   removeVolume(name: string): Promise<void>;

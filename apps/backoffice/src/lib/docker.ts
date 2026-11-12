@@ -1,5 +1,5 @@
 // API do Docker por HTTP (fetch), sempre pelo docker-socket-proxy (ADR 0011 da raiz): só as
-// rotas da lista do proxy. Sem cliente pronto: são oito chamadas, e assim nenhuma rota fora
+// rotas da lista do proxy. Sem cliente pronto: são nove chamadas, e assim nenhuma rota fora
 // da lista entra por engano. O fim do container é acompanhado por consulta periódica, sem
 // conexão longa (o render pode passar dos limites de tempo do fetch).
 import {
@@ -18,6 +18,31 @@ type Options = {
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
 };
+
+/**
+ * Texto do log de um container sem TTY: a API devolve quadros com cabeçalho de 8 bytes (fluxo,
+ * três zeros, tamanho em big-endian) antes de cada trecho. Sem cabeçalho válido, é texto puro.
+ */
+export function demux(bytes: Uint8Array): string {
+  const chunks: Uint8Array[] = [];
+  let offset = 0;
+  while (offset + 8 <= bytes.length) {
+    const stream = bytes[offset];
+    if ((stream !== 1 && stream !== 2) || bytes[offset + 1] !== 0) break;
+    const size = new DataView(bytes.buffer, bytes.byteOffset + offset + 4, 4).getUint32(0);
+    chunks.push(bytes.subarray(offset + 8, offset + 8 + size));
+    offset += 8 + size;
+  }
+  if (chunks.length === 0) return new TextDecoder().decode(bytes);
+  // Junta antes de decodificar: um caractere UTF-8 pode cair entre dois quadros.
+  const joined = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+  let at = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, at);
+    at += chunk.length;
+  }
+  return new TextDecoder().decode(joined);
+}
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -126,6 +151,11 @@ export function dockerRuntime(options: Options): ContainerRuntime {
       }
       const file = firstTarFile(new Uint8Array(await response.arrayBuffer()));
       return file === undefined ? undefined : new TextDecoder().decode(file);
+    },
+
+    async logsTail(id, lines) {
+      const response = await call('GET', `/containers/${id}/logs?stdout=1&stderr=1&tail=${lines}`);
+      return demux(new Uint8Array(await response.arrayBuffer()));
     },
 
     async removeContainer(id) {
