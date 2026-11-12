@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { RuntimeError } from '../domain/builds/runtime.ts';
+import { ImageUnavailableError, RuntimeError } from '../domain/builds/runtime.ts';
 import { demux, dockerRuntime } from './docker.ts';
 
 type Call = { method: string; url: string; body?: unknown };
@@ -205,7 +205,7 @@ describe('dockerRuntime', () => {
         'POST /images/create': [
           ndjson(
             { status: 'Pulling from orakel-ai-content/site-builder', id: '9.9.9' },
-            { errorDetail: { message: 'manifest unknown' }, error: 'manifest unknown' },
+            { errorDetail: { message: 'toomanyrequests' }, error: 'toomanyrequests' },
           ),
         ],
       });
@@ -213,7 +213,31 @@ describe('dockerRuntime', () => {
         'ghcr.io/orakel-ai-content/site-builder:9.9.9',
       );
       await expect(pull).rejects.toBeInstanceOf(RuntimeError);
+      await expect(pull).rejects.toThrow(/toomanyrequests/);
+    });
+
+    it('imagem inexistente no stream vira ImageUnavailableError', async () => {
+      const { fn } = fakeFetch({
+        'POST /images/create': [
+          ndjson({ errorDetail: { message: 'manifest unknown' }, error: 'manifest unknown' }),
+        ],
+      });
+      const pull = dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(
+        'ghcr.io/orakel-ai-content/site-builder:9.9.9',
+      );
+      await expect(pull).rejects.toBeInstanceOf(ImageUnavailableError);
       await expect(pull).rejects.toThrow(/manifest unknown/);
+    });
+
+    it('registry que nega o acesso (HTTP 500 denied) vira ImageUnavailableError', async () => {
+      const { fn } = fakeFetch({
+        'POST /images/create': [json({ message: 'error from registry: denied\ndenied' }, 500)],
+      });
+      const pull = dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(
+        'ghcr.io/orakel-ai-content/site-builder:1.0.1',
+      );
+      await expect(pull).rejects.toBeInstanceOf(ImageUnavailableError);
+      await expect(pull).rejects.toThrow(/denied/);
     });
 
     it('erro na última linha sem quebra também é detectado', async () => {

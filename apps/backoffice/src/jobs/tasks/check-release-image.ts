@@ -1,5 +1,6 @@
 import type { Task } from 'graphile-worker';
 
+import { ImageUnavailableError } from '../../domain/builds/runtime.ts';
 import {
   loadReleaseRun,
   recordReleaseImagePulled,
@@ -27,7 +28,8 @@ function tagOf(payload: unknown): string {
  * (build-runner, o único com acesso ao Docker pelo docker-socket-proxy, ADR 0011 da raiz).
  * Imagem no host leva a `disponivel`. Erro do pull, ou pull que termina sem a imagem, lança para
  * o Graphile Worker repetir; na última tentativa, a release vai a `falhou` com o motivo do
- * runtime em vez de ficar `baixando` para sempre. Release em outro estado é ignorada.
+ * runtime em vez de ficar `baixando` para sempre. Imagem recusada pelo registry (não existe ou
+ * acesso negado) vai a `falhou` já na primeira tentativa. Release em outro estado é ignorada.
  * Com o driver local, em vez do pull, etiqueta `SITE_BUILDER_IMAGE:SITE_BUILDER_TAG` (a imagem
  * do `pnpm local:images`) como a versão; sem ela no host, `falhou` já na primeira tentativa.
  */
@@ -70,7 +72,8 @@ export function createCheckReleaseImageTask(
         throw new Error(`o download terminou, mas ${image} não está no host`);
       }
     } catch (error) {
-      if (!isLastAttempt(helpers)) throw error;
+      // O registry recusou a imagem: repetir não a traz, então falha já nesta tentativa.
+      if (!isLastAttempt(helpers) && !(error instanceof ImageUnavailableError)) throw error;
       const message = error instanceof Error ? error.message : String(error);
       await fail(`Não foi possível baixar a imagem: ${message}`);
       return;

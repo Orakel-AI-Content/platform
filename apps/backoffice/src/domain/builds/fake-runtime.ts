@@ -1,7 +1,7 @@
 // Runtime de containers falso para os testes do build: cada etapa (render, publish, rollback) tem o
 // código de saída, os arquivos que deixa no volume, o log que escreve, se estoura o tempo e se
 // fica rodando até ser morto.
-import type { ContainerRuntime, ContainerSpec } from './runtime.ts';
+import { ImageUnavailableError, type ContainerRuntime, type ContainerSpec } from './runtime.ts';
 
 export type FakeStage = {
   exitCode?: number;
@@ -15,8 +15,11 @@ export type FakeStage = {
 export function fakeRuntime(options: {
   /** A imagem está no host? */
   image?: boolean;
-  /** O pull traz a imagem (`ok`), não traz (`absent`) ou lança (`error`). Padrão: `absent`. */
-  pull?: 'ok' | 'absent' | 'error';
+  /**
+   * O pull traz a imagem (`ok`), não traz (`absent`), lança erro transitório (`error`) ou o
+   * registry recusa a imagem (`unavailable`). Padrão: `absent`.
+   */
+  pull?: 'ok' | 'absent' | 'error' | 'unavailable';
   render?: FakeStage;
   publish?: FakeStage;
   rollback?: FakeStage;
@@ -40,7 +43,10 @@ export function fakeRuntime(options: {
     imageExists: () => Promise.resolve(present),
     pullImage(image) {
       pulled.push(image);
-      if (options.pull === 'error') return Promise.reject(new Error('manifest unknown'));
+      if (options.pull === 'error') return Promise.reject(new Error('toomanyrequests'));
+      if (options.pull === 'unavailable') {
+        return Promise.reject(new ImageUnavailableError('error from registry: denied'));
+      }
       if (options.pull === 'ok') present = true;
       return Promise.resolve();
     },

@@ -162,6 +162,13 @@
       "when": 1794444796511,
       "tag": "0022_estado_do_pipeline_da_release",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794493124943,
+      "tag": "0023_estado_herdado_da_release",
+      "breakpoints": true
     }
   ]
 }

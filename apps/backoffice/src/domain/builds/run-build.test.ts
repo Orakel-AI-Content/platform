@@ -101,7 +101,22 @@ describe('runBuild', () => {
     expect(outcome).toMatchObject({
       status: 'failed',
       stage: 'image',
-      failure: { kind: 'transient', message: 'image: manifest unknown' },
+      failure: { kind: 'transient', message: 'image: toomanyrequests' },
+    });
+    expect(fake.started).toEqual([]);
+  });
+
+  it('imagem recusada pelo registry é permanente, com a orientação de conferir a release', async () => {
+    const fake = fakeRuntime({ image: false, pull: 'unavailable' });
+    const outcome = await runBuild(plan, { runtime: fake.runtime, now });
+    expect(fake.pulled).toHaveLength(1);
+    expect(outcome).toMatchObject({
+      status: 'failed',
+      stage: 'image',
+      failure: {
+        kind: 'permanent',
+        message: expect.stringMatching(/denied.*Confira a release em Releases/) as unknown,
+      },
     });
     expect(fake.started).toEqual([]);
   });

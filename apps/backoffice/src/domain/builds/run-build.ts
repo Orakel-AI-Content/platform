@@ -18,6 +18,7 @@ import {
 
 import type { BUILD_STAGES } from '../../db/schema/index.ts';
 import {
+  ImageUnavailableError,
   readLogTail,
   type ContainerRuntime,
   type ContainerSpec,
@@ -92,8 +93,15 @@ function fromExitCode(stage: BuildStage, exitCode: number): Failure {
 }
 
 function errorFailure(stage: BuildStage, error: unknown): Failure {
-  // Erro do runtime (rede, proxy, daemon): transitório.
   const message = error instanceof Error ? error.message : String(error);
+  // O registry não tem a imagem ou negou o acesso: repetir não adianta.
+  if (error instanceof ImageUnavailableError) {
+    return {
+      kind: 'permanent',
+      message: `${stage}: a imagem da release não está no host nem no registry (${message}). Confira a release em Releases ou fixe outra no site`,
+    };
+  }
+  // Erro do runtime (rede, proxy, daemon): transitório.
   return { kind: 'transient', message: `${stage}: ${message}` };
 }
 
