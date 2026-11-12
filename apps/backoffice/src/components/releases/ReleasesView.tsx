@@ -5,7 +5,12 @@ import type { ReactNode } from 'react';
 import { ListHeader } from '@/components/shared/PageHeader';
 
 import { ReleasesTable, type ReleaseAction } from './ReleasesTable.tsx';
-import { RolloutButton, RolloutCard, type StartRollout } from './RolloutCard.tsx';
+import {
+  RolloutButton,
+  RolloutCard,
+  type InterruptRollout,
+  type StartRollout,
+} from './RolloutCard.tsx';
 import {
   useReleasesSnapshot,
   type ReleasesSnapshot,
@@ -22,6 +27,7 @@ export function ReleasesView({
   snapshot: initial,
   generate,
   startRollout,
+  interruptRollout,
   retry,
   discard,
   status,
@@ -32,6 +38,8 @@ export function ReleasesView({
   /** "Gerar nova versão", também repetido no estado vazio da tabela. */
   generate: ReactNode;
   startRollout: StartRollout;
+  /** "Interromper" no cartão, com a atualização em andamento. */
+  interruptRollout: InterruptRollout;
   retry: ReleaseAction;
   discard: ReleaseAction;
   /** Leitura do polling; sem ela, a tela não se atualiza sozinha. */
@@ -57,7 +65,7 @@ export function ReleasesView({
           </>
         }
       />
-      {rollout !== null && <RolloutCard rollout={rollout} />}
+      {rollout !== null && <RolloutCard rollout={rollout} interrupt={interruptRollout} />}
       <ReleasesTable
         rows={snapshot.rows}
         inUse={snapshot.inUse}

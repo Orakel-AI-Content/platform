@@ -72,6 +72,7 @@ const view = (initial: ReleasesSnapshot, status?: () => Promise<ReleasesSnapshot
     snapshot={initial}
     generate={<button type="button">Gerar nova versão</button>}
     startRollout={vi.fn()}
+    interruptRollout={vi.fn()}
     retry={vi.fn()}
     discard={vi.fn()}
     status={status}
