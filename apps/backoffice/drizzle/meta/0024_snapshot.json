@@ -1,5 +1,5 @@
 {
-  "id": "05b9c812-1218-4bde-ad34-89cd93d6cad6",
+  "id": "5d83cf7b-32dd-4a8d-b9a9-697115960539",
   "prevId": "806a609e-96c8-417b-b2fc-f02e9a14aa2b",
   "version": "7",
   "dialect": "postgresql",
@@ -1623,155 +1623,60 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.release_rollout_sites": {
-      "name": "release_rollout_sites",
-      "schema": "",
-      "columns": {
-        "rollout_id": {
-          "name": "rollout_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "site_id": {
-          "name": "site_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "previous_release": {
-          "name": "previous_release",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "release_rollout_sites_rollout_id_release_rollouts_id_fk": {
-          "name": "release_rollout_sites_rollout_id_release_rollouts_id_fk",
-          "tableFrom": "release_rollout_sites",
-          "tableTo": "release_rollouts",
-          "columnsFrom": ["rollout_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "release_rollout_sites_site_id_sites_id_fk": {
-          "name": "release_rollout_sites_site_id_sites_id_fk",
-          "tableFrom": "release_rollout_sites",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "release_rollout_sites_rollout_id_site_id_pk": {
-          "name": "release_rollout_sites_rollout_id_site_id_pk",
-          "columns": ["rollout_id", "site_id"]
-        }
-      },
-      "uniqueConstraints": {
-        "release_rollout_sites_position_unique": {
-          "name": "release_rollout_sites_position_unique",
-          "nullsNotDistinct": false,
-          "columns": ["rollout_id", "position"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.release_rollouts": {
-      "name": "release_rollouts",
+    "public.preview_state": {
+      "name": "preview_state",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "serial",
+          "type": "text",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "default": "'preview'"
+        },
+        "current_release": {
+          "name": "current_release",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "target_release": {
           "name": "target_release",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'em_andamento'"
-        },
-        "requested_by": {
-          "name": "requested_by",
+        "status": {
+          "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "started_at": {
-          "name": "started_at",
+        "failure_reason": {
+          "name": "failure_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "finished_at": {
-          "name": "finished_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
-      "indexes": {
-        "release_rollouts_open_unique": {
-          "name": "release_rollouts_open_unique",
-          "columns": [
-            {
-              "expression": "state",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"release_rollouts\".\"state\" = 'em_andamento'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "release_rollouts_target_release_releases_tag_fk": {
-          "name": "release_rollouts_target_release_releases_tag_fk",
-          "tableFrom": "release_rollouts",
-          "tableTo": "releases",
-          "columnsFrom": ["target_release"],
-          "columnsTo": ["tag"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "preview_state_single_row": {
+          "name": "preview_state_single_row",
+          "value": "\"preview_state\".\"id\" = 'preview'"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.releases": {

@@ -1,6 +1,6 @@
 # 0011 – Proxy do socket do Docker
 
-- Status: aceito (a recusa do `pull` foi substituída pelo 0021)
+- Status: aceito (a recusa do `pull` foi substituída pelo 0021; containers de serviço pelas mesmas rotas: 0024)
 - Data: 2026-09-30
 
 ## Contexto

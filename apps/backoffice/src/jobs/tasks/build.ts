@@ -14,6 +14,7 @@ import { planBuild, type BuildSettings } from '../../domain/builds/plan.ts';
 import { runBuild } from '../../domain/builds/run-build.ts';
 import type { ContainerRuntime } from '../../domain/builds/runtime.ts';
 import { retryRunAt } from '../../domain/builds/schedule.ts';
+import { schedulePreviewReconcile } from '../../domain/preview/preview.ts';
 import { isLastAttempt } from './last-attempt.ts';
 
 export type BuildTaskDeps = {

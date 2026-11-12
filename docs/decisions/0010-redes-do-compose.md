@@ -1,6 +1,6 @@
 # 0010 – Redes do compose
 
-- Status: aceito
+- Status: aceito (`blog-preview` passa a ser container do `build-runner`, nas mesmas redes: 0024)
 - Data: 2026-09-30
 
 ## Contexto
