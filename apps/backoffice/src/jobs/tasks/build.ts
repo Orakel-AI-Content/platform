@@ -93,6 +93,8 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
         { buildId, siteId, massUnpublishDeclaredAt: target.massUnpublishDeclaredAt, lastAttempt },
         outcome,
       );
+      // A prévia segue a maior release com build ok (domain/preview).
+      if (outcome.status === 'ok') await schedulePreviewReconcile(tx);
       if (retried && !lastAttempt) {
         await queueRetry(tx, buildId, retryRunAt(helpers.job.run_at, attempt, new Date(now())));
       }
