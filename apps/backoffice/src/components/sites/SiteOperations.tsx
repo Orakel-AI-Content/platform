@@ -4,7 +4,11 @@ import { createContext, use, useRef, useState, useTransition, type ReactNode } f
 
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
-import { dangerButtonClass } from '@/components/shared/ConfirmDialog.tsx';
+import ConfirmDialog, {
+  dangerButtonClass,
+  dangerConfirmButtonProps,
+} from '@/components/shared/ConfirmDialog.tsx';
+import { previousVersionText } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
 import type { RollbackVersion } from '@/domain/builds/builds.ts';
 
@@ -29,9 +33,13 @@ import {
 // `SiteOperationsScope` guarda o estado comum e monta cada diálogo de confirmação uma vez; cada
 // etapa recebe só o seu `SiteOperationButton`. O sucesso vai ao toast e a recusa de qualquer
 // uma ao `SiteOperationsAlert`, logo abaixo do painel. A página só monta o escopo com
-// operations.run.
+// operations.run. "Cancelar" (#649) troca de lugar com "Publicar agora" na Build enquanto há
+// publicação aberta, e "Desfazer última publicação" fica ao lado de "Escolher outra versão".
 
-export type SiteOperation = 'publish' | 'resume' | 'rebuild' | 'rollback';
+export type SiteOperation = 'publish' | 'resume' | 'rebuild' | 'rollback' | 'cancel' | 'undo';
+
+/** Server Action ligada a um site por `siteId`, como a de "Publicar agora". */
+export type SiteAction = (siteId: string) => Promise<ActionResult>;
 
 export type SiteOperationsProps = {
   siteId: string;
@@ -45,6 +53,13 @@ export type SiteOperationsProps = {
   rebuild?: { releases: readonly RebuildRelease[]; action: RebuildOnRelease };
   /** Versões revertíveis (sem a ativa) e a action de reverter, já ligada ao site. */
   rollback?: { versions: readonly RollbackVersion[]; action: RollbackSite };
+  /** "Cancelar" a publicação na fila ou em andamento (#649). */
+  cancel?: SiteAction;
+  /**
+   * "Desfazer última publicação" (#649): a versão para onde o site volta, só mostrada (o domínio
+   * a resolve de novo ao executar), e a action. Sem versão anterior, a página não passa.
+   */
+  undo?: { version: RollbackVersion; action: SiteAction };
 };
 
 type Scope = {
@@ -62,6 +77,8 @@ const LABEL: Record<SiteOperation, { idle: string; pending: string }> = {
   resume: RESUME_SITE_LABEL,
   rebuild: { idle: 'Reconstruir na release', pending: 'Reconstruindo…' },
   rollback: { idle: 'Escolher outra versão', pending: 'Revertendo…' },
+  cancel: { idle: 'Cancelar', pending: 'Cancelando…' },
+  undo: { idle: 'Desfazer última publicação', pending: 'Desfazendo…' },
 };
 
 /** Se a operação vale para o site agora: publicar fora da pausa, retomar só pausado. */
@@ -75,11 +92,15 @@ function available(operations: SiteOperationsProps, operation: SiteOperation): b
       return operations.rebuild !== undefined;
     case 'rollback':
       return operations.rollback !== undefined;
+    case 'cancel':
+      return operations.cancel !== undefined;
+    case 'undo':
+      return operations.undo !== undefined;
   }
 }
 
 /**
- * As ações de operação do site: `publish`, `resume`, `rebuild` e `rollback` só vêm de quem tem
+ * As ações de operação do site: `publish`, `resume`, `rebuild`, `rollback`, `cancel` e `undo` só vêm de quem tem
  * operations.run. Uma ação de cada vez: enquanto uma está na fila, todos os botões ficam
  * `aria-disabled` (não `disabled`: o diálogo fecha antes da resposta, e o foco volta ao botão
  * que o abriu).
@@ -93,7 +114,8 @@ export function SiteOperationsScope({
   const [running, setRunning] = useState<SiteOperation | null>(null);
   const [, startTransition] = useTransition();
   const returnFocus = useRef<HTMLElement | null>(null);
-  const { siteId, paused, release, timeZone, publish, resume, rebuild, rollback } = operations;
+  const { siteId, paused, release, timeZone, publish, resume, rebuild, rollback, cancel, undo } =
+    operations;
 
   const openFrom = (operation: SiteOperation, trigger: HTMLElement) => {
     if (running !== null) return;
@@ -156,6 +178,39 @@ export function SiteOperationsScope({
           onConfirm={(versionId) => execute('rollback', () => rollback.action(versionId))}
           onAfterClose={afterClose}
         />
+      )}
+      {cancel && (
+        <ConfirmDialog
+          isOpen={open === 'cancel'}
+          type="danger"
+          title={`Cancelar a publicação de ${siteId}?`}
+          cancelText="Voltar"
+          confirmText="Cancelar publicação"
+          confirmButtonProps={dangerConfirmButtonProps}
+          onCancel={close}
+          onConfirm={() => execute('cancel', () => cancel(siteId))}
+          onAfterClose={afterClose}
+        >
+          <p>
+            Na fila, a publicação sai da fila; em andamento, o build é interrompido. O site no ar
+            não muda, e as mudanças pendentes continuam para a próxima publicação.
+          </p>
+        </ConfirmDialog>
+      )}
+      {undo && (
+        <ConfirmDialog
+          isOpen={open === 'undo'}
+          type="danger"
+          title={`Desfazer a última publicação de ${siteId}?`}
+          confirmText="Desfazer"
+          confirmButtonProps={dangerConfirmButtonProps}
+          onCancel={close}
+          onConfirm={() => execute('undo', () => undo.action(siteId))}
+          onAfterClose={afterClose}
+        >
+          <p>O site no ar volta para a versão anterior:</p>
+          <p className="mt-2 font-semibold">{previousVersionText(undo.version, timeZone)}</p>
+        </ConfirmDialog>
       )}
     </SiteOperationsContext>
   );

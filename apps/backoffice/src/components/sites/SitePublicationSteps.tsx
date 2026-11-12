@@ -23,8 +23,29 @@ export type PublicationSite = Pick<
 
 export type PublicationInstance = Pick<SiteInstance, 'activePages' | 'activeSince'>;
 
-/** A ação de cada etapa, abaixo do estado (#648); a de Infra e zona vem em `lifecycleAction`. */
-export type PublicationStepActions = Partial<Record<Exclude<PublicationStep, 'infra'>, ReactNode>>;
+/**
+ * A ação de cada etapa, abaixo do estado (#648); a de Infra e zona vem em `lifecycleAction`.
+ * `cancel` (#649) toma o lugar da ação da Build enquanto há publicação na fila ou em andamento.
+ */
+export type PublicationStepActions = Partial<
+  Record<Exclude<PublicationStep, 'infra'>, ReactNode>
+> & { cancel?: ReactNode };
+
+/**
+ * A ação da etapa: na Build, com publicação aberta (não reversão), "Cancelar" no lugar da de
+ * sempre. Os dois gatilhos são o mesmo componente na mesma posição, então o React troca só o
+ * texto do botão e o foco fica nele quando a execução fecha.
+ */
+function stepAction(
+  step: Exclude<PublicationStep, 'infra'>,
+  actions: PublicationStepActions,
+  activity: SiteActivity,
+): ReactNode {
+  if (step === 'build' && activity.open?.kind === 'build' && actions.cancel !== undefined) {
+    return actions.cancel;
+  }
+  return actions[step];
+}
 
 type Step = { status: StepStatus; text: ReactNode };
 
@@ -104,7 +125,8 @@ function currentIndex(byStep: Record<PublicationStep, Step>, open: boolean): num
  * A etapa Build segue a atividade que a aba relê durante uma execução (`SiteLiveActivity`):
  * "na fila" com o horário previsto, em andamento com a etapa ou o resultado do último build.
  * As ações de operação (#648) vêm prontas em `actions`, uma por etapa, abaixo do estado, como o
- * "Marcar…" de Infra e zona; o painel só as posiciona.
+ * "Marcar…" de Infra e zona; o painel só as posiciona. Com publicação aberta, a Build mostra
+ * `cancel` no lugar da sua (#649), e volta à de sempre quando a execução fecha.
  */
 export function SitePublicationSteps({
   site,
@@ -127,7 +149,7 @@ export function SitePublicationSteps({
       current={currentIndex(byStep, activity.open !== null)}
     >
       {PUBLICATION_STEPS.map((step) => {
-        const action = step === 'infra' ? undefined : actions[step];
+        const action = step === 'infra' ? undefined : stepAction(step, actions, activity);
         return (
           <Steps.Item
             key={step}
