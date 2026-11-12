@@ -14,7 +14,6 @@ import type { ReleaseBump } from '../../src/domain/releases/next-version.ts';
 import {
   CHECK_RELEASE_IMAGE_TASK,
   listReleases,
-  registerRelease,
   RELEASE_RUN_TASK,
   requestNewRelease,
   requestReleaseImageCheck,
@@ -36,8 +35,12 @@ const operacao: Actor = { email: 'operacao@exemplo.com', roles: ['operacao'] };
 const editor: Actor = { email: 'editor@exemplo.com', roles: ['editor'] };
 const revisor: Actor = { email: 'revisor@exemplo.com', roles: ['revisor'] };
 
-const register = (actor: Actor, tag: string) =>
-  db.transaction((tx) => registerRelease(tx, actor, tag));
+/** Release já registrada (as releases nascem por `requestNewRelease`; o seed vai direto à tabela). */
+const seed = async (tag: string, registeredAt?: Date) => {
+  await db
+    .insert(releases)
+    .values({ tag, ...(registeredAt === undefined ? {} : { registeredAt }) });
+};
 
 const tags = async () => {
   const result = await listReleases(db, SYSTEM_ACTOR);
@@ -45,58 +48,21 @@ const tags = async () => {
   return result.value.map(({ tag }) => tag);
 };
 
-describe('registro de releases (#509)', () => {
-  it('admin e operação registram; a lista mostra da mais recente para a mais antiga', async () => {
-    const first = await register(SYSTEM_ACTOR, '1.0.0');
-    expect(first).toMatchObject({ ok: true, value: { tag: '1.0.0' } });
-    if (first.ok) expect(first.value.registeredAt).toBeInstanceOf(Date);
-    expect(await register(operacao, ' 1.1.0 ')).toMatchObject({
-      ok: true,
-      value: { tag: '1.1.0' },
-    });
+describe('lista de releases (#509)', () => {
+  it('admin e operação listam, da mais recente para a mais antiga', async () => {
+    await seed('1.0.0', new Date('2026-01-01T00:00:00Z'));
+    await seed('1.1.0', new Date('2026-02-01T00:00:00Z'));
 
     expect(await tags()).toEqual(['1.1.0', '1.0.0']);
     expect(await listReleases(db, operacao)).toMatchObject({ ok: true });
   });
 
-  it('recusa tag repetida com release.exists', async () => {
-    await register(operacao, '1.0.0');
-
-    const result = await register(SYSTEM_ACTOR, '1.0.0');
-
-    expect(result).toEqual({
+  it.each([editor, revisor])('recusa $roles com forbidden na lista', async (actor) => {
+    expect(await listReleases(db, actor)).toEqual({
       ok: false,
-      issues: [expect.objectContaining({ code: 'release.exists', path: ['tag'] })],
+      issues: [expect.objectContaining({ code: 'forbidden' })],
     });
-    expect(await tags()).toEqual(['1.0.0']);
   });
-
-  it.each(['site-builder-v1.2.0', 'v1.2.3', '1.2', '1.2.3-rc.1', ''])(
-    'recusa %j com release.invalid_tag',
-    async (tag) => {
-      const result = await register(operacao, tag);
-
-      expect(result).toEqual({
-        ok: false,
-        issues: [expect.objectContaining({ code: 'release.invalid_tag', path: ['tag'] })],
-      });
-      expect(await tags()).toEqual([]);
-    },
-  );
-
-  it.each([editor, revisor])(
-    'recusa $roles com forbidden, no cadastro e na lista',
-    async (actor) => {
-      const forbidden = {
-        ok: false,
-        issues: [expect.objectContaining({ code: 'forbidden' })],
-      };
-
-      expect(await register(actor, '1.0.0')).toEqual(forbidden);
-      expect(await listReleases(db, actor)).toEqual(forbidden);
-      expect(await tags()).toEqual([]);
-    },
-  );
 });
 
 describe('migração das releases com prefixo core-v (#569)', () => {
@@ -262,25 +228,8 @@ describe('conferência da imagem da release (#570)', () => {
     warnings.length = 0;
   });
 
-  it('registrar enfileira a conferência, e a release fica não conferida até o job rodar', async () => {
-    await register(operacao, '1.2.0');
-
-    expect(await checkJobs()).toEqual([
-      { payload: { tag: '1.2.0' }, key: 'release-image:1.2.0', max_attempts: 5 },
-    ]);
-    expect(await release('1.2.0')).toMatchObject({ imageStatus: null, imageCheckedAt: null });
-  });
-
-  it('tag recusada não enfileira nada', async () => {
-    await register(operacao, '1.2.0');
-    await register(operacao, '1.2.0');
-    await register(operacao, 'core-v1.3.0');
-
-    expect(await checkJobs()).toHaveLength(1);
-  });
-
   it('imagem fora do host: a release fica ausente, com a data da conferência', async () => {
-    await register(operacao, '1.2.0');
+    await seed('1.2.0');
 
     expect(await check('1.2.0', false)).toEqual(['ghcr.io/orakel-ai-content/site-builder:1.2.0']);
 
@@ -291,7 +240,7 @@ describe('conferência da imagem da release (#570)', () => {
   });
 
   it('imagem no host: a release fica disponível', async () => {
-    await register(operacao, '1.2.0');
+    await seed('1.2.0');
 
     await check('1.2.0', true);
 
@@ -309,7 +258,7 @@ describe('conferência da imagem da release (#570)', () => {
   });
 
   it('reconferir enfileira de novo; pedidos antes de o job rodar viram um só', async () => {
-    await register(operacao, '1.2.0');
+    await seed('1.2.0');
     await check('1.2.0', false);
 
     expect(await db.transaction((tx) => requestReleaseImageCheck(tx, operacao, '1.2.0'))).toEqual({
@@ -332,7 +281,7 @@ describe('conferência da imagem da release (#570)', () => {
   });
 
   it.each([editor, revisor])('reconferir recusa $roles com forbidden', async (actor) => {
-    await register(operacao, '1.2.0');
+    await seed('1.2.0');
     await db.execute(sql`delete from graphile_worker._private_jobs`);
 
     expect(await db.transaction((tx) => requestReleaseImageCheck(tx, actor, '1.2.0'))).toEqual({
@@ -402,8 +351,8 @@ describe('gerar nova versão (#658)', () => {
     },
   );
 
-  it('releases cadastradas à mão ficam disponíveis, sem run nem solicitante', async () => {
-    await register(operacao, '1.0.0');
+  it('releases antigas, cadastradas à mão, ficam disponíveis, sem run nem solicitante', async () => {
+    await seed('1.0.0');
 
     expect(await release('1.0.0')).toMatchObject({
       pipelineState: 'disponivel',

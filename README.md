@@ -175,17 +175,20 @@ O cadastro em `/releases` só aceita `X.Y.Z`: colar a tag Git (`site-builder-v1.
 
 ### Passo a passo de uma versão nova
 
-1. **Dispare o `release.yml`** na `main` com o número `X.Y.Z`: é o que o Backoffice fará
+1. **Peça a versão** em `/releases` → "Gerar nova versão", escolhendo correção, melhoria ou
+   mudança grande: o Backoffice propõe o número `X.Y.Z` (o próximo depois da maior versão já
+   pedida) e grava a release em "gerando". Não há campo para digitar o número.
+2. **Dispare o `release.yml`** na `main` com esse número: é o que o Backoffice fará sozinho
    (workspace#81); até lá, `gh workflow run release.yml --ref main -f version=X.Y.Z`. Merge
    na `main` não cria versão, e push de tag não dispara nada: não crie a tag à mão.
-2. **O `release.yml` roda:** recusa número fora do formato `X.Y.Z` ou já usado, confere que o
+3. **O `release.yml` roda:** recusa número fora do formato `X.Y.Z` ou já usado, confere que o
    último E2E completo da `main` terminou verde e, só então, publica a imagem
    `site-builder:X.Y.Z` no GHCR e cria a tag `site-builder-vX.Y.Z`. Se o E2E estiver vermelho
    (ou não houver run concluído), ele se recusa, nada é publicado e nenhuma tag é criada:
    corrija a `main` e dispare de novo com o mesmo número.
-3. **Leve a imagem ao host** onde o `build-runner` roda (`docker pull …/site-builder:X.Y.Z`).
-   O build não baixa imagens: sem ela no host, o build do site falha.
-4. **Registre a versão** em `/releases` → "Registrar release", com o valor `X.Y.Z`.
+4. **Leve a imagem ao host** onde o `build-runner` roda (`docker pull …/site-builder:X.Y.Z`) e,
+   em `/releases`, "Reconferir" a versão. O build não baixa imagens: sem ela no host, o build
+   do site falha.
 5. **Mova um site primeiro:** em `/sites/<site>`, "Reconstruir na release" e escolha `X.Y.Z`.
 6. **Observe** o resultado do build ("Último build" em `/sites`, logs do `build-runner`) e o
    site no ar; estando tudo certo, mova os demais, um por um.

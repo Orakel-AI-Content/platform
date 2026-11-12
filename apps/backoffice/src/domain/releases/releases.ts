@@ -6,15 +6,13 @@ import { releases } from '../../db/schema/index.ts';
 import type { RELEASE_IMAGE_STATUSES, RELEASE_PIPELINE_STATES } from '../../db/schema/releases.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { nextVersion, RELEASE_BUMPS, type ReleaseBump } from './next-version.ts';
-import { RELEASE_TAG_MESSAGE, ReleaseTagSchema } from './tag.ts';
 
-// Registro de versões do site-builder (L1): a operação cadastra as tags já publicadas no GHCR, e a
-// ação "Reconstruir na release X" escolhe entre elas. Tabela operacional, fora do snapshot.
-// A imagem é conferida no host (não no GHCR) por um job do build-runner, o único com acesso ao
-// Docker (ADR 0011 da raiz): o registro enfileira a conferência e a operação pode pedir de novo.
-// "Gerar nova versão" (`requestNewRelease`) cria a release antes de ela existir no GHCR, em
-// `gerando`, com o número calculado pela tabela (`nextVersion`), e enfileira o run do release.yml.
-// Editar e remover estão fora do escopo atual.
+// Registro de versões do site-builder (L1): "Gerar nova versão" (`requestNewRelease`) cria a
+// release antes de ela existir no GHCR, em `gerando`, com o número calculado pela tabela
+// (`nextVersion`), e enfileira o run do release.yml; a ação "Reconstruir na release X" escolhe
+// entre as registradas. Tabela operacional, fora do snapshot. A imagem é conferida no host (não
+// no GHCR) por um job do build-runner, o único com acesso ao Docker (ADR 0011 da raiz), e a
+// operação pode pedir a conferência de novo. Editar e remover estão fora do escopo atual.
 
 export type ReleaseImageStatus = (typeof RELEASE_IMAGE_STATUSES)[number];
 export type ReleasePipelineState = (typeof RELEASE_PIPELINE_STATES)[number];
@@ -69,43 +67,6 @@ async function scheduleImageCheck(tx: Executor, tag: string): Promise<void> {
       job_key => ${`release-image:${tag}`},
       job_key_mode => 'replace'
     )`);
-}
-
-/** Registra uma release; tag fora do formato ou já registrada é recusada. */
-export async function registerRelease(
-  tx: Executor,
-  actor: Actor,
-  tag: string,
-): Promise<Result<ReleaseRecord>> {
-  const allowed = requireRole(actor, 'release.promote');
-  if (!allowed.ok) return allowed;
-
-  const parsed = ReleaseTagSchema.safeParse(tag);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      issues: [{ code: 'release.invalid_tag', message: RELEASE_TAG_MESSAGE, path: ['tag'] }],
-    };
-  }
-  const [inserted] = await tx
-    .insert(releases)
-    .values({ tag: parsed.data })
-    .onConflictDoNothing()
-    .returning(RECORD_COLUMNS);
-  if (inserted === undefined) {
-    return {
-      ok: false,
-      issues: [
-        {
-          code: 'release.exists',
-          message: `A release ${parsed.data} já está registrada`,
-          path: ['tag'],
-        },
-      ],
-    };
-  }
-  await scheduleImageCheck(tx, inserted.tag);
-  return { ok: true, value: inserted };
 }
 
 /**
