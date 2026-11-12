@@ -1,10 +1,10 @@
 # Compose base da VPS (produção). O ambiente local aplica infra/local/compose.override.yaml
 # por cima deste arquivo (pnpm local:up), só com os substitutos da nuvem e as portas locais.
 #
-# Redes (ADR 0010 da raiz), com nome fixo: o build-runner cria os containers efêmeros do
-# site-builder (render, publish) nelas pelo nome.
-#   orakel-internal  serviços da VPS entre si
-#   orakel-export    API de exportação: backoffice-web, blog-preview e os render; sem internet
+# Redes (ADR 0010 da raiz), com nome fixo: o build-runner cria nelas, pelo nome, os containers
+# efêmeros do site-builder (render, publish) e a prévia (ssr, apelido blog-preview, ADR 0024).
+#   orakel-internal  serviços da VPS entre si e a prévia
+#   orakel-export    API de exportação: backoffice-web, a prévia e os render; sem internet
 #   orakel-publish   publish, destino do deploy e build-cache; nunca a API interna
 #   orakel-docker    só build-runner e docker-socket-proxy
 name: orakel
@@ -25,7 +25,7 @@ x-backoffice: &backoffice
     S3_ENDPOINT: ${S3_ENDPOINT:?defina S3_ENDPOINT}
     S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?defina S3_ACCESS_KEY_ID}
     S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?defina S3_SECRET_ACCESS_KEY}
-    # Visualização dos sites (blog-preview) como o navegador de quem revisa a vê.
+    # Visualização dos sites (a prévia do build-runner) como o navegador de quem revisa a vê.
     PREVIEW_BASE_URL: ${PREVIEW_BASE_URL:?defina PREVIEW_BASE_URL}
     SENTRY_DSN: ${SENTRY_DSN:-}
     HEARTBEAT_BASE_URL: ${HEARTBEAT_BASE_URL:-}
@@ -99,7 +99,8 @@ services:
 
   # Só a task build, dois builds por vez (ADR 0018 da plataforma). Fala com o Docker pelo
   # docker-socket-proxy, nunca pelo socket; cria render e publish nas redes export e publish
-  # (ADR 0008 do backoffice). Único serviço com o token de deploy, repassado só ao publish.
+  # (ADR 0008 do backoffice) e a prévia na versão corrente, nas redes internal e export (ADR
+  # 0024 da raiz). Único serviço com o token de deploy, repassado só ao publish.
   build-runner:
     <<: *backoffice
     command: ['node', 'src/bin/build-runner.ts']
@@ -149,33 +150,6 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: ['no-new-privileges:true']
-
-  # Visualização dos rascunhos de todos os sites (site-builder, entrypoint ssr), com a
-  # imagem da release corrente; o backoffice a troca quando uma release é promovida.
-  blog-preview:
-    image: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/site-builder:${SITE_BUILDER_TAG:-local}
-    restart: unless-stopped
-    command: ['ssr']
-    environment:
-      CONTENT_SOURCE: api
-      EXPORT_API_URL: http://backoffice-web:3000
-      EXPORT_PREVIEW_TOKEN: ${EXPORT_PREVIEW_TOKEN:?defina EXPORT_PREVIEW_TOKEN}
-      PORT: '4321'
-    networks: [internal, export]
-    depends_on:
-      backoffice-web:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "fetch('http://127.0.0.1:4321/').then(() => process.exit(0), () => process.exit(1))",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 12
 
 networks:
   internal:

@@ -51,7 +51,8 @@ flowchart LR
   do Postgres e das migrações.
 - **Entrega:** a imagem `site-builder` lê a API de exportação e gera o site estático de
   cada `SITE_ID`; o `wrangler.jsonc` de cada site é gerado pelo `build-site`. O SSR do
-  `apps/blog` existe só para a visualização no Backoffice.
+  `apps/blog` existe só para a visualização no Backoffice: a prévia, um container que o
+  `build-runner` mantém na versão corrente (ADR 0024).
 - **Eventos:** o Worker de borda grava eventos anônimos no Analytics Engine e na fila;
   o agregador consolida no Postgres.
 
