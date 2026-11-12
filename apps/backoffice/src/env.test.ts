@@ -149,6 +149,21 @@ describe('parseBuildRunnerEnv', () => {
     });
   });
 
+  it('o PAT do GitHub é opcional e fine-grained; o repositório tem padrão', () => {
+    expect(parseBuildRunnerEnv(runner)).toMatchObject({
+      GITHUB_REPOSITORY: 'Orakel-AI-Content/platform',
+    });
+    expect(parseBuildRunnerEnv({ ...runner, GITHUB_TOKEN: '' }).GITHUB_TOKEN).toBeUndefined();
+    const token = `github_pat_${'a'.repeat(40)}`;
+    expect(parseBuildRunnerEnv({ ...runner, GITHUB_TOKEN: token }).GITHUB_TOKEN).toBe(token);
+  });
+
+  it('recusa PAT clássico sem repetir o valor', () => {
+    const run = () => parseBuildRunnerEnv({ ...runner, GITHUB_TOKEN: 'ghp_segredo123' });
+    expect(run).toThrow(/GITHUB_TOKEN/);
+    expect(run).not.toThrow(/segredo/);
+  });
+
   it('o Docker é sempre por TCP (o proxy), nunca pelo socket', () => {
     expect(() =>
       parseBuildRunnerEnv({ ...runner, DOCKER_HOST: 'unix:///var/run/docker.sock' }),
