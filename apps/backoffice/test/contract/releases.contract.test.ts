@@ -10,10 +10,13 @@ import { releases, sites } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { fakeRuntime } from '../../src/domain/builds/fake-runtime.ts';
 import type { BuildSettings } from '../../src/domain/builds/plan.ts';
+import type { ReleaseBump } from '../../src/domain/releases/next-version.ts';
 import {
   CHECK_RELEASE_IMAGE_TASK,
   listReleases,
   registerRelease,
+  RELEASE_RUN_TASK,
+  requestNewRelease,
   requestReleaseImageCheck,
 } from '../../src/domain/releases/releases.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
@@ -337,5 +340,175 @@ describe('conferência da imagem da release (#570)', () => {
       issues: [expect.objectContaining({ code: 'forbidden' })],
     });
     expect(await checkJobs()).toEqual([]);
+  });
+});
+
+async function runJobs() {
+  const { rows } = await db.execute<{ payload: unknown; key: string | null }>(sql`
+    select j.payload, j.key
+    from graphile_worker._private_jobs j
+    join graphile_worker._private_tasks t on t.id = j.task_id
+    where t.identifier = ${RELEASE_RUN_TASK}
+    order by j.id`);
+  return rows;
+}
+
+const requestNew = (actor: Actor, bump: ReleaseBump) =>
+  db.transaction((tx) => requestNewRelease(tx, actor, bump));
+
+describe('gerar nova versão (#658)', () => {
+  it('sem releases, cria 0.1.0 em gerando com o solicitante e enfileira o run', async () => {
+    const result = await requestNew(operacao, 'patch');
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        tag: '0.1.0',
+        pipelineState: 'gerando',
+        requestedBy: 'operacao@exemplo.com',
+        runId: null,
+        runUrl: null,
+        failureReason: null,
+        imageStatus: null,
+      },
+    });
+    expect(await release('0.1.0')).toMatchObject({
+      pipelineState: 'gerando',
+      requestedBy: 'operacao@exemplo.com',
+    });
+    expect(await runJobs()).toEqual([{ payload: { tag: '0.1.0' }, key: 'release-run:0.1.0' }]);
+    expect(await checkJobs()).toEqual([]);
+  });
+
+  it.each([
+    ['patch', '1.10.1'],
+    ['minor', '1.11.0'],
+    ['major', '2.0.0'],
+  ] as const)(
+    '%s parte da maior versão numérica, descartadas inclusive: %s',
+    async (bump, expected) => {
+      await db
+        .insert(releases)
+        .values([
+          { tag: '1.9.0' },
+          { tag: '1.10.0', pipelineState: 'descartada' },
+          { tag: '1.2.3' },
+        ]);
+
+      expect(await requestNew(SYSTEM_ACTOR, bump)).toMatchObject({
+        ok: true,
+        value: { tag: expected, pipelineState: 'gerando', requestedBy: 'system' },
+      });
+    },
+  );
+
+  it('releases cadastradas à mão ficam disponíveis, sem run nem solicitante', async () => {
+    await register(operacao, '1.0.0');
+
+    expect(await release('1.0.0')).toMatchObject({
+      pipelineState: 'disponivel',
+      requestedBy: null,
+      runId: null,
+    });
+    expect(await runJobs()).toEqual([]);
+  });
+
+  it.each([editor, revisor])(
+    'recusa $roles com forbidden, sem gravar nem enfileirar',
+    async (actor) => {
+      expect(await requestNew(actor, 'patch')).toEqual({
+        ok: false,
+        issues: [expect.objectContaining({ code: 'forbidden' })],
+      });
+      expect(await tags()).toEqual([]);
+      expect(await runJobs()).toEqual([]);
+    },
+  );
+
+  it('recusa um tipo de mudança desconhecido com release.invalid_bump', async () => {
+    expect(await requestNew(operacao, 'hotfix' as ReleaseBump)).toEqual({
+      ok: false,
+      issues: [expect.objectContaining({ code: 'release.invalid_bump', path: ['bump'] })],
+    });
+    expect(await tags()).toEqual([]);
+  });
+
+  it('dois pedidos simultâneos: o segundo espera o primeiro e é recusado', async () => {
+    await db.insert(releases).values({ tag: '1.2.3' });
+    let commitFirst!: () => void;
+    const gate = new Promise<void>((resolve) => (commitFirst = resolve));
+    let firstDone!: () => void;
+    const firstInserted = new Promise<void>((resolve) => (firstDone = resolve));
+
+    const first = db.transaction(async (tx) => {
+      const result = await requestNewRelease(tx, operacao, 'patch');
+      firstDone();
+      await gate;
+      return result;
+    });
+    await firstInserted;
+    // O segundo lê as tags sem ver a linha do primeiro e para no insert, preso na chave primária.
+    const second = db.transaction((tx) => requestNewRelease(tx, SYSTEM_ACTOR, 'patch'));
+    await waitForLockWait();
+    commitFirst();
+
+    expect(await first).toMatchObject({ ok: true, value: { tag: '1.2.4' } });
+    expect(await second).toEqual({
+      ok: false,
+      issues: [expect.objectContaining({ code: 'release.version_taken', path: ['bump'] })],
+    });
+    expect(await tags()).toEqual(['1.2.4', '1.2.3']);
+    expect(await runJobs()).toEqual([expect.objectContaining({ payload: { tag: '1.2.4' } })]);
+  });
+});
+
+/** Espera alguma conexão da suíte ficar bloqueada num lock (o insert do segundo pedido). */
+async function waitForLockWait() {
+  for (let i = 0; i < 200; i += 1) {
+    const { rows } = await db.execute<{ n: number }>(sql`
+      select count(*)::int as n from pg_stat_activity
+      where datname = current_database() and wait_event_type = 'Lock'`);
+    if ((rows[0]?.n ?? 0) > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('o segundo pedido não chegou a esperar o lock');
+}
+
+describe('migração do estado do pipeline (#658)', () => {
+  it('só acrescenta colunas, e as linhas existentes ficam disponíveis', async () => {
+    const migration = await readFile(
+      new URL('../../drizzle/0022_estado_do_pipeline_da_release.sql', import.meta.url),
+      'utf8',
+    );
+    const statements = migration
+      .split('--> statement-breakpoint')
+      .map((statement) => statement.trim())
+      .filter(Boolean);
+    for (const statement of statements) {
+      expect(statement).toMatch(/^ALTER TABLE "releases" ADD COLUMN /);
+    }
+
+    // Banco já migrado: volta ao estado anterior (sem as colunas) com uma linha antiga e aplica.
+    await db.execute(sql`alter table releases
+      drop column pipeline_state, drop column run_id, drop column run_url,
+      drop column failure_reason, drop column requested_by`);
+    await db.execute(
+      sql`insert into releases (tag, image_status, image_checked_at)
+          values ('1.0.0', 'ausente', '2026-11-10T12:00:00Z')`,
+    );
+    for (const statement of statements) await db.execute(sql.raw(statement));
+
+    const { registeredAt, ...migrated } = (await release('1.0.0')) ?? {};
+    expect(registeredAt).toBeInstanceOf(Date);
+    expect(migrated).toEqual({
+      tag: '1.0.0',
+      imageStatus: 'ausente',
+      imageCheckedAt: new Date('2026-11-10T12:00:00Z'),
+      pipelineState: 'disponivel',
+      runId: null,
+      runUrl: null,
+      failureReason: null,
+      requestedBy: null,
+    });
   });
 });

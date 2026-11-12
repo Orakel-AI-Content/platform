@@ -117,10 +117,11 @@ services:
       docker-socket-proxy:
         condition: service_started
 
-  # API do Docker com permissão mínima (ADR 0011 da raiz): só as rotas que o build-runner
-  # usa — criar, iniciar, matar e apagar containers; criar e apagar volumes; ler o estado e
-  # os arquivos de resultado (archive). Recusa exec, pull, build, redes e o resto. O corpo
-  # do create é garantido pelo código.
+  # API do Docker com permissão mínima (ADRs 0011 e 0021 da raiz): só as rotas que o
+  # build-runner usa — criar, iniciar, matar e apagar containers; criar e apagar volumes; ler
+  # o estado e os arquivos de resultado (archive); baixar a imagem (images/create). Recusa
+  # exec, build, redes e o resto. O corpo do create e o nome da imagem do pull são
+  # garantidos pelo código.
   docker-socket-proxy:
     image: wollomatic/socket-proxy:1.13.1@sha256:3935b709275e4ec35d6ed5a5c4a1f0d01ed31eec5e7234efc3357ecd47689002
     restart: unless-stopped
@@ -132,7 +133,7 @@ services:
       - -allowfrom=build-runner
       - -allowHEAD=^(/v1\.[0-9]+)?/_ping$
       - -allowGET=^(/v1\.[0-9]+)?/(_ping|version|containers/[a-zA-Z0-9_.-]+/(json|logs|archive)|images/.+/json|volumes/[a-zA-Z0-9_.-]+)$
-      - -allowPOST=^(/v1\.[0-9]+)?/(containers/create|containers/[a-zA-Z0-9_.-]+/(start|wait|kill)|volumes/create)$
+      - -allowPOST=^(/v1\.[0-9]+)?/(containers/create|containers/[a-zA-Z0-9_.-]+/(start|wait|kill)|volumes/create|images/create)$
       - -allowDELETE=^(/v1\.[0-9]+)?/(containers|volumes)/[a-zA-Z0-9_.-]+$
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro

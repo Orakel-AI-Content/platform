@@ -13,6 +13,8 @@ import { firstTarFile } from './tar.ts';
 type Options = {
   /** DOCKER_HOST: tcp://docker-socket-proxy:2375. */
   host: string;
+  /** SITE_BUILDER_IMAGE (sem tag): única imagem que `pullImage` aceita baixar. */
+  siteBuilderImage: string;
   pollMs?: number;
   fetch?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
@@ -45,6 +47,23 @@ export function demux(bytes: Uint8Array): string {
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Tag do Docker: sem digest, sem outro repositório. */
+const TAG = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
+
+/** Mensagem de erro de uma linha do progresso do pull, se houver. */
+function pullError(line: string): string | undefined {
+  if (line.trim() === '') return undefined;
+  let event: { error?: unknown; errorDetail?: { message?: unknown } };
+  try {
+    event = JSON.parse(line) as typeof event;
+  } catch {
+    return `progresso ilegível: ${line}`;
+  }
+  const message = event.errorDetail?.message ?? event.error;
+  if (message === undefined) return undefined;
+  return typeof message === 'string' ? message : JSON.stringify(message);
+}
 
 export function dockerRuntime(options: Options): ContainerRuntime {
   const base = options.host.replace(/^tcp:\/\//, 'http://');
@@ -94,6 +113,44 @@ export function dockerRuntime(options: Options): ContainerRuntime {
       const response = await call('GET', `/images/${image}/json`, undefined, [404]);
       await response.body?.cancel();
       return response.status !== 404;
+    },
+
+    async pullImage(image) {
+      const prefix = `${options.siteBuilderImage}:`;
+      const tag = image.startsWith(prefix) ? image.slice(prefix.length) : undefined;
+      if (tag === undefined || !TAG.test(tag)) {
+        throw new Error(`pull recusado: ${image} não é ${prefix}<tag>`);
+      }
+      const response = await call(
+        'POST',
+        `/images/create?fromImage=${encodeURIComponent(options.siteBuilderImage)}&tag=${encodeURIComponent(tag)}`,
+      );
+      // O Docker responde 200 e informa a falha no stream (uma linha JSON por evento): lê até o fim.
+      const failed = (message: string) =>
+        new RuntimeError(`Docker POST /images/create (${image}): ${message}`);
+      const decoder = new TextDecoder();
+      let pending = '';
+      try {
+        for await (const chunk of response.body ?? new ReadableStream<Uint8Array>()) {
+          pending += decoder.decode(chunk, { stream: true });
+          const lines = pending.split('\n');
+          pending = lines.pop() ?? '';
+          for (const line of lines) {
+            const message = pullError(line);
+            if (message !== undefined) throw failed(message);
+          }
+        }
+      } catch (error) {
+        if (error instanceof RuntimeError) throw error;
+        throw new RuntimeError(
+          `Docker POST /images/create (${image}) interrompido: ${String(error)}`,
+          {
+            cause: error,
+          },
+        );
+      }
+      const message = pullError(pending + decoder.decode());
+      if (message !== undefined) throw failed(message);
     },
 
     async createVolume(name, labels) {

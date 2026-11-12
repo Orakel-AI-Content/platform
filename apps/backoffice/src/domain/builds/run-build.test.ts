@@ -70,15 +70,46 @@ describe('runBuild', () => {
     expect(outcome).toMatchObject({ status: 'failed', failure: { kind: 'transient' } });
   });
 
-  it('imagem ausente é permanente e nada é criado', async () => {
+  it('imagem ausente: tenta o pull uma vez e, sem a imagem, falha permanente e nada é criado', async () => {
     const fake = fakeRuntime({ image: false });
     const outcome = await runBuild(plan, { runtime: fake.runtime, now });
+    expect(fake.pulled).toEqual(['site-builder:local']);
     expect(outcome).toMatchObject({
       status: 'failed',
       stage: 'image',
       failure: { kind: 'permanent' },
     });
     expect(fake.volumes.created).toEqual([]);
+  });
+
+  it('imagem ausente que o pull traz segue para o render', async () => {
+    const fake = fakeRuntime({
+      image: false,
+      pull: 'ok',
+      render: { file: renderOk() },
+      publish: { file: publishOk() },
+    });
+    const outcome = await runBuild(plan, { runtime: fake.runtime, now });
+    expect(fake.pulled).toEqual(['site-builder:local']);
+    expect(outcome).toMatchObject({ status: 'ok' });
+  });
+
+  it('erro no pull é transitório, na etapa image', async () => {
+    const fake = fakeRuntime({ image: false, pull: 'error' });
+    const outcome = await runBuild(plan, { runtime: fake.runtime, now });
+    expect(fake.pulled).toHaveLength(1);
+    expect(outcome).toMatchObject({
+      status: 'failed',
+      stage: 'image',
+      failure: { kind: 'transient', message: 'image: manifest unknown' },
+    });
+    expect(fake.started).toEqual([]);
+  });
+
+  it('imagem presente não tenta o pull', async () => {
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    await runBuild(plan, { runtime: fake.runtime, now });
+    expect(fake.pulled).toEqual([]);
   });
 
   it('erro do runtime é transitório, na etapa em que aconteceu', async () => {

@@ -127,14 +127,17 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
   async function attempt(): Promise<BuildOutcome> {
     await enter('image');
     if (!(await runtime.imageExists(plan.image))) {
-      return {
-        status: 'failed',
-        stage: 'image',
-        failure: {
-          kind: 'permanent',
-          message: `A imagem ${plan.image} não está no host (o build não baixa imagens)`,
-        },
-      };
+      await runtime.pullImage(plan.image);
+      if (!(await runtime.imageExists(plan.image))) {
+        return {
+          status: 'failed',
+          stage: 'image',
+          failure: {
+            kind: 'permanent',
+            message: `A imagem ${plan.image} não está no host e o pull não a trouxe`,
+          },
+        };
+      }
     }
 
     current = 'render';
