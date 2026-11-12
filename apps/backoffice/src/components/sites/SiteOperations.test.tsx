@@ -24,7 +24,8 @@ import { type PublicationSite, SitePublicationSteps } from './SitePublicationSte
 // e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", cada uma com a confirmação de hoje (#327, #514, #515); o
 // sucesso vai ao toast e a recusa de qualquer uma ao `SiteOperationsAlert`, abaixo do painel.
 // "Cancelar" fica ao lado de "Publicar agora" com publicação na fila e no lugar dele em
-// andamento; "Desfazer última publicação" fica ao lado de "Escolher outra versão" (#649). Foco no
+// andamento; "Desfazer última publicação" fica ao lado de "Escolher outra versão" (#649).
+// "Atualizar para a mais recente" (#690) fica na Versão, antes do "Reconstruir". Foco no
 // navegador, em `SiteOperations.browser.test.tsx`.
 
 beforeAll(() => {
@@ -114,7 +115,12 @@ function Panel({
           instance={{ activePages: 120, activeSince: null }}
           activity={activity}
           actions={{
-            versao: <SiteOperationButton operation="rebuild" />,
+            versao: (
+              <span className="flex flex-wrap gap-2">
+                <SiteOperationButton operation="update" />
+                <SiteOperationButton operation="rebuild" />
+              </span>
+            ),
             build: <SiteOperationButton operation="publish" />,
             cancel: <SiteOperationButton operation="cancel" />,
             no_ar: (
@@ -218,6 +224,17 @@ describe('ações nas etapas', () => {
     expect(stepButtons(3)).toEqual([
       'Desfazer última publicação exemplo-a',
       'Escolher outra versão exemplo-a',
+    ]);
+  });
+
+  it('"Atualizar para a mais recente" só com release mais recente, antes do "Reconstruir"', () => {
+    const { rerender } = renderPanel(ALL);
+    expect(stepButtons(1)).toEqual(['Reconstruir na release exemplo-a']);
+
+    rerender(<Panel {...ALL} update={{ tag: '1.3.0', action: ok('') }} />);
+    expect(stepButtons(1)).toEqual([
+      'Atualizar para a mais recente exemplo-a',
+      'Reconstruir na release exemplo-a',
     ]);
   });
 
@@ -359,6 +376,44 @@ describe('confirmação', () => {
     await waitFor(() => expect(action).toHaveBeenCalledWith('exemplo-a'));
   });
 
+  it('"Atualizar para a mais recente" diz a versão de destino e roda a action com ela', async () => {
+    const user = userEvent.setup();
+    const action = ok('exemplo-a na release 1.3.0; build enfileirado.');
+    renderPanel({ ...ALL, update: { tag: '1.3.0', action } });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Atualizar para a mais recente exemplo-a' }),
+    );
+    expect(action).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Atualizar exemplo-a para a versão 1.3.0?',
+    });
+    expect(dialog.textContent).toContain('O site passa a usar a versão 1.3.0');
+    expect(dialog.textContent).not.toContain('sai da pausa');
+    expect(within(dialog).queryByRole('combobox')).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Atualizar' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe(
+        'exemplo-a na release 1.3.0; build enfileirado.',
+      ),
+    );
+    expect(action).toHaveBeenCalledWith('1.3.0');
+  });
+
+  it('pausado, a confirmação do "Atualizar" diz que o site sai da pausa', async () => {
+    const user = userEvent.setup();
+    renderPanel({ ...ALL, paused: true, update: { tag: '1.3.0', action: ok('') } });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Atualizar para a mais recente exemplo-a' }),
+    );
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Atualizar exemplo-a para a versão 1.3.0?',
+    });
+    expect(dialog.textContent).toContain('O site sai da pausa.');
+  });
+
   it('Cancelar não roda a ação', async () => {
     const user = userEvent.setup();
     const publish = ok('');
@@ -396,6 +451,11 @@ describe('recusa e ação em curso', () => {
       'Desfazer última publicação exemplo-a',
       'Desfazer',
       { undo: { version: PREVIOUS, action: refused(REFUSED) } },
+    ],
+    [
+      'Atualizar para a mais recente exemplo-a',
+      'Atualizar',
+      { update: { tag: '1.3.0', action: refused(REFUSED) } },
     ],
   ] as const)('a recusa de "%s" vai ao alerta único do painel', async (name, confirm, props) => {
     const user = userEvent.setup();
