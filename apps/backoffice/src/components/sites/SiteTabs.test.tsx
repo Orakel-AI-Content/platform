@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SiteTabs } from './SiteTabs.tsx';
 
-// Abas da página do site (#370): o Card com Ciclo de vida, Builds (#595), G1, Janela e Limite
+// Abas da página do site (#370): o Card com Ciclo de vida, Histórico (#637), G1, Janela e Limite
 // diário (#490), a primeira aberta.
 
 afterEach(cleanup);
@@ -16,7 +16,7 @@ describe('SiteTabs', () => {
     render(
       <SiteTabs
         lifecycle={<p>Etapas</p>}
-        builds={<p>Tabela</p>}
+        history={<p>Tabela</p>}
         g1={<p>Registro</p>}
         buildWindow={<p>Janela</p>}
         dailyLimit={<p>Limite</p>}
@@ -27,15 +27,15 @@ describe('SiteTabs', () => {
     expect(list.closest('.card')).not.toBeNull();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Ciclo de vida',
-      'Builds',
+      'Histórico',
       'G1 (indexação)',
       'Janela de agrupamento',
       'Limite diário',
     ]);
     expect(screen.getByRole('tabpanel', { name: 'Ciclo de vida' }).textContent).toBe('Etapas');
 
-    await user.click(screen.getByRole('tab', { name: 'Builds' }));
-    expect(screen.getByRole('tabpanel', { name: 'Builds' }).textContent).toBe('Tabela');
+    await user.click(screen.getByRole('tab', { name: 'Histórico' }));
+    expect(screen.getByRole('tabpanel', { name: 'Histórico' }).textContent).toBe('Tabela');
 
     await user.click(screen.getByRole('tab', { name: 'Janela de agrupamento' }));
     expect(screen.getByRole('tabpanel', { name: 'Janela de agrupamento' }).textContent).toBe(

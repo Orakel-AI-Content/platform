@@ -6,6 +6,7 @@ import { SiteBuildsTable } from '@/components/sites/SiteBuildsTable';
 import { SiteSummaryCard } from '@/components/sites/SiteSummaryCard';
 import { SiteTabs } from '@/components/sites/SiteTabs';
 import Card from '@/components/ui/Card';
+import type { SiteHistoryItem } from '@/domain/builds/builds.ts';
 import { REVIEW_CHECKLIST } from '@/domain/reviews/reviews.ts';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
@@ -72,6 +73,32 @@ const INSTANCE: SiteInstance = {
   ],
 };
 
+/** A aba "Histórico" (#637): uma falha e uma pausa. */
+const HISTORY: SiteHistoryItem[] = [
+  {
+    type: 'execucao',
+    id: 2,
+    kind: 'build',
+    status: 'failed',
+    requestedBy: 'system',
+    cancelRequestedBy: null,
+    at: new Date('2026-10-20T13:00:00.000Z'),
+    release: '1.4.0',
+    versionId: null,
+    failure: { stage: 'render', kind: 'permanent', message: 'falhou', logTail: 'exit 1' },
+  },
+  {
+    type: 'evento',
+    id: 1,
+    kind: 'pausa',
+    requestedBy: 'system',
+    at: new Date('2026-10-20T12:30:00.000Z'),
+    reason: 'falha permanente',
+    previousRelease: null,
+    release: null,
+  },
+];
+
 /** Slug longo e sem hífen (#371): tem de quebrar dentro do cartão em vez de passar da borda. */
 const SLUG = `/detalhe${'x'.repeat(90)}1761000000000`;
 
@@ -86,7 +113,7 @@ function SiteDetail() {
         <SiteSummaryCard site={SITE} instance={INSTANCE} g1Registered />
         <SiteTabs
           lifecycle={<p>Etapas do ciclo de vida.</p>}
-          builds={<SiteBuildsTable builds={INSTANCE.recentBuilds} timeZone={SITE.timeZone} />}
+          history={<SiteBuildsTable history={HISTORY} timeZone={SITE.timeZone} />}
           g1={<p>Registro no G1.</p>}
           buildWindow={<p>Janela de agrupamento.</p>}
           dailyLimit={<p>Limite diário.</p>}
