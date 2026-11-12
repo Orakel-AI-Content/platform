@@ -1,14 +1,14 @@
 // Colunas operacionais do site (estado, motivo e culpado da pausa, versão ativa, release, ciclo de
-// vida, janela dos builds, limite diário de publicações, despublicação em massa declarada),
-// gravadas pelo build e pela operação; pausa, retomada e troca de versão também viram uma linha
+// vida, janela dos builds, limite diário de publicações, despublicação em massa declarada,
+// conferência da infra), gravadas pelo build, pela operação e pelo backoffice-worker; pausa, retomada e troca de versão também viram uma linha
 // de `site_events`, na mesma transação. Não vão para o snapshot: gravar aqui não gera mudança pendente — senão cada build agendaria outro. Único
 // módulo fora de pending-changes liberado no teste de varredura.
 import type { Culprit } from '@orakel/build-contract';
 import type { Result } from '@orakel/content-model';
-import { and, desc, eq, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { releases, siteEvents, sites } from '../../db/schema/index.ts';
+import { releases, siteConfigs, siteEvents, sites } from '../../db/schema/index.ts';
 import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { buildNow } from './schedule.ts';
 
@@ -597,4 +597,106 @@ export async function setDailyPublishLimit(
     };
   }
   return { ok: true, value: undefined };
+}
+
+/** Conferência automática da infra (workspace#85): task do backoffice-worker, cron e "Conferir agora". */
+export const CHECK_SITE_INFRA_TASK = 'check-site-infra';
+
+/** Etapas em que a conferência ainda tem o que avançar; `zona_ativa` e `publicado` ficam de fora. */
+const INFRA_CHECK_STEPS = ['cadastrado', 'infra_aplicada'] as const;
+
+/**
+ * Resultado da consulta ao provedor (a forma do `ZoneStatus` de `lib/cloudflare.ts`):
+ * `inexistente` não avança, `pendente` avança até `infra_aplicada`, `ativa` até `zona_ativa`;
+ * `falha` só grava a mensagem.
+ */
+export type InfraCheckOutcome =
+  | { kind: 'inexistente' }
+  | { kind: 'pendente' }
+  | { kind: 'ativa' }
+  | { kind: 'falha'; message: string };
+
+export type InfraCheckTarget = {
+  siteId: string;
+  /** Domínio principal (`domains[0]` da configuração corrente); sem ele, não há o que consultar. */
+  domain: string | undefined;
+};
+
+/**
+ * Sites a conferir: os em `cadastrado` ou `infra_aplicada`, todos ou só `siteId` (se ainda
+ * estiver numa dessas etapas), com o domínio principal da configuração corrente.
+ */
+export async function sitesForInfraCheck(
+  db: Executor,
+  siteId?: string,
+): Promise<InfraCheckTarget[]> {
+  const rows = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(
+      and(
+        inArray(sites.lifecycle, INFRA_CHECK_STEPS),
+        siteId === undefined ? undefined : eq(sites.id, siteId),
+      ),
+    )
+    .orderBy(sites.id);
+  const targets: InfraCheckTarget[] = [];
+  for (const { id } of rows) {
+    const [config] = await db
+      .select({ config: siteConfigs.config })
+      .from(siteConfigs)
+      .where(eq(siteConfigs.siteId, id))
+      .orderBy(desc(siteConfigs.version))
+      .limit(1);
+    targets.push({ siteId: id, domain: config?.config.domains[0] });
+  }
+  return targets;
+}
+
+/**
+ * Grava a conferência (quando e, na `falha`, a mensagem; o sucesso limpa a anterior) e avança
+ * o ciclo de vida em nome do sistema. O update condicional do `advanceLifecycle` decide a
+ * corrida com "Marcar"/"Desmarcar": etapa fora de ordem não é erro, o site só não avança.
+ * Devolve a etapa em que o site ficou.
+ */
+export async function recordInfraCheck(
+  tx: Executor,
+  siteId: string,
+  outcome: InfraCheckOutcome,
+  checkedAt: Date,
+): Promise<(typeof sites.$inferSelect)['lifecycle'] | undefined> {
+  await tx
+    .update(sites)
+    .set({
+      infraCheckedAt: checkedAt,
+      infraCheckError: outcome.kind === 'falha' ? outcome.message : null,
+    })
+    .where(eq(sites.id, siteId));
+  if (outcome.kind === 'pendente' || outcome.kind === 'ativa') {
+    await advanceLifecycle(tx, SYSTEM_ACTOR, siteId, 'infra_aplicada');
+  }
+  if (outcome.kind === 'ativa') {
+    await advanceLifecycle(tx, SYSTEM_ACTOR, siteId, 'zona_ativa');
+  }
+  const [site] = await tx
+    .select({ lifecycle: sites.lifecycle })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  return site?.lifecycle;
+}
+
+/**
+ * Enfileira a conferência da infra de um site ("Conferir agora"), na transação de quem pede.
+ * `job_key` por site com `replace`: pedidos repetidos antes de o job rodar viram um só. Uma
+ * tentativa só, como o cron: a próxima conferência é a do cron.
+ */
+export async function scheduleSiteInfraCheck(tx: Executor, siteId: string): Promise<void> {
+  await tx.execute(sql`
+    select graphile_worker.add_job(
+      identifier => ${CHECK_SITE_INFRA_TASK},
+      payload => ${JSON.stringify({ siteId })}::json,
+      max_attempts => 1,
+      job_key => ${`site-infra:${siteId}`},
+      job_key_mode => 'replace'
+    )`);
 }
