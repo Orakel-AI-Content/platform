@@ -272,7 +272,7 @@ backoffice). O site precisa de um contexto editorial (aba Contextos) e de um aut
 `render`; sem internet), `orakel-publish` (`publish`, `edge-local`, S3), `orakel-docker`
 (`build-runner` e `docker-socket-proxy`) e `orakel-edge` (Caddy, `edge-local`, ClickHouse, S3).
 O ClickHouse também fica na `orakel-internal`, para o `backoffice-worker` (ADR 0018).
-Detalhes no ADR 0010; o proxy do socket, no ADR 0011.
+Detalhes no ADR 0010; o proxy do socket, nos ADRs 0011 e 0021.
 
 ## Serviços opcionais
 

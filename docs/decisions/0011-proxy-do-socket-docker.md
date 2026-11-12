@@ -1,6 +1,6 @@
 # 0011 – Proxy do socket do Docker
 
-- Status: aceito
+- Status: aceito (a recusa do `pull` foi substituída pelo 0021)
 - Data: 2026-09-30
 
 ## Contexto
@@ -33,5 +33,5 @@ host. Spike da L0: proxy com permissões mínimas ou Docker rootless.
 ## Consequências
 
 - `pnpm local:check` confere, a partir do `build-runner`, que `GET /version` passa e que
-  `exec`, `pull` e `GET /networks` são recusados.
+  `exec`, `pull` e `GET /networks` são recusados (o `pull` passou a ser aceito pelo 0021).
 - Rota nova no `build-runner` exige mudar a lista no compose.
