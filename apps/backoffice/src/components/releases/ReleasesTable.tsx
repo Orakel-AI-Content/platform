@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/Button';
 import useCallbackRef from '@/components/ui/hooks/useCallbackRef';
 import type { PreviewState } from '@/domain/preview/preview.ts';
 import type { ReleasePipelineState, ReleaseRecord } from '@/domain/releases/releases.ts';
+import type { Rollout } from '@/domain/releases/rollout.ts';
 
 /**
  * Fuso das datas: a release é da rede, não de um site, então a data aparece no fuso da operação
@@ -41,10 +42,17 @@ const LIST: ListConfig = {
 export type ReleaseAction = (tag: string) => Promise<ActionResult>;
 
 /**
- * Releases, as tags que algum site usa e o estado da prévia: o que a página carrega e o polling
- * relê.
+ * Releases, as tags que algum site usa, o estado da prévia, a última atualização de todos os
+ * sites e a versão que uma nova levaria (a `disponivel` mais recente): o que a página carrega e
+ * o polling relê.
  */
-export type ReleasesSnapshot = { rows: ReleaseRecord[]; inUse: string[]; preview: PreviewState };
+export type ReleasesSnapshot = {
+  rows: ReleaseRecord[];
+  inUse: string[];
+  preview: PreviewState;
+  rollout: Rollout | null;
+  rolloutTarget: string | null;
+};
 
 /** Leitura do polling; `undefined` quando não deu para ler (o próximo tique tenta de novo). */
 export type ReleasesStatus = () => Promise<ReleasesSnapshot | undefined>;
