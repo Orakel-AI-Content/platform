@@ -55,6 +55,7 @@ export async function latestVersion(db: Executor, siteId: string, contentId: num
       version: contentVersions.version,
       status: contentVersions.status,
       data: contentVersions.data,
+      submittedAt: contentVersions.submittedAt,
     })
     .from(contentVersions)
     .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))

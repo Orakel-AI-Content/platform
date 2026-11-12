@@ -1,0 +1,1 @@
+ALTER TABLE "content_versions" ADD COLUMN "submitted_at" timestamp with time zone;
