@@ -15,7 +15,7 @@ sites é configuração.
 - Uma unidade: `pnpm turbo run <tarefa> --filter=@orakel/<nome>`
 - Um teste (na pasta da unidade): `pnpm vitest run <caminho>`
 - Formatar: `pnpm format`
-- Ambiente local: `pnpm local:up` · `local:seed` · `local:check` · `local:publish <site>` · `local:load` · `local:trust` · `local:down` · `local:e2e` · `local:e2e:area <área>|smoke` · `local:e2e:telas <área>`
+- Ambiente local: `pnpm local:up` · `local:seed` · `local:check` · `local:publish <site>` (pede o build ao Backoffice) · `local:images` (reconstrói as imagens depois de mudar o código) · `local:load` · `local:trust` · `local:down` · `local:e2e` · `local:e2e:area <área>|smoke` · `local:e2e:telas <área>`
 - Compose direto: `infra/local/compose.sh <args>`
 - Sessão de branch em paralelo (ex.: `/execute`): `pnpm worktree new <issue> <branch>` no começo, `pnpm worktree rm <issue>` ao terminar; nunca deixe worktree para trás
 

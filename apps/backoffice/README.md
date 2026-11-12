@@ -6,7 +6,8 @@ consome. Next.js 16 (App Router), Drizzle sobre Postgres, Graphile Worker.
 
 ## Rodar
 
-Ambiente local (raiz): `pnpm local:images && pnpm local:up && pnpm local:seed`, e abra
+Ambiente local (raiz): `pnpm local:up && pnpm local:seed` (o `local:up` constrói as imagens que
+faltam; o seed enfileira o primeiro build dos sites de exemplo), e abra
 `https://admin.orakel.localhost` (login de teste pelo access-mock). No compose, a mesma imagem
 atende quatro serviços: `backoffice-migrate`, `backoffice-web`, `backoffice-worker` e
 `build-runner` (este fala com o Docker só pelo `docker-socket-proxy`). O seed aplica os domínios

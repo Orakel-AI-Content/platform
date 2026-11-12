@@ -4,7 +4,7 @@
 # que todos chegaram, com sessão só fora do EEE, Reino Unido e Suíça; nas tabelas diárias do
 # Postgres, depois da consolidação disparada no backoffice-worker, que o total bate com o
 # ClickHouse; e em nenhuma tabela do caminho nem nos logs da carga, o IP do container do k6.
-# Precisa do site publicado (pnpm local:publish <site>).
+# Precisa do site publicado (o local:seed pede o primeiro build; ou pnpm local:publish <site>).
 set -eu
 cd "$(dirname "$0")/../.."
 . infra/local/lib.sh
