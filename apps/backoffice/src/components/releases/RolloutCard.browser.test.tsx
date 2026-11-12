@@ -4,11 +4,13 @@ import { page, userEvent } from 'vitest/browser';
 import { appElementWarnings, appRoot, expectFocusTrapped } from '../../../test/browser/dialog.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 
-import { RolloutButton } from './RolloutCard.tsx';
+import type { Rollout } from '@/domain/releases/rollout.ts';
+
+import { RolloutButton, RolloutCard } from './RolloutCard.tsx';
 
 // "Atualizar todos os sites" em Chromium (#703): abre pelo teclado com o foco preso no
 // alertdialog e a versão de destino; Esc e o sucesso devolvem o foco ao botão; a recusa fica no
-// diálogo. Sem axe: Dialog e ConfirmDialog são cobertos como componentes de base (ADR 0020).
+// diálogo. "Interromper" no cartão (#704), no mesmo molde. Sem axe: Dialog e ConfirmDialog são cobertos como componentes de base (ADR 0020).
 
 const TRIGGER = 'Atualizar todos os sites';
 const NAME = 'Atualizar todos os sites para a 1.5.0?';
@@ -67,6 +69,77 @@ describe('Atualizar todos os sites no navegador', () => {
     await dialog.getByRole('button', { name: 'Atualizar', exact: true }).click();
 
     await expect.element(dialog.getByRole('alert')).toHaveTextContent('Já existe uma em andamento');
+    await expect.element(dialog).toBeVisible();
+  });
+});
+
+const running: Rollout = {
+  id: 1,
+  targetRelease: '1.5.0',
+  state: 'em_andamento',
+  requestedBy: 'operacao@orakel.local',
+  startedAt: new Date('2026-11-12T12:00Z'),
+  finishedAt: null,
+  interruptedBy: null,
+  interruptedAt: null,
+  sites: [
+    { siteId: 'site-a', position: 0, state: 'atualizado', previousRelease: '1.4.0' },
+    { siteId: 'site-b', position: 1, state: 'em_andamento', previousRelease: '1.4.0' },
+    { siteId: 'site-c', position: 2, state: 'aguardando', previousRelease: '1.4.0' },
+  ],
+};
+
+const INTERRUPT_NAME = 'Interromper a atualização para a 1.5.0?';
+
+describe('Interromper no navegador', () => {
+  it('abre pelo teclado com o foco preso; Esc devolve o foco', async () => {
+    const warnings = appElementWarnings();
+    const screen = await renderInApp(<RolloutCard rollout={running} interrupt={vi.fn()} />);
+    const trigger = screen.getByRole('button', { name: 'Interromper' });
+
+    (trigger.element() as HTMLElement).focus();
+    await userEvent.keyboard('{Enter}');
+    const dialog = page.getByRole('alertdialog', { name: INTERRUPT_NAME });
+    await expect.element(dialog.getByRole('heading', { name: INTERRUPT_NAME })).toBeVisible();
+    expect(appRoot().inert).toBe(true);
+    await expectFocusTrapped(dialog);
+
+    await userEvent.keyboard('{Escape}');
+    await expect.element(dialog).not.toBeInTheDocument();
+    await expect.element(trigger).toHaveFocus();
+    expect(appRoot().inert).toBe(false);
+    expect(warnings()).toEqual([]);
+  });
+
+  it('confirmar interrompe, fecha o diálogo e mostra o toast', async () => {
+    const action = vi
+      .fn()
+      .mockResolvedValue({ ok: true, message: 'Atualização para 1.5.0 interrompida.' });
+    const screen = await renderInApp(<RolloutCard rollout={running} interrupt={action} />);
+
+    await screen.getByRole('button', { name: 'Interromper' }).click();
+    const dialog = page.getByRole('alertdialog', { name: INTERRUPT_NAME });
+    await dialog.getByRole('button', { name: 'Interromper', exact: true }).click();
+
+    await expect.element(dialog).not.toBeInTheDocument();
+    expect(action).toHaveBeenCalledTimes(1);
+    await expect.element(page.getByText('Atualização para 1.5.0 interrompida.')).toBeVisible();
+  });
+
+  it('a recusa do domínio fica no diálogo, que segue aberto', async () => {
+    const action = vi.fn().mockResolvedValue({
+      ok: false,
+      message: 'Não há atualização de todos os sites em andamento',
+    });
+    const screen = await renderInApp(<RolloutCard rollout={running} interrupt={action} />);
+
+    await screen.getByRole('button', { name: 'Interromper' }).click();
+    const dialog = page.getByRole('alertdialog', { name: INTERRUPT_NAME });
+    await dialog.getByRole('button', { name: 'Interromper', exact: true }).click();
+
+    await expect
+      .element(dialog.getByRole('alert'))
+      .toHaveTextContent('Não há atualização de todos os sites em andamento');
     await expect.element(dialog).toBeVisible();
   });
 });
