@@ -7,10 +7,13 @@ import {
   liveResultText,
   liveStatusText,
   liveVersionText,
+  releaseAvailableText,
+  releaseInUseText,
   type PublicationStep,
 } from '@/components/shared/siteLabels.ts';
 import type { StepStatus } from '@/components/ui/@types/common';
 import { Steps } from '@/components/ui/Steps';
+import { Tag } from '@/components/ui/Tag';
 import type { ExecutionHistoryItem, SiteActivity } from '@/domain/builds/builds.ts';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
@@ -19,7 +22,13 @@ import { LifecycleSteps } from './LifecycleSteps.tsx';
 export type PublicationSite = Pick<
   SiteSummary,
   'lifecycle' | 'release' | 'activeVersionId' | 'state' | 'pausedReason' | 'timeZone'
->;
+> & {
+  /**
+   * A release `disponivel` mais recente, só quando difere da do site (#690): a página a resolve e
+   * decide; o painel só a mostra numa `Tag` na etapa Versão. Ausente ou `null`, nenhuma Tag.
+   */
+  newerRelease?: string | null;
+};
 
 export type PublicationInstance = Pick<SiteInstance, 'activePages' | 'activeSince'>;
 
@@ -90,7 +99,17 @@ function steps(
     },
     versao: {
       status: site.release === null ? 'pending' : 'complete',
-      text: site.release ?? 'Nenhuma release',
+      text: (
+        <span className="flex flex-wrap items-center gap-2">
+          <span>{releaseInUseText(site.release)}</span>
+          {site.newerRelease ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <Tag>{releaseAvailableText(site.newerRelease)}</Tag>
+            </>
+          ) : null}
+        </span>
+      ),
     },
     build:
       activity.open !== null
