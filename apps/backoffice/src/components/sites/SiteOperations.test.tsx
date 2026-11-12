@@ -89,6 +89,7 @@ const QUEUED: OpenExecution = {
 };
 const RUNNING: OpenExecution = { ...QUEUED, status: 'rodando', currentStage: 'render' };
 const ROLLING_BACK: OpenExecution = { ...RUNNING, kind: 'rollback', currentStage: null };
+const QUEUED_ACTIVITY: SiteActivity = { open: QUEUED, history: [] };
 
 type Props = Partial<Omit<ComponentProps<typeof SiteOperationsScope>, 'children'>> & {
   activity?: SiteActivity;
@@ -347,7 +348,7 @@ describe('recusa e ação em curso', () => {
     [
       'Cancelar exemplo-a',
       'Cancelar publicação',
-      { cancel: refused(REFUSED), activity: { open: QUEUED, history: [] } },
+      { cancel: refused(REFUSED), activity: QUEUED_ACTIVITY },
     ],
     [
       'Desfazer última publicação exemplo-a',
