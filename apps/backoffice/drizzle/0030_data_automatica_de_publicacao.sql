@@ -1,0 +1,1 @@
+ALTER TABLE "content_versions" ADD COLUMN "published_at_auto" boolean DEFAULT true NOT NULL;
