@@ -8,13 +8,10 @@ import { Button } from '@/components/ui/Button';
 
 import { RebuildReleaseDialog, type RebuildRelease } from './RebuildReleaseDialog.tsx';
 
-// Reconstruir na release em Chromium (#515): foco preso no alertdialog, o foco volta ao
+// "Escolher outra versão do motor" em Chromium (#515): foco preso no alertdialog, o foco volta ao
 // gatilho ao fechar (Esc, Cancelar e confirmar).
 
-const RELEASES: RebuildRelease[] = [
-  { tag: '1.3.0', imageStatus: 'ausente' },
-  { tag: '1.2.0', imageStatus: 'disponivel' },
-];
+const RELEASES: RebuildRelease[] = [{ tag: '1.3.0' }, { tag: '1.2.0' }];
 const NAME = 'Reconstruir o site numa release?';
 
 /** O diálogo aberto por um botão, como o "Mais ações" faz na página do site (#595). */
@@ -24,7 +21,7 @@ function Rebuild({ onConfirm }: { onConfirm: (tag: string) => void }) {
   return (
     <>
       <Button ref={trigger} type="button" size="sm" onClick={() => setOpen(true)}>
-        Reconstruir na release
+        Escolher outra versão do motor
       </Button>
       <RebuildReleaseDialog
         current="1.2.0"
@@ -46,11 +43,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('Reconstruir na release no navegador', () => {
+describe('Escolher outra versão do motor no navegador', () => {
   it('foco preso; Esc e Cancelar fecham e devolvem o foco ao gatilho', async () => {
     const warnings = appElementWarnings();
     const screen = await renderInApp(<Rebuild onConfirm={vi.fn()} />);
-    const trigger = screen.getByRole('button', { name: 'Reconstruir na release' });
+    const trigger = screen.getByRole('button', { name: 'Escolher outra versão do motor' });
 
     (trigger.element() as HTMLElement).focus();
     await userEvent.keyboard('{Enter}');
@@ -74,7 +71,7 @@ describe('Reconstruir na release no navegador', () => {
   it('escolher outra release e confirmar chama o onConfirm e devolve o foco ao gatilho', async () => {
     const action = vi.fn();
     const screen = await renderInApp(<Rebuild onConfirm={action} />);
-    const trigger = screen.getByRole('button', { name: 'Reconstruir na release' });
+    const trigger = screen.getByRole('button', { name: 'Escolher outra versão do motor' });
 
     await trigger.click();
     const dialog = page.getByRole('alertdialog', { name: NAME });

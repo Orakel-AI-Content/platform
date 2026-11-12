@@ -20,12 +20,13 @@ import {
 import { type PublicationSite, SitePublicationSteps } from './SitePublicationSteps.tsx';
 
 // Ações de operação nas etapas da aba "Publicação" (#648; antes no cabeçalho, #595):
-// "Reconstruir na release" na Versão, "Publicar agora" na Build, "Escolher outra versão" na No ar
+// "Escolher outra versão do motor" (o "Reconstruir na release") na Versão, "Publicar agora" na Build, "Escolher outra versão" na No ar
 // e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", cada uma com a confirmação de hoje (#327, #514, #515); o
 // sucesso vai ao toast e a recusa de qualquer uma ao `SiteOperationsAlert`, abaixo do painel.
 // "Cancelar" fica ao lado de "Publicar agora" com publicação na fila e no lugar dele em
 // andamento; "Desfazer última publicação" fica ao lado de "Escolher outra versão" (#649).
-// "Atualizar para a mais recente" (#690) fica na Versão, antes do "Reconstruir". Foco no
+// "Atualizar para a mais recente" (#690) e "Voltar à versão anterior (X)" (#691) ficam na Versão,
+// antes do "Escolher outra versão do motor". Foco no
 // navegador, em `SiteOperations.browser.test.tsx`.
 
 beforeAll(() => {
@@ -53,7 +54,7 @@ const ok = (message: string) =>
 const refused = (message: string) =>
   vi.fn((): Promise<ActionResult> => Promise.resolve({ ok: false, message }));
 
-const RELEASES = [{ tag: '1.3.0', imageStatus: 'disponivel' as const }];
+const RELEASES = [{ tag: '1.3.0' }];
 const VERSIONS = [
   {
     versionId: '20261010T120000Z-bbbbbbbb',
@@ -118,6 +119,7 @@ function Panel({
             versao: (
               <span className="flex flex-wrap gap-2">
                 <SiteOperationButton operation="update" />
+                <SiteOperationButton operation="revert" />
                 <SiteOperationButton operation="rebuild" />
               </span>
             ),
@@ -179,7 +181,7 @@ describe('ações nas etapas', () => {
     renderPanel(ALL);
 
     expect(stepButtons(0)).toEqual([]);
-    expect(stepButtons(1)).toEqual(['Reconstruir na release exemplo-a']);
+    expect(stepButtons(1)).toEqual(['Escolher outra versão do motor exemplo-a']);
     expect(stepButtons(2)).toEqual(['Publicar agora exemplo-a']);
     expect(stepButtons(3)).toEqual(['Escolher outra versão exemplo-a']);
     expect(stepButtons(4)).toEqual(['Pausar exemplo-a']);
@@ -227,14 +229,44 @@ describe('ações nas etapas', () => {
     ]);
   });
 
-  it('"Atualizar para a mais recente" só com release mais recente, antes do "Reconstruir"', () => {
+  it('"Atualizar para a mais recente" só com release mais recente, antes do "Escolher outra"', () => {
     const { rerender } = renderPanel(ALL);
-    expect(stepButtons(1)).toEqual(['Reconstruir na release exemplo-a']);
+    expect(stepButtons(1)).toEqual(['Escolher outra versão do motor exemplo-a']);
 
     rerender(<Panel {...ALL} update={{ tag: '1.3.0', action: ok('') }} />);
     expect(stepButtons(1)).toEqual([
       'Atualizar para a mais recente exemplo-a',
-      'Reconstruir na release exemplo-a',
+      'Escolher outra versão do motor exemplo-a',
+    ]);
+  });
+
+  it('"Voltar à versão anterior (X)" só com anterior válida, com a versão no nome', () => {
+    const { rerender } = renderPanel({ ...ALL, update: { tag: '1.5.0', action: ok('') } });
+    expect(screen.queryByRole('button', { name: /Voltar à versão anterior/ })).toBeNull();
+
+    rerender(
+      <Panel
+        {...ALL}
+        update={{ tag: '1.5.0', action: ok('') }}
+        revert={{ tag: '1.1.0', action: ok('') }}
+      />,
+    );
+    expect(stepButtons(1)).toEqual([
+      'Atualizar para a mais recente exemplo-a',
+      'Voltar à versão anterior (1.1.0) exemplo-a',
+      'Escolher outra versão do motor exemplo-a',
+    ]);
+  });
+
+  it('os gatilhos de "Escolher outra" da Versão e da No ar têm nomes acessíveis distintos', () => {
+    renderPanel(ALL);
+
+    const versao = within(step(1)).getByRole('button');
+    const noAr = within(step(3)).getByRole('button');
+    expect(versao.textContent).toBe('Escolher outra versão do motor exemplo-a');
+    expect(noAr.textContent).toBe('Escolher outra versão exemplo-a');
+    expect(screen.getAllByRole('button', { name: 'Escolher outra versão exemplo-a' })).toEqual([
+      noAr,
     ]);
   });
 
@@ -278,12 +310,14 @@ describe('confirmação', () => {
     await waitFor(() => expect(resume).toHaveBeenCalledWith('exemplo-a'));
   });
 
-  it('"Reconstruir na release" roda a action com a release escolhida', async () => {
+  it('"Escolher outra versão do motor" roda a action com a release escolhida', async () => {
     const user = userEvent.setup();
     const action = ok('Build enfileirado.');
     renderPanel({ ...ALL, paused: true, rebuild: { releases: RELEASES, action } });
 
-    await user.click(screen.getByRole('button', { name: 'Reconstruir na release exemplo-a' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Escolher outra versão do motor exemplo-a' }),
+    );
     const dialog = await screen.findByRole('alertdialog', {
       name: 'Reconstruir o site numa release?',
     });
@@ -414,6 +448,43 @@ describe('confirmação', () => {
     expect(dialog.textContent).toContain('O site sai da pausa.');
   });
 
+  it('"Voltar à versão anterior" diz a versão de destino e roda a action do site', async () => {
+    const user = userEvent.setup();
+    const action = ok('exemplo-a de volta à release 1.1.0; build enfileirado.');
+    renderPanel({ ...ALL, revert: { tag: '1.1.0', action } });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Voltar à versão anterior (1.1.0) exemplo-a' }),
+    );
+    expect(action).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Voltar exemplo-a para a versão 1.1.0?',
+    });
+    expect(dialog.textContent).toContain('O site volta a usar a versão 1.1.0');
+    expect(dialog.textContent).not.toContain('sai da pausa');
+    await user.click(within(dialog).getByRole('button', { name: 'Voltar' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe(
+        'exemplo-a de volta à release 1.1.0; build enfileirado.',
+      ),
+    );
+    expect(action).toHaveBeenCalledWith('exemplo-a');
+  });
+
+  it('pausado, a confirmação do "Voltar" diz que o site sai da pausa', async () => {
+    const user = userEvent.setup();
+    renderPanel({ ...ALL, paused: true, revert: { tag: '1.1.0', action: ok('') } });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Voltar à versão anterior (1.1.0) exemplo-a' }),
+    );
+    const dialog = screen.getByRole('alertdialog', {
+      name: 'Voltar exemplo-a para a versão 1.1.0?',
+    });
+    expect(dialog.textContent).toContain('O site sai da pausa.');
+  });
+
   it('Cancelar não roda a ação', async () => {
     const user = userEvent.setup();
     const publish = ok('');
@@ -432,7 +503,7 @@ describe('recusa e ação em curso', () => {
   it.each([
     ['Publicar agora exemplo-a', 'Publicar', { publish: refused(REFUSED) }],
     [
-      'Reconstruir na release exemplo-a',
+      'Escolher outra versão do motor exemplo-a',
       'Reconstruir',
       { rebuild: { releases: RELEASES, action: refused(REFUSED) } },
     ],
@@ -456,6 +527,11 @@ describe('recusa e ação em curso', () => {
       'Atualizar para a mais recente exemplo-a',
       'Atualizar',
       { update: { tag: '1.3.0', action: refused(REFUSED) } },
+    ],
+    [
+      'Voltar à versão anterior (1.1.0) exemplo-a',
+      'Voltar',
+      { revert: { tag: '1.1.0', action: refused(REFUSED) } },
     ],
   ] as const)('a recusa de "%s" vai ao alerta único do painel', async (name, confirm, props) => {
     const user = userEvent.setup();

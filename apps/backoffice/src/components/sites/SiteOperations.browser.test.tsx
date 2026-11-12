@@ -18,9 +18,9 @@ import { SitePublicationSteps } from './SitePublicationSteps.tsx';
 // confirmação de hoje com o foco preso, a action só roda depois de confirmar, e fechar devolve
 // o foco ao botão da etapa. "Cancelar" e "Desfazer última publicação" (#649) seguem o mesmo
 // caminho; quando a publicação cancelada fecha, o foco fica no "Publicar agora" da etapa.
-// "Atualizar para a mais recente" (#690) também.
+// "Atualizar para a mais recente" (#690) e "Voltar à versão anterior (X)" (#691) também.
 
-const RELEASES = [{ tag: '1.3.0', imageStatus: 'disponivel' as const }];
+const RELEASES = [{ tag: '1.3.0' }];
 const VERSIONS = [
   {
     versionId: '20261010T120000Z-bbbbbbbb',
@@ -53,6 +53,7 @@ type Actions = {
   cancel: ReturnType<typeof ok>;
   undo: ReturnType<typeof ok>;
   update: ReturnType<typeof ok>;
+  revert: ReturnType<typeof ok>;
 };
 
 const allActions = (): Actions => ({
@@ -63,6 +64,7 @@ const allActions = (): Actions => ({
   cancel: ok(),
   undo: ok(),
   update: ok(),
+  revert: ok(),
 });
 
 function Panel({
@@ -88,6 +90,7 @@ function Panel({
         cancel={actions.cancel}
         undo={{ version: VERSIONS[0]!, action: actions.undo }}
         update={{ tag: '1.3.0', action: actions.update }}
+        revert={{ tag: '1.1.0', action: actions.revert }}
       >
         <SitePublicationSteps
           site={{
@@ -104,6 +107,7 @@ function Panel({
             versao: (
               <span className="flex flex-wrap gap-2">
                 <SiteOperationButton operation="update" />
+                <SiteOperationButton operation="revert" />
                 <SiteOperationButton operation="rebuild" />
               </span>
             ),
@@ -132,7 +136,7 @@ afterEach(() => {
 const CASES = [
   {
     operation: 'rebuild',
-    button: 'Reconstruir na release exemplo-a',
+    button: 'Escolher outra versão do motor exemplo-a',
     dialog: 'Reconstruir o site numa release?',
     confirm: 'Reconstruir',
     paused: false,
@@ -177,6 +181,13 @@ const CASES = [
     button: 'Atualizar para a mais recente exemplo-a',
     dialog: 'Atualizar exemplo-a para a versão 1.3.0?',
     confirm: 'Atualizar',
+    paused: false,
+  },
+  {
+    operation: 'revert',
+    button: 'Voltar à versão anterior (1.1.0) exemplo-a',
+    dialog: 'Voltar exemplo-a para a versão 1.1.0?',
+    confirm: 'Voltar',
     paused: false,
   },
 ] as const;

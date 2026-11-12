@@ -16,6 +16,7 @@ import Card from '@/components/ui/Card';
 import { can } from '@/domain/access/rbac.ts';
 import { listRollbackVersions, previousVersion, siteActivity } from '@/domain/builds/builds.ts';
 import { countContentsByStatus } from '@/domain/content/contents.ts';
+import { previousRelease } from '@/domain/builds/site-state.ts';
 import { latestAvailableRelease, listReleases } from '@/domain/releases/releases.ts';
 import { listPolicyTriggers } from '@/domain/sites/policy-triggers.ts';
 import { readSiteInstance, redirectUsageFor } from '@/domain/sites/sites.ts';
@@ -33,6 +34,7 @@ import {
   rebuildOnReleaseAction,
   registerG1Action,
   resumeSiteAction,
+  revertReleaseAction,
   rollbackSiteAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
@@ -50,8 +52,9 @@ export const dynamic = 'force-dynamic';
  * embaixo, a atividade do site com o status ao vivo, para todos os perfis, #637, #638, #647), G1,
  * Janela de agrupamento e Limite diário (#490; empilham abaixo de `xl`). As ações de operação
  * (operations.run, #648) ficam nas etapas do painel: "Atualizar para a mais recente" (#690, só com
- * release disponível mais recente que a do site, mostrada a todos numa Tag) e "Reconstruir na
- * release" na Versão,
+ * release disponível mais recente que a do site, mostrada a todos numa Tag), "Voltar à versão
+ * anterior (X)" (#691, só com anterior disponível) e "Escolher outra versão do motor" (só as
+ * releases `disponivel`) na Versão,
  * "Publicar agora" na Build (com "Cancelar" ao lado na fila e no lugar dele em andamento,
  * #649), "Desfazer última publicação" (com versão anterior, #649) e "Escolher outra versão" na No
  * ar e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", com a recusa logo
@@ -76,13 +79,17 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   if (!activity.ok) return noRead;
   const canConfigure = can(actor, 'site.configure');
   const canOperate = can(actor, 'operations.run');
-  // As releases do "Reconstruir" (#515): listá-las exige release.promote, que a operação e o
-  // admin têm junto de operations.run; recusada a lista, a ação não aparece.
+  // As releases do "Escolher outra versão do motor" (#515): listá-las exige release.promote, que a
+  // operação e o admin têm junto de operations.run; recusada a lista, a ação não aparece. Só as
+  // `disponivel` entram no diálogo (#691); o domínio recusa as outras.
   const releases = canOperate ? await listReleases(db, actor) : undefined;
   // As versões do "Reverter" (#514): as dos builds `ok`, sem a que está no ar.
   const versions = canOperate ? await listRollbackVersions(db, actor, siteId) : undefined;
   // O destino do "Desfazer última publicação" (#649): só mostrado; sem ele, a ação não aparece.
   const previous = canOperate ? await previousVersion(db, actor, siteId) : undefined;
+  // O destino do "Voltar à versão anterior" (#691): só mostrado; nulo (sem troca, anterior nula ou
+  // fora de `disponivel`), a ação não aparece.
+  const previousTag = canOperate ? await previousRelease(db, actor, siteId) : undefined;
   // A release `disponivel` mais recente (#690), só quando difere da do site: a mesma condição dá a
   // Tag "disponível" na etapa Versão (para todos) e o "Atualizar para a mais recente".
   const latest = await latestAvailableRelease(db);
@@ -182,6 +189,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
               versao: (
                 <span className="flex flex-wrap gap-2">
                   <SiteOperationButton operation="update" />
+                  <SiteOperationButton operation="revert" />
                   <SiteOperationButton operation="rebuild" />
                 </span>
               ),
@@ -236,10 +244,9 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                   rebuild={
                     releases?.ok
                       ? {
-                          releases: releases.value.map(({ tag, imageStatus }) => ({
-                            tag,
-                            imageStatus,
-                          })),
+                          releases: releases.value
+                            .filter(({ pipelineState }) => pipelineState === 'disponivel')
+                            .map(({ tag }) => ({ tag })),
                           action: rebuildOnReleaseAction.bind(null, site.id),
                         }
                       : undefined
@@ -258,6 +265,11 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                   update={
                     newerRelease !== null
                       ? { tag: newerRelease, action: rebuildOnReleaseAction.bind(null, site.id) }
+                      : undefined
+                  }
+                  revert={
+                    previousTag?.ok && previousTag.value !== null
+                      ? { tag: previousTag.value, action: revertReleaseAction }
                       : undefined
                   }
                 >

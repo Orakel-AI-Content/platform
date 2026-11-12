@@ -544,8 +544,11 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   etapas não viram botões; o sucesso vai para o toast e o erro para o `ActionAlert` abaixo do
   painel (`LifecycleActionScope`), que sobrevive à revalidação que troca o botão. As ações de
   operação (#648) vêm prontas da página em `actions`, uma por etapa, abaixo do estado, como o
-  "Marcar…": na Versão, "Atualizar para a mais recente" (só quando há a Tag "disponível", #690)
-  e "Reconstruir na release" (só com a lista de releases), "Publicar agora"
+  "Marcar…": na Versão, "Atualizar para a mais recente" (só quando há a Tag "disponível", #690),
+  "Voltar à versão anterior (X)" (só quando a troca de versão mais recente veio de uma release
+  ainda `disponivel`, #691) e "Escolher outra versão do motor" (o antigo "Reconstruir na
+  release", só com a lista de releases, que lista só as `disponivel`; o nome não repete o
+  "Escolher outra versão" da No ar), "Publicar agora"
   na Build (fora da pausa), "Escolher outra versão" na No ar (o "Reverter", só com a lista de
   versões) e, na linha Site, "Pausar" (só ativo, com motivo obrigatório no diálogo, #650) ou
   "Retomar" (só pausado). "Cancelar" entra na Build com publicação (não
@@ -683,8 +686,10 @@ Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
   - **ações que afetam o site publicado:** "Publicar agora" (lista e etapa Build da página do
     site), que muda o site no ar sem esperar a janela de agrupamento; "Atualizar para a mais
     recente" (etapa Versão, #690), que diz a versão de destino e, pausado, que o site sai da
-    pausa, e reconstrói nela sem escolher; "Reconstruir na release"
-    (etapa Versão), que troca a release e enfileira um build; "Escolher outra versão" (etapa No
+    pausa, e reconstrói nela sem escolher; "Voltar à versão anterior (X)" (etapa Versão, #691),
+    que diz a versão de destino, volta à release de onde veio a última troca e enfileira um
+    build; "Escolher outra versão do motor" (etapa Versão), que troca a release por uma
+    disponível e enfileira um build; "Escolher outra versão" (etapa No
     ar), que reverte o site no ar para uma versão anterior; "Desfazer última publicação" (etapa
     No ar, #649), que volta o site à versão que estava no ar antes da atual e mostra qual na
     confirmação; "Cancelar" (etapa Build, #649), que tira da fila ou interrompe a publicação
