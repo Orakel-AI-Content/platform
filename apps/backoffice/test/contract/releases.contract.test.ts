@@ -638,7 +638,7 @@ describe('tentar de novo e descartar (#663)', () => {
       },
       getRun: () => Promise.reject(new Error('getRun inesperado')),
     };
-    await createReleaseRunTask({ db, github })({ tag }, helpers);
+    await createReleaseRunTask({ db, driver: { kind: 'github', github } })({ tag }, helpers);
     return dispatched;
   }
 
