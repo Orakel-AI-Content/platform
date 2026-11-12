@@ -501,6 +501,94 @@ describe('cancelar a publicação', () => {
     });
   });
 
+  describe('em andamento, o build-runner interrompe', () => {
+    /** Runtime que pede o cancelamento na primeira espera da etapa `on`. */
+    function cancelDuring(fake: ReturnType<typeof fakeRuntime>, on: 'render' | 'publish') {
+      let asked = false;
+      const runtime: ContainerRuntime = {
+        ...fake.runtime,
+        wait: async (...args) => {
+          if (!asked && args[0].startsWith(`orakel-${on}`)) {
+            asked = true;
+            const [jobId] = await buildJobIds();
+            await lockJob(jobId);
+            expect(await cancel()).toEqual({ ok: true, value: 'pedido' });
+          }
+          return fake.runtime.wait(...args);
+        },
+      };
+      return runtime;
+    }
+    const run = async (runtime: ContainerRuntime) =>
+      createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, await helpers());
+
+    it('mata o container da etapa e fecha a linha cancelado, com quem pediu', async () => {
+      const [queued] = await rows();
+      const fake = fakeRuntime({ render: { running: true } });
+      await run(cancelDuring(fake, 'render'));
+
+      expect(fake.killed).toEqual([expect.stringMatching(/^orakel-render-/)]);
+      expect(fake.started.map((s) => s.command[0])).toEqual(['render']);
+      expect(fake.removed).toEqual(fake.killed);
+      expect(fake.volumes.removed).toEqual(fake.volumes.created);
+      expect(await rows()).toEqual([
+        expect.objectContaining({
+          id: queued?.id,
+          status: 'cancelado',
+          cancelRequestedBy: 'o@orakel.local',
+          cancelRequestedAt: expect.any(Date) as Date,
+          finishedAt: expect.any(Date) as Date,
+          failedStage: null,
+          failureKind: null,
+        }),
+      ]);
+    });
+
+    it('o job termina sem lançar, sem repetição na fila, e o site não é pausado', async () => {
+      const pending = await unresolvedPendingChangeIds(db, 'exemplo-a');
+      const fake = fakeRuntime({ render: { running: true } });
+      await expect(run(cancelDuring(fake, 'render'))).resolves.toBeUndefined();
+
+      expect((await rows()).map((r) => r.status)).toEqual(['cancelado']);
+      expect(await site()).toMatchObject({ state: 'ativo', pausedReason: null });
+      expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(pending);
+      expect(await events()).toEqual([]);
+    });
+
+    it('pedido durante o render impede o publish e a versão ativa não muda', async () => {
+      await buildOk('v-1');
+      await publish('ana');
+      const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+      await run(cancelDuring(fake, 'render'));
+
+      expect(fake.started.map((s) => s.command[0])).toEqual(['render']);
+      expect(await site()).toMatchObject({ state: 'ativo', activeVersionId: 'v-1' });
+      expect((await rows()).at(-1)).toMatchObject({ status: 'cancelado', pages: 12 });
+    });
+
+    it('build que termina antes de o pedido ser visto fecha com o resultado real', async () => {
+      const ok = fakeRuntime({
+        render: { file: renderOk() },
+        publish: { file: { ...publishOk(), versionId: 'v-ok' } },
+      });
+      await run(cancelDuring(ok, 'publish'));
+      expect((await rows()).at(-1)).toMatchObject({ status: 'ok', versionId: 'v-ok' });
+      expect(await site()).toMatchObject({ activeVersionId: 'v-ok' });
+
+      await publish('ana');
+      const failing = fakeRuntime({
+        render: { file: renderOk() },
+        publish: { exitCode: 10, file: failedFile('permanent', 'alvo recusou') },
+      });
+      await run(cancelDuring(failing, 'publish'));
+      expect((await rows()).at(-1)).toMatchObject({
+        status: 'failed',
+        failedStage: 'publish',
+        failureKind: 'permanent',
+      });
+    });
+  });
+
   it('sem publicação aberta recusa com erro próprio; sem operations.run, com forbidden', async () => {
     const editor = { email: 'e@orakel.local', roles: ['editor'] as const };
     expect(await cancel(editor)).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
