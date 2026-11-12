@@ -123,6 +123,28 @@ export async function buildNow(
 }
 
 /**
+ * "Cancelar" na fila: tira da fila o job de build do site (`job_key` `build:<site>`), desde que
+ * seja o job da linha e ninguém o tenha pegado. Trava a linha do job antes (o worker pega com
+ * `skip locked`, então não a leva no meio) e devolve `false` quando ele já está travado ou não
+ * existe: `remove_job` num job travado zeraria a chave e cortaria as repetições do que roda.
+ */
+export async function removeQueuedBuildJob(
+  tx: Executor,
+  siteId: string,
+  jobId: string,
+): Promise<boolean> {
+  const key = `build:${siteId}`;
+  const { rows } = await tx.execute<{ locked_at: Date | string | null }>(sql`
+    select locked_at from graphile_worker._private_jobs
+    where id = ${jobId}::bigint and key = ${key}
+    for update`);
+  const [job] = rows;
+  if (job === undefined || job.locked_at !== null) return false;
+  await tx.execute(sql`select graphile_worker.remove_job(${key})`);
+  return true;
+}
+
+/**
  * Horário da próxima tentativa depois de uma falha: a mesma conta de backoff do Graphile
  * Worker (`greatest(now, run_at) + exp(least(attempts, 10))` segundos). A linha `na_fila` da
  * repetição sai daqui, sem ler a fila.
