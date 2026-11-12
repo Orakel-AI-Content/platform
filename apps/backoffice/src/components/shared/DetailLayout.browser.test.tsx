@@ -222,7 +222,7 @@ function ReviewDetail() {
           <ReviewPanel
             version={1}
             status="em_revisao"
-            issues={[]}
+            blocked={false}
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
             canApprove
             approve={() => Promise.resolve({ ok: true as const, message: 'ok' })}

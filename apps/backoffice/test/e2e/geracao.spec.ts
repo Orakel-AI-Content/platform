@@ -92,10 +92,12 @@ test(
     await expect(
       reviewer.getByRole('heading', { level: 1, name: `Revisão de “${title}”` }),
     ).toBeVisible();
-    await expect(reviewer.getByText('Nenhum problema de validação.')).toBeVisible();
+    await expect(
+      reviewer.getByRole('heading', { level: 2, name: 'Checagens automáticas' }),
+    ).toBeVisible();
     const items = reviewer.getByRole('checkbox');
-    await expect(items).toHaveCount(5);
-    for (let index = 0; index < 5; index += 1) {
+    await expect(items).toHaveCount(3);
+    for (let index = 0; index < 3; index += 1) {
       await items.nth(index).focus();
       await reviewer.keyboard.press('Space');
     }
