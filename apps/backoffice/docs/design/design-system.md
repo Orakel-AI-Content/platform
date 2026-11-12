@@ -529,7 +529,9 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   #647), o painel no topo da aba "Publicação": Infra e zona, Versão, Build, No ar e Site, nessa
   ordem (`PUBLICATION_STEPS` em `siteLabels.ts`), não tag. Usa o `Steps` vertical
   (`src/components/ui/Steps`), sem marcador próprio: um `Steps.Item` por etapa, com o rótulo no
-  `title` e o estado de domínio em texto visível na `description` (a release; "na fila" com o
+  `title` e o estado de domínio em texto visível na `description` ("X em uso" ou "Nenhuma
+  versão", com a `Tag` "Y disponível" ao lado quando a release `disponivel` mais recente difere
+  da do site, #690; "na fila" com o
   horário previsto ou a etapa em andamento, ou o resultado do último build; a versão no ar com
   páginas, quando e por quem; "Ativo" ou "Pausado: <motivo>"). As etapas são independentes:
   cada item recebe o `status` próprio (`complete`, `in-progress`, `pending`, `error`), e o
@@ -542,7 +544,8 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   etapas não viram botões; o sucesso vai para o toast e o erro para o `ActionAlert` abaixo do
   painel (`LifecycleActionScope`), que sobrevive à revalidação que troca o botão. As ações de
   operação (#648) vêm prontas da página em `actions`, uma por etapa, abaixo do estado, como o
-  "Marcar…": "Reconstruir na release" na Versão (só com a lista de releases), "Publicar agora"
+  "Marcar…": na Versão, "Atualizar para a mais recente" (só quando há a Tag "disponível", #690)
+  e "Reconstruir na release" (só com a lista de releases), "Publicar agora"
   na Build (fora da pausa), "Escolher outra versão" na No ar (o "Reverter", só com a lista de
   versões) e, na linha Site, "Pausar" (só ativo, com motivo obrigatório no diálogo, #650) ou
   "Retomar" (só pausado). "Cancelar" entra na Build com publicação (não
@@ -678,7 +681,9 @@ Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
   - "Remover link" do rich text: o popover fecha antes de abrir o diálogo;
   - "Descartar" do formulário de tela na criação (ver "Formulário");
   - **ações que afetam o site publicado:** "Publicar agora" (lista e etapa Build da página do
-    site), que muda o site no ar sem esperar a janela de agrupamento; "Reconstruir na release"
+    site), que muda o site no ar sem esperar a janela de agrupamento; "Atualizar para a mais
+    recente" (etapa Versão, #690), que diz a versão de destino e, pausado, que o site sai da
+    pausa, e reconstrói nela sem escolher; "Reconstruir na release"
     (etapa Versão), que troca a release e enfileira um build; "Escolher outra versão" (etapa No
     ar), que reverte o site no ar para uma versão anterior; "Desfazer última publicação" (etapa
     No ar, #649), que volta o site à versão que estava no ar antes da atual e mostra qual na
