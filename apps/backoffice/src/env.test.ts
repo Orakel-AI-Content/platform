@@ -126,6 +126,7 @@ describe('parseBuildRunnerEnv', () => {
       SITE_BUILDER_TAG: 'local',
       BUILD_EXPORT_NETWORK: 'orakel-export',
       BUILD_PUBLISH_NETWORK: 'orakel-publish',
+      BUILD_INTERNAL_NETWORK: 'orakel-internal',
     });
   });
 
