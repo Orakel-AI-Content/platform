@@ -96,6 +96,8 @@ export const BuildRunnerEnvSchema = z
     SITE_BUILDER_TAG: optional(z.string().min(1)),
     BUILD_EXPORT_NETWORK: z.string().min(1).default('orakel-export'),
     BUILD_PUBLISH_NETWORK: z.string().min(1).default('orakel-publish'),
+    /** Rede do Caddy: a prévia entra nela e na export com o apelido `blog-preview` (ADR 0024). */
+    BUILD_INTERNAL_NETWORK: z.string().min(1).default('orakel-internal'),
     /** API de exportação vista da rede export. */
     BUILD_EXPORT_API_URL: z.url().default('http://backoffice-web:3000'),
     BUILD_PAGE_DROP_TOLERANCE: z.coerce.number().min(0).max(1).default(0.2),

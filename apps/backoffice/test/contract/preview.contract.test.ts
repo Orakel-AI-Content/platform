@@ -78,8 +78,9 @@ async function finished(
 
 /** Jobs de reconciliação da prévia na fila, com a chave. */
 async function reconcileJobs() {
-  const { rows } = await db.execute<{ key: string | null }>(
-    sql`select key from graphile_worker.jobs where task_identifier = ${RECONCILE_PREVIEW_TASK}`,
+  const { rows } = await db.execute<{ key: string | null; queue_name: string | null }>(
+    sql`select key, queue_name from graphile_worker.jobs
+        where task_identifier = ${RECONCILE_PREVIEW_TASK}`,
   );
   return rows;
 }
@@ -127,7 +128,7 @@ describe('reconciliação ao fim do build', () => {
       { siteId: 'exemplo-a' },
       helpers(),
     );
-    expect(await reconcileJobs()).toEqual([{ key: 'preview' }]);
+    expect(await reconcileJobs()).toEqual([{ key: 'preview', queue_name: 'preview' }]);
   });
 
   it('pedidos repetidos viram um job só', async () => {
@@ -138,7 +139,7 @@ describe('reconciliação ao fim do build', () => {
       { siteId: 'exemplo-a' },
       helpers(),
     );
-    expect(await reconcileJobs()).toEqual([{ key: 'preview' }]);
+    expect(await reconcileJobs()).toEqual([{ key: 'preview', queue_name: 'preview' }]);
   });
 
   it('build falho não enfileira', async () => {

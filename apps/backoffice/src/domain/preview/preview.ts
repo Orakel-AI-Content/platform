@@ -26,15 +26,20 @@ export type PreviewState = {
 /** Troca do container da prévia para a versão corrente; só o build-runner registra esta task. */
 export const RECONCILE_PREVIEW_TASK = 'reconcile-preview';
 
+/** Fila nomeada da reconciliação: uma troca por vez, mesmo com o build-runner em concorrência 2. */
+export const PREVIEW_QUEUE = 'preview';
+
 /**
  * Enfileira a reconciliação da prévia, na transação de quem pede. `job_key` único com
- * `replace`: há uma prévia só, e pedidos repetidos antes de o job rodar viram um só.
+ * `replace`: há uma prévia só, e pedidos repetidos antes de o job rodar viram um só. A fila
+ * `preview` serializa: um pedido feito durante uma troca em andamento só roda depois dela.
  */
 export async function schedulePreviewReconcile(tx: Executor): Promise<void> {
   await tx.execute(sql`
     select graphile_worker.add_job(
       identifier => ${RECONCILE_PREVIEW_TASK},
       payload => '{}'::json,
+      queue_name => ${PREVIEW_QUEUE},
       max_attempts => 5,
       job_key => 'preview',
       job_key_mode => 'replace'
