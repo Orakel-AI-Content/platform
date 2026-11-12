@@ -16,7 +16,11 @@ import type { Actor } from '../../src/domain/access/rbac.ts';
 import { recordBuild, startBuild } from '../../src/domain/builds/builds.ts';
 import { publishOk, renderOk } from '../../src/domain/builds/fake-runtime.ts';
 import type { BuildOutcome } from '../../src/domain/builds/run-build.ts';
-import { latestRollout, startRollout } from '../../src/domain/releases/rollout.ts';
+import {
+  interruptRollout,
+  latestRollout,
+  startRollout,
+} from '../../src/domain/releases/rollout.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
 let db: Db;
@@ -30,6 +34,7 @@ beforeEach(() => resetDatabase(db));
 
 const operacao: Actor = { email: 'operacao@exemplo.com', roles: ['operacao'] };
 const editor: Actor = { email: 'editor@exemplo.com', roles: ['editor'] };
+const revisor: Actor = { email: 'revisor@exemplo.com', roles: ['revisor'] };
 const now = new Date('2026-11-12T15:00:00Z');
 
 const site = (id: string, values: Partial<typeof sites.$inferInsert> = {}) =>
@@ -66,6 +71,9 @@ const totals = async () => ({
 });
 
 const start = (actor: Actor = operacao) => db.transaction((tx) => startRollout(tx, actor, now));
+const interruptedAt = new Date('2026-11-12T16:00:00Z');
+const interrupt = (actor: Actor = operacao) =>
+  db.transaction((tx) => interruptRollout(tx, actor, interruptedAt));
 
 describe('iniciar a atualização de todos os sites (#700)', () => {
   it('grava o destino e os sites por audiência crescente, com o estado de cada um', async () => {
@@ -495,7 +503,7 @@ describe('avançar a atualização de todos os sites quando o build termina (#70
 
   it('atualização interrompida registra o site em andamento e não começa outro', async () => {
     await started();
-    await db.update(releaseRollouts).set({ state: 'interrompida' });
+    expect(await interrupt()).toMatchObject({ ok: true });
 
     await closeBuild('site-c', 'ok');
 
@@ -510,5 +518,161 @@ describe('avançar a atualização de todos os sites quando o build termina (#70
     expect(await siteStates()).toContainEqual(['site-c', 'ativo', '1.1.0']);
     expect(await siteStates()).toContainEqual(['site-d', 'ativo', '1.0.0']);
     expect(await releasePending()).toEqual(['site-c']);
+    expect(await queuedBuilds()).toEqual(['site-c']);
+  });
+});
+
+/** Sites com build na fila; o do site-c é o do início (`closeBuild` abre outro direto). */
+const queuedBuilds = async () =>
+  (
+    await db
+      .select({ siteId: builds.siteId })
+      .from(builds)
+      .where(eq(builds.status, 'na_fila'))
+      .orderBy(asc(builds.siteId))
+  ).map((row) => row.siteId);
+
+describe('interromper a atualização de todos os sites (#702)', () => {
+  it('grava quem pediu e quando e fecha interrompida, sem tocar em sites, builds nem pendências', async () => {
+    await started();
+    const before = {
+      totals: await totals(),
+      sites: await rolloutSites(),
+      siteStates: await siteStates(),
+      builds: await db.select().from(builds).orderBy(asc(builds.id)),
+      pending: await db.select().from(pendingChanges).orderBy(asc(pendingChanges.id)),
+    };
+
+    const result = await interrupt();
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value).toMatchObject({
+      state: 'interrompida',
+      interruptedBy: 'operacao@exemplo.com',
+      interruptedAt,
+      finishedAt: interruptedAt,
+      requestedBy: 'operacao@exemplo.com',
+    });
+    expect(result.value.sites.map(({ siteId, state }) => [siteId, state])).toEqual(before.sites);
+    expect(
+      await db
+        .select({
+          state: releaseRollouts.state,
+          interruptedBy: releaseRollouts.interruptedBy,
+          interruptedAt: releaseRollouts.interruptedAt,
+          finishedAt: releaseRollouts.finishedAt,
+        })
+        .from(releaseRollouts),
+    ).toEqual([
+      {
+        state: 'interrompida',
+        interruptedBy: 'operacao@exemplo.com',
+        interruptedAt,
+        finishedAt: interruptedAt,
+      },
+    ]);
+    expect({
+      totals: await totals(),
+      sites: await rolloutSites(),
+      siteStates: await siteStates(),
+      builds: await db.select().from(builds).orderBy(asc(builds.id)),
+      pending: await db.select().from(pendingChanges).orderBy(asc(pendingChanges.id)),
+    }).toEqual(before);
+  });
+
+  it('build com falha permanente depois de interromper: só o site em andamento falha', async () => {
+    await started();
+    await interrupt();
+
+    await closeBuild('site-c', 'permanent');
+
+    expect(await rolloutSites()).toEqual([
+      ['site-a', 'atualizado'],
+      ['site-b', 'nao_atualizado'],
+      ['site-c', 'falhou'],
+      ['site-d', 'aguardando'],
+      ['site-e', 'aguardando'],
+    ]);
+    expect(await rolloutRow()).toEqual({ state: 'interrompida', finished: true });
+    expect(await siteStates()).toEqual([
+      ['site-a', 'ativo', '1.1.0'],
+      ['site-b', 'pausado', '1.0.0'],
+      ['site-c', 'pausado', '1.1.0'],
+      ['site-d', 'ativo', '1.0.0'],
+      ['site-e', 'ativo', '1.0.0'],
+    ]);
+    expect(await releasePending()).toEqual(['site-c']);
+    expect(await queuedBuilds()).toEqual(['site-c']);
+  });
+
+  it('recusa sem nenhuma atualização, sem gravar nada', async () => {
+    await seedNetwork();
+
+    expect(await interrupt()).toEqual({
+      ok: false,
+      issues: [expect.objectContaining({ code: 'rollout.not_open' })],
+    });
+    expect((await totals()).rollouts).toBe(0);
+  });
+
+  it.each(['concluida', 'falhou', 'interrompida'] as const)(
+    'recusa com a última atualização %s, sem gravar nada',
+    async (state) => {
+      await started();
+      await db.update(releaseRollouts).set({ state, finishedAt: now });
+      const before = {
+        totals: await totals(),
+        rollouts: await db.select().from(releaseRollouts),
+      };
+
+      expect(await interrupt()).toEqual({
+        ok: false,
+        issues: [expect.objectContaining({ code: 'rollout.not_open' })],
+      });
+      expect({
+        totals: await totals(),
+        rollouts: await db.select().from(releaseRollouts),
+      }).toEqual(before);
+    },
+  );
+
+  it.each([editor, revisor])('recusa $email, sem release.promote', async (actor) => {
+    await started();
+
+    expect(await interrupt(actor)).toEqual({
+      ok: false,
+      issues: [expect.objectContaining({ code: 'forbidden' })],
+    });
+    expect(await rolloutRow()).toEqual({ state: 'em_andamento', finished: false });
+  });
+
+  it('depois de interromper, outra atualização pode começar', async () => {
+    await started();
+    await interrupt();
+    await db.insert(releases).values({ tag: '1.3.0' });
+
+    const second = await start();
+
+    expect(second).toMatchObject({ ok: true, value: { targetRelease: '1.3.0' } });
+  });
+
+  it('latestRollout devolve quem interrompeu e quando; nulos numa não interrompida', async () => {
+    await started();
+
+    expect(await latestRollout(db, operacao)).toMatchObject({
+      ok: true,
+      value: { state: 'em_andamento', interruptedBy: null, interruptedAt: null },
+    });
+
+    await interrupt();
+
+    expect(await latestRollout(db, operacao)).toMatchObject({
+      ok: true,
+      value: {
+        state: 'interrompida',
+        interruptedBy: 'operacao@exemplo.com',
+        interruptedAt,
+      },
+    });
   });
 });
