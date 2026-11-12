@@ -31,6 +31,7 @@ import {
   pauseSiteManually,
   rebuildOnRelease,
   resumeSite,
+  revertRelease,
   setBuildWindow,
   setDailyPublishLimit,
   type ManualLifecycleStep,
@@ -171,6 +172,19 @@ export async function rebuildOnReleaseAction(siteId: string, tag: string): Promi
     siteId,
     (tx, actor) => rebuildOnRelease(tx, actor, siteId, tag),
     `${siteId} na release ${tag}; build enfileirado.`,
+  );
+}
+
+/**
+ * "Voltar à versão anterior": troca o site para a release de onde veio a última troca de
+ * versão e enfileira o build. O destino, o papel e o site são resolvidos pelo domínio; a
+ * release não vem do cliente.
+ */
+export async function revertReleaseAction(siteId: string): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => revertRelease(tx, actor, siteId),
+    (tag) => `${siteId} de volta à release ${tag}; build enfileirado.`,
   );
 }
 
