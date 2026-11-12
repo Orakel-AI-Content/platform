@@ -155,6 +155,13 @@
       "when": 1794443751431,
       "tag": "0021_cancelamento_do_build",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794444796511,
+      "tag": "0022_estado_do_pipeline_da_release",
+      "breakpoints": true
     }
   ]
 }
