@@ -34,6 +34,7 @@ import {
   rebuildOnReleaseAction,
   registerG1Action,
   resumeSiteAction,
+  retreatLifecycleAction,
   revertReleaseAction,
   rollbackSiteAction,
   setBuildWindowAction,
@@ -180,6 +181,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
           <LifecycleAction
             lifecycle={site.lifecycle}
             action={advanceLifecycleAction.bind(null, site.id)}
+            undo={retreatLifecycleAction.bind(null, site.id)}
           />
         ) : undefined
       }

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '../../src/db/client.ts';
 import { pendingChanges, siteConfigs, sites } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
-import { advanceLifecycle } from '../../src/domain/builds/site-state.ts';
+import { advanceLifecycle, retreatLifecycle } from '../../src/domain/builds/site-state.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
 import {
@@ -300,9 +300,100 @@ describe('ciclo de vida', () => {
   });
 });
 
+describe('desmarcar etapa do ciclo de vida', () => {
+  const lifecycle = async () =>
+    (await db.select({ lifecycle: sites.lifecycle }).from(sites))[0]?.lifecycle;
+  const setLifecycle = (value: 'cadastrado' | 'infra_aplicada' | 'zona_ativa' | 'publicado') =>
+    db.update(sites).set({ lifecycle: value }).where(eq(sites.id, 'exemplo-b'));
+
+  it('volta uma etapa por vez, sem mudança pendente', async () => {
+    await setLifecycle('zona_ativa');
+    const before = await unresolvedPendingChangeIds(db, 'exemplo-b');
+    for (const [step, to] of [
+      ['zona_ativa', 'infra_aplicada'],
+      ['infra_aplicada', 'cadastrado'],
+    ] as const) {
+      expect(
+        await db.transaction((tx) => retreatLifecycle(tx, SYSTEM_ACTOR, 'exemplo-b', step)),
+      ).toEqual({ ok: true, value: undefined });
+      expect(await lifecycle()).toBe(to);
+    }
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-b')).toEqual(before);
+  });
+
+  it.each([
+    ['publicado', 'zona_ativa'],
+    ['cadastrado', 'infra_aplicada'],
+    ['infra_aplicada', 'zona_ativa'],
+  ] as const)('com o site em %s, recusa desmarcar %s, com o motivo', async (current, step) => {
+    await setLifecycle(current);
+
+    expect(
+      await db.transaction((tx) => retreatLifecycle(tx, SYSTEM_ACTOR, 'exemplo-b', step)),
+    ).toEqual({
+      ok: false,
+      issues: [
+        {
+          code: 'site.lifecycle_undo_order',
+          message: `${step} só pode ser desmarcada com o site em ${step}; o site está em ${current}`,
+          path: ['lifecycle'],
+        },
+      ],
+    });
+    expect(await lifecycle()).toBe(current);
+  });
+
+  it('recusa site inexistente', async () => {
+    expect(
+      await db.transaction((tx) => retreatLifecycle(tx, SYSTEM_ACTOR, 'outro', 'zona_ativa')),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+  });
+
+  it('de dois pedidos simultâneos, só um passa e o site volta uma etapa só', async () => {
+    await setLifecycle('zona_ativa');
+    let commitFirst!: () => void;
+    const gate = new Promise<void>((resolve) => (commitFirst = resolve));
+    let firstDone!: () => void;
+    const firstUpdated = new Promise<void>((resolve) => (firstDone = resolve));
+
+    const first = db.transaction(async (tx) => {
+      const result = await retreatLifecycle(tx, SYSTEM_ACTOR, 'exemplo-b', 'zona_ativa');
+      firstDone();
+      await gate;
+      return result;
+    });
+    await firstUpdated;
+    // O segundo para no update, preso no lock da linha, e relê o site depois do commit.
+    const second = db.transaction((tx) =>
+      retreatLifecycle(tx, SYSTEM_ACTOR, 'exemplo-b', 'zona_ativa'),
+    );
+    await waitForLockWait();
+    commitFirst();
+
+    expect(await first).toEqual({ ok: true, value: undefined });
+    expect(await second).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.lifecycle_undo_order' }],
+    });
+    expect(await lifecycle()).toBe('infra_aplicada');
+  });
+});
+
+/** Espera alguma conexão da suíte ficar bloqueada num lock (o update do segundo pedido). */
+async function waitForLockWait() {
+  for (let i = 0; i < 200; i += 1) {
+    const { rows } = await db.execute<{ n: number }>(sql`
+      select count(*)::int as n from pg_stat_activity
+      where datname = current_database() and wait_event_type = 'Lock'`);
+    if ((rows[0]?.n ?? 0) > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('o segundo pedido não chegou a esperar o lock');
+}
+
 describe('permissões da configuração', () => {
   it.each(['editor', 'revisor'] as const)(
-    '%s não edita a configuração nem marca etapas',
+    '%s não edita a configuração nem marca ou desmarca etapas',
     async (role) => {
       const actor = { email: `${role}@orakel.local`, roles: [role] };
       expect(
@@ -313,6 +404,13 @@ describe('permissões da configuração', () => {
       ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
       const [site] = await db.select({ lifecycle: sites.lifecycle }).from(sites);
       expect(site?.lifecycle).toBe('cadastrado');
+
+      await db.update(sites).set({ lifecycle: 'zona_ativa' }).where(eq(sites.id, 'exemplo-b'));
+      expect(
+        await db.transaction((tx) => retreatLifecycle(tx, actor, 'exemplo-b', 'zona_ativa')),
+      ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+      const [after] = await db.select({ lifecycle: sites.lifecycle }).from(sites);
+      expect(after?.lifecycle).toBe('zona_ativa');
     },
   );
 });
