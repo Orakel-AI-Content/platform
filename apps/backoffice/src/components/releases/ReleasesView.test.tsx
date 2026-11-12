@@ -45,6 +45,8 @@ const rollout = (
   requestedBy: 'operacao@orakel.local',
   startedAt: new Date('2026-11-12T12:00Z'),
   finishedAt: null,
+  interruptedBy: null,
+  interruptedAt: null,
   sites: sites.map(([siteId, siteState], position) => ({
     siteId,
     position,
