@@ -215,8 +215,15 @@
     {
       "idx": 30,
       "version": "7",
-      "when": 1794524637480,
-      "tag": "0030_data_automatica_de_publicacao",
+      "when": 1794524373270,
+      "tag": "0030_confirmacoes_da_revisao",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794525051530,
+      "tag": "0031_data_automatica_de_publicacao",
       "breakpoints": true
     }
   ]

@@ -201,6 +201,25 @@ export const reviews = pgTable('reviews', {
 });
 
 /**
+ * Confirmações humanas da revisão marcadas numa versão (#749): uma linha por chave de
+ * `REVIEW_CHECKLIST` (o domínio recusa as outras), com quem marcou e quando. Desmarcar apaga a
+ * linha; a aprovação exige todas e as copia para `reviews.checklist`.
+ */
+export const reviewConfirmations = pgTable(
+  'review_confirmations',
+  {
+    siteId: siteId(),
+    contentId: integer().notNull(),
+    version: integer().notNull(),
+    key: text().notNull(),
+    /** E-mail de quem marcou. */
+    confirmedBy: text().notNull(),
+    confirmedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.contentId, t.version, t.key] })],
+);
+
+/**
  * Checagem dos links externos de uma versão (#745): nasce na transação que leva a versão a
  * `em_revisao`, com `finishedAt` nulo enquanto o job não termina ("verificando").
  */

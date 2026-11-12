@@ -7,6 +7,7 @@ import {
   contents,
   contentVersions,
   redirects,
+  reviewConfirmations,
   reviews,
   taxonomies,
 } from '../../db/schema/index.ts';
@@ -21,11 +22,12 @@ import {
 } from './checks.ts';
 
 /**
- * Checklist da aprovação, fixo no código: só as confirmações que dependem de julgamento humano
+ * Checklist da aprovação, fixo no código: só as confirmações que dependem de julgamento humano,
+ * gravadas por versão à medida que o revisor marca (`confirmations.ts`, #749)
  * (RN-CON-02: valor original, políticas de anúncios e afiliados, visualização conferida).
  * Descrição das imagens (RN-CON-02) e imagens decorativas marcadas (P14) saíram: o schema do
  * bloco de imagem as garante e a validação da release barra a aprovação (ADR 0021). Aprovar
- * exige todos os itens marcados; chave fora desta lista, inclusive as que saíram, é recusada.
+ * exige todos os itens gravados; marcar chave fora desta lista, inclusive as que saíram, é recusado.
  */
 export const REVIEW_CHECKLIST = [
   {
@@ -50,7 +52,11 @@ const notFound = (siteId: string, contentId: number): Issue => ({
   path: [],
 });
 
-const refused = (code: string, message: string, path: PropertyKey[] = []): Result<never> => ({
+export const refused = (
+  code: string,
+  message: string,
+  path: PropertyKey[] = [],
+): Result<never> => ({
   ok: false,
   issues: [{ code, message, path }],
 });
@@ -180,10 +186,10 @@ export async function reviewChecks(
 
 /**
  * Trava a linha de `contents` (como na edição e no envio) e confere que `version` é a mais
- * recente e está `em_revisao`: a guarda comum de aprovar e devolver. `verb` completa a recusa
- * ("aprovada", "devolvida").
+ * recente e está `em_revisao`: a guarda comum de aprovar, devolver e marcar as confirmações
+ * (`confirmations.ts`). `verb` completa a recusa ("aprovada", "devolvida", "conferida").
  */
-async function lockVersionInReview(
+export async function lockVersionInReview(
   tx: Executor,
   siteId: string,
   contentId: number,
@@ -235,9 +241,34 @@ async function setVersionStatus(
 }
 
 /**
- * Aprova a versão que o revisor viu: precisa ser a mais recente, estar `em_revisao`, ter o
- * checklist completo e passar na validação da release do site. Grava a revisão e leva a
- * versão a `aprovado`, sem mudança pendente (o status não entra no snapshot, ADR 0015).
+ * Chaves de `REVIEW_CHECKLIST` gravadas na versão (#749), na ordem do checklist, sem checar
+ * permissão: a leitura de quem já passou pela guarda (aprovar, marcar).
+ */
+export async function confirmedKeys(
+  db: Executor,
+  siteId: string,
+  contentId: number,
+  version: number,
+): Promise<ReviewChecklistKey[]> {
+  const rows = await db
+    .select({ key: reviewConfirmations.key })
+    .from(reviewConfirmations)
+    .where(
+      and(
+        eq(reviewConfirmations.siteId, siteId),
+        eq(reviewConfirmations.contentId, contentId),
+        eq(reviewConfirmations.version, version),
+      ),
+    );
+  const stored = new Set(rows.map((row) => row.key));
+  return REVIEW_CHECKLIST.map((item) => item.key).filter((key) => stored.has(key));
+}
+
+/**
+ * Aprova a versão que o revisor viu: precisa ser a mais recente, estar `em_revisao`, ter as
+ * confirmações do checklist gravadas na versão (`confirmations.ts`, #749) e passar na validação
+ * da release do site. Grava a revisão, com as chaves confirmadas, e leva a versão a `aprovado`,
+ * sem mudança pendente (o status não entra no snapshot, ADR 0015).
  */
 export async function approveVersion(
   tx: Executor,
@@ -245,7 +276,6 @@ export async function approveVersion(
   siteId: string,
   contentId: number,
   version: number,
-  checklist: readonly string[],
 ): Promise<Result<{ reviewId: number }>> {
   const allowed = requireRole(actor, 'content.publish');
   if (!allowed.ok) return allowed;
@@ -254,15 +284,12 @@ export async function approveVersion(
   if (!locked.ok) return locked;
   const latest = locked.value;
 
-  const keys: readonly string[] = REVIEW_CHECKLIST.map((item) => item.key);
-  const missing = REVIEW_CHECKLIST.filter((item) => !checklist.includes(item.key));
-  const unknown = checklist.filter((key) => !keys.includes(key));
-  if (missing.length > 0 || unknown.length > 0) {
+  const confirmed: readonly string[] = await confirmedKeys(tx, siteId, contentId, version);
+  const missing = REVIEW_CHECKLIST.filter((item) => !confirmed.includes(item.key));
+  if (missing.length > 0) {
     return refused(
       'review.checklist_incomplete',
-      missing.length > 0
-        ? `Marque todos os itens do checklist: falta ${missing.map((item) => item.label).join('; ')}`
-        : `Item de checklist desconhecido: ${unknown.join(', ')}`,
+      `Marque todos os itens do checklist: falta ${missing.map((item) => item.label).join('; ')}`,
       ['checklist'],
     );
   }
@@ -272,13 +299,7 @@ export async function approveVersion(
 
   const [review] = await tx
     .insert(reviews)
-    .values({
-      siteId,
-      contentId,
-      version,
-      reviewer: actor.email,
-      checklist: [...new Set(checklist)],
-    })
+    .values({ siteId, contentId, version, reviewer: actor.email, checklist: [...confirmed] })
     .returning({ id: reviews.id });
   if (review === undefined) throw new Error('INSERT em reviews não devolveu o id');
   await setVersionStatus(tx, siteId, contentId, version, 'aprovado');
