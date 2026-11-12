@@ -46,14 +46,14 @@ const rows: ReviewQueueItem[] = [
     kind: 'page',
     title: 'Quem somos',
     version: 2,
-    updatedAt: new Date('2026-10-01T12:00:00Z'),
+    submittedAt: new Date('2026-10-01T12:00:00Z'),
   },
   {
     id: 1,
     kind: 'article',
     title: 'Guia de uso',
     version: 4,
-    updatedAt: new Date('2026-10-02T15:30:00Z'),
+    submittedAt: new Date('2026-10-02T15:30:00Z'),
   },
 ];
 
@@ -105,7 +105,7 @@ describe('fila de revisão', () => {
     );
   });
 
-  it('mostra a data no fuso do site', () => {
+  it('mostra o instante do envio no fuso do site (#771)', () => {
     renderTable(rows, 'Europe/Lisbon');
 
     expect(screen.getAllByRole('row')[1]?.textContent).toContain('01/10/2026, 13:00 GMT+1');
@@ -132,7 +132,7 @@ const many: ReviewQueueItem[] = Array.from({ length: 30 }, (_, index) => ({
   title: index === 0 ? 'Ação de graças' : `Receita ${String(index).padStart(2, '0')}`,
   version: (index % 4) + 1,
   // Mais recente quanto maior o índice.
-  updatedAt: new Date(Date.UTC(2026, 8, 1 + index)),
+  submittedAt: new Date(Date.UTC(2026, 8, 1 + index)),
 }));
 
 const renderMany = () =>
@@ -204,7 +204,7 @@ describe('busca, filtro, ordem e paginação (#365)', () => {
   });
 
   it('a URL de uma lista filtrada e ordenada restaura o mesmo estado', () => {
-    act(() => navigation.set('tipo=article&ordem=-updatedAt&q=receita'));
+    act(() => navigation.set('tipo=article&ordem=-submittedAt&q=receita'));
     renderMany();
 
     expect(screen.getByLabelText<HTMLInputElement>('Buscar por título').value).toBe('receita');

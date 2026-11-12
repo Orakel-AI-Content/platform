@@ -477,6 +477,17 @@ export async function amendInReview(
         eq(contentVersions.version, version),
       ),
     );
+  // A correção não reinicia a espera na fila: a N+1 herda o instante do envio da N (#771).
+  await tx
+    .update(contentVersions)
+    .set({ submittedAt: locked.value.submittedAt })
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        eq(contentVersions.contentId, contentId),
+        eq(contentVersions.version, next),
+      ),
+    );
   await carryConfirmations(tx, siteId, contentId, version, next, textChanged);
   await enqueueLinkCheck(tx, { siteId, contentId, version: next });
   return { ok: true, value: { version: next, created } };
@@ -527,7 +538,7 @@ export async function submitForReview(
 
   await tx
     .update(contentVersions)
-    .set({ status: 'em_revisao' })
+    .set({ status: 'em_revisao', submittedAt: sql`now()` })
     .where(
       and(
         eq(contentVersions.siteId, siteId),
@@ -660,14 +671,14 @@ export async function listLiveContents(
   };
 }
 
-export type ReviewQueueItem = Omit<
-  ContentListItem,
-  'slug' | 'status' | 'live' | 'authors' | 'liveSlug'
->;
+export type ReviewQueueItem = Pick<ContentListItem, 'id' | 'kind' | 'title' | 'version'> & {
+  /** Instante do envio para revisão; a data da versão nas anteriores à coluna (#771). */
+  submittedAt: Date;
+};
 
 /**
- * Fila de revisão do site: conteúdos cuja versão mais recente está `em_revisao`, da versão
- * mais antiga para a mais recente. O filtro vem depois do DISTINCT ON: antes, traria a
+ * Fila de revisão do site: conteúdos cuja versão mais recente está `em_revisao`, do envio mais
+ * antigo para o mais recente (#771). O filtro vem depois do DISTINCT ON: antes, traria a
  * versão N em revisão mesmo com uma N+1 em rascunho (salvar de novo tira da fila).
  */
 export async function listReviewQueue(
@@ -675,14 +686,40 @@ export async function listReviewQueue(
   actor: Actor,
   siteId: string,
 ): Promise<Result<ReviewQueueItem[]>> {
-  const listed = await listContents(db, actor, siteId);
-  if (!listed.ok) return listed;
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+
+  const rows = await db
+    .selectDistinctOn([contentVersions.contentId], {
+      id: contentVersions.contentId,
+      kind: contents.kind,
+      title: sql<string>`${contentVersions.data}->>'title'`,
+      status: contentVersions.status,
+      version: contentVersions.version,
+      submittedAt:
+        sql<Date>`coalesce(${contentVersions.submittedAt}, ${contentVersions.createdAt})`.mapWith(
+          contentVersions.createdAt,
+        ),
+    })
+    .from(contentVersions)
+    .innerJoin(
+      contents,
+      and(eq(contents.siteId, contentVersions.siteId), eq(contents.id, contentVersions.contentId)),
+    )
+    .where(eq(contentVersions.siteId, siteId))
+    .orderBy(asc(contentVersions.contentId), desc(contentVersions.version));
   return {
     ok: true,
-    value: listed.value
-      .filter((item) => item.status === 'em_revisao')
-      .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime() || a.id - b.id)
-      .map(({ id, kind, title, version, updatedAt }) => ({ id, kind, title, version, updatedAt })),
+    value: rows
+      .filter((row) => row.status === 'em_revisao')
+      .sort((a, b) => a.submittedAt.getTime() - b.submittedAt.getTime() || a.id - b.id)
+      .map(({ id, kind, title, version, submittedAt }) => ({
+        id,
+        kind,
+        title,
+        version,
+        submittedAt,
+      })),
   };
 }
 

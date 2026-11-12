@@ -172,6 +172,11 @@ export const contentVersions = pgTable(
      * importação, cuja data vem do acervo.
      */
     publishedAtAuto: boolean().notNull().default(true),
+    /**
+     * Instante do envio para revisão (`submitForReview`); a correção na revisão o herda da versão
+     * corrigida. Nulo nas versões nunca enviadas e nas anteriores à #771 (a fila usa `createdAt`).
+     */
+    submittedAt: timestamp({ withTimezone: true }),
   },
   (t) => [primaryKey({ columns: [t.siteId, t.contentId, t.version] })],
 );

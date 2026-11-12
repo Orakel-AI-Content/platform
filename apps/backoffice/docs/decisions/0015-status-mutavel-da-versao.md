@@ -22,7 +22,7 @@ que o status muda na própria versão, com o histórico da revisão na tabela `r
   muda quando uma versão chega a `publicado`, o que é papel da publicação. Registrar a
   mudança agendaria um build idêntico ao anterior.
 - **Fila de revisão** (`listReviewQueue`): conteúdos cuja versão mais recente está
-  `em_revisao`, da mais antiga para a mais recente. O filtro vem depois do `DISTINCT ON`.
+  `em_revisao`, do envio mais antigo para o mais recente. O filtro vem depois do `DISTINCT ON`.
 
 ## Alternativas consideradas
 
@@ -33,6 +33,9 @@ que o status muda na própria versão, com o histórico da revisão na tabela `r
 ## Consequências
 
 - "Versão imutável" na 0003 passa a significar os dados da versão, não o status.
-- A data da fila é a da versão, não a do envio. Guardar a data do envio exige uma coluna nova.
+- A data da fila é a do envio, na coluna `submitted_at` (#771): `submitForReview` grava o
+  instante junto com o status, e a correção na revisão (ADR 0022) o copia para a N+1. Como
+  `status`, é um fato da revisão, não dos dados: `data` e `created_at` seguem imutáveis. As
+  versões anteriores à coluna entram na fila pela data da versão.
 - A publicação, que leva a versão a `publicado`, registra a mudança pendente, porque muda
   o snapshot.

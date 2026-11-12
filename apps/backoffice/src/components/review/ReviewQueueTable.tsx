@@ -19,8 +19,8 @@ const KINDS = Object.keys(CONTENT_KIND_LABEL) as ReviewQueueItem['kind'][];
 /** Busca por título, filtro por tipo, a mais antiga primeiro (a ordem do domínio, #74) (#365). */
 const LIST: ListConfig = {
   filters: [{ column: 'kind', param: 'tipo', values: KINDS }],
-  sortable: ['title', 'kind', 'version', 'updatedAt'],
-  defaultSort: { id: 'updatedAt', desc: false },
+  sortable: ['title', 'kind', 'version', 'submittedAt'],
+  defaultSort: { id: 'submittedAt', desc: false },
   pageSizes: [10, 25, 50, 100],
 };
 
@@ -60,13 +60,13 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueItem
       enableGlobalFilter: false,
       sortFn: 'basic',
     },
-    // Data da versão enviada: a data do envio não é guardada (#72).
+    // Instante do envio para revisão (#771); a data da versão nas anteriores à coluna.
     {
       header: 'Enviado em',
-      accessorKey: 'updatedAt',
+      accessorKey: 'submittedAt',
       enableGlobalFilter: false,
       sortFn: 'datetime',
-      cell: ({ row }) => <NoWrap>{formatDateTime(row.original.updatedAt, timeZone)}</NoWrap>,
+      cell: ({ row }) => <NoWrap>{formatDateTime(row.original.submittedAt, timeZone)}</NoWrap>,
     },
   ];
 }

@@ -225,6 +225,13 @@
       "when": 1794525051530,
       "tag": "0031_data_automatica_de_publicacao",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794527055729,
+      "tag": "0032_data_de_envio_para_revisao",
+      "breakpoints": true
     }
   ]
 }

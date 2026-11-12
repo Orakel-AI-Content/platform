@@ -296,6 +296,12 @@ describe('criar conteúdo', () => {
   });
 });
 
+/** `now()` do banco, o relógio que grava `submitted_at`. */
+async function dbNow(): Promise<Date> {
+  const { rows } = await db.execute<{ now: string }>(sql`select now()::text as now`);
+  return new Date(rows[0]!.now);
+}
+
 const submit = (contentId: number, actor = SYSTEM_ACTOR) =>
   db.transaction((tx) => submitForReview(tx, actor, SITE, contentId));
 
@@ -315,6 +321,18 @@ describe('enviar para revisão (#72)', () => {
     expect(after[1]?.data).toEqual(before?.data);
     expect(after[1]?.createdAt).toEqual(before?.createdAt);
     expect(await unresolvedPendingChangeIds(db, SITE)).toEqual(pending);
+  });
+
+  it('grava na versão o instante do envio, pelo relógio do banco (#771)', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    const before = await dbNow();
+
+    await submit(1);
+
+    const [published, sent] = await versions(1);
+    expect(published?.submittedAt).toBeNull();
+    expect(sent?.submittedAt?.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    expect(sent?.submittedAt?.getTime()).toBeLessThanOrEqual((await dbNow()).getTime());
   });
 
   it('enfileira a checagem de links externos da versão na mesma transação (#745)', async () => {
@@ -394,6 +412,34 @@ describe('fila de revisão (#72)', () => {
       { id: 3, kind: 'page', title: 'Quem somos (2)', version: 2 },
       { id: 1, kind: 'article', title: 'Guia revisado', version: 2 },
     ]);
+  });
+
+  it('ordena pelo instante do envio, não pela data da versão (#771)', async () => {
+    await edit(3, { ...(await latest(3)), title: 'Quem somos (2)' });
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await submit(1);
+    await submit(3);
+
+    const [first, second] = await queue();
+    expect([first?.id, second?.id]).toEqual([1, 3]);
+    expect(first?.submittedAt).toEqual((await versions(1))[1]?.submittedAt);
+    expect(first!.submittedAt.getTime()).toBeLessThanOrEqual(second!.submittedAt.getTime());
+  });
+
+  it('versão sem instante do envio (anterior à coluna) entra na ordem pela data da versão', async () => {
+    await edit(2, { ...(await latest(2)), title: 'Outro guia' });
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await submit(1);
+    await submit(2);
+    await db
+      .update(contentVersions)
+      .set({ submittedAt: null })
+      .where(and(eq(contentVersions.siteId, SITE), eq(contentVersions.contentId, 2)));
+
+    const items = await queue();
+
+    expect(items.map((item) => item.id)).toEqual([2, 1]);
+    expect(items[0]?.submittedAt).toEqual((await versions(2)).at(-1)?.createdAt);
   });
 
   it('salvar uma versão nova tira o conteúdo da fila', async () => {
@@ -853,6 +899,16 @@ describe('corrigir em revisão (#750)', () => {
     ]);
     expect(rows[2]?.data.title).toBe('Guia corrigido');
     expect((await unresolvedPendingChangeIds(db, SITE)).length).toBe(pending.length + 1);
+  });
+
+  it('a N+1 herda o instante do envio da N: a correção não reinicia a espera (#771)', async () => {
+    await inReview();
+    const sent = (await versions(1))[1]?.submittedAt;
+
+    await amend(1, 2, { ...(await latest(1)), title: 'Guia corrigido' });
+
+    expect(sent).toBeInstanceOf(Date);
+    expect((await versions(1)).map((row) => row.submittedAt)).toEqual([null, sent, sent]);
   });
 
   it('a fila e o selo contam o conteúdo uma vez, pela N+1', async () => {
