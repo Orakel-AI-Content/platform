@@ -43,6 +43,7 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import { Steps } from '@/components/ui/Steps';
+import { Timeline } from '@/components/ui/Timeline';
 import { Switcher } from '@/components/ui/Switcher';
 import { Table, type ThSort } from '@/components/ui/Table';
 import { Tabs } from '@/components/ui/Tabs';
@@ -879,6 +880,28 @@ export function Showcase({ linkPage }: { linkPage: number }) {
             <Steps.Item title="Verificação" description="Links e imagens conferidos." />
             <Steps.Item title="Publicação" description="O deploy falhou." />
           </Steps>
+        </Card>
+      </section>
+
+      <section aria-labelledby="vitrine-timeline" className="space-y-3">
+        <h2 id="vitrine-timeline" className="text-lg font-semibold">
+          Timeline
+        </h2>
+        <Card>
+          <Timeline>
+            <Timeline.Item>
+              <p className="heading-text font-semibold">Publicação concluída</p>
+              <p className="text-sm">ana · 14:02</p>
+            </Timeline.Item>
+            <Timeline.Item media={<span className="block h-4 w-4 rounded-full bg-primary" />}>
+              <p className="heading-text font-semibold">Reversão para a v40</p>
+              <p className="text-sm">bruno · 13:10</p>
+            </Timeline.Item>
+            <Timeline.Item>
+              <p className="heading-text font-semibold">Publicação com falha</p>
+              <p className="text-sm">ana · 12:45</p>
+            </Timeline.Item>
+          </Timeline>
         </Card>
       </section>
 
