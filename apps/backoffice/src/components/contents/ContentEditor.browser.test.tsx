@@ -257,6 +257,69 @@ describe('salvar sem alteração (#525)', () => {
   });
 });
 
+describe('correção na revisão (#751)', () => {
+  const REVIEW = '/sites/exemplo-a/revisao/7';
+  const save = () => page.getByRole('button', { name: 'Salvar correção', exact: true });
+  const title = () => page.getByRole('textbox', { name: 'Título', exact: true });
+
+  async function renderAmend(respond: (input: ContentEdit) => Promise<ContentFormResult>) {
+    navigation.set(`${REVIEW}/corrigir`);
+    const action = vi.fn(respond);
+    await renderInApp(
+      <ContentEditor
+        mode="amend"
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        defaultValues={defaultValues}
+        options={options}
+        action={action}
+        backHref={REVIEW}
+      />,
+    );
+    return action;
+  }
+
+  it('sem mudança, "Salvar correção" fica indisponível e focável, com o motivo, e não envia', async () => {
+    const action = await renderAmend(() =>
+      Promise.resolve({ ok: true, message: 'Correção salva na versão 3.', id: 7 }),
+    );
+    await expect.element(save()).toHaveAttribute('aria-disabled', 'true');
+    await expect.element(save()).toHaveAccessibleDescription('Nenhuma alteração para salvar.');
+    (save().element() as HTMLElement).focus();
+    await expect.element(save()).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    expect(action).not.toHaveBeenCalled();
+    // O tipo não muda depois de criado, como na edição.
+    await expect.element(page.getByLabelText('Tipo', { exact: true })).not.toBeInTheDocument();
+  });
+
+  it('salvar pelo teclado envia a correção e volta à revisão', async () => {
+    const action = await renderAmend(() =>
+      Promise.resolve({ ok: true, message: 'Correção salva na versão 3.', id: 7 }),
+    );
+    await userEvent.type(title(), '!');
+    (save().element() as HTMLElement).focus();
+    await userEvent.keyboard('{Enter}');
+    await expect.poll(() => action.mock.calls.length).toBe(1);
+    expect(action.mock.calls[0]?.[0].title).toBe('Artigo longo!');
+    await expect.poll(() => navigation.get()).toBe(REVIEW);
+  });
+
+  it('recusa do domínio fica no editor, com o motivo no resumo', async () => {
+    await renderAmend(() =>
+      Promise.resolve({
+        ok: false,
+        message: 'Não foi possível salvar o conteúdo.',
+        issues: [{ path: [], message: 'A versão 2 não está em revisão' }],
+      }),
+    );
+    await userEvent.type(title(), '!');
+    await userEvent.click(save());
+    await expect.element(page.getByText('A versão 2 não está em revisão')).toBeVisible();
+    expect(navigation.get()).toBe(`${REVIEW}/corrigir`);
+  });
+});
+
 describe('título, slug e SEO no navegador (#590)', () => {
   it('na criação, o slug acompanha o título; a contagem do SEO é a descrição do campo', async () => {
     await renderInApp(

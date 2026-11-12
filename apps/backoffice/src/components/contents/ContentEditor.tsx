@@ -104,6 +104,7 @@ export type ContentEditorOptions = {
 const SUBMIT_LABEL = {
   create: { idle: 'Criar', pending: 'Criando…' },
   edit: { idle: 'Salvar', pending: 'Salvando…' },
+  amend: { idle: 'Salvar correção', pending: 'Salvando correção…' },
 } as const;
 
 /** Por quanto tempo o "Desfazer" da remoção de bloco fica disponível no toast (#112). */
@@ -182,7 +183,12 @@ export function ContentEditor({
   created = false,
   previewUrl,
 }: {
-  mode: 'create' | 'edit';
+  /**
+   * `amend` (#751): a correção do revisor durante a revisão. Funciona como `edit` (sem o tipo,
+   * sem salvar o que não mudou), mas salvar volta à revisão (`backHref`) em vez de continuar
+   * no editor.
+   */
+  mode: 'create' | 'edit' | 'amend';
   siteId: string;
   /** Fuso IANA do site: a data de publicação é escolhida e mostrada nele (#183). */
   timeZone: string;
@@ -371,6 +377,13 @@ export function ContentEditor({
           router.replace(`/sites/${siteId}/conteudos/${result.id}/editar?criado=1`);
           return;
         }
+        if (mode === 'amend') {
+          // A revisão mostra a versão nova; o toast confirma a correção depois da navegação.
+          form.reset(sent);
+          pushSuccess(result.message);
+          router.push(backHref);
+          return;
+        }
         setCarried(
           blocks.fields.flatMap((field, index) => (collapsed.has(field.id) ? [index] : [])),
         );
@@ -409,7 +422,7 @@ export function ContentEditor({
       ? 'As alterações não salvas não aparecem na prévia.'
       : '';
   // Edição sem alteração (#525): nada a enviar; o domínio também não grava (#523).
-  const unchanged = mode === 'edit' && !form.formState.isDirty;
+  const unchanged = mode !== 'create' && !form.formState.isDirty;
   return (
     <FormProvider {...form}>
       <form
@@ -453,7 +466,7 @@ export function ContentEditor({
                   hints={{ ...META_HINTS, publishedAt: `Horário de ${timeZone}` }}
                   // O tipo não muda depois de criado; `updatedAt` é do site, não do editor; o
                   // SEO tem cartão próprio, recolhível.
-                  hidden={mode === 'edit' ? ['kind', 'updatedAt', 'seo'] : ['updatedAt', 'seo']}
+                  hidden={mode === 'create' ? ['updatedAt', 'seo'] : ['kind', 'updatedAt', 'seo']}
                   fields={metaFields}
                 />
               </Card>
@@ -586,7 +599,7 @@ export function ContentEditor({
         </div>
         ;
         <FormActionBar
-          kind={mode}
+          kind={mode === 'create' ? 'create' : 'edit'}
           href={backHref}
           contentClassName={contentClassName}
           pending={busy}
