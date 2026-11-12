@@ -743,6 +743,79 @@ describe('task build', () => {
     ]);
   });
 
+  it('durante o build, a linha rodando mostra a etapa render e depois publish', async () => {
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    const during: { status: string; currentStage: string | null }[] = [];
+    const runtime = {
+      ...fake.runtime,
+      wait: async (...args: Parameters<ContainerRuntime['wait']>) => {
+        during.push(
+          ...(await db
+            .select({ status: builds.status, currentStage: builds.currentStage })
+            .from(builds)),
+        );
+        return fake.runtime.wait(...args);
+      },
+    };
+    await createBuildTask({ db, runtime, settings })({ siteId: 'exemplo-a' }, await helpers());
+
+    expect(during).toEqual([
+      { status: 'rodando', currentStage: 'render' },
+      { status: 'rodando', currentStage: 'publish' },
+    ]);
+  });
+
+  it('a falha guarda a etapa, a mensagem e o fim do log do container daquela etapa, limitado', async () => {
+    const lines = Array.from({ length: 500 }, (_, i) => `linha ${i} ${'x'.repeat(100)}`);
+    const fake = fakeRuntime({
+      render: { file: renderOk(), log: 'render: 12 páginas' },
+      publish: {
+        exitCode: 10,
+        file: { ...failedFile('permanent', 'token recusado'), release: undefined },
+        log: lines.join('\n'),
+      },
+    });
+    await createBuildTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a' },
+      await helpers(),
+    );
+
+    const [build] = await db.select().from(builds);
+    expect(build).toMatchObject({
+      status: 'failed',
+      failedStage: 'publish',
+      failureKind: 'permanent',
+      failureMessage: 'token recusado',
+    });
+    const logTail = build?.logTail ?? '';
+    expect(logTail.endsWith(lines[499] ?? '')).toBe(true);
+    expect(logTail).not.toContain('render: 12 páginas');
+    expect(logTail.split('\n').length).toBeLessThanOrEqual(200);
+    expect(new TextEncoder().encode(logTail).length).toBeLessThanOrEqual(16 * 1024);
+  });
+
+  it('falha ao ler o log não muda o resultado nem a classificação do build', async () => {
+    const fake = fakeRuntime({
+      render: { exitCode: 20, file: failedFile('transient', 'API fora') },
+      failOn: 'logs',
+    });
+    await expect(
+      createBuildTask({ db, runtime: fake.runtime, settings })(
+        { siteId: 'exemplo-a' },
+        await helpers(5),
+      ),
+    ).rejects.toBeInstanceOf(TransientBuildError);
+    expect(await db.select().from(builds)).toMatchObject([
+      {
+        status: 'failed',
+        failedStage: 'render',
+        failureKind: 'transient',
+        failureMessage: 'API fora',
+        logTail: null,
+      },
+    ]);
+  });
+
   it('o banco só aceita linha aberta sem fim e linha fechada com fim', async () => {
     const row = { siteId: 'exemplo-a', release: 'local', attempt: 1, startedAt: new Date() };
     await expect(

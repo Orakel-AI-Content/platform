@@ -6,6 +6,7 @@ import {
   loadBuildTarget,
   queueRetry,
   recordBuild,
+  setCurrentStage,
   startBuild,
 } from '../../domain/builds/builds.ts';
 import { planBuild, type BuildSettings } from '../../domain/builds/plan.ts';
@@ -76,6 +77,7 @@ export function createBuildTask(deps: BuildTaskDeps): Task {
       runtime: deps.runtime,
       now,
       log: (msg) => log.warn(msg),
+      onStage: (stage) => setCurrentStage(deps.db, buildId, stage),
     });
     const retried = outcome.status === 'failed' && outcome.failure.kind === 'transient';
     await deps.db.transaction(async (tx) => {

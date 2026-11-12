@@ -233,6 +233,44 @@ describe('task rollback', () => {
     expect(fake.volumes.removed).toHaveLength(1);
   });
 
+  it('a falha guarda a mensagem e as últimas linhas do log do container', async () => {
+    const lines = Array.from({ length: 300 }, (_, i) => `linha ${i}`);
+    const { result } = await run({
+      exitCode: 10,
+      file: failedFile('permanent', 'Versão não existe no alvo'),
+      log: lines.join('\n'),
+    });
+    await result;
+    const [row] = await rollbackRows();
+    expect(row).toMatchObject({
+      status: 'failed',
+      failureKind: 'permanent',
+      failureMessage: 'Versão não existe no alvo',
+      currentStage: null,
+      logTail: lines.slice(-200).join('\n'),
+    });
+  });
+
+  it('falha ao ler o log não muda o resultado nem a classificação do rollback', async () => {
+    const jobId = await queueRollback();
+    const fake = fakeRuntime({
+      rollback: { exitCode: 10, file: failedFile('permanent', 'Versão não existe no alvo') },
+      failOn: 'logs',
+    });
+    await createRollbackTask({ db, runtime: fake.runtime, settings })(
+      { siteId: 'exemplo-a', versionId: OLDER },
+      helpers(jobId, 1),
+    );
+    expect(await rollbackRows()).toMatchObject([
+      {
+        status: 'failed',
+        failureKind: 'permanent',
+        failureMessage: 'Versão não existe no alvo',
+        logTail: null,
+      },
+    ]);
+  });
+
   it('site inexistente: ignora sem rodar container', async () => {
     const fake = fakeRuntime({});
     await createRollbackTask({ db, runtime: fake.runtime, settings })(

@@ -140,6 +140,75 @@ describe('runBuild', () => {
     });
   });
 
+  it('avisa cada troca de etapa, na ordem', async () => {
+    const stages: string[] = [];
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    await runBuild(plan, {
+      runtime: fake.runtime,
+      now,
+      onStage: (stage) => {
+        stages.push(stage);
+        return Promise.resolve();
+      },
+    });
+    expect(stages).toEqual(['image', 'render', 'publish']);
+  });
+
+  it('erro ao avisar a etapa só vai para o log', async () => {
+    const logs: string[] = [];
+    const fake = fakeRuntime({ render: { file: renderOk() }, publish: { file: publishOk() } });
+    const outcome = await runBuild(plan, {
+      runtime: fake.runtime,
+      now,
+      log: (msg) => logs.push(msg),
+      onStage: () => Promise.reject(new Error('banco fora')),
+    });
+    expect(outcome.status).toBe('ok');
+    expect(logs).toHaveLength(3);
+  });
+
+  it('na falha, guarda o fim do log do container da etapa, lido antes de removê-lo', async () => {
+    const fake = fakeRuntime({
+      render: { file: renderOk(), log: 'render ok' },
+      publish: { exitCode: 20, log: 'publicando\nedge-local 503' },
+    });
+    const outcome = await runBuild(plan, { runtime: fake.runtime, now });
+    expect(outcome).toMatchObject({
+      status: 'failed',
+      stage: 'publish',
+      logTail: 'publicando\nedge-local 503',
+    });
+    expect(fake.removed).toHaveLength(2);
+  });
+
+  it('o fim do log fica em 200 linhas e 16 KiB', async () => {
+    const lines = Array.from({ length: 500 }, (_, i) => `linha ${i} ${'x'.repeat(100)}`);
+    const fake = fakeRuntime({ render: { exitCode: 1, log: lines.join('\n') } });
+    const outcome = await runBuild(plan, { runtime: fake.runtime, now });
+    const logTail = outcome.status === 'failed' ? (outcome.logTail ?? '') : '';
+    expect(new TextEncoder().encode(logTail).length).toBeLessThanOrEqual(16 * 1024);
+    expect(logTail.split('\n').length).toBeLessThanOrEqual(200);
+    expect(logTail.endsWith(lines[499] ?? '')).toBe(true);
+  });
+
+  it('erro ao ler o log não muda o resultado nem a classificação', async () => {
+    const outcome = await runBuild(plan, {
+      runtime: fakeRuntime({ render: { exitCode: 10 }, failOn: 'logs' }).runtime,
+      now,
+    });
+    expect(outcome).toMatchObject({
+      status: 'failed',
+      stage: 'render',
+      failure: { kind: 'permanent', message: 'render saiu com 10 sem um result.json válido' },
+    });
+    expect(outcome).not.toHaveProperty('logTail');
+  });
+
+  it('sem container (imagem ausente), não há log', async () => {
+    const outcome = await runBuild(plan, { runtime: fakeRuntime({ image: false }).runtime, now });
+    expect(outcome).not.toHaveProperty('logTail');
+  });
+
   it('resultado de outro site é recusado', async () => {
     const fake = fakeRuntime({ render: { file: renderOk('exemplo-b') } });
     const outcome = await runBuild(plan, { runtime: fake.runtime, now });

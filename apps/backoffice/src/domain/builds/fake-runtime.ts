@@ -1,8 +1,8 @@
 // Runtime de containers falso para os testes do build: cada etapa (render, publish, rollback) tem o
-// código de saída, os arquivos que deixa no volume e se estoura o tempo.
+// código de saída, os arquivos que deixa no volume, o log que escreve e se estoura o tempo.
 import type { ContainerRuntime, ContainerSpec } from './runtime.ts';
 
-export type FakeStage = { exitCode?: number; file?: unknown; timedOut?: boolean };
+export type FakeStage = { exitCode?: number; file?: unknown; timedOut?: boolean; log?: string };
 
 export function fakeRuntime(options: {
   /** A imagem está no host? */
@@ -12,7 +12,7 @@ export function fakeRuntime(options: {
   render?: FakeStage;
   publish?: FakeStage;
   rollback?: FakeStage;
-  failOn?: 'createVolume' | 'start';
+  failOn?: 'createVolume' | 'start' | 'logs';
 }) {
   const started: ContainerSpec[] = [];
   const removed: string[] = [];
@@ -58,6 +58,13 @@ export function fakeRuntime(options: {
     readFile(id) {
       const file = stageOf(id)?.file;
       return Promise.resolve(file === undefined ? undefined : JSON.stringify(file));
+    },
+    logsTail(id, lines) {
+      if (options.failOn === 'logs') return Promise.reject(new Error('proxy recusou'));
+      // Como o Docker: container já removido não tem log.
+      if (removed.includes(id)) return Promise.reject(new Error(`no such container: ${id}`));
+      const log = stageOf(id)?.log ?? '';
+      return Promise.resolve(log.split('\n').slice(-lines).join('\n'));
     },
     removeContainer(id) {
       removed.push(id);

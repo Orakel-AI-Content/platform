@@ -20,7 +20,7 @@ import {
 } from '../../db/schema/index.ts';
 import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
 import { currentConfig } from '../sites/sites.ts';
-import type { BuildOutcome } from './run-build.ts';
+import type { BuildOutcome, BuildStage } from './run-build.ts';
 import type { RollbackOutcome } from './run-rollback.ts';
 import {
   buildNow,
@@ -154,6 +154,21 @@ export async function startBuild(db: Executor, run: BuildRun): Promise<number> {
 }
 
 /**
+ * Etapa em andamento da tentativa (image, render, publish), gravada a cada troca enquanto a
+ * linha está `rodando`, para o status ao vivo. Linha já fechada não muda.
+ */
+export async function setCurrentStage(
+  db: Executor,
+  buildId: number,
+  stage: BuildStage,
+): Promise<void> {
+  await db
+    .update(builds)
+    .set({ currentStage: stage })
+    .where(and(eq(builds.id, buildId), eq(builds.status, 'rodando')));
+}
+
+/**
  * A linha `na_fila` do job, de build ou de rollback: o id do job é único entre as tasks e o
  * índice `builds_queued_job_unique` garante uma só.
  */
@@ -203,7 +218,8 @@ export async function queueRetry(tx: Executor, buildId: number, runAt: Date): Pr
 /**
  * Fecha a linha `rodando` da tentativa de rollback com o resultado. Com sucesso, a versão
  * ativada passa a ser a ativa do site, na mesma transação; com falha, a linha guarda o tipo e
- * a mensagem (sem etapa: o rollback é um único container) e o site não é pausado.
+ * a mensagem (sem etapa: o rollback é um único container) e o fim do log do container, e o
+ * site não é pausado.
  */
 export async function recordRollback(
   tx: Executor,
@@ -218,6 +234,7 @@ export async function recordRollback(
           failedStage: null,
           failureKind: outcome.failure.kind,
           failureMessage: outcome.failure.message,
+          logTail: outcome.logTail ?? null,
         };
   const closed = await tx
     .update(builds)
@@ -263,6 +280,7 @@ export async function recordBuild(
           failedStage: outcome.stage,
           failureKind: outcome.failure.kind,
           failureMessage: outcome.failure.message,
+          logTail: outcome.logTail ?? null,
           pendingChangeIds: outcome.render?.pendingChangeIds ?? [],
           pages: outcome.render?.pages ?? null,
           files: outcome.render?.files ?? null,
