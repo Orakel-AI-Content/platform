@@ -52,7 +52,10 @@ flowchart LR
 - **Entrega:** a imagem `site-builder` lê a API de exportação e gera o site estático de
   cada `SITE_ID`; o `wrangler.jsonc` de cada site é gerado pelo `build-site`. O SSR do
   `apps/blog` existe só para a visualização no Backoffice: a prévia, um container que o
-  `build-runner` mantém na versão corrente (ADR 0024).
+  `build-runner` mantém na versão do motor corrente (ADR 0024). Cada build ou rollback de
+  um site é uma execução (tabela `builds`), registrada desde o enfileiramento e visível no
+  histórico do site; a atualização de sites leva a versão do motor mais recente a todos os
+  sites, um por vez, começando pelo canário.
 - **Eventos:** o Worker de borda grava eventos anônimos no Analytics Engine e na fila;
   o agregador consolida no Postgres.
 
@@ -67,8 +70,8 @@ flowchart LR
 | Variáveis CSS dos temas                                           | `@orakel/tokens`         | elements, ui, blog                                           |
 
 Regras de evolução: aditiva dentro de uma versão; mudança incompatível cria a próxima
-versão; o parse ignora campos desconhecidos. Versão do site-builder pelo
-`release.yml` (`workflow_dispatch` com `version`), que publica a imagem `site-builder:X.Y.Z` e
+versão; o parse ignora campos desconhecidos. Versão do motor (a versão do site-builder,
+`release` no código) pelo `release.yml` (`workflow_dispatch` com `version`), que publica a imagem `site-builder:X.Y.Z` e
 cria a tag `site-builder-vX.Y.Z` (major = muda o schema
 da API ou exige migração de configuração; ADR 0018). Quem dispara é o job `release-run` do
 `build-runner`, o único processo com o PAT do GitHub, que acompanha o run até o fim (ADR 0022).
