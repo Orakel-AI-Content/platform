@@ -190,6 +190,13 @@
       "when": 1794507851914,
       "tag": "0026_interrupcao_da_atualizacao",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794508653831,
+      "tag": "0027_conferencia_da_infra",
+      "breakpoints": true
     }
   ]
 }

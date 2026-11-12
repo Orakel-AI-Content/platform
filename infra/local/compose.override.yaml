@@ -183,6 +183,11 @@ services:
       AE_SQL_URL: http://${CLICKHOUSE_USER:-orakel}:${CLICKHOUSE_PASSWORD:-orakel-local}@clickhouse:8123
       # Geração: o E2E nunca chama o provedor (ver backoffice-migrate).
       LLM_MODEL: ${LOCAL_LLM_MODEL:-fixture}
+      # Conferência da infra (#718): no local não há zona, o worker pergunta ao /healthz do
+      # edge-local, que só escuta o :8081 na rede publish (não na edge, a do ClickHouse).
+      DEPLOY_TARGET: local
+      EDGE_LOCAL_URL: http://edge-local:8081
+    networks: [internal, publish]
     depends_on:
       s3-init:
         condition: service_completed_successfully

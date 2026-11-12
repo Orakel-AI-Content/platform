@@ -1,6 +1,7 @@
 import { RESOURCES } from '@orakel/content-model/v1';
 import { count, eq, sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { JobHelpers } from 'graphile-worker';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
 import {
@@ -17,9 +18,11 @@ import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
 import { createAuthor } from '../../src/domain/content/authors.ts';
 import {
+  CHECK_SITE_INFRA_TASK,
   pauseSite,
   pauseSiteManually,
   resumeSite,
+  scheduleSiteInfraCheck,
   setBuildWindow,
   setDailyPublishLimit,
 } from '../../src/domain/builds/site-state.ts';
@@ -38,6 +41,8 @@ import {
   unresolvedPendingChangeIds,
   updateSiteConfig,
 } from '../../src/domain/sites/sites.ts';
+import { createCheckSiteInfraTask } from '../../src/jobs/tasks/check-site-infra.ts';
+import type { ZoneStatus } from '../../src/lib/cloudflare.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
 let db: Db;
@@ -862,5 +867,137 @@ describe('versão no cadastro do site (#689)', () => {
     expect(await createExemploC()).toMatchObject({ ok: true });
 
     expect(await releaseOf('exemplo-c')).toBeNull();
+  });
+});
+
+describe('conferência automática da infra (#718)', () => {
+  const T1 = Date.parse('2026-11-12T12:00:00Z');
+  const T2 = Date.parse('2026-11-12T12:05:00Z');
+
+  /** Roda a task de verdade, com o banco da suíte e a consulta da zona falsa. */
+  async function check(
+    byDomain: Record<string, ZoneStatus>,
+    at: number,
+    payload: unknown = null,
+  ): Promise<string[]> {
+    const checked: string[] = [];
+    const task = createCheckSiteInfraTask({
+      db,
+      zones: {
+        check(domain) {
+          checked.push(domain);
+          return Promise.resolve(byDomain[domain] ?? { kind: 'inexistente' });
+        },
+      },
+      now: () => new Date(at),
+    });
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    await task(payload, { logger } as unknown as JobHelpers);
+    return checked;
+  }
+
+  async function site(siteId: string) {
+    const [row] = await db
+      .select({
+        lifecycle: sites.lifecycle,
+        infraCheckedAt: sites.infraCheckedAt,
+        infraCheckError: sites.infraCheckError,
+      })
+      .from(sites)
+      .where(eq(sites.id, siteId));
+    return row;
+  }
+
+  it('pendente leva cadastrado a infra_aplicada; ativa leva a zona_ativa, inclusive de cadastrado', async () => {
+    await check(
+      {
+        'exemplo-a.com.br': { kind: 'pendente', status: 'pending' },
+        'exemplo-b.com.br': { kind: 'ativa' },
+      },
+      T1,
+    );
+
+    expect(await site('exemplo-a')).toEqual({
+      lifecycle: 'infra_aplicada',
+      infraCheckedAt: new Date(T1),
+      infraCheckError: null,
+    });
+    expect(await site('exemplo-b')).toEqual({
+      lifecycle: 'zona_ativa',
+      infraCheckedAt: new Date(T1),
+      infraCheckError: null,
+    });
+
+    await check({ 'exemplo-a.com.br': { kind: 'ativa' } }, T2);
+    expect((await site('exemplo-a'))?.lifecycle).toBe('zona_ativa');
+  });
+
+  it('inexistente grava a conferência e não muda a etapa', async () => {
+    await check({}, T1);
+
+    expect(await site('exemplo-a')).toEqual({
+      lifecycle: 'cadastrado',
+      infraCheckedAt: new Date(T1),
+      infraCheckError: null,
+    });
+  });
+
+  it('falha guarda a mensagem e o horário sem mudar a etapa; a próxima conferência bem-sucedida limpa', async () => {
+    const falha: ZoneStatus = {
+      kind: 'falha',
+      message: 'Cloudflare respondeu 503 (zona exemplo-a.com.br)',
+      transient: true,
+    };
+    await check({ 'exemplo-a.com.br': falha }, T1);
+    expect(await site('exemplo-a')).toEqual({
+      lifecycle: 'cadastrado',
+      infraCheckedAt: new Date(T1),
+      infraCheckError: falha.message,
+    });
+
+    await check({ 'exemplo-a.com.br': { kind: 'pendente', status: 'pending' } }, T2);
+    expect(await site('exemplo-a')).toEqual({
+      lifecycle: 'infra_aplicada',
+      infraCheckedAt: new Date(T2),
+      infraCheckError: null,
+    });
+  });
+
+  it('não consulta sites em zona_ativa nem publicado', async () => {
+    await db.update(sites).set({ lifecycle: 'zona_ativa' }).where(eq(sites.id, 'exemplo-a'));
+    await db.update(sites).set({ lifecycle: 'publicado' }).where(eq(sites.id, 'exemplo-b'));
+
+    expect(await check({}, T1)).toEqual([]);
+    expect((await site('exemplo-a'))?.infraCheckedAt).toBeNull();
+    expect((await site('exemplo-b'))?.infraCheckedAt).toBeNull();
+  });
+
+  it('com { siteId } confere só aquele site', async () => {
+    expect(await check({}, T1, { siteId: 'exemplo-b' })).toEqual(['exemplo-b.com.br']);
+    expect((await site('exemplo-a'))?.infraCheckedAt).toBeNull();
+  });
+
+  it('a conferência não gera mudança pendente', async () => {
+    const before = await db.select({ n: count() }).from(pendingChanges);
+    await check({ 'exemplo-a.com.br': { kind: 'ativa' } }, T1);
+    await check({ 'exemplo-b.com.br': { kind: 'falha', message: 'x', transient: false } }, T1);
+
+    expect(await db.select({ n: count() }).from(pendingChanges)).toEqual(before);
+  });
+
+  it('enfileirar a conferência de um site de novo não duplica o job (jobKey por site)', async () => {
+    await db.transaction((tx) => scheduleSiteInfraCheck(tx, 'exemplo-a'));
+    await db.transaction((tx) => scheduleSiteInfraCheck(tx, 'exemplo-a'));
+    await db.transaction((tx) => scheduleSiteInfraCheck(tx, 'exemplo-b'));
+
+    const jobs = await db.execute<{ key: string; payload: unknown; max_attempts: number }>(
+      sql`select j.key, j.payload, j.max_attempts from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+          where t.identifier = ${CHECK_SITE_INFRA_TASK} order by j.key`,
+    );
+    expect(jobs.rows).toEqual([
+      { key: 'site-infra:exemplo-a', payload: { siteId: 'exemplo-a' }, max_attempts: 1 },
+      { key: 'site-infra:exemplo-b', payload: { siteId: 'exemplo-b' }, max_attempts: 1 },
+    ]);
   });
 });

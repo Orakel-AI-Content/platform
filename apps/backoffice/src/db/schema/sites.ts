@@ -50,6 +50,13 @@ export const sites = pgTable(
      */
     massUnpublishDeclaredBy: text(),
     massUnpublishDeclaredAt: timestamp({ withTimezone: true }),
+    /**
+     * Última conferência automática da infra (zona do domínio principal, workspace#85) e, se a
+     * consulta ao provedor falhou, a mensagem da falha; uma conferência bem-sucedida a limpa.
+     * Nulas até a primeira conferência. Operacional: fora do snapshot.
+     */
+    infraCheckedAt: timestamp({ withTimezone: true }),
+    infraCheckError: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
