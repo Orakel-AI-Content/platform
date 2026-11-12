@@ -216,6 +216,11 @@ export function releaseAvailableText(tag: string): string {
   return `${tag} disponível`;
 }
 
+/** O botão "Voltar à versão anterior" da etapa "Versão" (#691), com a release de destino. */
+export function revertReleaseText(tag: string): string {
+  return `Voltar à versão anterior (${tag})`;
+}
+
 /** Estado da etapa "Infra e zona" a partir do ciclo de vida (#647). */
 export const INFRA_STEP_TEXT: Record<SiteSummary['lifecycle'], string> = {
   cadastrado: 'Infra e zona pendentes',

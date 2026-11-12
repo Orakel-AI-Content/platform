@@ -8,7 +8,7 @@ import ConfirmDialog, {
   dangerButtonClass,
   dangerConfirmButtonProps,
 } from '@/components/shared/ConfirmDialog.tsx';
-import { previousVersionText } from '@/components/shared/siteLabels.ts';
+import { previousVersionText, revertReleaseText } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
 import type { RollbackVersion } from '@/domain/builds/builds.ts';
 
@@ -29,19 +29,19 @@ import {
 } from './SiteStatus.tsx';
 
 // Ações de operação da página do site nas etapas da aba "Publicação" (#648; antes no cabeçalho,
-// #595): "Reconstruir na release" (#515) na Versão, "Publicar agora" na Build, "Escolher outra
-// versão" (o "Reverter" de #514) na No ar e, na linha Site, "Pausar" com motivo (#650) com o
-// site ativo ou "Retomar" com ele pausado. O
-// `SiteOperationsScope` guarda o estado comum e monta cada diálogo de confirmação uma vez; cada
-// etapa recebe só o seu `SiteOperationButton`. O sucesso vai ao toast e a recusa de qualquer
-// uma ao `SiteOperationsAlert`, logo abaixo do painel. A página só monta o escopo com
-// operations.run. "Cancelar" (#649) fica na Build ao lado de "Publicar agora" com publicação na
-// fila e no lugar dele em andamento; "Desfazer última publicação" fica ao lado de "Escolher outra
-// versão". "Atualizar para a mais recente" (#690) fica na Versão, antes do "Reconstruir", só quando
-// há release disponível mais recente que a do site.
+// #595). Na Versão: "Atualizar para a mais recente" (#690), só quando há release disponível mais
+// recente que a do site; "Voltar à versão anterior (X)" (#691), só quando a troca de versão mais
+// recente veio de uma release ainda disponível; e "Escolher outra versão do motor" (o
+// "Reconstruir na release" de #515). "Publicar agora" na Build, com "Cancelar" (#649) ao lado na
+// fila e no lugar dele em andamento. Na No ar, "Desfazer última publicação" (#649) e "Escolher
+// outra versão" (o "Reverter" de #514). Na linha Site, "Pausar" com motivo (#650) com o site
+// ativo ou "Retomar" com ele pausado. O `SiteOperationsScope` guarda o estado comum e monta cada
+// diálogo de confirmação uma vez; cada etapa recebe só o seu `SiteOperationButton`. O sucesso vai
+// ao toast e a recusa de qualquer uma ao `SiteOperationsAlert`, logo abaixo do painel. A página
+// só monta o escopo com operations.run.
 
 export type SiteOperation =
-  'publish' | 'pause' | 'resume' | 'rebuild' | 'rollback' | 'cancel' | 'undo' | 'update';
+  'publish' | 'pause' | 'resume' | 'rebuild' | 'rollback' | 'cancel' | 'undo' | 'update' | 'revert';
 
 /** "Pausar" com o motivo informado, já ligado ao site. */
 export type PauseSite = (reason: string) => Promise<ActionResult>;
@@ -52,13 +52,13 @@ export type SiteAction = (siteId: string) => Promise<ActionResult>;
 export type SiteOperationsProps = {
   siteId: string;
   paused: boolean;
-  /** Release atual do site, de onde o "Reconstruir" começa. */
+  /** Release atual do site, de onde o "Escolher outra versão do motor" começa. */
   release: string | null;
   timeZone: string;
   publish?: PublishNow;
   pause?: PauseSite;
   resume?: ResumeSite;
-  /** Releases registradas (com o estado da imagem) e a action de reconstruir, já ligada ao site. */
+  /** Releases `disponivel` e a action de reconstruir, já ligada ao site. */
   rebuild?: { releases: readonly RebuildRelease[]; action: RebuildOnRelease };
   /** Versões revertíveis (sem a ativa) e a action de reverter, já ligada ao site. */
   rollback?: { versions: readonly RollbackVersion[]; action: RollbackSite };
@@ -74,6 +74,12 @@ export type SiteOperationsProps = {
    * página (só quando difere da do site), e a action de reconstruir, já ligada ao site.
    */
   update?: { tag: string; action: RebuildOnRelease };
+  /**
+   * "Voltar à versão anterior" (#691): a release de onde veio a última troca de versão, só
+   * mostrada (o domínio a resolve de novo ao executar), e a action. Sem anterior válida, a página
+   * não passa.
+   */
+  revert?: { tag: string; action: SiteAction };
 };
 
 type Scope = {
@@ -92,11 +98,12 @@ const LABEL: Record<SiteOperation, { idle: string; pending: string }> = {
   publish: PUBLISH_NOW_LABEL,
   pause: PAUSE_SITE_LABEL,
   resume: RESUME_SITE_LABEL,
-  rebuild: { idle: 'Reconstruir na release', pending: 'Reconstruindo…' },
+  rebuild: { idle: 'Escolher outra versão do motor', pending: 'Reconstruindo…' },
   rollback: { idle: 'Escolher outra versão', pending: 'Revertendo…' },
   cancel: { idle: 'Cancelar', pending: 'Cancelando…' },
   undo: { idle: 'Desfazer última publicação', pending: 'Desfazendo…' },
   update: { idle: 'Atualizar para a mais recente', pending: 'Atualizando…' },
+  revert: { idle: 'Voltar à versão anterior', pending: 'Voltando…' },
 };
 
 /** Se a operação vale para o site agora: publicar e pausar fora da pausa, retomar só pausado. */
@@ -118,12 +125,14 @@ function available(operations: SiteOperationsProps, operation: SiteOperation): b
       return operations.undo !== undefined;
     case 'update':
       return operations.update !== undefined;
+    case 'revert':
+      return operations.revert !== undefined;
   }
 }
 
 /**
  * As ações de operação do site: `publish`, `pause`, `resume`, `rebuild`, `rollback`, `cancel`,
- * `undo` e `update` só vêm de quem tem
+ * `undo`, `update` e `revert` só vêm de quem tem
  * operations.run. Uma ação de cada vez: enquanto uma está na fila, todos os botões ficam
  * `aria-disabled` (não `disabled`: o diálogo fecha antes da resposta, e o foco volta ao botão
  * que o abriu).
@@ -155,6 +164,7 @@ export function SiteOperationsScope({
     cancel,
     undo,
     update,
+    revert,
   } = operations;
 
   const openFrom = (operation: SiteOperation, trigger: HTMLElement) => {
@@ -284,6 +294,24 @@ export function SiteOperationsScope({
           </p>
         </ConfirmDialog>
       )}
+      {revert && (
+        <ConfirmDialog
+          isOpen={open === 'revert'}
+          type="danger"
+          title={`Voltar ${siteId} para a versão ${revert.tag}?`}
+          confirmText="Voltar"
+          confirmButtonProps={dangerConfirmButtonProps}
+          onCancel={close}
+          onConfirm={() => execute('revert', () => revert.action(siteId))}
+          onAfterClose={afterClose}
+        >
+          <p>
+            O site volta a usar a versão {revert.tag}, de onde veio a última troca, o build entra na
+            fila já e o site no ar muda.
+            {paused && ' O site sai da pausa.'}
+          </p>
+        </ConfirmDialog>
+      )}
     </SiteOperationsContext>
   );
 }
@@ -298,6 +326,10 @@ export function SiteOperationButton({ operation }: { operation: SiteOperation })
   if (scope === null) throw new Error('SiteOperationButton fora de um SiteOperationsScope.');
   if (!available(scope.operations, operation)) return null;
   const label = LABEL[operation];
+  const idle =
+    operation === 'revert' && scope.operations.revert
+      ? revertReleaseText(scope.operations.revert.tag)
+      : label.idle;
   return (
     <Button
       type="button"
@@ -310,7 +342,7 @@ export function SiteOperationButton({ operation }: { operation: SiteOperation })
       aria-disabled={scope.running !== null || undefined}
       onClick={(event) => scope.open(operation, event.currentTarget)}
     >
-      {scope.running === operation ? label.pending : label.idle}
+      {scope.running === operation ? label.pending : idle}
       <span className="sr-only"> {scope.operations.siteId}</span>
     </Button>
   );
