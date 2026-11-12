@@ -18,8 +18,13 @@ export type ContainerSpec = {
 export type WaitResult = { exitCode: number } | { timedOut: true };
 
 export interface ContainerRuntime {
-  /** A imagem já está no host? O proxy recusa pull: a imagem chega pela promoção/deploy. */
+  /** A imagem já está no host? */
   imageExists(image: string): Promise<boolean>;
+  /**
+   * Baixa a imagem do registry (sem credencial: o pacote é público). Só aceita
+   * `SITE_BUILDER_IMAGE:<tag>`; o proxy libera a rota, mas não enxerga o nome (ADR 0021 da raiz).
+   */
+  pullImage(image: string): Promise<void>;
   createVolume(name: string, labels: Record<string, string>): Promise<void>;
   /** Cria e inicia; devolve o ID do container. */
   start(spec: ContainerSpec): Promise<string>;

@@ -108,15 +108,20 @@ export async function runBuild(plan: BuildPlan, deps: Deps): Promise<BuildOutcom
   let render: RenderOk | undefined;
   let renderMs: number | undefined;
   try {
+    // Imagem ausente: uma tentativa de pull (ADR 0021 da raiz). Erro do pull é transitório,
+    // pela captura abaixo; pull sem erro e imagem ainda ausente é permanente.
     if (!(await runtime.imageExists(plan.image))) {
-      return {
-        status: 'failed',
-        stage: 'image',
-        failure: {
-          kind: 'permanent',
-          message: `A imagem ${plan.image} não está no host (o build não baixa imagens)`,
-        },
-      };
+      await runtime.pullImage(plan.image);
+      if (!(await runtime.imageExists(plan.image))) {
+        return {
+          status: 'failed',
+          stage: 'image',
+          failure: {
+            kind: 'permanent',
+            message: `A imagem ${plan.image} não está no host e o pull não a trouxe`,
+          },
+        };
+      }
     }
 
     current = 'render';
