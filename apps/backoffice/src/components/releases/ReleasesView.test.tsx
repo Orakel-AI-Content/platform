@@ -45,6 +45,8 @@ const rollout = (
   requestedBy: 'operacao@orakel.local',
   startedAt: new Date('2026-11-12T12:00Z'),
   finishedAt: null,
+  interruptedBy: null,
+  interruptedAt: null,
   sites: sites.map(([siteId, siteState], position) => ({
     siteId,
     position,
@@ -72,6 +74,7 @@ const view = (initial: ReleasesSnapshot, status?: () => Promise<ReleasesSnapshot
     snapshot={initial}
     generate={<button type="button">Gerar nova versão</button>}
     startRollout={vi.fn()}
+    interruptRollout={vi.fn()}
     retry={vi.fn()}
     discard={vi.fn()}
     status={status}

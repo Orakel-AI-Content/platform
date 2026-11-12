@@ -5,7 +5,10 @@ import { TbRefresh } from 'react-icons/tb';
 
 import { ActionAlert, pushSuccess } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
-import ConfirmDialog from '@/components/shared/ConfirmDialog.tsx';
+import ConfirmDialog, {
+  dangerButtonClass,
+  dangerConfirmButtonProps,
+} from '@/components/shared/ConfirmDialog.tsx';
 import type { StateTagColor } from '@/components/shared/siteLabels.ts';
 import { StateTag } from '@/components/sites/SiteStatus';
 import { Button } from '@/components/ui/Button';
@@ -21,9 +24,11 @@ import type {
 // confirmação com a versão de destino, e o cartão de progresso da última atualização, no esboço
 // aprovado no refinamento. A regra é do domínio (`startRollout`): a recusa fica no Alert do
 // diálogo, como no `NewReleaseDialog`, e o sucesso vai ao toast. O polling é da tela
-// (`useReleasesSnapshot`).
+// (`useReleasesSnapshot`). "Interromper" (#704) segue o mesmo fluxo no cartão, sobre
+// `interruptRollout`: o estado "interrompida" chega pelo snapshot, nunca otimista.
 
 export type StartRollout = () => Promise<ActionResult>;
+export type InterruptRollout = () => Promise<ActionResult>;
 
 const ROLLOUT_STATE_LABEL: Record<RolloutState, string> = {
   em_andamento: 'em andamento',
@@ -148,25 +153,105 @@ export function RolloutButton({
 }
 
 /**
+ * "Interromper" a atualização em andamento: pede confirmação danger, que explica que o site em
+ * andamento termina na versão nova e que nenhum outro começa. A recusa do domínio fica no
+ * diálogo; o sucesso vai ao toast, e o cartão passa a "interrompida" pelo snapshot revalidado.
+ */
+export function InterruptRolloutButton({
+  target,
+  action,
+}: {
+  /** Versão de destino da atualização em andamento. */
+  target: string;
+  action: InterruptRollout;
+}) {
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const close = () => {
+    if (!pending) setOpen(false);
+  };
+  const confirm = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await action();
+      if (result.ok) {
+        setOpen(false);
+        pushSuccess(result.message);
+      } else {
+        setError(result.message);
+      }
+    });
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        aria-haspopup="dialog"
+        customColorClass={dangerButtonClass}
+        onClick={() => {
+          setError(null);
+          setOpen(true);
+        }}
+      >
+        Interromper
+      </Button>
+      <ConfirmDialog
+        isOpen={open}
+        type="danger"
+        title={`Interromper a atualização para a ${target}?`}
+        confirmText={pending ? 'Interrompendo…' : 'Interromper'}
+        confirmButtonProps={{ ...dangerConfirmButtonProps, loading: pending }}
+        cancelButtonProps={{ disabled: pending }}
+        onCancel={close}
+        onConfirm={confirm}
+      >
+        <p>
+          O site em andamento termina na versão{' '}
+          <span className="font-semibold tabular-nums">{target}</span> e nenhum outro começa. Os que
+          ainda aguardam continuam na versão em que estão.
+        </p>
+        <ActionAlert error={error} className="mt-4" />
+      </ConfirmDialog>
+    </>
+  );
+}
+
+/**
  * Cartão de progresso da última atualização: versão, estado e "N de M"; cada site na ordem com o
  * seu estado, o primeiro marcado; os pausados numa linha à parte, como não atualizados. O resumo
- * fica num `role="status"`, para o leitor de tela anunciar o avanço que o polling traz.
+ * fica num `role="status"`, para o leitor de tela anunciar o avanço que o polling traz. Em
+ * andamento, o cabeçalho traz "Interromper".
  */
-export function RolloutCard({ rollout }: { rollout: Rollout }) {
+export function RolloutCard({
+  rollout,
+  interrupt,
+}: {
+  rollout: Rollout;
+  interrupt: InterruptRollout;
+}) {
   const { reached, total } = rolloutProgress(rollout);
   const first = firstSiteId(rollout);
   const listed = rollout.sites.filter(isListed);
   const skipped = rollout.sites.filter((site) => !isListed(site));
   return (
     <Card bodyClass="space-y-3">
-      <div role="status" aria-label="Progresso da atualização">
-        <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
-          Atualização para <span className="tabular-nums">{rollout.targetRelease}</span> ·{' '}
-          {ROLLOUT_STATE_LABEL[rollout.state]} ·{' '}
-          <span className="tabular-nums">
-            {reached} de {total}
-          </span>
-        </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div role="status" aria-label="Progresso da atualização">
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">
+            Atualização para <span className="tabular-nums">{rollout.targetRelease}</span> ·{' '}
+            {ROLLOUT_STATE_LABEL[rollout.state]} ·{' '}
+            <span className="tabular-nums">
+              {reached} de {total}
+            </span>
+          </h2>
+        </div>
+        {rollout.state === 'em_andamento' && (
+          <InterruptRolloutButton target={rollout.targetRelease} action={interrupt} />
+        )}
       </div>
       {listed.length > 0 && (
         <ul aria-label="Sites da atualização" className="space-y-2 text-sm">
