@@ -43,9 +43,7 @@ para recriar o site, remova-o do banco (ou `pnpm local:reset`) e rode o seed de 
 Já tinha um `.env.local`? Compare com o `.env.example` e acrescente as variáveis novas
 (backoffice, Access local e o bloco "Ambiente local"); o compose avisa qual falta. Apague ou
 comente `BLOG_PREVIEW_UPSTREAM`: sem ela, `preview.orakel.localhost` vai para a prévia que o
-`build-runner` sobe (apelido `blog-preview`). Pilha subida quando a prévia ainda era serviço do
-compose? O container órfão disputa o apelido: remova-o com
-`infra/local/compose.sh up -d --remove-orphans`. No Linux, o `compose.sh` usa o gid do dono de
+`build-runner` sobe (apelido `blog-preview`). No Linux, o `compose.sh` usa o gid do dono de
 `/var/run/docker.sock` como `DOCKER_SOCKET_GID` (o `0` do `.env.example` é o do Docker
 Desktop); outro valor só pelo shell.
 
@@ -183,7 +181,7 @@ sessão. Num worktree sem `.env.local`, aponte o da raiz (legado):
 | `pnpm local:load [<site>]`                                  | Carga k6 com países variados; confere ClickHouse, tabelas diárias e ausência de IP |
 | `pnpm local:trust`                                          | Instala a CA atual do Caddy no Keychain (macOS)                                    |
 | `pnpm local:seed`                                           | Roda `db:seed` (usuários, exemplos e `infra/local/seeds/`)                         |
-| `pnpm local:down`                                           | Para os containers (mantém os dados)                                               |
+| `pnpm local:down`                                           | Para os containers, prévia do `build-runner` inclusive (mantém os dados)           |
 | `pnpm local:reset`                                          | Para e **apaga os volumes**                                                        |
 | `pnpm local:images`                                         | Constrói as imagens com as tags de produção (SHA do commit)                        |
 | `pnpm local:e2e`                                            | E2E completo com Playwright                                                        |
