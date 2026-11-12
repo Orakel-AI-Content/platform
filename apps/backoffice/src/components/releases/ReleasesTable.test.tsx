@@ -41,20 +41,32 @@ afterEach(() => {
   navigation.set('');
 });
 
+// Releases cadastradas à mão: o estado do pipeline ainda não entra na tabela.
+const manual = {
+  pipelineState: 'disponivel',
+  runId: null,
+  runUrl: null,
+  failureReason: null,
+  requestedBy: null,
+} as const;
+
 const rows: ReleaseRecord[] = [
   {
+    ...manual,
     tag: '1.10.0',
     registeredAt: new Date('2026-11-02T15:00Z'),
     imageStatus: 'disponivel',
     imageCheckedAt: new Date('2026-11-03T13:15Z'),
   },
   {
+    ...manual,
     tag: '1.9.0',
     registeredAt: new Date('2026-10-20T12:30Z'),
     imageStatus: 'ausente',
     imageCheckedAt: new Date('2026-10-21T10:00Z'),
   },
   {
+    ...manual,
     tag: '1.8.0',
     registeredAt: new Date('2026-10-01T12:00Z'),
     imageStatus: null,

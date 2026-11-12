@@ -3,24 +3,36 @@ import { desc, eq, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { releases } from '../../db/schema/index.ts';
-import type { RELEASE_IMAGE_STATUSES } from '../../db/schema/releases.ts';
+import type { RELEASE_IMAGE_STATUSES, RELEASE_PIPELINE_STATES } from '../../db/schema/releases.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
+import { nextVersion, RELEASE_BUMPS, type ReleaseBump } from './next-version.ts';
 import { RELEASE_TAG_MESSAGE, ReleaseTagSchema } from './tag.ts';
 
 // Registro de versões do site-builder (L1): a operação cadastra as tags já publicadas no GHCR, e a
 // ação "Reconstruir na release X" escolhe entre elas. Tabela operacional, fora do snapshot.
 // A imagem é conferida no host (não no GHCR) por um job do build-runner, o único com acesso ao
 // Docker (ADR 0011 da raiz): o registro enfileira a conferência e a operação pode pedir de novo.
+// "Gerar nova versão" (`requestNewRelease`) cria a release antes de ela existir no GHCR, em
+// `gerando`, com o número calculado pela tabela (`nextVersion`), e enfileira o run do release.yml.
 // Editar e remover estão fora do escopo atual.
 
 export type ReleaseImageStatus = (typeof RELEASE_IMAGE_STATUSES)[number];
+export type ReleasePipelineState = (typeof RELEASE_PIPELINE_STATES)[number];
 
-/** `imageStatus` e `imageCheckedAt` nulos: a imagem ainda não foi conferida. */
+/**
+ * `imageStatus` e `imageCheckedAt` nulos: a imagem ainda não foi conferida. `runId` e `runUrl`
+ * nulos até o build-runner disparar o run; `requestedBy` nulo nas releases cadastradas à mão.
+ */
 export type ReleaseRecord = {
   tag: string;
   registeredAt: Date;
   imageStatus: ReleaseImageStatus | null;
   imageCheckedAt: Date | null;
+  pipelineState: ReleasePipelineState;
+  runId: string | null;
+  runUrl: string | null;
+  failureReason: string | null;
+  requestedBy: string | null;
 };
 
 const RECORD_COLUMNS = {
@@ -28,10 +40,21 @@ const RECORD_COLUMNS = {
   registeredAt: releases.registeredAt,
   imageStatus: releases.imageStatus,
   imageCheckedAt: releases.imageCheckedAt,
+  pipelineState: releases.pipelineState,
+  runId: releases.runId,
+  runUrl: releases.runUrl,
+  failureReason: releases.failureReason,
+  requestedBy: releases.requestedBy,
 };
 
 /** Conferência da imagem site-builder:X.Y.Z no host; só o build-runner registra esta task. */
 export const CHECK_RELEASE_IMAGE_TASK = 'check-release-image';
+
+/**
+ * Disparo e acompanhamento do run do release.yml para a release em `gerando`; só o
+ * build-runner registra esta task (o único com a credencial do GitHub).
+ */
+export const RELEASE_RUN_TASK = 'release-run';
 
 /**
  * Enfileira a conferência da imagem da release, na transação de quem pede. `job_key` por tag
@@ -82,6 +105,74 @@ export async function registerRelease(
     };
   }
   await scheduleImageCheck(tx, inserted.tag);
+  return { ok: true, value: inserted };
+}
+
+/**
+ * Enfileira o run do release.yml da release, na transação de quem pede. `job_key` por tag com
+ * `replace`: pedidos repetidos antes de o job rodar viram um só.
+ */
+async function scheduleReleaseRun(tx: Executor, tag: string): Promise<void> {
+  await tx.execute(sql`
+    select graphile_worker.add_job(
+      identifier => ${RELEASE_RUN_TASK},
+      payload => ${JSON.stringify({ tag })}::json,
+      max_attempts => 5,
+      job_key => ${`release-run:${tag}`},
+      job_key_mode => 'replace'
+    )`);
+}
+
+/**
+ * "Gerar nova versão": calcula o número a partir de todas as tags registradas (descartadas
+ * inclusive), grava a release em `gerando` com o solicitante e enfileira o run, tudo na
+ * transação de quem pede. Dois pedidos simultâneos calculam o mesmo número; a chave primária
+ * faz o segundo esperar o primeiro e ser recusado com `release.version_taken`.
+ */
+export async function requestNewRelease(
+  tx: Executor,
+  actor: Actor,
+  bump: ReleaseBump,
+): Promise<Result<ReleaseRecord>> {
+  const allowed = requireRole(actor, 'release.promote');
+  if (!allowed.ok) return allowed;
+
+  if (!RELEASE_BUMPS.includes(bump)) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'release.invalid_bump',
+          message: 'Escolha correção, melhoria ou mudança grande',
+          path: ['bump'],
+        },
+      ],
+    };
+  }
+
+  const registered = await tx.select({ tag: releases.tag }).from(releases);
+  const tag = nextVersion(
+    registered.map((r) => r.tag),
+    bump,
+  );
+  const [inserted] = await tx
+    .insert(releases)
+    .values({ tag, pipelineState: 'gerando', requestedBy: actor.email })
+    .onConflictDoNothing()
+    .returning(RECORD_COLUMNS);
+  if (inserted === undefined) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'release.version_taken',
+          message: `A versão ${tag} acabou de ser pedida por outra pessoa; peça de novo`,
+          path: ['bump'],
+        },
+      ],
+    };
+  }
+  await scheduleReleaseRun(tx, inserted.tag);
   return { ok: true, value: inserted };
 }
 
