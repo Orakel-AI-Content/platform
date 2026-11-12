@@ -67,6 +67,8 @@ const INSTANCE: SiteInstance = {
     },
   ],
   activeFiles: 412,
+  activePages: 120,
+  activeSince: { at: new Date('2026-10-20T12:00:00.000Z'), by: 'ana@orakel.local' },
   pendingByOrigin: [
     { origin: 'content', count: 3 },
     { origin: 'redirect', count: 1 },

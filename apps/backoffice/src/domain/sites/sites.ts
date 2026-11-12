@@ -17,8 +17,10 @@ import { pendingChanges, redirects, siteConfigs, sites } from '../../db/schema/i
 import { requireRole, type Actor } from '../access/rbac.ts';
 import {
   activeBuild,
+  activeSince,
   lastBuilds,
   recentBuilds,
+  type ActiveSince,
   type LastBuild,
   type RecentBuild,
 } from '../builds/builds.ts';
@@ -375,6 +377,10 @@ export type SiteInstance = {
   recentBuilds: RecentBuild[];
   /** Arquivos do build da versão ativa; nulo sem versão no ar ou sem o build dela. */
   activeFiles: number | null;
+  /** Páginas do build da versão ativa; nulo como `activeFiles`. */
+  activePages: number | null;
+  /** Quando a versão ativa entrou no ar e quem pediu (#647); nulo sem versão no ar. */
+  activeSince: ActiveSince | null;
   /** Mudanças pendentes por origem. */
   pendingByOrigin: PendingOriginCount[];
 };
@@ -397,11 +403,14 @@ export async function readSiteInstance(
     };
   }
   const active = await activeBuild(db, siteId, site.activeVersionId);
+  const since = await activeSince(db, siteId, site.activeVersionId);
   return {
     ok: true,
     value: {
       recentBuilds: await recentBuilds(db, siteId),
       activeFiles: active?.files ?? null,
+      activePages: active?.pages ?? null,
+      activeSince: since ?? null,
       pendingByOrigin: pendingByOrigin.value,
     },
   };
