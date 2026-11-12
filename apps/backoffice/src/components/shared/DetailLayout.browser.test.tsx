@@ -9,7 +9,7 @@ import { SiteTabs } from '@/components/sites/SiteTabs';
 import Card from '@/components/ui/Card';
 import type { SiteActivity, SiteHistoryItem } from '@/domain/builds/builds.ts';
 import { REVIEW_CHECKLIST } from '@/domain/reviews/reviews.ts';
-import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
+import type { SiteInfraCheck, SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
 import { audit, COLOR_SCHEMES, setReducedMotion, setTheme } from '../../../test/browser/a11y.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
@@ -123,6 +123,14 @@ const SLUG = `/detalhe${'x'.repeat(90)}1761000000000`;
 /** Título longo de versão (#588): vai cortado sob a versão, sem empurrar a tabela para fora. */
 const LONG_TITLE = `Como montar uma horta vertical em apartamento pequeno ${'com pouca luz '.repeat(6)}`;
 
+/** A última conferência da infra (workspace#85), sem nenhuma na fila. */
+const INFRA_CHECK: SiteInfraCheck = {
+  lifecycle: 'infra_aplicada',
+  checkedAt: new Date(),
+  error: null,
+  queued: false,
+};
+
 /** A tela do site: o resumo à esquerda das abas. */
 function SiteDetail() {
   return (
@@ -136,10 +144,12 @@ function SiteDetail() {
               instance={INSTANCE}
               activity={ACTIVITY}
               status={() => Promise.resolve(ACTIVITY)}
+              infraCheck={{ check: INFRA_CHECK, now: new Date() }}
+              infraCheckStatus={() => Promise.resolve(INFRA_CHECK)}
               lifecycleAction={
                 <LifecycleAction
                   lifecycle="infra_aplicada"
-                  action={() => Promise.resolve({ ok: true, message: '' })}
+                  check={() => Promise.resolve({ ok: true, message: '' })}
                   undo={() => Promise.resolve({ ok: true, message: '' })}
                 />
               }

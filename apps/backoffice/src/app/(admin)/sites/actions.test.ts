@@ -2,8 +2,8 @@ import type { SiteConfig } from '@orakel/content-model/v1';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  advanceLifecycleAction,
   cancelBuildAction,
+  checkSiteInfraAction,
   createSiteAction,
   pauseSiteAction,
   rebuildOnReleaseAction,
@@ -15,6 +15,7 @@ import {
   setBuildWindowAction,
   setDailyPublishLimitAction,
   siteActivityAction,
+  siteInfraCheckAction,
   undoLastPublishAction,
   updateSiteConfigAction,
 } from './actions.ts';
@@ -27,7 +28,8 @@ const mocks = vi.hoisted(() => ({
   createSite: vi.fn(),
   updateSiteConfig: vi.fn(),
   revalidatePath: vi.fn(),
-  advanceLifecycle: vi.fn(),
+  requestSiteInfraCheck: vi.fn(),
+  readSiteInfraCheck: vi.fn(),
   retreatLifecycle: vi.fn(),
   resumeSite: vi.fn(),
   pauseSiteManually: vi.fn(),
@@ -55,7 +57,6 @@ vi.mock('@/domain/builds/builds.ts', () => ({
   siteActivity: mocks.siteActivity,
 }));
 vi.mock('@/domain/builds/site-state.ts', () => ({
-  advanceLifecycle: mocks.advanceLifecycle,
   retreatLifecycle: mocks.retreatLifecycle,
   resumeSite: mocks.resumeSite,
   pauseSiteManually: mocks.pauseSiteManually,
@@ -70,6 +71,8 @@ vi.mock('@/domain/sites/policy-triggers.ts', () => ({
 vi.mock('@/domain/sites/sites.ts', () => ({
   createSite: mocks.createSite,
   updateSiteConfig: mocks.updateSiteConfig,
+  requestSiteInfraCheck: mocks.requestSiteInfraCheck,
+  readSiteInfraCheck: mocks.readSiteInfraCheck,
 }));
 
 const operacao = { email: 'operacao@orakel.local', roles: ['operacao'] };
@@ -139,7 +142,7 @@ describe('Server Actions da página do site', () => {
   it('sem sessão, recusa sem chamar o domínio', async () => {
     mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
 
-    expect(await advanceLifecycleAction('exemplo-a', 'infra_aplicada')).toEqual({
+    expect(await checkSiteInfraAction('exemplo-a')).toEqual({
       ok: false,
       message: 'Sessão inválida; entre de novo.',
     });
@@ -148,7 +151,7 @@ describe('Server Actions da página do site', () => {
       ok: false,
     });
     expect(await retreatLifecycleAction('exemplo-a', 'zona_ativa')).toMatchObject({ ok: false });
-    expect(mocks.advanceLifecycle).not.toHaveBeenCalled();
+    expect(mocks.requestSiteInfraCheck).not.toHaveBeenCalled();
     expect(mocks.retreatLifecycle).not.toHaveBeenCalled();
     expect(mocks.registerPolicyTrigger).not.toHaveBeenCalled();
     expect(mocks.setBuildWindow).not.toHaveBeenCalled();
@@ -159,23 +162,14 @@ describe('Server Actions da página do site', () => {
   });
 
   it('a recusa do domínio vira a mensagem, sem revalidar', async () => {
-    mocks.advanceLifecycle.mockResolvedValue({
+    const step =
+      'A infra só é conferida com o site em cadastrado ou infra_aplicada; o site está em zona_ativa';
+    mocks.requestSiteInfraCheck.mockResolvedValue({
       ok: false,
-      issues: [
-        {
-          code: 'site.lifecycle_order',
-          message:
-            'zona_ativa só pode ser marcada a partir de infra_aplicada; o site está em cadastrado',
-          path: ['lifecycle'],
-        },
-      ],
+      issues: [{ code: 'site.infra_check_step', message: step, path: ['lifecycle'] }],
     });
 
-    expect(await advanceLifecycleAction('exemplo-a', 'zona_ativa')).toEqual({
-      ok: false,
-      message:
-        'zona_ativa só pode ser marcada a partir de infra_aplicada; o site está em cadastrado',
-    });
+    expect(await checkSiteInfraAction('exemplo-a')).toEqual({ ok: false, message: step });
 
     const undo =
       'zona_ativa só pode ser desmarcada com o site em zona_ativa; o site está em publicado';
@@ -191,21 +185,16 @@ describe('Server Actions da página do site', () => {
   });
 
   it('delegam ao domínio com o ator e revalidam a lista e a página', async () => {
-    mocks.advanceLifecycle.mockResolvedValue(done);
+    mocks.requestSiteInfraCheck.mockResolvedValue(done);
     mocks.registerPolicyTrigger.mockResolvedValue(done);
     mocks.setBuildWindow.mockResolvedValue(done);
     mocks.setDailyPublishLimit.mockResolvedValue(done);
 
-    expect(await advanceLifecycleAction('exemplo-a', 'infra_aplicada')).toEqual({
+    expect(await checkSiteInfraAction('exemplo-a')).toEqual({
       ok: true,
-      message: 'Infra aplicada marcada.',
+      message: 'Conferência da infra enfileirada.',
     });
-    expect(mocks.advanceLifecycle).toHaveBeenCalledWith(
-      {},
-      operacao,
-      'exemplo-a',
-      'infra_aplicada',
-    );
+    expect(mocks.requestSiteInfraCheck).toHaveBeenCalledWith({}, operacao, 'exemplo-a');
 
     mocks.retreatLifecycle.mockResolvedValue(done);
     expect(await retreatLifecycleAction('exemplo-a', 'zona_ativa')).toEqual({
@@ -597,5 +586,34 @@ describe('siteActivityAction (#635)', () => {
 
     mocks.siteActivity.mockResolvedValue({ ok: false, issues: [{ code: 'forbidden' }] });
     expect(await siteActivityAction('exemplo-a')).toBeNull();
+  });
+});
+
+describe('siteInfraCheckAction (#716)', () => {
+  const check = {
+    lifecycle: 'cadastrado',
+    checkedAt: new Date('2026-11-12T12:00:00Z'),
+    error: null,
+    queued: true,
+  };
+
+  it('só delega ao domínio com quem está na sessão e devolve a conferência, sem revalidar', async () => {
+    mocks.readSiteInfraCheck.mockResolvedValue({ ok: true, value: check });
+
+    const result = await siteInfraCheckAction('exemplo-a');
+
+    expect(result).toEqual(check);
+    expect(structuredClone(result)).toEqual(check);
+    expect(mocks.readSiteInfraCheck).toHaveBeenCalledWith(expect.anything(), operacao, 'exemplo-a');
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('sem sessão devolve null sem chamar o domínio; recusa do domínio também vira null', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await siteInfraCheckAction('exemplo-a')).toBeNull();
+    expect(mocks.readSiteInfraCheck).not.toHaveBeenCalled();
+
+    mocks.readSiteInfraCheck.mockResolvedValue({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await siteInfraCheckAction('exemplo-a')).toBeNull();
   });
 });

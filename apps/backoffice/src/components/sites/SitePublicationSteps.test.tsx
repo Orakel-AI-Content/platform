@@ -219,11 +219,11 @@ describe('painel de etapas', () => {
         site={{ ...SITE, lifecycle: 'cadastrado', release: null, activeVersionId: null }}
         instance={{ activePages: null, activeSince: null }}
         activity={activity(null)}
-        lifecycleAction={<button type="button">Marcar infra aplicada</button>}
+        lifecycleAction={<button type="button">Conferir agora</button>}
       />,
     );
 
-    expect(description(0)).toBe('Infra e zona pendentesMarcar infra aplicada');
+    expect(description(0)).toBe('Infra e zona pendentesConferir agora');
     expect(items()[0]?.contains(screen.getByRole('button'))).toBe(true);
     expect(items()[0]?.getAttribute('aria-current')).toBe('step');
     expect(description(1)).toBe('Nenhuma versão');

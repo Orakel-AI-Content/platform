@@ -22,8 +22,10 @@ import {
   PUBLICATION_STEP_LABEL,
   SITE_STATE_LABEL,
   SITE_STATE_VARIANT,
+  agoText,
   formatDateTime,
   formatDuration,
+  infraCheckText,
   liveResultText,
   liveStatusText,
   liveVersionText,
@@ -231,5 +233,59 @@ describe('painel de etapas da aba Publicação (#647)', () => {
       'v41 · 1 página · no ar desde 01/10/2026, 12:00 UTC',
     );
     expect(liveVersionText('v41', null, null, 'UTC')).toBe('v41');
+  });
+});
+
+describe('conferência da infra na etapa Infra e zona (#716)', () => {
+  const now = new Date('2026-11-12T12:00:00Z');
+  const minutesAgo = (n: number) => new Date(now.getTime() - n * 60_000);
+
+  it('quanto tempo passou, em minutos, horas e dias', () => {
+    expect(agoText(now, now)).toBe('há menos de 1 minuto');
+    expect(agoText(new Date(now.getTime() + 5000), now)).toBe('há menos de 1 minuto');
+    expect(agoText(minutesAgo(1), now)).toBe('há 1 minuto');
+    expect(agoText(minutesAgo(59), now)).toBe('há 59 minutos');
+    expect(agoText(minutesAgo(60), now)).toBe('há 1 hora');
+    expect(agoText(minutesAgo(5 * 60), now)).toBe('há 5 horas');
+    expect(agoText(minutesAgo(24 * 60), now)).toBe('há 1 dia');
+    expect(agoText(minutesAgo(3 * 24 * 60), now)).toBe('há 3 dias');
+  });
+
+  const base = { checkedAt: minutesAgo(5), error: null, queued: false };
+
+  it('na fila, "Conferindo…", mesmo com conferência anterior', () => {
+    expect(infraCheckText({ ...base, lifecycle: 'cadastrado', queued: true }, now)).toBe(
+      'Conferindo…',
+    );
+  });
+
+  it('nunca conferido: "Ainda não conferido" só onde a conferência ainda avança', () => {
+    const never = { ...base, checkedAt: null };
+    expect(infraCheckText({ ...never, lifecycle: 'cadastrado' }, now)).toBe('Ainda não conferido');
+    expect(infraCheckText({ ...never, lifecycle: 'infra_aplicada' }, now)).toBe(
+      'Ainda não conferido',
+    );
+    expect(infraCheckText({ ...never, lifecycle: 'zona_ativa' }, now)).toBeNull();
+    expect(infraCheckText({ ...never, lifecycle: 'publicado' }, now)).toBeNull();
+  });
+
+  it('o que foi detectado, com o motivo de não ter avançado e quando', () => {
+    expect(infraCheckText({ ...base, lifecycle: 'cadastrado' }, now)).toBe(
+      'Zona não encontrada no provedor (conferido há 5 minutos)',
+    );
+    expect(infraCheckText({ ...base, lifecycle: 'infra_aplicada' }, now)).toBe(
+      'Infra detectada sozinha, zona ainda pendente no provedor (conferido há 5 minutos)',
+    );
+    expect(infraCheckText({ ...base, lifecycle: 'zona_ativa' }, now)).toBe(
+      'Detectado sozinho (conferido há 5 minutos)',
+    );
+  });
+
+  it('falha do provedor com a mensagem, sem texto de etapa pendente', () => {
+    expect(
+      infraCheckText({ ...base, lifecycle: 'cadastrado', error: 'Cloudflare respondeu 503' }, now),
+    ).toBe(
+      'Não foi possível consultar o provedor (conferido há 5 minutos): Cloudflare respondeu 503',
+    );
   });
 });

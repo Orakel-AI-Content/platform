@@ -9,7 +9,7 @@ import type {
 import type { BuildStage } from '@/domain/builds/run-build.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { PendingOrigin } from '@/domain/pending-changes/record.ts';
-import type { SiteSummary } from '@/domain/sites/sites.ts';
+import type { SiteInfraCheck, SiteSummary } from '@/domain/sites/sites.ts';
 
 /** Etapas do ciclo de vida como a operação as lê (lista de sites e página do site). */
 export const LIFECYCLE_LABEL: Record<SiteSummary['lifecycle'], string> = {
@@ -228,6 +228,39 @@ export const INFRA_STEP_TEXT: Record<SiteSummary['lifecycle'], string> = {
   zona_ativa: 'Infra aplicada e zona ativa',
   publicado: 'Infra aplicada e zona ativa',
 };
+
+/** Quanto tempo passou desde `since`, em pt-BR ("há 5 minutos"); o futuro conta como agora. */
+export function agoText(since: Date, now: Date): string {
+  const minutes = Math.floor((now.getTime() - since.getTime()) / 60_000);
+  if (minutes < 1) return 'há menos de 1 minuto';
+  if (minutes < 60) return `há ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+  const days = Math.floor(hours / 24);
+  return `há ${days} ${days === 1 ? 'dia' : 'dias'}`;
+}
+
+/**
+ * Situação da conferência automática na etapa "Infra e zona" (workspace#85), abaixo do
+ * `INFRA_STEP_TEXT`: "Conferindo…" com conferência na fila; a falha do provedor com a mensagem
+ * (não é etapa pendente); o que a última conferência detectou, com o motivo de não ter avançado;
+ * "Ainda não conferido" numa etapa que a conferência ainda avança. Etapa já concluída sem
+ * conferência gravada (marcada antes da conferência automática) não tem o que dizer: `null`.
+ */
+export function infraCheckText(check: SiteInfraCheck, now: Date): string | null {
+  if (check.queued) return 'Conferindo…';
+  const pending = check.lifecycle === 'cadastrado' || check.lifecycle === 'infra_aplicada';
+  if (check.checkedAt === null) return pending ? 'Ainda não conferido' : null;
+  const ago = `conferido ${agoText(check.checkedAt, now)}`;
+  if (check.error !== null) {
+    return `Não foi possível consultar o provedor (${ago}): ${check.error}`;
+  }
+  if (check.lifecycle === 'cadastrado') return `Zona não encontrada no provedor (${ago})`;
+  if (check.lifecycle === 'infra_aplicada') {
+    return `Infra detectada sozinha, zona ainda pendente no provedor (${ago})`;
+  }
+  return `Detectado sozinho (${ago})`;
+}
 
 /**
  * Texto da etapa "No ar" (#647): a versão, as páginas e quando entrou no ar, no fuso do site, e

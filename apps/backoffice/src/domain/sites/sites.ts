@@ -10,7 +10,7 @@ import {
 import type { Result } from '@orakel/content-model';
 import { redirectUsage, type RedirectUsage } from '@orakel/core/v1';
 import { isThemeId } from '@orakel/tokens';
-import { and, count, desc, eq, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { pendingChanges, redirects, siteConfigs, sites } from '../../db/schema/index.ts';
@@ -25,6 +25,7 @@ import {
   type RecentBuild,
 } from '../builds/builds.ts';
 import { effectiveBuildWindowMs } from '../builds/schedule.ts';
+import { isInfraCheckStep, scheduleSiteInfraCheck, siteInfraJobKey } from '../builds/site-state.ts';
 import { toRedirect } from '../export/mappers.ts';
 import { countPendingChangesByOrigin, type PendingOriginCount } from '../pending-changes/list.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
@@ -420,6 +421,92 @@ export async function readSiteInstance(
       pendingByOrigin: pendingByOrigin.value,
     },
   };
+}
+
+/**
+ * Conferência da infra de um site (workspace#85), para a etapa "Infra e zona" da página do
+ * site: a etapa do ciclo de vida, a última conferência gravada pelo job e se há outra na fila.
+ * O motivo de não ter avançado sai da etapa: conferido sem erro em `cadastrado`, a zona não
+ * existe; em `infra_aplicada`, ainda está pendente.
+ */
+export type SiteInfraCheck = {
+  lifecycle: SiteSummary['lifecycle'];
+  /** Quando a última conferência terminou; nulo se nunca houve. */
+  checkedAt: Date | null;
+  /** Mensagem da última conferência quando o provedor não respondeu; nula no sucesso. */
+  error: string | null;
+  /** Há conferência do site na fila ou rodando. */
+  queued: boolean;
+};
+
+function siteNotFound(siteId: string): Result<never> {
+  return {
+    ok: false,
+    issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+  };
+}
+
+/**
+ * Lê a conferência da infra do site (`site.read`). Conta como na fila o job da chave do site
+ * que ainda vai rodar ou está rodando; o que falhou de vez (uma tentativa só) fica na tabela
+ * do Graphile e não conta, senão a tela consultaria para sempre.
+ */
+export async function readSiteInfraCheck(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<SiteInfraCheck>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+  const [site] = await db
+    .select({
+      lifecycle: sites.lifecycle,
+      checkedAt: sites.infraCheckedAt,
+      error: sites.infraCheckError,
+    })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) return siteNotFound(siteId);
+  const { rows } = await db.execute<{ queued: boolean }>(sql`
+    select exists (
+      select 1 from graphile_worker._private_jobs
+      where key = ${siteInfraJobKey(siteId)}
+        and (locked_at is not null or attempts < max_attempts)
+    ) as queued`);
+  return { ok: true, value: { ...site, queued: rows[0]?.queued === true } };
+}
+
+/**
+ * "Conferir agora" (workspace#85): enfileira a conferência só deste site, no job do cron
+ * (`scheduleSiteInfraCheck`, um job por site). Só com `site.configure` e com o site numa
+ * etapa que a conferência ainda avança (`cadastrado` ou `infra_aplicada`).
+ */
+export async function requestSiteInfraCheck(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+  const [site] = await tx
+    .select({ lifecycle: sites.lifecycle })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) return siteNotFound(siteId);
+  if (!isInfraCheckStep(site.lifecycle)) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'site.infra_check_step',
+          message: `A infra só é conferida com o site em cadastrado ou infra_aplicada; o site está em ${site.lifecycle}`,
+          path: ['lifecycle'],
+        },
+      ],
+    };
+  }
+  await scheduleSiteInfraCheck(tx, siteId);
+  return { ok: true, value: undefined };
 }
 
 /** Nome do arquivo de sites da raiz do OpenTofu (ADR 0011). */

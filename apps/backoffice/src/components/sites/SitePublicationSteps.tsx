@@ -17,7 +17,7 @@ import { Tag } from '@/components/ui/Tag';
 import type { ExecutionHistoryItem, SiteActivity } from '@/domain/builds/builds.ts';
 import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
-import { LifecycleSteps } from './LifecycleSteps.tsx';
+import { infraCheckFailed, LifecycleSteps, type InfraCheckView } from './LifecycleSteps.tsx';
 
 export type PublicationSite = Pick<
   SiteSummary,
@@ -89,13 +89,19 @@ function steps(
   instance: PublicationInstance,
   activity: SiteActivity,
   lifecycleAction: ReactNode,
+  infraCheck: InfraCheckView | undefined,
 ): Record<PublicationStep, Step> {
   const last = lastBuild(activity);
-  const infraDone = site.lifecycle === 'zona_ativa' || site.lifecycle === 'publicado';
+  const lifecycle = infraCheck?.check.lifecycle ?? site.lifecycle;
+  const infraDone = lifecycle === 'zona_ativa' || lifecycle === 'publicado';
   return {
     infra: {
-      status: infraDone ? 'complete' : 'in-progress',
-      text: <LifecycleSteps current={site.lifecycle} action={lifecycleAction} />,
+      status: infraDone
+        ? 'complete'
+        : infraCheck !== undefined && infraCheckFailed(infraCheck.check)
+          ? 'error'
+          : 'in-progress',
+      text: <LifecycleSteps current={lifecycle} check={infraCheck} action={lifecycleAction} />,
     },
     versao: {
       status: site.release === null ? 'pending' : 'complete',
@@ -156,8 +162,11 @@ function currentIndex(byStep: Record<PublicationStep, Step>, open: boolean): num
  * genérico ("concluída", "atual", "pendente", "com erro") em `sr-only`, sem repetir o texto.
  * A etapa Build segue a atividade que a aba relê durante uma execução (`SiteLiveActivity`):
  * "na fila" com o horário previsto, em andamento com a etapa ou o resultado do último build.
+ * A etapa Infra e zona segue a conferência automática (`infraCheck`, relida pelo polling da aba
+ * enquanto há conferência na fila): a etapa relida, a situação da conferência e, com a última em
+ * falha, o estado "com erro" no lugar de pendente (workspace#85).
  * As ações de operação (#648) vêm prontas em `actions`, uma por etapa, abaixo do estado, como o
- * "Marcar…" de Infra e zona; o painel só as posiciona. Com publicação na fila, a Build mostra
+ * "Conferir agora" de Infra e zona; o painel só as posiciona. Com publicação na fila, a Build mostra
  * `cancel` ao lado da sua; em andamento, no lugar dela (#649).
  */
 export function SitePublicationSteps({
@@ -165,15 +174,17 @@ export function SitePublicationSteps({
   instance,
   activity,
   lifecycleAction,
+  infraCheck,
   actions = {},
 }: {
   site: PublicationSite;
   instance: PublicationInstance;
   activity: SiteActivity;
   lifecycleAction?: ReactNode;
+  infraCheck?: InfraCheckView;
   actions?: PublicationStepActions;
 }) {
-  const byStep = steps(site, instance, activity, lifecycleAction);
+  const byStep = steps(site, instance, activity, lifecycleAction, infraCheck);
   return (
     <Steps
       vertical
