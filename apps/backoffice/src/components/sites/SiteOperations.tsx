@@ -8,6 +8,7 @@ import { dangerButtonClass } from '@/components/shared/ConfirmDialog.tsx';
 import { Button } from '@/components/ui/Button';
 import type { RollbackVersion } from '@/domain/builds/builds.ts';
 
+import { PAUSE_SITE_LABEL, PauseSiteDialog } from './PauseSiteDialog.tsx';
 import {
   RebuildReleaseDialog,
   type RebuildOnRelease,
@@ -25,13 +26,17 @@ import {
 
 // Ações de operação da página do site nas etapas da aba "Publicação" (#648; antes no cabeçalho,
 // #595): "Reconstruir na release" (#515) na Versão, "Publicar agora" na Build, "Escolher outra
-// versão" (o "Reverter" de #514) na No ar e, com o site pausado, "Retomar" na linha Site. O
+// versão" (o "Reverter" de #514) na No ar e, na linha Site, "Pausar" com motivo (#650) com o
+// site ativo ou "Retomar" com ele pausado. O
 // `SiteOperationsScope` guarda o estado comum e monta cada diálogo de confirmação uma vez; cada
 // etapa recebe só o seu `SiteOperationButton`. O sucesso vai ao toast e a recusa de qualquer
 // uma ao `SiteOperationsAlert`, logo abaixo do painel. A página só monta o escopo com
 // operations.run.
 
-export type SiteOperation = 'publish' | 'resume' | 'rebuild' | 'rollback';
+export type SiteOperation = 'publish' | 'pause' | 'resume' | 'rebuild' | 'rollback';
+
+/** "Pausar" com o motivo informado, já ligado ao site. */
+export type PauseSite = (reason: string) => Promise<ActionResult>;
 
 export type SiteOperationsProps = {
   siteId: string;
@@ -40,6 +45,7 @@ export type SiteOperationsProps = {
   release: string | null;
   timeZone: string;
   publish?: PublishNow;
+  pause?: PauseSite;
   resume?: ResumeSite;
   /** Releases registradas (com o estado da imagem) e a action de reconstruir, já ligada ao site. */
   rebuild?: { releases: readonly RebuildRelease[]; action: RebuildOnRelease };
@@ -59,16 +65,19 @@ const SiteOperationsContext = createContext<Scope | null>(null);
 /** Texto do botão de cada operação e de quando ela está na fila. */
 const LABEL: Record<SiteOperation, { idle: string; pending: string }> = {
   publish: PUBLISH_NOW_LABEL,
+  pause: PAUSE_SITE_LABEL,
   resume: RESUME_SITE_LABEL,
   rebuild: { idle: 'Reconstruir na release', pending: 'Reconstruindo…' },
   rollback: { idle: 'Escolher outra versão', pending: 'Revertendo…' },
 };
 
-/** Se a operação vale para o site agora: publicar fora da pausa, retomar só pausado. */
+/** Se a operação vale para o site agora: publicar e pausar fora da pausa, retomar só pausado. */
 function available(operations: SiteOperationsProps, operation: SiteOperation): boolean {
   switch (operation) {
     case 'publish':
       return !operations.paused && operations.publish !== undefined;
+    case 'pause':
+      return !operations.paused && operations.pause !== undefined;
     case 'resume':
       return operations.paused && operations.resume !== undefined;
     case 'rebuild':
@@ -79,7 +88,7 @@ function available(operations: SiteOperationsProps, operation: SiteOperation): b
 }
 
 /**
- * As ações de operação do site: `publish`, `resume`, `rebuild` e `rollback` só vêm de quem tem
+ * As ações de operação do site: `publish`, `pause`, `resume`, `rebuild` e `rollback` só vêm de quem tem
  * operations.run. Uma ação de cada vez: enquanto uma está na fila, todos os botões ficam
  * `aria-disabled` (não `disabled`: o diálogo fecha antes da resposta, e o foco volta ao botão
  * que o abriu).
@@ -93,7 +102,8 @@ export function SiteOperationsScope({
   const [running, setRunning] = useState<SiteOperation | null>(null);
   const [, startTransition] = useTransition();
   const returnFocus = useRef<HTMLElement | null>(null);
-  const { siteId, paused, release, timeZone, publish, resume, rebuild, rollback } = operations;
+  const { siteId, paused, release, timeZone, publish, pause, resume, rebuild, rollback } =
+    operations;
 
   const openFrom = (operation: SiteOperation, trigger: HTMLElement) => {
     if (running !== null) return;
@@ -124,6 +134,15 @@ export function SiteOperationsScope({
           isOpen={open === 'publish'}
           onCancel={close}
           onConfirm={() => execute('publish', () => publish(siteId))}
+          onAfterClose={afterClose}
+        />
+      )}
+      {pause && (
+        <PauseSiteDialog
+          siteId={siteId}
+          isOpen={open === 'pause'}
+          onCancel={close}
+          onConfirm={(reason) => execute('pause', () => pause(reason))}
           onAfterClose={afterClose}
         />
       )}
@@ -164,7 +183,7 @@ export function SiteOperationsScope({
 /**
  * O botão de uma operação, na etapa dela: abre a confirmação do escopo e recebe o foco de volta
  * ao fechar. Não renderiza nada quando a operação não vale para o site agora (sem a action, ou
- * "Publicar agora" com o site pausado e "Retomar" fora da pausa).
+ * "Publicar agora" e "Pausar" com o site pausado, "Retomar" fora da pausa).
  */
 export function SiteOperationButton({ operation }: { operation: SiteOperation }) {
   const scope = use(SiteOperationsContext);
