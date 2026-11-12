@@ -1433,6 +1433,29 @@ describe('reconstruir na release', () => {
     expect(await events()).toEqual([]);
   });
 
+  it.each(['gerando', 'baixando', 'falhou', 'descartada'] as const)(
+    'recusa release em %s com release.not_available, sem gravar nem enfileirar',
+    async (pipelineState) => {
+      await pause();
+      await db.insert(releases).values({ tag: '1.4.0', pipelineState });
+      expect(
+        await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', '1.4.0')),
+      ).toMatchObject({
+        ok: false,
+        issues: [
+          {
+            code: 'release.not_available',
+            message: expect.stringContaining(pipelineState) as unknown,
+            path: ['release'],
+          },
+        ],
+      });
+      expect(await site()).toMatchObject({ release: null, state: 'pausado' });
+      expect(await buildJobs()).toEqual([]);
+      expect(await events()).toEqual([]);
+    },
+  );
+
   it('recusa site inexistente, sem enfileirar', async () => {
     expect(
       await db.transaction((tx) => rebuildOnRelease(tx, operacao, 'nao-existe', '1.2.0')),

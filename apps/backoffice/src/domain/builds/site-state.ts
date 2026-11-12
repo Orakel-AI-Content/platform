@@ -197,7 +197,8 @@ export async function resumeSite(
 }
 
 /**
- * "Reconstruir na release X" (L4): só release registrada (`releases`). Grava `sites.release`
+ * "Reconstruir na release X" (L4): só release registrada (`releases`) e `disponivel` — a tela
+ * filtra a lista, e o domínio é a proteção final contra release em outro estado. Grava `sites.release`
  * (a tag da imagem `site-builder` dos próximos builds), retoma o site se pausado (como
  * "Retomar") e enfileira o build já. Site ativo também é reconstruído: trocar de release não
  * depende de pausa.
@@ -212,7 +213,7 @@ export async function rebuildOnRelease(
   if (!allowed.ok) return allowed;
 
   const [registered] = await tx
-    .select({ tag: releases.tag })
+    .select({ tag: releases.tag, pipelineState: releases.pipelineState })
     .from(releases)
     .where(eq(releases.tag, tag));
   if (registered === undefined) {
@@ -222,6 +223,18 @@ export async function rebuildOnRelease(
         {
           code: 'release.not_registered',
           message: `A release ${tag} não está registrada`,
+          path: ['release'],
+        },
+      ],
+    };
+  }
+  if (registered.pipelineState !== 'disponivel') {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'release.not_available',
+          message: `A release ${tag} não está disponível (${registered.pipelineState})`,
           path: ['release'],
         },
       ],

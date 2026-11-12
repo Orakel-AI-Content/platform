@@ -8,17 +8,20 @@ export type ReleaseBump = (typeof RELEASE_BUMPS)[number];
 /** Primeira versão, quando nenhuma release foi registrada. */
 export const FIRST_VERSION = '0.1.0';
 
-type Version = readonly [major: number, minor: number, patch: number];
+/** Versão X.Y.Z já decomposta em números. */
+export type Version = readonly [major: number, minor: number, patch: number];
 
 const VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
 
-function parse(tag: string): Version | undefined {
+/** Decompõe uma tag X.Y.Z; fora do formato (ex.: `core-v1.0.0`, `1.2`), devolve `undefined`. */
+export function parse(tag: string): Version | undefined {
   const match = VERSION.exec(tag);
   if (match === null) return undefined;
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
-function compare(a: Version, b: Version): number {
+/** Ordem numérica (1.10.0 > 1.9.0): negativo se `a` < `b`, zero se iguais, positivo se `a` > `b`. */
+export function compare(a: Version, b: Version): number {
   return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 }
 

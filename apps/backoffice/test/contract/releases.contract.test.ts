@@ -14,6 +14,7 @@ import type { ReleaseBump } from '../../src/domain/releases/next-version.ts';
 import {
   CHECK_RELEASE_IMAGE_TASK,
   discardRelease,
+  latestAvailableRelease,
   listReleases,
   RELEASE_RUN_TASK,
   requestNewRelease,
@@ -67,6 +68,38 @@ describe('lista de releases (#509)', () => {
       ok: false,
       issues: [expect.objectContaining({ code: 'forbidden' })],
     });
+  });
+});
+
+describe('mais recente disponível (#687)', () => {
+  const seedIn = (tag: string, pipelineState: ReleasePipelineState) =>
+    db.insert(releases).values({ tag, pipelineState });
+
+  it('sem nenhuma release, devolve null', async () => {
+    expect(await latestAvailableRelease(db)).toBeNull();
+  });
+
+  it('a maior disponível em ordem numérica, não de texto nem de cadastro', async () => {
+    await seed('1.10.0', new Date('2026-01-01T00:00:00Z'));
+    await seed('1.9.0', new Date('2026-03-01T00:00:00Z'));
+    await seed('1.9.12', new Date('2026-02-01T00:00:00Z'));
+    expect(await latestAvailableRelease(db)).toBe('1.10.0');
+  });
+
+  it('ignora releases em outro estado e tags fora do formato', async () => {
+    await seed('1.2.0');
+    await seedIn('1.3.0', 'gerando');
+    await seedIn('1.4.0', 'baixando');
+    await seedIn('1.5.0', 'falhou');
+    await seedIn('1.6.0', 'descartada');
+    await seed('core-v9.0.0');
+    expect(await latestAvailableRelease(db)).toBe('1.2.0');
+  });
+
+  it('só releases fora de disponivel: devolve null', async () => {
+    await seedIn('1.3.0', 'gerando');
+    await seedIn('1.4.0', 'falhou');
+    expect(await latestAvailableRelease(db)).toBeNull();
   });
 });
 
