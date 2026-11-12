@@ -15,6 +15,8 @@ export const SITE_TABLES = [
   'release_rollout_sites',
   'builds',
   'site_events',
+  'content_link_results',
+  'content_link_checks',
   'reviews',
   'publications',
   'pending_changes',
