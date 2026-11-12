@@ -14,7 +14,7 @@
 - **Tipos:** `tsc --noEmit` por pacote.
 - **Git hooks:** lefthook no `pre-commit` (Prettier e ESLint `--fix` nos arquivos staged).
 - **Git:** `main` sem proteção; branch `<issue>-<slug>`; Conventional Commits; squash
-  merge (o título do PR vira o commit); tags manuais `core-vX.Y.Z`.
+  merge (o título do PR vira o commit); tags manuais `site-builder-vX.Y.Z` (prefixo trocado pelo ADR 0018).
 
 ## Alternativas consideradas
 
