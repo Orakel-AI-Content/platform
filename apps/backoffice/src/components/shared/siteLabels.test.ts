@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUILD_KINDS, BUILD_STAGES, SITE_EVENT_KINDS } from '@/db/schema/operations.ts';
-import type { ExecutionHistoryItem, OpenExecution } from '@/domain/builds/builds.ts';
+import type {
+  EventHistoryItem,
+  ExecutionHistoryItem,
+  OpenExecution,
+} from '@/domain/builds/builds.ts';
 
 import {
   BUILD_STAGE_LABEL,
   BUILD_STATUS_LABEL,
   HISTORY_KIND_LABEL,
+  historyItemTitle,
   BUILD_STATUS_VARIANT,
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_TAG,
@@ -91,6 +96,60 @@ describe('histórico do site (#637)', () => {
   it('tem rótulo para cada etapa do build', () => {
     expect(Object.keys(BUILD_STAGE_LABEL).sort()).toEqual([...BUILD_STAGES].sort());
     for (const label of Object.values(BUILD_STAGE_LABEL)) expect(label).not.toBe('');
+  });
+});
+
+describe('título do item da linha do tempo (#651)', () => {
+  const run = (over: Partial<ExecutionHistoryItem>): ExecutionHistoryItem => ({
+    type: 'execucao',
+    id: 1,
+    kind: 'build',
+    status: 'ok',
+    requestedBy: 'system',
+    cancelRequestedBy: null,
+    at: new Date('2026-10-11T17:00:00Z'),
+    release: '1.3.0',
+    versionId: null,
+    failure: null,
+    ...over,
+  });
+  const event = (over: Partial<EventHistoryItem>): EventHistoryItem => ({
+    type: 'evento',
+    id: 1,
+    kind: 'retomada',
+    requestedBy: 'ana@orakel.local',
+    at: new Date('2026-10-11T17:00:00Z'),
+    reason: null,
+    previousRelease: null,
+    release: null,
+    ...over,
+  });
+
+  it('a execução concluída leva só o tipo', () => {
+    expect(historyItemTitle(run({}))).toBe('Publicação');
+    expect(historyItemTitle(run({ kind: 'rollback' }))).toBe('Reversão');
+  });
+
+  it('o cancelamento e a falha dizem o resultado, a falha com a etapa quando há uma', () => {
+    expect(historyItemTitle(run({ status: 'cancelado' }))).toBe('Publicação cancelada');
+    const failure = { stage: 'render', kind: 'permanent', message: null, logTail: null } as const;
+    expect(historyItemTitle(run({ status: 'failed', failure }))).toBe(
+      'Publicação · falhou na etapa Renderização',
+    );
+    expect(
+      historyItemTitle(
+        run({ kind: 'rollback', status: 'failed', failure: { ...failure, stage: null } }),
+      ),
+    ).toBe('Reversão · falhou');
+  });
+
+  it('a pausa leva o motivo; os outros eventos, só o tipo', () => {
+    expect(historyItemTitle(event({ kind: 'pausa', reason: 'migração de domínio' }))).toBe(
+      'Pausa: migração de domínio',
+    );
+    expect(historyItemTitle(event({ kind: 'pausa' }))).toBe('Pausa');
+    expect(historyItemTitle(event({}))).toBe('Retomada');
+    expect(historyItemTitle(event({ kind: 'troca_de_versao' }))).toBe('Troca de versão');
   });
 });
 
