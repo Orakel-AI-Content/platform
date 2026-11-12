@@ -15,6 +15,25 @@ export type ContainerSpec = {
   labels: Record<string, string>;
 };
 
+/**
+ * Container de serviço, de longa duração (a prévia, ADR 0024 da raiz): várias redes com apelido,
+ * healthcheck e restart `unless-stopped`; sem volume e sem limites de render.
+ */
+export type ServiceSpec = {
+  name: string;
+  /** Só `SITE_BUILDER_IMAGE:<tag>`. */
+  image: string;
+  command: string[];
+  env: Record<string, string>;
+  /** A primeira é a rede principal; todas entram no create (API ≥ 1.44). */
+  networks: { name: string; aliases: string[] }[];
+  healthcheck: { test: string[]; intervalMs: number; timeoutMs: number; retries: number };
+  labels: Record<string, string>;
+};
+
+/** Saúde pelo healthcheck; `absent` quando o container não existe. Parado conta como `unhealthy`. */
+export type ServiceHealth = 'starting' | 'healthy' | 'unhealthy' | 'absent';
+
 export type WaitResult = { exitCode: number } | { timedOut: true };
 
 export interface ContainerRuntime {
@@ -33,6 +52,13 @@ export interface ContainerRuntime {
   createVolume(name: string, labels: Record<string, string>): Promise<void>;
   /** Cria e inicia; devolve o ID do container. */
   start(spec: ContainerSpec): Promise<string>;
+  /**
+   * Cria e inicia um container de serviço; devolve o ID. Só aceita `SITE_BUILDER_IMAGE:<tag>`.
+   * Para e remove pelo `kill` e pelo `removeContainer`.
+   */
+  startService(spec: ServiceSpec): Promise<string>;
+  /** Estado de saúde atual do container (leitura pontual, sem esperar). */
+  health(id: string): Promise<ServiceHealth>;
   /** Espera o container terminar, até o limite. */
   wait(id: string, timeoutMs: number): Promise<WaitResult>;
   kill(id: string): Promise<void>;
