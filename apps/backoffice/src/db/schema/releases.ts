@@ -1,4 +1,16 @@
-import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import {
+  integer,
+  pgTable,
+  primaryKey,
+  serial,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
+
+import { sites } from './sites.ts';
 
 /** Resultado da conferência da imagem site-builder:X.Y.Z no host (valores em português). */
 export const RELEASE_IMAGE_STATUSES = ['disponivel', 'ausente'] as const;
@@ -40,3 +52,75 @@ export const releases = pgTable('releases', {
   failureReason: text(),
   requestedBy: text(),
 });
+
+/**
+ * Estado da atualização de todos os sites: `em_andamento` enquanto há site por atualizar;
+ * `concluida`, `falhou` (um site falhou e a atualização parou) e `interrompida` (quem opera
+ * parou) são finais.
+ */
+export const RELEASE_ROLLOUT_STATES = [
+  'em_andamento',
+  'concluida',
+  'falhou',
+  'interrompida',
+] as const;
+
+/**
+ * Estado de cada site na atualização: `aguardando` a vez, `em_andamento` (promovido, à espera
+ * do build), `atualizado`, `falhou` e `nao_atualizado` (pausado, fica de fora).
+ */
+export const RELEASE_ROLLOUT_SITE_STATES = [
+  'aguardando',
+  'em_andamento',
+  'atualizado',
+  'falhou',
+  'nao_atualizado',
+] as const;
+
+/**
+ * "Atualizar todos os sites" (workspace#83): leva a release de destino a todos os sites, um por
+ * vez, começando pelo primeiro da ordem (canário). Operacional: fora do snapshot. Só uma
+ * `em_andamento` por vez (índice único parcial). `finishedAt` nulo enquanto aberta.
+ */
+export const releaseRollouts = pgTable(
+  'release_rollouts',
+  {
+    id: serial().primaryKey(),
+    targetRelease: text()
+      .notNull()
+      .references(() => releases.tag),
+    state: text({ enum: RELEASE_ROLLOUT_STATES }).notNull().default('em_andamento'),
+    /** E-mail de quem iniciou. */
+    requestedBy: text().notNull(),
+    startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('release_rollouts_open_unique')
+      .on(t.state)
+      .where(sql`${t.state} = 'em_andamento'`),
+  ],
+);
+
+/**
+ * Os sites de uma atualização, na ordem em que são atualizados (`position`, de 0): audiência
+ * crescente dos últimos 30 dias, empate pelo id. `previousRelease` é a release do site no início.
+ */
+export const releaseRolloutSites = pgTable(
+  'release_rollout_sites',
+  {
+    rolloutId: integer()
+      .notNull()
+      .references(() => releaseRollouts.id),
+    siteId: text()
+      .notNull()
+      .references(() => sites.id),
+    position: integer().notNull(),
+    state: text({ enum: RELEASE_ROLLOUT_SITE_STATES }).notNull(),
+    previousRelease: text(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.rolloutId, t.siteId] }),
+    unique('release_rollout_sites_position_unique').on(t.rolloutId, t.position),
+  ],
+);

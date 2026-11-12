@@ -76,6 +76,8 @@ const TABLES = [
   'site_policy_triggers',
   'generation_runs',
   'editorial_contexts',
+  'release_rollout_sites',
+  'release_rollouts',
   'releases',
   'site_configs',
   'sites',
