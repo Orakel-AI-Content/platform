@@ -13,10 +13,12 @@ import type { BuildSettings } from '../../src/domain/builds/plan.ts';
 import type { ReleaseBump } from '../../src/domain/releases/next-version.ts';
 import {
   CHECK_RELEASE_IMAGE_TASK,
+  discardRelease,
   listReleases,
   RELEASE_RUN_TASK,
   requestNewRelease,
   requestReleaseImageCheck,
+  retryRelease,
   type ReleasePipelineState,
 } from '../../src/domain/releases/releases.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
@@ -594,5 +596,201 @@ describe('disparo e acompanhamento do run (#660)', () => {
 
     expect(await release('0.1.0')).toMatchObject({ pipelineState: 'descartada' });
     expect(await checkJobs()).toEqual([]);
+  });
+});
+
+describe('tentar de novo e descartar (#663)', () => {
+  const runUrl = 'https://github.com/Orakel-AI-Content/platform/actions/runs/12345678901';
+  const retry = (actor: Actor, tag: string) => db.transaction((tx) => retryRelease(tx, actor, tag));
+  const discard = (actor: Actor, tag: string) =>
+    db.transaction((tx) => discardRelease(tx, actor, tag));
+  const clearJobs = () => db.execute(sql`delete from graphile_worker._private_jobs`);
+
+  /** Release pedida pelo botão cujo CI falhou com o run já disparado. */
+  async function ciFailed(tag = '0.1.0') {
+    await requestNew(operacao, 'minor');
+    await db
+      .update(releases)
+      .set({ pipelineState: 'falhou', failureReason: 'O CI falhou', runId: '111', runUrl })
+      .where(eq(releases.tag, tag));
+    await clearJobs();
+  }
+
+  /** Release cujo download falhou na última tentativa, como o job grava. */
+  async function pullFailed(tag = '1.2.0') {
+    await seed(tag);
+    await setState(tag, 'baixando');
+    await check(tag, { pull: 'error', attempts: 5 });
+    await clearJobs();
+  }
+
+  /** Roda a task release-run com um GitHub falso que só aceita disparo; devolve os inputs. */
+  async function runStep(tag: string) {
+    const dispatched: Record<string, string>[] = [];
+    const github: GitHubClient = {
+      dispatchWorkflow: (_workflow, _ref, inputs) => {
+        dispatched.push(inputs);
+        return Promise.resolve({ runId: '222', runUrl: `${runUrl}-novo` });
+      },
+      getRun: () => Promise.reject(new Error('getRun inesperado')),
+    };
+    await createReleaseRunTask({ db, github })({ tag }, helpers);
+    return dispatched;
+  }
+
+  async function addSites() {
+    for (const id of ['exemplo-a', 'exemplo-b']) {
+      const line = (await readFixture(id)).find((l) => l.type === 'config');
+      if (line?.type !== 'config') throw new Error(`fixture ${id} sem config`);
+      await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, line.data));
+    }
+  }
+
+  it('falha no CI: volta a gerando sem run nem motivo, e o run novo é disparado com o mesmo número', async () => {
+    await ciFailed();
+
+    const result = await retry(operacao, '0.1.0');
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { tag: '0.1.0', pipelineState: 'gerando', failureReason: null, runId: null },
+    });
+    expect(await runJobs()).toEqual([{ payload: { tag: '0.1.0' }, key: 'release-run:0.1.0' }]);
+    expect(await checkJobs()).toEqual([]);
+
+    expect(await runStep('0.1.0')).toEqual([{ version: '0.1.0' }]);
+    expect(await release('0.1.0')).toMatchObject({
+      pipelineState: 'gerando',
+      runId: '222',
+      runUrl: `${runUrl}-novo`,
+    });
+  });
+
+  it('falha no pull: volta a baixando sem motivo, e o download leva a disponível', async () => {
+    await pullFailed();
+
+    const result = await retry(SYSTEM_ACTOR, '1.2.0');
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { tag: '1.2.0', pipelineState: 'baixando', failureReason: null },
+    });
+    expect(await checkJobs()).toEqual([
+      { payload: { tag: '1.2.0' }, key: 'release-image:1.2.0', max_attempts: 5 },
+    ]);
+    expect(await runJobs()).toEqual([]);
+
+    expect(await check('1.2.0', { pull: 'ok' })).toEqual([IMAGE]);
+    expect(await release('1.2.0')).toMatchObject({ pipelineState: 'disponivel' });
+  });
+
+  it.each(['gerando', 'baixando', 'disponivel', 'descartada'] as const)(
+    'tentar de novo recusa release em %s com release.not_failed, sem enfileirar',
+    async (state) => {
+      await seed('1.2.0');
+      await setState('1.2.0', state);
+      const before = await release('1.2.0');
+
+      expect(await retry(operacao, '1.2.0')).toEqual({
+        ok: false,
+        issues: [expect.objectContaining({ code: 'release.not_failed', path: ['tag'] })],
+      });
+      expect(await release('1.2.0')).toEqual(before);
+      expect(await runJobs()).toEqual([]);
+      expect(await checkJobs()).toEqual([]);
+    },
+  );
+
+  it('tentar de novo e descartar recusam tag não registrada com release.not_found', async () => {
+    for (const result of [await retry(operacao, '9.9.9'), await discard(operacao, '9.9.9')]) {
+      expect(result).toEqual({
+        ok: false,
+        issues: [expect.objectContaining({ code: 'release.not_found', path: ['tag'] })],
+      });
+    }
+  });
+
+  it.each([editor, revisor])(
+    'tentar de novo e descartar recusam $roles com forbidden',
+    async (actor) => {
+      await ciFailed();
+      const before = await release('0.1.0');
+
+      for (const result of [await retry(actor, '0.1.0'), await discard(actor, '0.1.0')]) {
+        expect(result).toEqual({
+          ok: false,
+          issues: [expect.objectContaining({ code: 'forbidden' })],
+        });
+      }
+      expect(await release('0.1.0')).toEqual(before);
+      expect(await runJobs()).toEqual([]);
+    },
+  );
+
+  it.each(['disponivel', 'falhou', 'gerando', 'baixando'] as const)(
+    'descartar marca descartada a release em %s que nenhum site usa',
+    async (state) => {
+      await addSites();
+      await seed('1.2.0');
+      await setState('1.2.0', state);
+      await db.update(sites).set({ release: '1.1.0' }).where(eq(sites.id, 'exemplo-a'));
+
+      expect(await discard(operacao, '1.2.0')).toMatchObject({
+        ok: true,
+        value: { tag: '1.2.0', pipelineState: 'descartada' },
+      });
+      expect(await release('1.2.0')).toMatchObject({ pipelineState: 'descartada' });
+    },
+  );
+
+  it('descartar recusa com release.in_use, nomeando os sites, quando algum site usa a tag', async () => {
+    await addSites();
+    await seed('1.2.0');
+    await db.update(sites).set({ release: '1.2.0' });
+
+    const result = await discard(operacao, '1.2.0');
+
+    expect(result).toEqual({
+      ok: false,
+      issues: [expect.objectContaining({ code: 'release.in_use', path: ['tag'] })],
+    });
+    expect(result.ok ? '' : result.issues[0]?.message).toContain('exemplo-a, exemplo-b');
+    expect(await release('1.2.0')).toMatchObject({ pipelineState: 'disponivel' });
+  });
+
+  it('descartar recusa release já descartada com release.already_discarded', async () => {
+    await seed('1.2.0');
+    await setState('1.2.0', 'descartada');
+
+    expect(await discard(operacao, '1.2.0')).toEqual({
+      ok: false,
+      issues: [expect.objectContaining({ code: 'release.already_discarded', path: ['tag'] })],
+    });
+  });
+
+  it('descartada em gerando ou baixando não muda quando o job da etapa roda depois', async () => {
+    await requestNew(operacao, 'minor');
+    expect(await discard(operacao, '0.1.0')).toMatchObject({ ok: true });
+    expect(await runStep('0.1.0')).toEqual([]);
+    expect(await release('0.1.0')).toMatchObject({ pipelineState: 'descartada', runId: null });
+
+    await seed('1.2.0');
+    await setState('1.2.0', 'baixando');
+    expect(await discard(operacao, '1.2.0')).toMatchObject({ ok: true });
+    expect(await check('1.2.0', { pull: 'ok' })).toEqual([]);
+    expect(await release('1.2.0')).toMatchObject({
+      pipelineState: 'descartada',
+      imageStatus: null,
+    });
+  });
+
+  it('o número descartado continua contando para o próximo', async () => {
+    await requestNew(operacao, 'minor');
+    await discard(operacao, '0.1.0');
+
+    expect(await requestNew(operacao, 'minor')).toMatchObject({
+      ok: true,
+      value: { tag: '0.2.0' },
+    });
   });
 });
