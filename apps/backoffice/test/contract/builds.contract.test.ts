@@ -25,8 +25,11 @@ import {
 } from '../../src/domain/builds/builds.ts';
 import { configureBuildWindow } from '../../src/domain/builds/schedule.ts';
 import {
+  pauseSiteManually,
+  previousRelease,
   rebuildOnRelease,
   resumeSite,
+  revertRelease,
   setActiveVersion,
   setBuildWindow,
 } from '../../src/domain/builds/site-state.ts';
@@ -1474,6 +1477,127 @@ describe('reconstruir na release', () => {
     expect(await site()).toMatchObject({ release: null, state: 'pausado' });
     expect(await buildJobs()).toEqual([]);
     expect(await events()).toEqual([]);
+  });
+});
+
+describe('voltar à versão anterior', () => {
+  const operacao = { email: 'o@orakel.local', roles: ['operacao'] as const };
+  const revert = (actor: Actor = operacao) =>
+    db.transaction((tx) => revertRelease(tx, actor, 'exemplo-a'));
+  const previous = (actor: Actor = operacao) => previousRelease(db, actor, 'exemplo-a');
+  const switchTo = (tag: string) =>
+    db.transaction((tx) => rebuildOnRelease(tx, operacao, 'exemplo-a', tag));
+
+  beforeEach(async () => {
+    await db.insert(releases).values([{ tag: '1.3.2' }, { tag: '1.4.0' }]);
+    await clearQueue();
+  });
+
+  async function buildJobs(): Promise<string[]> {
+    const result = await db.execute<{ key: string }>(
+      sql`select key from graphile_worker.jobs where task_identifier = 'build'`,
+    );
+    return result.rows.map((row) => row.key);
+  }
+
+  it('com trocas 1.3.2 → 1.4.0, volta a 1.3.2 e enfileira o build; de novo, volta a 1.4.0', async () => {
+    await switchTo('1.3.2');
+    await switchTo('1.4.0');
+    await clearQueue();
+    expect(await previous()).toEqual({ ok: true, value: '1.3.2' });
+
+    expect(await revert()).toEqual({ ok: true, value: '1.3.2' });
+    expect(await site()).toMatchObject({ release: '1.3.2', state: 'ativo' });
+    expect(await buildJobs()).toEqual(['build:exemplo-a']);
+    expect((await events()).at(-1)).toMatchObject({
+      kind: 'troca_de_versao',
+      requestedBy: 'o@orakel.local',
+      previousRelease: '1.4.0',
+      release: '1.3.2',
+    });
+
+    expect(await previous()).toEqual({ ok: true, value: '1.4.0' });
+    expect(await revert()).toEqual({ ok: true, value: '1.4.0' });
+    expect(await site()).toMatchObject({ release: '1.4.0' });
+    expect((await events()).at(-1)).toMatchObject({
+      kind: 'troca_de_versao',
+      previousRelease: '1.3.2',
+      release: '1.4.0',
+    });
+  });
+
+  it('site pausado volta e é retomado', async () => {
+    await switchTo('1.3.2');
+    await switchTo('1.4.0');
+    await db
+      .update(sites)
+      .set({ state: 'pausado', pausedReason: 'Falha permanente' })
+      .where(eq(sites.id, 'exemplo-a'));
+    expect(await revert()).toEqual({ ok: true, value: '1.3.2' });
+    expect(await site()).toMatchObject({ release: '1.3.2', state: 'ativo', pausedReason: null });
+  });
+
+  async function expectRefusedWithoutWriting(release: string | null): Promise<void> {
+    const eventsBefore = await events();
+    await clearQueue();
+    expect(await previous()).toEqual({ ok: true, value: null });
+    expect(await revert()).toMatchObject({
+      ok: false,
+      issues: [{ code: 'release.no_previous' }],
+    });
+    expect(await site()).toMatchObject({ release });
+    expect(await events()).toEqual(eventsBefore);
+    expect(await buildJobs()).toEqual([]);
+  }
+
+  it('sem troca: leitura nula e recusa sem gravar nada', async () => {
+    await expectRefusedWithoutWriting(null);
+  });
+
+  it('com a anterior nula: leitura nula e recusa sem gravar nada', async () => {
+    await switchTo('1.4.0');
+    await expectRefusedWithoutWriting('1.4.0');
+  });
+
+  it.each(['gerando', 'baixando', 'falhou', 'descartada'] as const)(
+    'com a anterior em %s: leitura nula e recusa sem gravar nada',
+    async (pipelineState) => {
+      await switchTo('1.3.2');
+      await switchTo('1.4.0');
+      await db.update(releases).set({ pipelineState }).where(eq(releases.tag, '1.3.2'));
+      await expectRefusedWithoutWriting('1.4.0');
+    },
+  );
+
+  it('olha só a troca mais recente, não as pausas e retomadas depois dela', async () => {
+    await switchTo('1.3.2');
+    await switchTo('1.4.0');
+    await db.transaction((tx) => pauseSiteManually(tx, operacao, 'exemplo-a', 'Manutenção'));
+    expect(await previous()).toEqual({ ok: true, value: '1.3.2' });
+  });
+
+  it('site inexistente: site.not_found', async () => {
+    expect(await previousRelease(db, operacao, 'nao-existe')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
+    expect(await db.transaction((tx) => revertRelease(tx, operacao, 'nao-existe'))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
+  });
+
+  it.each(['editor', 'revisor'] as const)('%s recebe forbidden e nada muda', async (role) => {
+    await switchTo('1.3.2');
+    await switchTo('1.4.0');
+    const eventsBefore = await events();
+    await clearQueue();
+    const actor = { email: `${role}@orakel.local`, roles: [role] };
+    expect(await previous(actor)).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await revert(actor)).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await site()).toMatchObject({ release: '1.4.0' });
+    expect(await events()).toEqual(eventsBefore);
+    expect(await buildJobs()).toEqual([]);
   });
 });
 
