@@ -200,6 +200,8 @@ services:
       # do host como X.Y.Z. A rodada com o GitHub de verdade: LOCAL_RELEASE_DRIVER=github e o
       # GITHUB_RELEASE_TOKEN no .env.local.
       RELEASE_DRIVER: ${LOCAL_RELEASE_DRIVER:-local}
+      # Imagem do site ainda sem versão e origem do driver local; na VPS ela não existe.
+      SITE_BUILDER_TAG: ${SITE_BUILDER_TAG:-local}
     depends_on:
       s3-init:
         condition: service_completed_successfully
