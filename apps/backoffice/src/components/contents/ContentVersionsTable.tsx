@@ -26,6 +26,8 @@ export type ContentVersionRow = {
   status: ContentListItem['status'];
   title: string;
   createdAt: Date;
+  /** E-mail de quem criou a versão (`generator` no gerador); nulo nas versões antigas (#748). */
+  createdBy: string | null;
   /** Quem aprovou a versão e quando (`reviews`); nula sem aprovação. */
   approval: { reviewer: string; approvedAt: Date } | null;
 };
@@ -104,7 +106,12 @@ function columnsFor(
       accessorKey: 'createdAt',
       enableGlobalFilter: false,
       sortFn: 'datetime',
-      cell: ({ row }) => <NoWrap>{formatDateTime(row.original.createdAt, timeZone)}</NoWrap>,
+      // Quem criou a versão vai sob a data; "—" nas anteriores à autoria (#748).
+      cell: ({ row }) => (
+        <TwoLines secondary={<Truncated text={row.original.createdBy ?? '—'} />}>
+          <NoWrap>{formatDateTime(row.original.createdAt, timeZone)}</NoWrap>
+        </TwoLines>
+      ),
     },
   ];
 }
