@@ -57,8 +57,9 @@ export function LifecycleActionScope({ children }: { children: ReactNode }) {
  * As ações da etapa "Infra e zona": "Conferir agora" (workspace#85), que enfileira a conferência
  * da infra só deste site, enquanto a conferência ainda tem o que avançar (`cadastrado`,
  * `infra_aplicada`), e o caminho de volta da etapa atual ("Desmarcar", com confirmação; #714);
- * `publicado` vem do build e não se desmarca. Com conferência na fila, "Conferir agora" fica
- * desabilitado e diz "Conferindo…". A etapa e a fila vêm da conferência relida pela aba
+ * `publicado` vem do build e não se desmarca. Com conferência pedida ou na fila, "Conferir agora"
+ * diz "Conferindo…" e fica `aria-disabled` (não `disabled`: o foco continua no botão até o
+ * resultado, como nas ações de operação). A etapa e a fila vêm da conferência relida pela aba
  * (`InfraCheckContext`); fora dela, da `lifecycle` da página. Sem nenhuma ação (publicado) não
  * renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de qualquer uma vai ao mesmo
  * Alert.
@@ -90,8 +91,9 @@ export function LifecycleAction({
         <Button
           type="button"
           size="sm"
-          disabled={scope.pending || queued}
+          aria-disabled={scope.pending || queued || undefined}
           onClick={() => {
+            if (scope.pending || queued) return;
             setRunning('check');
             scope.run(check);
           }}

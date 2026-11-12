@@ -413,11 +413,11 @@ usa o gerador, #47).
   criação e "Salvar" na edição, sem complemento, como o "Create"/"Save" do
   `CustomerCreate`/`CustomerEdit` do Ecme; o objeto já está no título da tela ("Criar site",
   "Criar conteúdo"), que não muda. O formulário em cartão e a ação de domínio usam o verbo do
-  que acontece: "Registrar G1", "Aprovar", "Usar padrão", "Enviar para revisão", "Marcar zona
-  ativa"; a janela de agrupamento, que só grava um valor, envia com "Salvar". Durante o envio o
+  que acontece: "Registrar G1", "Aprovar", "Usar padrão", "Enviar para revisão", "Conferir
+  agora"; a janela de agrupamento, que só grava um valor, envia com "Salvar". Durante o envio o
   botão fica desabilitado e mostra `pendingLabel`, sem segundo envio: sempre o rótulo inteiro no
   gerúndio, com reticências ("Criando…", "Salvando…", "Registrando G1…", "Aprovando…", "Usando
-  padrão…", "Enviando para revisão…", "Marcando zona ativa…"). Todo botão que roda uma ação tem
+  padrão…", "Enviando para revisão…", "Conferindo…"). Todo botão que roda uma ação tem
   pendência, inclusive a ação secundária do cartão (`card.extra.pendingLabel`).
 - **Confirmação do envio:** quem fica na tela devolve `{ success: mensagem }`, que vai para o
   toast do retorno padrão (`pushSuccess`, ver "Retorno das ações"), como a aprovação na
@@ -538,13 +538,19 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   `StepItem` diz o estado genérico ("concluída", "atual", "pendente", "com erro") em `sr-only`,
   sem repetir o texto visível. `aria-current="step"` vai na Build durante uma execução; senão,
   na primeira etapa não concluída; tudo concluído, em nenhuma. A etapa Build lê a mesma
-  atividade relida pelo polling da aba e muda sem recarregar; as outras mudam na revalidação.
-  A ação manual do ciclo de vida ("Marcar infra aplicada", "Marcar zona ativa") fica na
-  `description` de Infra e zona (`LifecycleSteps`, com o texto do ciclo); sem `onChange`, as
-  etapas não viram botões; o sucesso vai para o toast e o erro para o `ActionAlert` abaixo do
-  painel (`LifecycleActionScope`), que sobrevive à revalidação que troca o botão. As ações de
+  atividade relida pelo polling da aba e muda sem recarregar; Infra e zona segue a conferência
+  automática da infra, relida por um polling próprio só enquanto há conferência na fila
+  (`useInfraCheck`, workspace#85): o texto do ciclo, a situação da conferência num `role="status"`
+  ("Conferindo…", "Detectado sozinho (conferido há X)", "Ainda não conferido") e, com a última
+  em falha, "Não foi possível consultar o provedor" com a mensagem e o estado "com erro" no
+  lugar de pendente; as outras mudam na revalidação. As ações do ciclo de vida ("Conferir
+  agora", "Desmarcar") ficam na `description` de Infra e zona (`LifecycleSteps`); "Conferir
+  agora" fica `aria-disabled` com "Conferindo…" enquanto há conferência na fila, com o foco
+  nele; sem `onChange`, as etapas não viram botões; o sucesso vai para o toast e o erro para o
+  `ActionAlert` abaixo do painel (`LifecycleActionScope`), que sobrevive à revalidação que troca
+  o botão. As ações de
   operação (#648) vêm prontas da página em `actions`, uma por etapa, abaixo do estado, como o
-  "Marcar…": na Versão, "Atualizar para a mais recente" (só quando há a Tag "disponível", #690),
+  "Conferir agora": na Versão, "Atualizar para a mais recente" (só quando há a Tag "disponível", #690),
   "Voltar à versão anterior (X)" (só quando a troca de versão mais recente veio de uma release
   ainda `disponivel`, #691) e "Escolher outra versão do motor" (o antigo "Reconstruir na
   release", só com a lista de releases, que lista só as `disponivel`; o nome não repete o

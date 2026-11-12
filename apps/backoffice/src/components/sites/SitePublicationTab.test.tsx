@@ -217,7 +217,9 @@ describe('conferência da infra na etapa Infra e zona (#716)', () => {
     render(tab(idle, undefined, check({ queued: true }), action));
 
     expect(infraStep()).toContain('Conferindo…');
-    expect(screen.getByRole('button', { name: 'Conferindo…' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Conferindo…' }).getAttribute('aria-disabled')).toBe(
+      'true',
+    );
     await tick();
     expect(infraStep()).toContain('Conferindo…');
     expect(refresh).not.toHaveBeenCalled();
