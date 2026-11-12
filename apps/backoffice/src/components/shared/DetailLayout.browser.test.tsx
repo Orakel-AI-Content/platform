@@ -226,7 +226,10 @@ function ReviewDetail() {
             status="em_revisao"
             blocked={false}
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
+            confirmed={[]}
             canApprove
+            confirm={() => Promise.resolve({ ok: true as const, confirmed: [] })}
+            confirmAll={() => Promise.resolve({ ok: true as const, confirmed: [] })}
             approve={() => Promise.resolve({ ok: true as const, message: 'ok' })}
             giveBack={() => Promise.resolve({ ok: true as const, message: 'ok' })}
           />
