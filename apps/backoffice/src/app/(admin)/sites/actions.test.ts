@@ -12,6 +12,7 @@ import {
   resumeSiteAction,
   setBuildWindowAction,
   setDailyPublishLimitAction,
+  undoLastPublishAction,
   updateSiteConfigAction,
 } from './actions.ts';
 
@@ -28,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   pauseSiteManually: vi.fn(),
   rebuildOnRelease: vi.fn(),
   requestRollback: vi.fn(),
+  requestUndoLastPublish: vi.fn(),
   cancelBuild: vi.fn(),
   setBuildWindow: vi.fn(),
   setDailyPublishLimit: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('@/db/client.ts', () => ({
 vi.mock('@/domain/builds/builds.ts', () => ({
   requestBuildNow: vi.fn(),
   requestRollback: mocks.requestRollback,
+  requestUndoLastPublish: mocks.requestUndoLastPublish,
   cancelBuild: mocks.cancelBuild,
 }));
 vi.mock('@/domain/builds/site-state.ts', () => ({
@@ -355,6 +358,43 @@ describe('Server Actions da página do site', () => {
       message: 'Rollback de exemplo-a para v-antiga enfileirado.',
     });
     expect(mocks.requestRollback).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a', 'v-antiga');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('"Desfazer última publicação" só delega ao domínio; a recusa vira a mensagem, sem revalidar', async () => {
+    mocks.currentActor.mockResolvedValueOnce({ ok: false, issues: [] });
+    expect(await undoLastPublishAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.requestUndoLastPublish).not.toHaveBeenCalled();
+
+    mocks.requestUndoLastPublish.mockResolvedValueOnce({
+      ok: false,
+      issues: [
+        {
+          code: 'rollback.no_previous',
+          message: 'O site exemplo-a não tem versão anterior publicada para voltar',
+          path: [],
+        },
+      ],
+    });
+    expect(await undoLastPublishAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'O site exemplo-a não tem versão anterior publicada para voltar',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+
+    mocks.requestUndoLastPublish.mockResolvedValueOnce({
+      ok: true,
+      value: { versionId: 'v-antiga', release: '1.2.0', pages: 10, finishedAt: new Date() },
+    });
+    expect(await undoLastPublishAction('exemplo-a')).toEqual({
+      ok: true,
+      message: 'Rollback de exemplo-a para v-antiga enfileirado.',
+    });
+    expect(mocks.requestUndoLastPublish).toHaveBeenLastCalledWith({}, operacao, 'exemplo-a');
+    expect(mocks.requestRollback).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
   });
 

@@ -4,9 +4,10 @@
 // a transação que a fecha baixa as mudanças pela lista que o snapshot viu; com falha
 // permanente, pausa o site com o motivo. As consultas daqui só leem builds fechados. "Reverter" (L4) escolhe
 // entre as versões dos builds `ok` e enfileira o rollback, que tem o mesmo ciclo de linhas
-// (tipo rollback) e fica fora das consultas de build.
+// (tipo rollback) e fica fora das consultas de build; "Desfazer última publicação" volta à versão
+// que estava no ar antes da ativa, pela ordem das idas ao ar (builds e rollbacks `ok`).
 import type { Result } from '@orakel/content-model';
-import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import {
@@ -497,6 +498,98 @@ export async function listRollbackVersions(
     )
     .sort((a, b) => b.finishedAt.getTime() - a.finishedAt.getTime());
   return { ok: true, value: versions };
+}
+
+/**
+ * Versão que estava no ar imediatamente antes da ativa: a da ida ao ar mais recente (build ou
+ * rollback `ok`, pela ordem em que terminaram) com outra versão. Contar os rollbacks é o que
+ * faz o desfazer de um desfazer voltar à versão que acabou de sair do ar, e não a uma mais
+ * antiga. Os dados vêm do build mais recente que publicou a versão, como no "Reverter".
+ */
+async function resolvePreviousVersion(
+  db: Executor,
+  siteId: string,
+  activeVersionId: string | null,
+): Promise<RollbackVersion | null> {
+  if (activeVersionId === null) return null;
+  // Sem filtro de tipo: build e rollback `ok` são as idas ao ar.
+  const [previous] = await db
+    .select({ versionId: builds.versionId })
+    .from(builds)
+    .where(
+      and(
+        eq(builds.siteId, siteId),
+        eq(builds.status, 'ok'),
+        isNotNull(builds.versionId),
+        ne(builds.versionId, activeVersionId),
+      ),
+    )
+    .orderBy(desc(builds.finishedAt), desc(builds.id))
+    .limit(1);
+  if (previous?.versionId == null) return null;
+  const [published] = await db
+    .select({ release: builds.release, pages: builds.pages, finishedAt: builds.finishedAt })
+    .from(builds)
+    .where(and(eq(builds.siteId, siteId), publishedBuild, eq(builds.versionId, previous.versionId)))
+    .orderBy(desc(builds.finishedAt), desc(builds.id))
+    .limit(1);
+  if (published === undefined || published.release === null || published.finishedAt === null) {
+    return null;
+  }
+  return {
+    versionId: previous.versionId,
+    release: published.release,
+    pages: published.pages,
+    finishedAt: published.finishedAt,
+  };
+}
+
+/**
+ * Destino do "Desfazer última publicação": a versão que estava no ar imediatamente antes da
+ * ativa, ou `null` quando o site não tem uma.
+ */
+export async function previousVersion(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<RollbackVersion | null>> {
+  const allowed = requireRole(actor, 'operations.run');
+  if (!allowed.ok) return allowed;
+  const [site] = await db
+    .select({ activeVersionId: sites.activeVersionId })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) return notFound(siteId);
+  return { ok: true, value: await resolvePreviousVersion(db, siteId, site.activeVersionId) };
+}
+
+/**
+ * "Desfazer última publicação": enfileira o rollback para a versão que estava no ar antes da
+ * ativa, sem receber a versão de quem chama. Sem versão anterior, recusa e não enfileira nada;
+ * com ela, as regras e o enfileiramento são os do "Reverter" (`requestRollback`).
+ */
+export async function requestUndoLastPublish(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<RollbackVersion>> {
+  const previous = await previousVersion(tx, actor, siteId);
+  if (!previous.ok) return previous;
+  if (previous.value === null) {
+    return {
+      ok: false,
+      issues: [
+        {
+          code: 'rollback.no_previous',
+          message: `O site ${siteId} não tem versão anterior publicada para voltar`,
+          path: [],
+        },
+      ],
+    };
+  }
+  const requested = await requestRollback(tx, actor, siteId, previous.value.versionId);
+  if (!requested.ok) return requested;
+  return { ok: true, value: previous.value };
 }
 
 /**

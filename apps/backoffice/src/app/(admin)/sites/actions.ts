@@ -18,7 +18,12 @@ import {
 } from '@/components/sites/siteOperationForms.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
-import { cancelBuild, requestBuildNow, requestRollback } from '@/domain/builds/builds.ts';
+import {
+  cancelBuild,
+  requestBuildNow,
+  requestRollback,
+  requestUndoLastPublish,
+} from '@/domain/builds/builds.ts';
 import {
   advanceLifecycle,
   pauseSiteManually,
@@ -164,6 +169,18 @@ export async function rollbackSiteAction(siteId: string, versionId: string): Pro
     siteId,
     (tx, actor) => requestRollback(tx, actor, siteId, versionId),
     `Rollback de ${siteId} para ${versionId} enfileirado.`,
+  );
+}
+
+/**
+ * "Desfazer última publicação": enfileira o rollback para a versão que estava no ar antes da
+ * ativa. O destino, o papel e o site são resolvidos pelo domínio; a versão não vem do cliente.
+ */
+export async function undoLastPublishAction(siteId: string): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => requestUndoLastPublish(tx, actor, siteId),
+    (previous) => `Rollback de ${siteId} para ${previous.versionId} enfileirado.`,
   );
 }
 
