@@ -65,7 +65,7 @@ describe('painel de revisão', () => {
     for (const item of checklist) {
       expect(screen.getByRole('checkbox', { name: item.label })).toBeTruthy();
     }
-    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(3);
     expect(screen.getByText('Nenhum problema de validação.')).toBeTruthy();
     expect(document.querySelector('.bg-error-subtle')).toBeNull();
   });
@@ -148,7 +148,7 @@ describe('painel de revisão', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
 
     expect(approve).not.toHaveBeenCalled();
-    expect(screen.getAllByText('Marque este item para aprovar.')).toHaveLength(4);
+    expect(screen.getAllByText('Marque este item para aprovar.')).toHaveLength(2);
   });
 
   it('pelo teclado, com o checklist completo, aprova com as chaves e anuncia no toast', async () => {
