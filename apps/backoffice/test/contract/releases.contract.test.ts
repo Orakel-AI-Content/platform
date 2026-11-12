@@ -260,7 +260,7 @@ describe('download e conferência da imagem da release (#570, #661)', () => {
 
     expect(await release('1.2.0')).toMatchObject({
       pipelineState: 'falhou',
-      failureReason: 'Não foi possível baixar a imagem: manifest unknown',
+      failureReason: 'Não foi possível baixar a imagem: toomanyrequests',
       imageStatus: 'ausente',
       imageCheckedAt: CHECKED_AT,
     });
@@ -270,9 +270,7 @@ describe('download e conferência da imagem da release (#570, #661)', () => {
     await seed('1.2.0');
     await setState('1.2.0', 'baixando');
 
-    await expect(check('1.2.0', { pull: 'error', attempts: 4 })).rejects.toThrow(
-      'manifest unknown',
-    );
+    await expect(check('1.2.0', { pull: 'error', attempts: 4 })).rejects.toThrow('toomanyrequests');
 
     expect(await release('1.2.0')).toMatchObject({
       pipelineState: 'baixando',
@@ -502,6 +500,45 @@ describe('migração do estado do pipeline (#658)', () => {
       failureReason: null,
       requestedBy: null,
     });
+  });
+});
+
+describe('migração do estado herdado com imagem ausente', () => {
+  const migrate = async () => {
+    const migration = await readFile(
+      new URL('../../drizzle/0023_estado_herdado_da_release.sql', import.meta.url),
+      'utf8',
+    );
+    await db.execute(sql.raw(migration));
+  };
+
+  it('disponivel com imagem ausente vai a falhou; as outras ficam como estão', async () => {
+    await db.insert(releases).values([
+      { tag: '1.0.1', imageStatus: 'ausente', pipelineState: 'disponivel' },
+      { tag: '1.0.2', imageStatus: 'disponivel', pipelineState: 'disponivel' },
+      { tag: '1.0.3', imageStatus: null, pipelineState: 'disponivel' },
+      { tag: '1.0.4', imageStatus: 'ausente', pipelineState: 'descartada' },
+    ]);
+    await migrate();
+    await migrate();
+
+    expect(await release('1.0.1')).toMatchObject({
+      pipelineState: 'falhou',
+      failureReason: expect.stringContaining('tente de novo') as unknown,
+    });
+    expect(await release('1.0.2')).toMatchObject({ pipelineState: 'disponivel' });
+    expect(await release('1.0.3')).toMatchObject({ pipelineState: 'disponivel' });
+    expect(await release('1.0.4')).toMatchObject({ pipelineState: 'descartada' });
+  });
+
+  it('"Tentar de novo" leva a release migrada à conferência da imagem', async () => {
+    await db
+      .insert(releases)
+      .values({ tag: '1.0.1', imageStatus: 'ausente', pipelineState: 'disponivel' });
+    await migrate();
+
+    const retried = await retryRelease(db, operacao, '1.0.1');
+    expect(retried).toMatchObject({ ok: true, value: { pipelineState: 'baixando' } });
   });
 });
 

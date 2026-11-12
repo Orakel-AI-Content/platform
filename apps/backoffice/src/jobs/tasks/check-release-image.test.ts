@@ -74,7 +74,7 @@ describe('check-release-image', () => {
     mocks.loadReleaseRun.mockResolvedValue({ pipelineState: 'baixando', runId: '42' });
     const { done } = run({ image: false, pull: 'error' }, helpers(4, 5));
 
-    await expect(done).rejects.toThrow('manifest unknown');
+    await expect(done).rejects.toThrow('toomanyrequests');
     expect(mocks.recordReleaseImagePulled).not.toHaveBeenCalled();
     expect(mocks.recordReleaseImagePullFailed).not.toHaveBeenCalled();
   });
@@ -87,11 +87,25 @@ describe('check-release-image', () => {
     expect(mocks.recordReleaseImagePullFailed).toHaveBeenCalledWith(
       db,
       '1.2.0',
-      'Não foi possível baixar a imagem: manifest unknown',
+      'Não foi possível baixar a imagem: toomanyrequests',
       new Date(NOW),
     );
     expect(mocks.recordReleaseImagePulled).not.toHaveBeenCalled();
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('manifest unknown'));
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('toomanyrequests'));
+  });
+
+  it('imagem recusada pelo registry: falhou já na primeira tentativa, sem repetir', async () => {
+    mocks.loadReleaseRun.mockResolvedValue({ pipelineState: 'baixando', runId: '42' });
+    const { done } = run({ image: false, pull: 'unavailable' }, helpers(1, 5));
+    await done;
+
+    expect(mocks.recordReleaseImagePullFailed).toHaveBeenCalledWith(
+      db,
+      '1.2.0',
+      'Não foi possível baixar a imagem: error from registry: denied',
+      new Date(NOW),
+    );
+    expect(mocks.recordReleaseImagePulled).not.toHaveBeenCalled();
   });
 
   it('pull sem erro que não traz a imagem conta como falha', async () => {

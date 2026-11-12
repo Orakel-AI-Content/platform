@@ -3,6 +3,7 @@
 // da lista entra por engano. O fim do container é acompanhado por consulta periódica, sem
 // conexão longa (o render pode passar dos limites de tempo do fetch).
 import {
+  ImageUnavailableError,
   RuntimeError,
   type ContainerRuntime,
   type ContainerSpec,
@@ -47,6 +48,12 @@ export function demux(bytes: Uint8Array): string {
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Resposta do registry para imagem que não existe ou cujo acesso foi negado. O Docker a devolve
+ * como HTTP 500 (`error from registry: denied`) ou no stream do pull (`manifest unknown`).
+ */
+const UNAVAILABLE = /\b(denied|unauthorized|manifest unknown|not found)\b/i;
 
 /** Tag do Docker: sem digest, sem outro repositório. */
 const TAG = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
@@ -130,10 +137,17 @@ export function dockerRuntime(options: Options): ContainerRuntime {
       const response = await call(
         'POST',
         `/images/create?fromImage=${encodeURIComponent(options.siteBuilderImage)}&tag=${encodeURIComponent(tag)}`,
-      );
+      ).catch((error: unknown) => {
+        if (error instanceof RuntimeError && UNAVAILABLE.test(error.message)) {
+          throw new ImageUnavailableError(error.message, { cause: error });
+        }
+        throw error;
+      });
       // O Docker responde 200 e informa a falha no stream (uma linha JSON por evento): lê até o fim.
-      const failed = (message: string) =>
-        new RuntimeError(`Docker POST /images/create (${image}): ${message}`);
+      const failed = (message: string) => {
+        const text = `Docker POST /images/create (${image}): ${message}`;
+        return UNAVAILABLE.test(message) ? new ImageUnavailableError(text) : new RuntimeError(text);
+      };
       const decoder = new TextDecoder();
       let pending = '';
       try {
@@ -147,7 +161,7 @@ export function dockerRuntime(options: Options): ContainerRuntime {
           }
         }
       } catch (error) {
-        if (error instanceof RuntimeError) throw error;
+        if (error instanceof RuntimeError || error instanceof ImageUnavailableError) throw error;
         throw new RuntimeError(
           `Docker POST /images/create (${image}) interrompido: ${String(error)}`,
           {

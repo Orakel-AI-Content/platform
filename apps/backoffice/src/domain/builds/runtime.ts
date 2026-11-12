@@ -77,3 +77,12 @@ export class RuntimeError extends Error {
   override readonly name = 'RuntimeError';
   readonly kind = 'transient';
 }
+
+/**
+ * O registry recusou o pull porque a imagem não existe ou o acesso foi negado (`denied`,
+ * `manifest unknown`, `not found`, `unauthorized`): repetir não a traz, a falha é permanente.
+ */
+export class ImageUnavailableError extends Error {
+  override readonly name = 'ImageUnavailableError';
+  readonly kind = 'permanent';
+}
