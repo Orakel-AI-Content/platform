@@ -6,8 +6,9 @@ import type { SiteHistoryItem } from '@/domain/builds/builds.ts';
 
 import { SiteBuildsTable } from './SiteBuildsTable.tsx';
 
-// Aba "Histórico" em Chromium (#637): a linha de uma falha abre o painel pelo teclado (Tab até
-// "Ver detalhe" e Enter) e pelo clique na linha; Esc fecha e o foco volta ao botão da linha.
+// Histórico em linha do tempo, em Chromium (#651; era a tabela do #637): o item de uma falha
+// abre o painel pelo teclado (Tab até "Ver detalhe" e Enter) e pelo clique no botão; Esc ou
+// "Fechar" fecham e o foco volta ao botão do item.
 // Sem axe nem tema: componente de domínio (ADR 0020 da raiz).
 
 const HISTORY: SiteHistoryItem[] = [
@@ -65,12 +66,13 @@ describe('SiteBuildsTable no navegador', () => {
     await expect.element(button).toHaveFocus();
   });
 
-  it('o clique na linha abre o painel e, ao fechar, o foco vai ao botão da linha', async () => {
+  it('o clique no "Ver detalhe" abre o painel e, ao fechar, o foco volta ao botão do item', async () => {
     const screen = await renderInApp(
       <SiteBuildsTable history={HISTORY} timeZone="America/Sao_Paulo" />,
     );
+    const button = screen.getByRole('button', { name: DETAIL });
 
-    await screen.getByRole('cell', { name: 'Falhou' }).click();
+    await button.click();
     const dialog = page.getByRole('dialog', { name: 'Falha da publicação' });
     await expect
       .element(dialog.getByRole('heading', { name: 'Falha da publicação' }))
@@ -78,6 +80,6 @@ describe('SiteBuildsTable no navegador', () => {
 
     await dialog.getByRole('button', { name: /fechar/i }).click();
     await expect.element(dialog).not.toBeInTheDocument();
-    await expect.element(screen.getByRole('button', { name: DETAIL })).toHaveFocus();
+    await expect.element(button).toHaveFocus();
   });
 });
