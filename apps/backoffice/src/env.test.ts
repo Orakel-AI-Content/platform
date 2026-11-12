@@ -115,7 +115,9 @@ describe('parseBuildRunnerEnv', () => {
     DOCKER_HOST: 'tcp://docker-socket-proxy:2375',
     SITE_BUILDER_IMAGE: 'ghcr.io/orakel-ai-content/site-builder',
     EDGE_LOCAL_URL: 'http://edge-local:8081',
+    RELEASE_DRIVER: 'local',
   };
+  const token = `github_pat_${'a'.repeat(40)}`;
 
   it('alvo local com os padrões das redes e da tag', () => {
     expect(parseBuildRunnerEnv(runner)).toMatchObject({
@@ -149,14 +151,35 @@ describe('parseBuildRunnerEnv', () => {
     });
   });
 
-  it('o PAT do GitHub é opcional e fine-grained; o repositório tem padrão', () => {
+  it('o driver da release é github por padrão e exige o PAT (ADR 0023)', () => {
+    const github = { ...runner, RELEASE_DRIVER: undefined };
+    expect(() => parseBuildRunnerEnv(github)).toThrow(/GITHUB_RELEASE_TOKEN/);
+    expect(() => parseBuildRunnerEnv({ ...github, GITHUB_RELEASE_TOKEN: '' })).toThrow(
+      /GITHUB_RELEASE_TOKEN/,
+    );
+    expect(() => parseBuildRunnerEnv({ ...runner, RELEASE_DRIVER: 'github' })).toThrow(
+      /GITHUB_RELEASE_TOKEN/,
+    );
+    expect(parseBuildRunnerEnv({ ...github, GITHUB_RELEASE_TOKEN: token })).toMatchObject({
+      RELEASE_DRIVER: 'github',
+    });
+    expect(() => parseBuildRunnerEnv({ ...runner, RELEASE_DRIVER: 'ghcr' })).toThrow(
+      /RELEASE_DRIVER/,
+    );
+  });
+
+  it('o driver local dispensa o PAT', () => {
+    expect(parseBuildRunnerEnv(runner)).toMatchObject({ RELEASE_DRIVER: 'local' });
+    expect(parseBuildRunnerEnv(runner).GITHUB_RELEASE_TOKEN).toBeUndefined();
+  });
+
+  it('o PAT do GitHub é fine-grained; o repositório tem padrão', () => {
     expect(parseBuildRunnerEnv(runner)).toMatchObject({
       GITHUB_RELEASE_REPOSITORY: 'Orakel-AI-Content/platform',
     });
     expect(
       parseBuildRunnerEnv({ ...runner, GITHUB_RELEASE_TOKEN: '' }).GITHUB_RELEASE_TOKEN,
     ).toBeUndefined();
-    const token = `github_pat_${'a'.repeat(40)}`;
     expect(
       parseBuildRunnerEnv({ ...runner, GITHUB_RELEASE_TOKEN: token }).GITHUB_RELEASE_TOKEN,
     ).toBe(token);
