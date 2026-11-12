@@ -183,13 +183,6 @@
       "when": 1794506360734,
       "tag": "0025_estado_da_previa",
       "breakpoints": true
-    },
-    {
-      "idx": 25,
-      "version": "7",
-      "when": 1794506377542,
-      "tag": "0025_atualizacao_de_todos_os_sites",
-      "breakpoints": true
     }
   ]
 }
