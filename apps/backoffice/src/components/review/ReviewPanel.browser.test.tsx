@@ -1,6 +1,8 @@
+import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
+import { tabTo } from '../../../test/browser/a11y.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 import { toast } from '@/components/ui/toast';
 
@@ -9,8 +11,10 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 
 // Revisão em Chromium (workspace#87, ADR 0020 da raiz: só teclado e foco na composição): a seção
 // de checagens não tem parada de Tab (o sistema marca, ninguém clica), e "Marcar todos" funciona
-// pelo teclado, fica com o foco e leva direto às caixas e a "Aprovar". Cada caixa grava ao ser
-// marcada pelo Espaço (#752), e o foco fica nela, inclusive quando a gravação falha.
+// pelo teclado, fica com o foco e leva direto às caixas e às aprovações. Cada caixa grava ao ser
+// marcada pelo Espaço (#752), e o foco fica nela, inclusive quando a gravação falha. "Aprovar e
+// publicar agora" e "Aprovar e agendar" (workspace#89) só com o teclado: o agendamento envia o
+// instante em ISO da hora de parede de São Paulo escolhida no Dialog.
 
 const CHECKLIST = [
   { key: 'valor_original', label: 'Valor original' },
@@ -22,6 +26,27 @@ afterEach(() => {
   toast.removeAll();
   vi.restoreAllMocks();
 });
+
+type Props = ComponentProps<typeof ReviewPanel>;
+
+/** Painel em revisão, com o checklist já completo. */
+const decisionPanel = (props: Partial<Props>) => (
+  <ReviewPanel
+    version={2}
+    status="em_revisao"
+    blocked={false}
+    checklist={CHECKLIST}
+    confirmed={CHECKLIST.map((item) => item.key)}
+    canApprove
+    confirm={vi.fn()}
+    confirmAll={vi.fn()}
+    approve={vi.fn()}
+    approvePublish={vi.fn()}
+    approveSchedule={vi.fn()}
+    giveBack={vi.fn()}
+    {...props}
+  />
+);
 
 describe('Revisão no navegador', () => {
   it('pelo teclado: a seção de checagens não prende o Tab; marcar todos e aprovar', async () => {
@@ -60,6 +85,8 @@ describe('Revisão no navegador', () => {
           confirm={vi.fn()}
           confirmAll={confirmAll}
           approve={approve}
+          approvePublish={vi.fn()}
+          approveSchedule={vi.fn()}
           giveBack={vi.fn()}
         />
       </>,
@@ -80,8 +107,11 @@ describe('Revisão no navegador', () => {
 
     await userEvent.keyboard('{Tab}');
     await expect.element(screen.getByRole('checkbox', { name: CHECKLIST[0]!.label })).toHaveFocus();
+    // Depois das caixas, as três aprovações, com "Só aprovar" (o envio) por último.
     await userEvent.keyboard('{Tab}{Tab}{Tab}');
-    await expect.element(screen.getByRole('button', { name: 'Aprovar' })).toHaveFocus();
+    await expect.element(screen.getByRole('button', { name: 'Aprovar e agendar' })).toHaveFocus();
+    await userEvent.keyboard('{Tab}{Tab}');
+    await expect.element(screen.getByRole('button', { name: 'Só aprovar' })).toHaveFocus();
     await userEvent.keyboard('{Enter}');
 
     await vi.waitFor(() => expect(approve).toHaveBeenCalledWith());
@@ -103,6 +133,8 @@ describe('Revisão no navegador', () => {
         confirm={confirm}
         confirmAll={vi.fn()}
         approve={vi.fn()}
+        approvePublish={vi.fn()}
+        approveSchedule={vi.fn()}
         giveBack={vi.fn()}
       />,
     );
@@ -119,5 +151,80 @@ describe('Revisão no navegador', () => {
     await expect.element(screen.getByText('Versão já decidida.')).toBeInTheDocument();
     await expect.element(second).not.toBeChecked();
     await expect.element(second).toHaveFocus();
+  });
+
+  it('pelo teclado: "Aprovar e publicar agora" decide e mostra o desfecho', async () => {
+    const approvePublish = vi
+      .fn()
+      .mockResolvedValue({ ok: true, message: 'Versão 2 aprovada: o artigo foi ao ar.' });
+    const screen = await renderInApp(decisionPanel({ approvePublish }));
+
+    await tabTo(screen.getByRole('button', { name: 'Aprovar e publicar agora' }));
+    await userEvent.keyboard('{Enter}');
+
+    await vi.waitFor(() => expect(approvePublish).toHaveBeenCalledWith());
+    await expect
+      .element(
+        screen.getByRole('complementary').getByText('Versão 2 aprovada: o artigo foi ao ar.'),
+      )
+      .toBeVisible();
+  });
+
+  it('pelo teclado: "Aprovar e agendar" abre o Dialog e envia o instante escolhido em ISO', async () => {
+    // Dois dias adiante, no calendário de São Paulo.
+    const day = new Date(Date.now() + 2 * 86_400_000);
+    const dayLabel = new Intl.DateTimeFormat('pt-BR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'America/Sao_Paulo',
+    }).format(day);
+    const sameDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const ymd = sameDay.format(day);
+    const approve = vi.fn();
+    const approveSchedule = vi.fn().mockResolvedValue({
+      ok: true,
+      message: 'Versão 2 aprovada: o artigo foi agendado para o dia escolhido.',
+    });
+    const screen = await renderInApp(decisionPanel({ approve, approveSchedule }));
+
+    await tabTo(screen.getByRole('button', { name: 'Aprovar e agendar' }));
+    await userEvent.keyboard('{Enter}');
+    const dialog = page.getByRole('dialog', { name: 'Agendar publicação' });
+    await expect.element(dialog).toBeVisible();
+
+    const field = dialog.getByRole('combobox', { name: 'Data e hora (horário de Brasília)' });
+    await tabTo(field);
+    await userEvent.keyboard('{Enter}');
+    const picker = page.getByRole('dialog', { name: 'Escolher data e hora' });
+    await expect.element(picker).toBeVisible();
+    // Os dias têm uma parada de Tab só (roving tabindex); as setas levam ao dia escolhido.
+    const days = [...picker.element().querySelectorAll<HTMLButtonElement>('button[aria-pressed]')];
+    const tabbableDay = days.find((button) => button.tabIndex === 0);
+    expect(tabbableDay).toBeDefined();
+    await tabTo(tabbableDay!);
+    for (let step = 0; step < 40; step += 1) {
+      if (document.activeElement?.getAttribute('aria-label') === dayLabel) break;
+      await userEvent.keyboard('{ArrowRight}');
+    }
+    expect(document.activeElement?.getAttribute('aria-label')).toBe(dayLabel);
+    await userEvent.keyboard('{Enter}');
+    // Escolhido o dia, o foco volta ao campo, com a hora de agora em São Paulo.
+    await expect.element(field).toHaveFocus();
+
+    await tabTo(dialog.getByRole('button', { name: 'Agendar' }));
+    await userEvent.keyboard('{Enter}');
+
+    // O instante sai em ISO e cai no dia escolhido em São Paulo; o envio do Dialog não envia
+    // "Só aprovar".
+    await vi.waitFor(() => expect(approveSchedule).toHaveBeenCalledOnce());
+    const [iso] = approveSchedule.mock.calls[0] as [string];
+    expect(iso).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(sameDay.format(new Date(iso))).toBe(ymd);
+    expect(approve).not.toHaveBeenCalled();
+    await expect.element(dialog).not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole('complementary').getByText(/agendado para o dia escolhido/))
+      .toBeVisible();
   });
 });

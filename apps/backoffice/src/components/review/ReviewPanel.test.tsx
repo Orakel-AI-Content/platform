@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MotionGlobalConfig } from 'motion/react';
 import type { ComponentProps } from 'react';
@@ -14,8 +14,9 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 // Painel da revisão (#75): checagens automáticas (workspace#87), checklist com "Marcar todos", com os rótulos recebidos, bloqueio,
 // permissão e a mensagem de aprovação (no toast, #325). As caixas abrem com as confirmações
 // gravadas na versão e gravam a cada clique (#752); a recusa desfaz e é anunciada. No Ecme (#277), o conteúdo fica em Cards;
-// o checklist tem o seu, com "Aprovar" no rodapé (#333). "Devolver ao editor" (#598) tem cartão
-// próprio, com o comentário obrigatório.
+// o checklist tem o seu, com as aprovações no rodapé (#333): "Aprovar e publicar agora", "Aprovar
+// e agendar" e "Só aprovar" (workspace#89), com o desfecho e o aviso de transbordo no cartão.
+// "Devolver ao editor" (#598) tem cartão próprio, com o comentário obrigatório.
 
 beforeAll(() => {
   MotionGlobalConfig.skipAnimations = true;
@@ -66,6 +67,9 @@ function server(initial: readonly string[] = []) {
   };
 }
 
+const APPROVALS = ['Aprovar e publicar agora', 'Aprovar e agendar', 'Só aprovar'] as const;
+const approvals = () => APPROVALS.map((name) => screen.getByRole('button', { name }));
+
 const checkbox = (label: string) => screen.getByRole<HTMLInputElement>('checkbox', { name: label });
 
 // Itens como a página os monta: avisos (capa, link externo fora do ar) não bloqueiam.
@@ -93,6 +97,8 @@ const renderPanel = (props: Partial<Props> = {}) =>
       checklist={checklist}
       canApprove
       approve={vi.fn()}
+      approvePublish={vi.fn()}
+      approveSchedule={vi.fn()}
       giveBack={vi.fn()}
       {...server()}
       {...props}
@@ -110,7 +116,7 @@ describe('painel de revisão', () => {
     expect(document.querySelector('.bg-error-subtle')).toBeNull();
   });
 
-  it('fica em Cards dentro do complementar; o checklist tem cartão próprio com Aprovar no rodapé', () => {
+  it('fica em Cards dentro do complementar; o checklist tem cartão próprio com as aprovações no rodapé', () => {
     renderPanel({ checks: <ReviewChecks items={warnings} /> });
 
     const panel = screen.getByRole('complementary', { name: 'Revisão da versão 2' });
@@ -123,8 +129,10 @@ describe('painel de revisão', () => {
     expect(rest).toHaveLength(2);
     const checklistCard = rest[0];
     expect(checklistCard?.contains(screen.getByRole('heading', { name: 'Checklist' }))).toBe(true);
-    const approve = screen.getByRole('button', { name: 'Aprovar' });
-    expect(checklistCard?.querySelector('.card-footer')?.contains(approve)).toBe(true);
+    const approve = screen.getByRole('button', { name: 'Só aprovar' });
+    for (const button of approvals()) {
+      expect(checklistCard?.querySelector('.card-footer')?.contains(button)).toBe(true);
+    }
     expect(approve.className).toContain('bg-primary');
     expect(main?.contains(approve)).toBe(false);
     expect(panel.querySelector('.sticky')).toBeNull();
@@ -149,7 +157,7 @@ describe('painel de revisão', () => {
     expect(panel.querySelector('a')).toBeNull();
   });
 
-  it('com erro nas checagens, bloqueia aprovar, com o motivo', () => {
+  it('com erro nas checagens, bloqueia as três aprovações, com o motivo', () => {
     renderPanel({ blocked: true, confirmed: allKeys });
 
     // Aviso no Alert de erro do Ecme, com ícone, sem `text-error` à mão e sem região viva: chega
@@ -162,16 +170,17 @@ describe('painel de revisão', () => {
     expect(alert?.querySelector('[aria-hidden="true"] svg')).toBeTruthy();
     expect(blocked.closest('[role="alert"]')).toBeNull();
     expect(document.querySelector('.text-error:not([aria-hidden="true"])')).toBeNull();
-    const button = screen.getByRole('button', { name: 'Aprovar' });
-    expect(button.hasAttribute('disabled')).toBe(true);
-    expect(button.getAttribute('aria-describedby')).toBeTruthy();
-    expect(document.getElementById(button.getAttribute('aria-describedby') ?? '')).toBe(blocked);
+    for (const button of approvals()) {
+      expect(button.hasAttribute('disabled')).toBe(true);
+      expect(button.getAttribute('aria-describedby')).toBeTruthy();
+      expect(document.getElementById(button.getAttribute('aria-describedby') ?? '')).toBe(blocked);
+    }
   });
 
   it('sem content.publish, não há ação de aprovar; o checklist aparece só para leitura', () => {
     renderPanel({ canApprove: false });
 
-    expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    for (const name of APPROVALS) expect(screen.queryByRole('button', { name })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Devolver ao editor' })).toBeNull();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.getByText(checklist[0]!.label)).toBeTruthy();
@@ -185,14 +194,15 @@ describe('painel de revisão', () => {
     expect(checkbox(checklist[2]!.label).checked).toBe(false);
   });
 
-  it('com o checklist incompleto, "Aprovar" fica desabilitado, com o motivo', () => {
+  it('com o checklist incompleto, as três aprovações ficam desabilitadas, com o motivo', () => {
     renderPanel({ confirmed: ['valor_original', 'politicas_anuncios_afiliados'] });
 
-    const button = screen.getByRole('button', { name: 'Aprovar' });
-    expect(button.hasAttribute('disabled')).toBe(true);
-    expect(
-      document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent,
-    ).toBe('Marque todos os itens para aprovar.');
+    for (const button of approvals()) {
+      expect(button.hasAttribute('disabled')).toBe(true);
+      expect(
+        document.getElementById(button.getAttribute('aria-describedby') ?? '')?.textContent,
+      ).toBe('Marque todos os itens para aprovar.');
+    }
   });
 
   it('marcar e desmarcar uma caixa grava na hora, com a chave e o novo estado', async () => {
@@ -217,7 +227,7 @@ describe('painel de revisão', () => {
     await userEvent.click(checkbox(checklist[0]!.label));
 
     await waitFor(() => expect(checkbox(checklist[2]!.label).checked).toBe(true));
-    expect(screen.getByRole('button', { name: 'Aprovar' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Só aprovar' }).hasAttribute('disabled')).toBe(false);
   });
 
   it('falha ao gravar é anunciada e a caixa volta ao estado anterior', async () => {
@@ -257,7 +267,7 @@ describe('painel de revisão', () => {
       await user.keyboard(' ');
     }
     expect(actions.confirm.mock.calls).toEqual(allKeys.map((key) => [key, true]));
-    const button = screen.getByRole('button', { name: 'Aprovar' });
+    const button = screen.getByRole('button', { name: 'Só aprovar' });
     await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false));
     button.focus();
     await user.keyboard('{Enter}');
@@ -276,15 +286,17 @@ describe('painel de revisão', () => {
         checklist={checklist}
         canApprove
         approve={approve}
+        approvePublish={vi.fn()}
+        approveSchedule={vi.fn()}
         giveBack={vi.fn()}
         {...server(allKeys)}
       />,
     );
-    expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Só aprovar' })).toBeNull();
     expect(screen.getByRole('complementary').querySelector('[role="status"]')).toBeNull();
   });
 
-  it('"Marcar todos" grava as três confirmações, e "Aprovar" funciona em seguida', async () => {
+  it('"Marcar todos" grava as três confirmações, e "Só aprovar" funciona em seguida', async () => {
     const approve = vi.fn().mockResolvedValue({ ok: true, message: 'Versão 2 aprovada.' });
     const actions = server();
     renderPanel({ approve, ...actions });
@@ -293,7 +305,7 @@ describe('painel de revisão', () => {
     expect(actions.confirmAll).toHaveBeenCalledExactlyOnceWith(true);
     expect(actions.confirm).not.toHaveBeenCalled();
     for (const item of checklist) expect(checkbox(item.label).checked).toBe(true);
-    const button = screen.getByRole('button', { name: 'Aprovar' });
+    const button = screen.getByRole('button', { name: 'Só aprovar' });
     await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false));
     await userEvent.click(button);
 
@@ -310,11 +322,11 @@ describe('painel de revisão', () => {
     expect(checklist.map((item) => checkbox(item.label).checked)).toEqual([true, false, false]);
   });
 
-  it('só com avisos nas checagens, "Aprovar" fica habilitado', () => {
+  it('só com avisos nas checagens, as aprovações ficam habilitadas', () => {
     renderPanel({ checks: <ReviewChecks items={warnings} />, blocked: false, confirmed: allKeys });
 
     expect(screen.getByText('O link https://x.example não respondeu: HTTP 404')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Aprovar' }).hasAttribute('disabled')).toBe(false);
+    for (const button of approvals()) expect(button.hasAttribute('disabled')).toBe(false);
   });
 
   it('sem content.publish, não há "Marcar todos"', () => {
@@ -333,7 +345,7 @@ describe('painel de revisão', () => {
     });
     renderPanel({ approve, confirmed: allKeys });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Aprovar' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Só aprovar' }));
 
     // Cada formulário tem o próprio resumo (região viva); a recusa vai ao da aprovação.
     const refusal = await screen.findByText(/não é a mais recente/);
@@ -343,11 +355,91 @@ describe('painel de revisão', () => {
   it('versão fora de em revisão mostra o status, sem formulário', () => {
     renderPanel({ status: 'rascunho' });
 
-    expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Só aprovar' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Devolver ao editor' })).toBeNull();
     expect(
       screen.getByText(/Esta versão está rascunho: só uma versão em revisão pode ser aprovada/),
     ).toBeTruthy();
+  });
+
+  it('com content.publish e a versão em revisão, oferece as quatro decisões', () => {
+    renderPanel();
+
+    for (const name of [...APPROVALS, 'Devolver ao editor']) {
+      expect(screen.getByRole('button', { name })).toBeTruthy();
+    }
+  });
+
+  it('publicar na hora diz que o artigo foi ao ar, no cartão e no toast, e tira os formulários', async () => {
+    const approvePublish = vi
+      .fn()
+      .mockResolvedValue({ ok: true, message: 'Versão 2 aprovada: o artigo foi ao ar.' });
+    renderPanel({ approvePublish, confirmed: allKeys });
+    render(<ToastProvider />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Aprovar e publicar agora' }));
+
+    expect(approvePublish).toHaveBeenCalledWith();
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('Versão 2 aprovada: o artigo foi ao ar.'),
+    );
+    const panel = screen.getByRole('complementary');
+    expect(
+      within(panel)
+        .getByText('Versão 2 aprovada: o artigo foi ao ar.')
+        .closest('.bg-success-subtle'),
+    ).toBeTruthy();
+    expect(panel.querySelector('.bg-warning-subtle')).toBeNull();
+    for (const name of [...APPROVALS, 'Devolver ao editor']) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+    }
+  });
+
+  it('com transbordo, o desfecho diz "agendado para" e o aviso de dia cheio fica no cartão', async () => {
+    const message = 'Versão 2 aprovada: o artigo foi agendado para 13/11/2026, 10:00 BRT.';
+    const warning = 'O dia pedido já tinha atingido o limite diário de publicações do site.';
+    const approvePublish = vi.fn().mockResolvedValue({ ok: true, message, warning });
+    renderPanel({ approvePublish, confirmed: allKeys });
+    render(<ToastProvider />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Aprovar e publicar agora' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe(`${message} ${warning}`),
+    );
+    const panel = screen.getByRole('complementary');
+    expect(within(panel).getByText(message).closest('.bg-success-subtle')).toBeTruthy();
+    expect(within(panel).getByText(warning).closest('.bg-warning-subtle')).toBeTruthy();
+  });
+
+  it('recusa de publicar vai ao resumo do formulário e as caixas continuam marcadas', async () => {
+    const approvePublish = vi.fn().mockResolvedValue({
+      ok: false,
+      message: 'Não foi possível aprovar.',
+      issues: [{ path: [], message: 'O site exemplo-a não tem vaga de publicação' }],
+    });
+    renderPanel({ approvePublish, confirmed: allKeys });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Aprovar e publicar agora' }));
+
+    const refusal = await screen.findByText('O site exemplo-a não tem vaga de publicação');
+    expect(refusal.closest('[role="alert"]')).not.toBeNull();
+    for (const item of checklist) expect(checkbox(item.label).checked).toBe(true);
+    for (const button of approvals()) expect(button.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('"Aprovar e agendar" abre o Dialog de agendamento; Cancelar fecha sem decidir', async () => {
+    const approveSchedule = vi.fn();
+    renderPanel({ approveSchedule, confirmed: allKeys });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Aprovar e agendar' }));
+    expect(screen.getByRole('dialog', { name: 'Agendar publicação' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Agendar publicação' })).toBeNull(),
+    );
+    expect(approveSchedule).not.toHaveBeenCalled();
   });
 
   it('devolver exige o comentário: vazio não chama a ação e o erro fica no campo', async () => {
@@ -386,7 +478,7 @@ describe('painel de revisão', () => {
       expect(screen.getByRole('status').textContent).toBe('Versão 2 devolvida ao editor.'),
     );
     expect(screen.queryByRole('button', { name: 'Devolver ao editor' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Aprovar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Só aprovar' })).toBeNull();
   });
 
   it('recusa do comentário pelo domínio aparece no campo', async () => {
