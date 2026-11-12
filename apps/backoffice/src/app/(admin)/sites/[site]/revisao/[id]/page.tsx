@@ -24,7 +24,14 @@ import { previewUrl } from '../../conteudos/content-urls.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { sitePageContext } from '../../editorial-page.tsx';
-import { approveAction, confirmAction, confirmAllAction, returnAction } from '../actions.ts';
+import {
+  approveAction,
+  approvePublishAction,
+  approveScheduleAction,
+  confirmAction,
+  confirmAllAction,
+  returnAction,
+} from '../actions.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +49,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 /**
  * Tela de revisão (#75): a versão mais recente na visualização do site (iframe) e, ao lado, as
  * checagens automáticas (workspace#87: as calculadas na leitura e a dos links externos, gravada
- * pelo job), o checklist com as confirmações gravadas na versão (#752), a aprovação e a devolução ao editor (#598). Ler exige site.read; aprovar só
+ * pelo job), o checklist com as confirmações gravadas na versão (#752), as decisões (só aprovar,
+ * aprovar e publicar agora ou agendar, workspace#89) e a devolução ao editor (#598). Ler exige site.read; aprovar só
  * aparece com content.publish, e o domínio confere tudo de novo. Tela de detalhe do guia (#373),
  * na ordem invertida do `CustomerDetails`: a prévia é o conteúdo principal, com a largura do
  * `main`, e o painel fica abaixo dela até `xl` e ao lado a partir dele.
@@ -120,6 +128,8 @@ export default async function ReviewPage({ params }: Params) {
             confirm={confirmAction.bind(null, site.id, contentId, latest.version)}
             confirmAll={confirmAllAction.bind(null, site.id, contentId, latest.version)}
             approve={approveAction.bind(null, site.id, contentId, latest.version)}
+            approvePublish={approvePublishAction.bind(null, site.id, contentId, latest.version)}
+            approveSchedule={approveScheduleAction.bind(null, site.id, contentId, latest.version)}
             giveBack={returnAction.bind(null, site.id, contentId, latest.version)}
           />
         </div>
