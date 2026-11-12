@@ -165,6 +165,12 @@ export const contentVersions = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /** E-mail de quem criou a versão (`generator` no gerador); nulo nas anteriores à #748. */
     createdBy: text(),
+    /**
+     * Data de publicação automática (ADR 0022): a exportação troca `data.publishedAt` pela
+     * primeira publicação do conteúdo. Desliga quando um salvamento troca a data, e na
+     * importação, cuja data vem do acervo.
+     */
+    publishedAtAuto: boolean().notNull().default(true),
   },
   (t) => [primaryKey({ columns: [t.siteId, t.contentId, t.version] })],
 );

@@ -229,7 +229,12 @@ export async function createContent(
   actor: Actor,
   siteId: string,
   input: ContentEdit,
-  options: WriteOptions & { status?: Status; resources?: Resources } = {},
+  options: WriteOptions & {
+    status?: Status;
+    resources?: Resources;
+    /** Data de publicação automática (ADR 0022); a importação desliga: a data vem do acervo. */
+    publishedAtAuto?: boolean;
+  } = {},
 ): Promise<Result<{ id: number }>> {
   const status = options.status ?? 'rascunho';
   const allowed = checkWrite(actor);
@@ -260,6 +265,7 @@ export async function createContent(
     status,
     data: data.value,
     createdBy: actor.email,
+    publishedAtAuto: options.publishedAtAuto ?? true,
   });
   await recordPendingChange(tx, siteId, 'content', String(id));
   return { ok: true, value: { id } };
@@ -292,6 +298,9 @@ function sameData(a: ContentData, b: ContentData): boolean {
  * Dados iguais aos da versão mais recente não gravam nada (#523): nem versão, nem
  * `nextBlockN`, nem mudança pendente; devolve a versão atual com `created: false`, e ela
  * continua com o status que tinha. Bloco novo sempre conta como alteração.
+ *
+ * A versão nova herda a data de publicação automática da anterior e a desliga quando
+ * `publishedAt` muda (ADR 0022).
  */
 export async function updateContent(
   tx: Executor,
@@ -310,7 +319,11 @@ export async function updateContent(
     .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)))
     .for('update');
   const [latest] = await tx
-    .select({ version: contentVersions.version, data: contentVersions.data })
+    .select({
+      version: contentVersions.version,
+      data: contentVersions.data,
+      publishedAtAuto: contentVersions.publishedAtAuto,
+    })
     .from(contentVersions)
     .where(and(eq(contentVersions.siteId, siteId), eq(contentVersions.contentId, contentId)))
     .orderBy(desc(contentVersions.version))
@@ -362,6 +375,11 @@ export async function updateContent(
     status: 'rascunho',
     data: data.value,
     createdBy: actor.email,
+    // Trocar a data a torna definida por pessoa, nesta e nas próximas versões (ADR 0022). Compara
+    // o instante: o mesmo horário com outro offset não é troca.
+    publishedAtAuto:
+      latest.publishedAtAuto &&
+      Date.parse(data.value.publishedAt) === Date.parse(latest.data.publishedAt),
   });
   await tx
     .update(contents)

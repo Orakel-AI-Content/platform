@@ -80,7 +80,11 @@ export async function importSnapshot(
         ...snapshot.contents.map(
           ({ id, ...data }) =>
             () =>
-              createContent(tx, actor, siteId, data, { id, status: 'publicado' }),
+              createContent(tx, actor, siteId, data, {
+                id,
+                status: 'publicado',
+                publishedAtAuto: false,
+              }),
         ),
       ];
       for (const step of steps) {
