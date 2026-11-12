@@ -89,11 +89,12 @@ describe('aba Publicação', () => {
     renderTab({ open: null, history: [finished] });
 
     const heading = screen.getByRole('heading', { name: 'Histórico' });
-    const table = screen.getByRole('table', { name: 'Histórico do site' });
+    // O histórico é a linha do tempo fora do painel de etapas (#651).
+    const timeline = screen.getAllByRole('list').find((list) => !panel().contains(list));
     const follows = (a: Node, b: Node) =>
       Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(follows(panel(), heading)).toBe(true);
-    expect(follows(heading, table)).toBe(true);
+    expect(timeline && follows(heading, timeline)).toBe(true);
     // A ação do ciclo de vida fica na etapa Infra e zona.
     expect(
       within(panel())

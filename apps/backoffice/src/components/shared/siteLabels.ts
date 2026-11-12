@@ -1,7 +1,11 @@
 import type { Block } from '@orakel/content-model/v1';
 
 import type { BuildKind, BuildStatus, SiteEventKind } from '@/db/schema/operations.ts';
-import type { ExecutionHistoryItem, OpenExecution } from '@/domain/builds/builds.ts';
+import type {
+  ExecutionHistoryItem,
+  OpenExecution,
+  SiteHistoryItem,
+} from '@/domain/builds/builds.ts';
 import type { BuildStage } from '@/domain/builds/run-build.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { PendingOrigin } from '@/domain/pending-changes/record.ts';
@@ -142,6 +146,23 @@ export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {
   render: 'Renderização',
   publish: 'Publicação',
 };
+
+/**
+ * Título de um item da linha do tempo do histórico (#651): o tipo e, na execução, o resultado
+ * que o status sozinho não diz (o cancelamento e a etapa da falha); na pausa, o motivo.
+ */
+export function historyItemTitle(item: SiteHistoryItem): string {
+  const kind = HISTORY_KIND_LABEL[item.kind];
+  if (item.type === 'evento') {
+    return item.kind === 'pausa' && item.reason ? `${kind}: ${item.reason}` : kind;
+  }
+  if (item.status === 'cancelado') return `${kind} cancelada`;
+  if (item.status === 'failed') {
+    const stage = item.failure?.stage;
+    return stage ? `${kind} · falhou na etapa ${BUILD_STAGE_LABEL[stage]}` : `${kind} · falhou`;
+  }
+  return kind;
+}
 
 /** Resultado de uma execução terminada, na faixa de status ao vivo (#638). */
 const LIVE_RESULT_LABEL: Record<ExecutionHistoryItem['status'], string> = {

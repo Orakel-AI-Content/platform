@@ -95,19 +95,16 @@ describe('SiteLiveActivity', () => {
     expect(region().textContent).toBe('Publicação falhou em 11/10/2026, 14:05 BRT');
   });
 
-  it('a tabela do histórico passa a mostrar a execução que terminou', async () => {
+  it('a linha do tempo do histórico passa a mostrar a execução que terminou', async () => {
     status.mockResolvedValue({ open: null, history: [finished, PAUSE] });
     renderLive({ open: running, history: [PAUSE] });
 
-    const table = screen.getByRole('table', { name: 'Histórico do site' });
-    expect(within(table).queryByText('Falhou')).toBeNull();
+    expect(within(screen.getByRole('list')).queryByText('Falhou')).toBeNull();
     await tick();
-    const rows = within(screen.getByRole('table', { name: 'Histórico do site' })).getAllByRole(
-      'row',
-    );
-    expect(rows).toHaveLength(3);
-    expect(within(rows[1] as HTMLElement).getByText('Publicação')).toBeTruthy();
-    expect(within(rows[1] as HTMLElement).getByText('Falhou')).toBeTruthy();
+    const items = within(screen.getByRole('list')).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(within(items[0] as HTMLElement).getByText(/^Publicação/)).toBeTruthy();
+    expect(within(items[0] as HTMLElement).getByText('Falhou')).toBeTruthy();
   });
 
   it('sem execução aberta, não consulta a Server Action nem mostra faixa', async () => {

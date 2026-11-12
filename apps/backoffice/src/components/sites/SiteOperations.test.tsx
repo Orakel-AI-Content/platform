@@ -21,7 +21,7 @@ import { type PublicationSite, SitePublicationSteps } from './SitePublicationSte
 
 // Ações de operação nas etapas da aba "Publicação" (#648; antes no cabeçalho, #595):
 // "Reconstruir na release" na Versão, "Publicar agora" na Build, "Escolher outra versão" na No ar
-// e, pausado, "Retomar" na linha Site, cada uma com a confirmação de hoje (#327, #514, #515); o
+// e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", cada uma com a confirmação de hoje (#327, #514, #515); o
 // sucesso vai ao toast e a recusa de qualquer uma ao `SiteOperationsAlert`, abaixo do painel.
 // "Cancelar" fica ao lado de "Publicar agora" com publicação na fila e no lugar dele em
 // andamento; "Desfazer última publicação" fica ao lado de "Escolher outra versão" (#649). Foco no navegador, em
@@ -108,7 +108,7 @@ function Panel({ activity = { open: null, history: [] }, ...props }: Props) {
         paused={paused}
       >
         <SitePublicationSteps
-          site={{ ...SITE, state: paused ? 'pausado' : 'ativo' }}
+          site={{ ...SITE, state: paused ? 'pausado' : 'ativo', pausedReason }}
           instance={{ activePages: 120, activeSince: null }}
           activity={activity}
           actions={{
@@ -137,13 +137,14 @@ const PREVIOUS = VERSIONS[0]!;
 
 const ALL: Props = {
   publish: ok('Build de exemplo-a enfileirado.'),
+  pause: ok('exemplo-a pausado.'),
   resume: ok('exemplo-a retomado; build enfileirado.'),
   rebuild: { releases: RELEASES, action: ok('Build enfileirado.') },
   rollback: { versions: VERSIONS, action: ok('Reversão enfileirada.') },
   cancel: ok('Publicação de exemplo-a cancelada.'),
 };
 
-function renderPanel(props: Props) {
+function renderPanel(props: ComponentProps<typeof Panel>) {
   return render(<Panel {...props} />, { container: app });
 }
 
@@ -161,25 +162,26 @@ const stepButtons = (index: number) =>
 const alert = () => within(screen.getByTestId('alert')).getByRole('alert');
 
 describe('ações nas etapas', () => {
-  it('cada ação na sua etapa: Versão, Build e No ar; nenhuma em Infra e zona nem em Site', () => {
+  it('cada ação na sua etapa: Versão, Build, No ar e "Pausar" em Site; nenhuma em Infra e zona', () => {
     renderPanel(ALL);
 
     expect(stepButtons(0)).toEqual([]);
     expect(stepButtons(1)).toEqual(['Reconstruir na release exemplo-a']);
     expect(stepButtons(2)).toEqual(['Publicar agora exemplo-a']);
     expect(stepButtons(3)).toEqual(['Escolher outra versão exemplo-a']);
-    expect(stepButtons(4)).toEqual([]);
+    expect(stepButtons(4)).toEqual(['Pausar exemplo-a']);
     const publish = screen.getByRole('button', { name: 'Publicar agora exemplo-a' });
     expect(publish.className).toContain('text-error');
     expect(publish.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
   });
 
-  it('pausado, "Retomar" na linha Site e "Publicar agora" some', () => {
+  it('pausado, "Retomar" no lugar de "Pausar" na linha Site e "Publicar agora" some', () => {
     renderPanel({ ...ALL, paused: true });
 
     expect(stepButtons(2)).toEqual([]);
     expect(stepButtons(4)).toEqual(['Retomar exemplo-a']);
     expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Pausar/ })).toBeNull();
   });
 
   it('com publicação na fila, "Publicar agora" (pula a janela) e "Cancelar" na Build', () => {

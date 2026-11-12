@@ -211,6 +211,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                   release={site.release}
                   timeZone={site.timeZone}
                   publish={publishNow}
+                  pause={pauseSiteAction.bind(null, site.id)}
                   resume={resumeSiteAction}
                   rebuild={
                     releases?.ok

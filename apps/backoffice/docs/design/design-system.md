@@ -501,20 +501,22 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   na coluna da direita, a 1440 × 900 o resumo inteiro cabe na primeira tela. A atividade do
   site fica na aba "Publicação" (#647; juntou "Ciclo de vida" e "Histórico", #637, que era a
   "Builds"), abaixo do painel de etapas e do título "Histórico", para todos os perfis, no
-  `SiteBuildsTable` (`src/components/sites/SiteBuildsTable.tsx`): a `Table` do Ecme direto,
-  não o `DataTable` (até 50 linhas de `siteActivity`, sem busca, ordem nem paginação), com
-  Tipo (publicação, reversão, troca de versão, pausa, retomada), Status (`StateTag`, só nas
-  execuções; "—" nos eventos), Quem, Quando (no fuso do site) e Versão; sem itens, o
-  `EmptyState` "Nenhuma atividade ainda.". A linha de uma falha tem o `IconButton` "Ver
-  detalhe" e abre, pelo botão ou pelo clique na linha, o `Drawer` à direita
-  (`SiteExecutionDrawer`) com quando, quem pediu, etapa, mensagem e o fim do log num `<pre>`
-  rolável e focável; o foco volta ao botão da linha. A linha não é focável: a tabela continua
-  tabela para o leitor de tela. Acima da tabela, a faixa de status ao vivo (#638,
+  `SiteBuildsTable` (`src/components/sites/SiteBuildsTable.tsx`): o `Timeline` do Ecme (#651;
+  era a `Table`, #637), um item por acontecimento (até 50 de `siteActivity`, do mais recente ao
+  mais antigo, sem busca nem paginação). Cada item tem o título com o tipo (publicação,
+  reversão, troca de versão, pausa, retomada) e o que o status não diz ("Publicação
+  cancelada", "Publicação · falhou na etapa Renderização", "Pausa: <motivo>"), o status na
+  `StateTag` (só nas execuções) e, embaixo, quem (no cancelamento, quem cancelou), quando no
+  fuso do site e a versão, quando há. O marcador é decorativo, na cor do status (cinza nos
+  eventos). Sem itens, o `EmptyState` "Nenhuma atividade ainda.". O item de uma falha tem o
+  `IconButton` "Ver detalhe", que abre o `Drawer` à direita (`SiteExecutionDrawer`) com
+  quando, quem pediu, etapa, mensagem e o fim do log num `<pre>` rolável e focável; o foco
+  volta ao botão do item. O item em si não é clicável nem focável. Acima da tabela, a faixa de status ao vivo (#638,
   `SiteLiveActivity`): um `Alert` do Ecme (`info`) com a execução aberta, "na fila" com o
   horário previsto no fuso do site ou "em andamento" com a etapa, e, quando ela termina, o
   resultado (`success`, `danger` ou `warning` para concluída, falhou ou cancelada). O `Alert`
   fica dentro de um contêiner `role="status"` sempre montado, que anuncia cada mudança. Enquanto
-  há execução aberta, a aba relê painel, faixa e tabela pela `siteActivityAction` a cada 3 s
+  há execução aberta, a aba relê painel, faixa e histórico pela `siteActivityAction` a cada 3 s
   (`usePolling`), uma consulta só para os três (`SitePublicationTab`); sem execução aberta,
   não consulta e não mostra faixa.
 - **Eventos em ordem cronológica:** `Timeline` (`src/components/ui/Timeline`) para uma lista
