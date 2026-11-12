@@ -2,14 +2,13 @@
 
 import { useMemo, useTransition, type ReactNode } from 'react';
 
-import { ActionAlert, pushSuccess, useActionResult } from '@/components/shared/ActionFeedback.tsx';
+import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import DataTable, { type ColumnDef } from '@/components/shared/DataTable';
 import { EmptyState, NoResults } from '@/components/shared/EmptyState';
 import { ListToolbar } from '@/components/shared/ListControls.tsx';
 import { formatDateTime, type StateTagColor } from '@/components/shared/siteLabels.ts';
 import { TwoLines } from '@/components/shared/TwoLines';
-import { useCreatedAnnouncement } from '@/components/shared/useCreatedAnnouncement.ts';
 import { useListTable } from '@/components/shared/useListTable';
 import type { ListConfig } from '@/components/shared/useListState.ts';
 import { StateTag } from '@/components/sites/SiteStatus';
@@ -143,16 +142,13 @@ export function ReleasesTable({
   rows,
   recheck,
   emptyAction,
-  created,
   labelledBy,
 }: {
   rows: ReleaseRecord[];
   /** Action de reconferir a imagem; sem ela, a coluna de ações não aparece. */
   recheck?: RecheckReleaseImage;
-  /** Ação principal da tela (registrar release), repetida no estado vazio. */
+  /** Ação principal da tela (gerar nova versão), repetida no estado vazio. */
   emptyAction?: ReactNode;
-  /** Release recém-registrada (`?registrada=<tag>`): anuncia a confirmação e tira a marca. */
-  created?: string;
   /** Id do título da lista, que dá nome à tabela. */
   labelledBy?: string;
 }) {
@@ -161,10 +157,6 @@ export function ReleasesTable({
   const onResult = useCallbackRef(report);
   const columns = useMemo(() => columnsFor(recheck, onResult), [recheck, onResult]);
   const { list, tableProps } = useListTable({ config: LIST, columns, data: rows });
-  useCreatedAnnouncement(
-    created === undefined ? undefined : `Release ${created} registrada.`,
-    pushSuccess,
-  );
   if (rows.length === 0) {
     return <EmptyState action={emptyAction}>Nenhuma release registrada.</EmptyState>;
   }

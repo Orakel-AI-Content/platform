@@ -154,11 +154,11 @@ describe('ReleasesTable', () => {
 
   it('sem releases, o estado vazio com a ação', () => {
     render(
-      <ReleasesTable rows={[]} emptyAction={<button type="button">Registrar release</button>} />,
+      <ReleasesTable rows={[]} emptyAction={<button type="button">Gerar nova versão</button>} />,
     );
 
     expect(screen.getByText('Nenhuma release registrada.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Registrar release' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Gerar nova versão' })).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();
   });
 });
