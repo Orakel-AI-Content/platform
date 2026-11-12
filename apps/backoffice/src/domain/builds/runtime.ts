@@ -25,6 +25,11 @@ export interface ContainerRuntime {
    * `SITE_BUILDER_IMAGE:<tag>`; o proxy libera a rota, mas não enxerga o nome (ADR 0021 da raiz).
    */
   pullImage(image: string): Promise<void>;
+  /**
+   * Dá a `target` a imagem que já está em `source`, no host (driver local da release, ADR 0023
+   * da raiz). Os dois são `SITE_BUILDER_IMAGE:<tag>`; a rota só é liberada no proxy do local.
+   */
+  tagImage(source: string, target: string): Promise<void>;
   createVolume(name: string, labels: Record<string, string>): Promise<void>;
   /** Cria e inicia; devolve o ID do container. */
   start(spec: ContainerSpec): Promise<string>;

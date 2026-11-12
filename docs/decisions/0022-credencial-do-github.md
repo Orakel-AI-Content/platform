@@ -1,6 +1,6 @@
 # 0022 – Credencial do GitHub no build-runner
 
-- Status: aceito
+- Status: aceito (sem o PAT, o build-runner não sobe com o driver `github`: 0023)
 - Data: 2026-11-11
 
 ## Contexto
@@ -28,7 +28,8 @@ pacote privado, também precisaria de credencial.
 - O pacote `site-builder` no GHCR é público: o pull (ADR 0021) não usa credencial, e o PAT não
   precisa de `packages:read`.
 - Sem `GITHUB_RELEASE_TOKEN`, o build-runner sobe igual e a release pedida vai a `falhou` com
-  o motivo. O ambiente local não usa GitHub (driver local, #662).
+  o motivo. O ambiente local não usa GitHub (driver local, #662). Revisado pelo 0023: com
+  `RELEASE_DRIVER=github` (padrão), o schema exige o PAT e o build-runner não sobe sem ele.
 
 ### Passos manuais
 

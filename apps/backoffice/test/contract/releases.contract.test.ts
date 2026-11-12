@@ -208,6 +208,7 @@ async function check(
     db,
     runtime,
     settings,
+    driver: { kind: 'github', github: {} as GitHubClient },
     now: () => CHECKED_AT.getTime(),
   })({ tag }, attempt);
   return pulled;
@@ -515,7 +516,10 @@ describe('disparo e acompanhamento do run (#660)', () => {
       getRun: () => Promise.reject(new Error('getRun inesperado')),
       ...github,
     };
-    await createReleaseRunTask({ db, github: fake, now: () => NOW })({ tag }, helpers);
+    await createReleaseRunTask({ db, driver: { kind: 'github', github: fake }, now: () => NOW })(
+      { tag },
+      helpers,
+    );
   }
   const completed = (conclusion: string): WorkflowRun => ({
     status: 'completed',

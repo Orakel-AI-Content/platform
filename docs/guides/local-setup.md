@@ -229,6 +229,16 @@ site-builder, quando usar "Reconstruir na release", "Reverter" e "Publicar agora
 testar uma versão nova no local:
 [README, "Versão do site-builder e builds"](../../README.md#versão-do-site-builder-e-builds).
 
+### Gerar nova versão
+
+No local, "Gerar nova versão" (Releases) não usa GitHub nem GHCR: o `build-runner` sobe com
+`RELEASE_DRIVER=local`, dá o CI como concluído e etiqueta a `site-builder:local` do host como
+`site-builder:X.Y.Z` (ADR 0023 da raiz). A versão é uma cópia da imagem do momento: rode
+`pnpm local:images` antes, se o site-builder mudou. Sem a `site-builder:local` no host, a
+release termina em "falhou" pedindo o `pnpm local:images`. Para a rodada com o GitHub de
+verdade, defina `GITHUB_RELEASE_TOKEN` no `.env.local` e suba com
+`LOCAL_RELEASE_DRIVER=github pnpm local:up`.
+
 ## Geração
 
 A aba Geração de cada site (`/sites/<site>/geracao`) dispara um artigo por tema; o

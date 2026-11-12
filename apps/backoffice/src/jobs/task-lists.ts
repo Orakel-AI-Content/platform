@@ -58,7 +58,7 @@ export const WORKER_CRONTAB = [
  * a credencial do GitHub (ADR 0022 da raiz); concorrência 2.
  */
 export function buildRunnerTasks(
-  deps: BuildTaskDeps & Pick<ReleaseRunTaskDeps, 'github'>,
+  deps: BuildTaskDeps & Pick<ReleaseRunTaskDeps, 'driver'>,
 ): TaskList {
   return {
     build: createBuildTask(deps),

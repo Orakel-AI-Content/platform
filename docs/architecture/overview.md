@@ -71,6 +71,8 @@ versão; o parse ignora campos desconhecidos. Versão do site-builder pelo
 cria a tag `site-builder-vX.Y.Z` (major = muda o schema
 da API ou exige migração de configuração; ADR 0018). Quem dispara é o job `release-run` do
 `build-runner`, o único processo com o PAT do GitHub, que acompanha o run até o fim (ADR 0022).
+No local, o driver `local` dispensa o GitHub e etiqueta a `site-builder:local` do host como
+`X.Y.Z` (ADR 0023).
 
 ## Mapa das unidades
 

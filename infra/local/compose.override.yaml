@@ -196,9 +196,26 @@ services:
       # Destino do publish no local; o container publish o alcança pela rede publish.
       EDGE_LOCAL_URL: http://edge-local:8081
       LLM_MODEL: ${LOCAL_LLM_MODEL:-fixture}
+      # "Gerar nova versão" sem GitHub nem GHCR (ADR 0023 da raiz): etiqueta a site-builder:local
+      # do host como X.Y.Z. A rodada com o GitHub de verdade: LOCAL_RELEASE_DRIVER=github e o
+      # GITHUB_RELEASE_TOKEN no .env.local.
+      RELEASE_DRIVER: ${LOCAL_RELEASE_DRIVER:-local}
     depends_on:
       s3-init:
         condition: service_completed_successfully
+
+  # Mesma lista da VPS (ADRs 0011 e 0021) mais a rota de tag da imagem (images/<nome>/tag), só
+  # aqui, para o driver local da release (ADR 0023). O compose troca o `command` inteiro: mudou
+  # a lista em infra/vps/compose.yaml, repita aqui.
+  docker-socket-proxy:
+    command:
+      - -loglevel=info
+      - -listenip=0.0.0.0
+      - -allowfrom=build-runner
+      - -allowHEAD=^(/v1\.[0-9]+)?/_ping$
+      - -allowGET=^(/v1\.[0-9]+)?/(_ping|version|containers/[a-zA-Z0-9_.-]+/(json|logs|archive)|images/.+/json|volumes/[a-zA-Z0-9_.-]+)$
+      - -allowPOST=^(/v1\.[0-9]+)?/(containers/create|containers/[a-zA-Z0-9_.-]+/(start|wait|kill)|volumes/create|images/create|images/.+/tag)$
+      - -allowDELETE=^(/v1\.[0-9]+)?/(containers|volumes)/[a-zA-Z0-9_.-]+$
 
   # --- Perfil observability (ADR 0015 da raiz) ---------------------------------------------
   # Erros (GlitchTip, compatível com o Sentry) e heartbeats (Healthchecks). DSN e URL de ping

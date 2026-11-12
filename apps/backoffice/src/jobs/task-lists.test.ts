@@ -41,7 +41,7 @@ describe('build-runner', () => {
       db: {} as Db,
       runtime: {} as ContainerRuntime,
       settings: {} as BuildSettings,
-      github: undefined,
+      driver: { kind: 'local' },
     });
     const worker = workerTasks({
       db: {} as Db,
