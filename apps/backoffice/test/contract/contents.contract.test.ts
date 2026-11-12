@@ -11,7 +11,7 @@ import {
   reviews,
 } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
-import { GENERATOR_ACTOR, SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
+import { GENERATOR_ACTOR, SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import {
   amendInReview,
   countContentsByStatus,
@@ -810,7 +810,7 @@ describe('corrigir em revisão (#750)', () => {
   const REVISOR = { email: 'revisor@orakel.local', roles: ['revisor' as const] };
   const EDITOR = { email: 'editor@orakel.local', roles: ['editor' as const] };
 
-  const amend = (contentId: number, version: number, input: ContentEdit, actor = REVISOR) =>
+  const amend = (contentId: number, version: number, input: ContentEdit, actor: Actor = REVISOR) =>
     db.transaction((tx) => amendInReview(tx, actor, SITE, contentId, version, input));
 
   /** Conteúdo 1 com a versão 2 em revisão e as três confirmações gravadas pelo revisor. */
