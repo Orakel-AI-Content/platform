@@ -15,8 +15,7 @@ import { openSnapshot } from '../../src/domain/export/snapshot.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { publishScheduledVersion, publishVersion } from '../../src/domain/publications/publish.ts';
 import { schedulePublication } from '../../src/domain/publications/schedule.ts';
-import { approveVersion, REVIEW_CHECKLIST } from '../../src/domain/reviews/reviews.ts';
-import { resetDatabase, setupDatabase } from './helpers.ts';
+import { confirmAndApprove, resetDatabase, setupDatabase } from './helpers.ts';
 
 // Data de publicação automática (#758, ADR 0022): a exportação troca a data da versão pela
 // primeira publicação do conteúdo, salvo data definida por pessoa ou vinda da importação.
@@ -25,7 +24,6 @@ let db: Db;
 let close: () => Promise<void>;
 
 const SITE = 'exemplo-a';
-const ALL = REVIEW_CHECKLIST.map((item) => item.key);
 const REVIEWER: Actor = { email: 'revisor@orakel.local', roles: ['revisor'] };
 const FIRST = new Date('2026-11-04T10:00:00-03:00');
 const LATER = new Date('2026-11-06T15:30:00-03:00');
@@ -96,7 +94,7 @@ async function approve(contentId: number): Promise<number> {
   if (last === undefined) throw new Error(`conteúdo ${String(contentId)} sem versão`);
   await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
   const approved = await db.transaction((tx) =>
-    approveVersion(tx, REVIEWER, SITE, contentId, last.version, ALL),
+    confirmAndApprove(tx, REVIEWER, SITE, contentId, last.version),
   );
   if (!approved.ok) throw new Error(JSON.stringify(approved.issues));
   return last.version;
