@@ -128,6 +128,12 @@ describe('painel de etapas', () => {
     ]);
   });
 
+  it('sem operations.run, nem "Cancelar" com publicação aberta nem "Desfazer" (#649)', () => {
+    renderPanel({}, activity(QUEUED, [BUILD_OK]));
+
+    expect(screen.queryAllByRole('button')).toEqual([]);
+  });
+
   it('com as ações, cada uma abaixo do estado da sua etapa', () => {
     render(
       <SitePublicationSteps
