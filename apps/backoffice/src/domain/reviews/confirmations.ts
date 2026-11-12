@@ -144,3 +144,45 @@ export async function reviewConfirmations(
     }),
   };
 }
+
+/**
+ * Confirmações que sobrevivem a uma correção que não mexe no texto (título, descrição ou
+ * blocos): valor original e políticas julgam o texto. A visualização conferida cai com
+ * qualquer mudança, porque o que vai ao site mudou.
+ */
+const TEXT_KEYS: readonly ReviewChecklistKey[] = ['valor_original', 'politicas_anuncios_afiliados'];
+
+/**
+ * Carrega para a versão `to` as confirmações de `from` que a correção em revisão não afeta
+ * (#750): nenhuma se o texto mudou, senão as de `TEXT_KEYS`. Mantém quem marcou e quando: a
+ * confirmação é de quem conferiu. Sem checar permissão: roda dentro de `amendInReview`.
+ */
+export async function carryConfirmations(
+  tx: Executor,
+  siteId: string,
+  contentId: number,
+  from: number,
+  to: number,
+  textChanged: boolean,
+): Promise<void> {
+  if (textChanged) return;
+  const rows = await tx
+    .select({
+      key: reviewConfirmationsTable.key,
+      confirmedBy: reviewConfirmationsTable.confirmedBy,
+      confirmedAt: reviewConfirmationsTable.confirmedAt,
+    })
+    .from(reviewConfirmationsTable)
+    .where(
+      and(
+        eq(reviewConfirmationsTable.siteId, siteId),
+        eq(reviewConfirmationsTable.contentId, contentId),
+        eq(reviewConfirmationsTable.version, from),
+        inArray(reviewConfirmationsTable.key, [...TEXT_KEYS]),
+      ),
+    );
+  if (rows.length === 0) return;
+  await tx
+    .insert(reviewConfirmationsTable)
+    .values(rows.map((row) => ({ siteId, contentId, version: to, ...row })));
+}

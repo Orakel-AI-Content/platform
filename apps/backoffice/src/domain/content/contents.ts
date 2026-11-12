@@ -37,7 +37,9 @@ import {
 import { allocateId } from '../../db/site-ids.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
+import { carryConfirmations } from '../reviews/confirmations.ts';
 import { enqueueLinkCheck } from '../reviews/link-checks.ts';
+import { lockVersionInReview } from '../reviews/reviews.ts';
 import { checkWrite, type WriteOptions } from './write.ts';
 
 type Status = (typeof CONTENT_STATUSES)[number];
@@ -270,7 +272,7 @@ export async function createContent(
  * e as chaves saem ordenadas, porque o Postgres não preserva a ordem. Sem `node:util`: o
  * módulo também é importado pelos testes de navegador.
  */
-function canonical(data: ContentData): string {
+function canonical(data: unknown): string {
   return JSON.stringify(data, (_key, value: unknown) =>
     value !== null && typeof value === 'object' && !Array.isArray(value)
       ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
@@ -283,27 +285,36 @@ function sameData(a: ContentData, b: ContentData): boolean {
   return canonical(a) === canonical(b);
 }
 
+/** Título, descrição e blocos: o texto da versão, de que dependem as confirmações de conteúdo. */
+function sameText(a: ContentData, b: ContentData): boolean {
+  const text = ({ title, description, blocks }: ContentData) =>
+    canonical({ title, description, blocks });
+  return text(a) === text(b);
+}
+
+/** Resultado da gravação da versão N+1: `textChanged` diz se título, descrição ou blocos mudaram. */
+type NextVersion = { version: number; created: boolean; textChanged: boolean };
+
 /**
- * Edita um conteúdo: grava a versão N+1 em `rascunho` (as anteriores ficam intactas). Bloco
- * existente mantém o `n` da versão mais recente; bloco novo recebe `nextBlockN`, em ordem, e
- * o `n` nunca é reutilizado. A linha de `contents` fica travada até o fim da transação: duas
- * edições simultâneas não calculam a mesma versão nem os mesmos `n`.
+ * Núcleo da edição e da correção em revisão, sem checar permissão (quem chama checa): valida a
+ * edição contra a versão mais recente e grava a N+1 com o `status` pedido. Bloco existente
+ * mantém o `n` da versão mais recente; bloco novo recebe `nextBlockN`, em ordem, e o `n` nunca
+ * é reutilizado. A linha de `contents` fica travada até o fim da transação: duas gravações
+ * simultâneas não calculam a mesma versão nem os mesmos `n`.
  *
  * Dados iguais aos da versão mais recente não gravam nada (#523): nem versão, nem
  * `nextBlockN`, nem mudança pendente; devolve a versão atual com `created: false`, e ela
  * continua com o status que tinha. Bloco novo sempre conta como alteração.
  */
-export async function updateContent(
+async function writeNextVersion(
   tx: Executor,
   actor: Actor,
   siteId: string,
   contentId: number,
   input: ContentEdit,
-  resources: Resources = RESOURCES,
-): Promise<Result<{ version: number; created: boolean }>> {
-  const allowed = checkWrite(actor);
-  if (!allowed.ok) return allowed;
-
+  resources: Resources,
+  status: 'rascunho' | 'em_revisao',
+): Promise<Result<NextVersion>> {
   const [content] = await tx
     .select({ kind: contents.kind, nextBlockN: contents.nextBlockN })
     .from(contents)
@@ -351,7 +362,7 @@ export async function updateContent(
   const data = await validateContentData(tx, siteId, contentId, { ...input, blocks }, resources);
   if (!data.ok) return data;
   if (nextBlockN === content.nextBlockN && sameData(data.value, latest.data)) {
-    return { ok: true, value: { version: latest.version, created: false } };
+    return { ok: true, value: { version: latest.version, created: false, textChanged: false } };
   }
 
   const version = latest.version + 1;
@@ -359,7 +370,7 @@ export async function updateContent(
     siteId,
     contentId,
     version,
-    status: 'rascunho',
+    status,
     data: data.value,
     createdBy: actor.email,
   });
@@ -368,7 +379,89 @@ export async function updateContent(
     .set({ nextBlockN })
     .where(and(eq(contents.siteId, siteId), eq(contents.id, contentId)));
   await recordPendingChange(tx, siteId, 'content', String(contentId));
-  return { ok: true, value: { version, created: true } };
+  return {
+    ok: true,
+    value: { version, created: true, textChanged: !sameText(data.value, latest.data) },
+  };
+}
+
+/**
+ * Edita um conteúdo: grava a versão N+1 em `rascunho` (as anteriores ficam intactas), pelas
+ * regras de `writeNextVersion`; dados iguais aos da mais recente não gravam nada (#523).
+ */
+export async function updateContent(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  input: ContentEdit,
+  resources: Resources = RESOURCES,
+): Promise<Result<{ version: number; created: boolean }>> {
+  const allowed = checkWrite(actor);
+  if (!allowed.ok) return allowed;
+
+  const written = await writeNextVersion(
+    tx,
+    actor,
+    siteId,
+    contentId,
+    input,
+    resources,
+    'rascunho',
+  );
+  if (!written.ok) return written;
+  return { ok: true, value: { version: written.value.version, created: written.value.created } };
+}
+
+/**
+ * Corrige o conteúdo durante a revisão (#750, ADR 0022): o revisor edita a versão que viu sem
+ * devolvê-la ao editor. `version` precisa ser a mais recente e estar `em_revisao` (a guarda de
+ * aprovar e devolver). Grava a N+1 já `em_revisao`, com a autoria de quem corrigiu, pelas regras
+ * da edição; a N vai a `substituido` (só histórico, fora da fila), as confirmações que a mudança
+ * não afeta passam para a N+1 (`carryConfirmations`) e a checagem de links é enfileirada para
+ * ela. Dados iguais aos da versão em revisão não gravam nada, como em `updateContent`.
+ */
+export async function amendInReview(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  version: number,
+  input: ContentEdit,
+  resources: Resources = RESOURCES,
+): Promise<Result<{ version: number; created: boolean }>> {
+  const allowed = checkWrite(actor, 'content.amend');
+  if (!allowed.ok) return allowed;
+
+  const locked = await lockVersionInReview(tx, siteId, contentId, version, 'corrigida');
+  if (!locked.ok) return locked;
+
+  const written = await writeNextVersion(
+    tx,
+    actor,
+    siteId,
+    contentId,
+    input,
+    resources,
+    'em_revisao',
+  );
+  if (!written.ok) return written;
+  const { version: next, created, textChanged } = written.value;
+  if (!created) return { ok: true, value: { version: next, created } };
+
+  await tx
+    .update(contentVersions)
+    .set({ status: 'substituido' })
+    .where(
+      and(
+        eq(contentVersions.siteId, siteId),
+        eq(contentVersions.contentId, contentId),
+        eq(contentVersions.version, version),
+      ),
+    );
+  await carryConfirmations(tx, siteId, contentId, version, next, textChanged);
+  await enqueueLinkCheck(tx, { siteId, contentId, version: next });
+  return { ok: true, value: { version: next, created } };
 }
 
 /**
