@@ -1,7 +1,7 @@
 # 0017 – Publicação e limite diário por site
 
 - Status: aceito (completa a 0015 e segue a precedência da 0010)
-- Data: 2026-10-31 (revisada em 2026-11-03: versões substituídas, #519)
+- Data: 2026-10-31 (revisada em 2026-11-03: versões substituídas, #519; em 2026-11-12: transbordo, #759)
 
 ## Contexto
 
@@ -75,6 +75,16 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
   nada. O autor da publicação é quem agendou. Com troca de slug, grava o 301 do endereço
   antigo como a publicação imediata (#489), com o ator de sistema; o slug em uso já é
   conferido no agendamento.
+- **Transbordo da decisão do revisor** (`approveAndPublish` e `approveAndSchedule`, em
+  `domain/reviews/reviews.ts`, #759): aprovar e publicar ou agendar numa decisão só, num
+  savepoint, como duas transições (`approveVersion` e depois `publishVersion` ou
+  `schedulePublication`); qualquer recusa desfaz também a aprovação. Só a recusa
+  `publication.daily_limit` transborda: `nextPublicationSlot` (`publish.ts`) acha, na mesma
+  contagem do dia e com a trava do site já tomada, o primeiro dia de São Paulo depois do dia
+  cheio com vaga, no mesmo horário (o da decisão ou o escolhido), até
+  `PUBLISH_SLOT_HORIZON_DAYS` (30) dias, e a versão é agendada nele. Sem vaga no horizonte,
+  inclusive com o limite `0`, a decisão é recusada com `publication.no_slot`. A regra das
+  vagas e o `reservePublicationSlot` não mudam.
 - **Cancelar** (`cancelScheduledPublication`): a versão volta a `aprovado`, a linha da
   reserva é apagada (libera a vaga) e o job sai da fila (`remove_job`), na mesma transação.
 
@@ -108,6 +118,9 @@ por proposta, calibrado na fase 2. O refinamento decidiu que o dia é sempre o d
   voltar a `aprovado` sem ninguém ver.
 - **Marcar o cancelamento (`cancelled_at`) em vez de apagar a reserva:** não há requisito de
   histórico, e exigiria migração e filtro na contagem.
+- **Transbordo sem horizonte:** com o limite `0`, ou um site cheio por muito tempo, a busca
+  não terminaria. **Achar a vaga dentro de `reservePublicationSlot`:** misturaria a regra das
+  vagas com o transbordo, que só a decisão do revisor pede.
 - **Limite na `SiteConfig`:** iria para o snapshot, e cada ajuste geraria um build sem nada a
   publicar (o mesmo motivo da 0010).
 

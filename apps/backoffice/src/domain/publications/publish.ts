@@ -1,5 +1,5 @@
 import type { Issue, Result } from '@orakel/content-model';
-import { and, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lt, sql, type SQL } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { contents, contentVersions, publications, sites } from '../../db/schema/index.ts';
@@ -54,14 +54,18 @@ async function publishedOnDay(tx: Executor, siteId: string, at: Date): Promise<n
   return row?.total ?? 0;
 }
 
-/** `published_at` dentro do dia de São Paulo que contém `at`. */
-function onPublishDay(at: Date) {
-  const instant = sql`${at.toISOString()}::timestamptz`;
+/** `published_at` dentro do dia de São Paulo que contém `instant` (expressão `timestamptz`). */
+function onPublishDayOf(instant: SQL) {
   const dayStart = sql`(date_trunc('day', ${instant} at time zone ${PUBLISH_DAY_TIME_ZONE}) at time zone ${PUBLISH_DAY_TIME_ZONE})`;
   return and(
     gte(publications.publishedAt, dayStart),
     lt(publications.publishedAt, sql`${dayStart} + interval '1 day'`),
   );
+}
+
+/** `published_at` dentro do dia de São Paulo que contém `at`. */
+function onPublishDay(at: Date) {
+  return onPublishDayOf(sql`${at.toISOString()}::timestamptz`);
 }
 
 /**
@@ -79,6 +83,49 @@ export async function publishedOnDayBySite(
     .where(onPublishDay(at))
     .groupBy(publications.siteId);
   return new Map(rows.map((row) => [row.siteId, row.total]));
+}
+
+/**
+ * Horizonte da busca da próxima vaga (`nextPublicationSlot`), em dias de São Paulo depois do
+ * dia cheio. Sem vaga nele, inclusive com o limite `0`, a decisão do revisor é recusada.
+ */
+export const PUBLISH_SLOT_HORIZON_DAYS = 30;
+
+/**
+ * Próxima vaga do limite diário para o transbordo da decisão do revisor (workspace#89): o
+ * primeiro dia de São Paulo depois do que contém `from` em que o site está abaixo do limite,
+ * no mesmo horário de `from`, até `PUBLISH_SLOT_HORIZON_DAYS`. É a contagem da reserva
+ * (`onPublishDayOf`: feitas e agendadas), calculada no Postgres. `undefined` sem vaga no
+ * horizonte. Chamada depois de `reservePublicationSlot` recusar, com a trava do site já
+ * tomada na transação: a vaga achada não é ocupada por outra decisão antes do agendamento.
+ */
+export async function nextPublicationSlot(
+  tx: Executor,
+  siteId: string,
+  from: Date,
+): Promise<Date | undefined> {
+  const [site] = await tx
+    .select({ limit: sites.dailyPublishLimit })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) return undefined;
+  const limit = effectiveDailyPublishLimit(site.limit);
+  if (limit <= 0) return undefined;
+
+  // Mesmo horário de São Paulo, `n` dias de calendário depois.
+  const candidate = sql`((${from.toISOString()}::timestamptz at time zone ${PUBLISH_DAY_TIME_ZONE}) + day.n * interval '1 day') at time zone ${PUBLISH_DAY_TIME_ZONE}`;
+  const used = tx
+    .select({ total: count() })
+    .from(publications)
+    .where(and(eq(publications.siteId, siteId), onPublishDayOf(candidate)));
+  const { rows } = await tx.execute<{ at: Date | string }>(sql`
+    select ${candidate} as at
+    from generate_series(1, ${PUBLISH_SLOT_HORIZON_DAYS}::int) as day(n)
+    where (${used}) < ${limit}
+    order by day.n
+    limit 1`);
+  const found = rows[0]?.at;
+  return found === undefined ? undefined : new Date(found);
 }
 
 const dayLabel = new Intl.DateTimeFormat('pt-BR', { timeZone: PUBLISH_DAY_TIME_ZONE });
