@@ -17,6 +17,7 @@ import {
   RELEASE_RUN_TASK,
   requestNewRelease,
   requestReleaseImageCheck,
+  type ReleasePipelineState,
 } from '../../src/domain/releases/releases.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { createCheckReleaseImageTask } from '../../src/jobs/tasks/check-release-image.ts';
@@ -185,25 +186,29 @@ const logger = {
 };
 const helpers = { logger, job: { id: '1', attempts: 1 } } as unknown as JobHelpers;
 const CHECKED_AT = new Date('2026-11-10T12:00:00Z');
+const IMAGE = 'ghcr.io/orakel-ai-content/site-builder:1.2.0';
 
-/** Roda a task como o build-runner, com o runtime falso respondendo `imageExists`. */
-async function check(tag: string, image: boolean) {
-  const asked: string[] = [];
-  const { runtime } = fakeRuntime({ image });
-  const spy = {
-    ...runtime,
-    imageExists: (name: string) => {
-      asked.push(name);
-      return runtime.imageExists(name);
-    },
-  };
+/** Leva a release semeada a um estado do pipeline (o seed nasce `disponivel`). */
+const setState = (tag: string, pipelineState: ReleasePipelineState) =>
+  db.update(releases).set({ pipelineState }).where(eq(releases.tag, tag));
+
+/** Roda a task como o build-runner, com o runtime falso; devolve as imagens baixadas. */
+async function check(
+  tag: string,
+  options: { image?: boolean; pull?: 'ok' | 'absent' | 'error'; attempts?: number } = {},
+) {
+  const { runtime, pulled } = fakeRuntime({ image: options.image ?? false, pull: options.pull });
+  const attempt = {
+    logger,
+    job: { id: '1', attempts: options.attempts ?? 1, max_attempts: 5 },
+  } as unknown as JobHelpers;
   await createCheckReleaseImageTask({
     db,
-    runtime: spy,
+    runtime,
     settings,
     now: () => CHECKED_AT.getTime(),
-  })({ tag }, helpers);
-  return asked;
+  })({ tag }, attempt);
+  return pulled;
 }
 
 async function checkJobs() {
@@ -225,35 +230,69 @@ async function release(tag: string) {
   return result.value.find((r) => r.tag === tag);
 }
 
-describe('conferência da imagem da release (#570)', () => {
+describe('download e conferência da imagem da release (#570, #661)', () => {
   beforeEach(() => {
     warnings.length = 0;
   });
 
-  it('imagem fora do host: a release fica ausente, com a data da conferência', async () => {
+  it('baixando: baixa a imagem e a release fica disponível, com a data da conferência', async () => {
     await seed('1.2.0');
+    await setState('1.2.0', 'baixando');
 
-    expect(await check('1.2.0', false)).toEqual(['ghcr.io/orakel-ai-content/site-builder:1.2.0']);
+    expect(await check('1.2.0', { pull: 'ok' })).toEqual([IMAGE]);
 
     expect(await release('1.2.0')).toMatchObject({
-      imageStatus: 'ausente',
-      imageCheckedAt: CHECKED_AT,
-    });
-  });
-
-  it('imagem no host: a release fica disponível', async () => {
-    await seed('1.2.0');
-
-    await check('1.2.0', true);
-
-    expect(await release('1.2.0')).toMatchObject({
+      pipelineState: 'disponivel',
+      failureReason: null,
       imageStatus: 'disponivel',
       imageCheckedAt: CHECKED_AT,
     });
   });
 
+  it('baixando: pull que falha na última tentativa leva a falhou com o motivo do runtime', async () => {
+    await seed('1.2.0');
+    await setState('1.2.0', 'baixando');
+
+    await check('1.2.0', { pull: 'error', attempts: 5 });
+
+    expect(await release('1.2.0')).toMatchObject({
+      pipelineState: 'falhou',
+      failureReason: 'Não foi possível baixar a imagem: manifest unknown',
+      imageStatus: 'ausente',
+      imageCheckedAt: CHECKED_AT,
+    });
+  });
+
+  it('baixando: pull que falha antes da última tentativa lança e a release continua baixando', async () => {
+    await seed('1.2.0');
+    await setState('1.2.0', 'baixando');
+
+    await expect(check('1.2.0', { pull: 'error', attempts: 4 })).rejects.toThrow(
+      'manifest unknown',
+    );
+
+    expect(await release('1.2.0')).toMatchObject({
+      pipelineState: 'baixando',
+      failureReason: null,
+      imageStatus: null,
+    });
+  });
+
+  it.each(['disponivel', 'descartada', 'gerando', 'falhou'] as const)(
+    'release em %s não muda nem baixa',
+    async (state) => {
+      await seed('1.2.0');
+      await setState('1.2.0', state);
+      const before = await release('1.2.0');
+
+      expect(await check('1.2.0', { pull: 'ok', attempts: 5 })).toEqual([]);
+
+      expect(await release('1.2.0')).toEqual(before);
+    },
+  );
+
   it('release não registrada: a task não grava nada e avisa', async () => {
-    await check('9.9.9', true);
+    await check('9.9.9', { pull: 'ok' });
 
     expect(await tags()).toEqual([]);
     expect(warnings).toEqual([expect.stringContaining('9.9.9')]);
@@ -261,7 +300,6 @@ describe('conferência da imagem da release (#570)', () => {
 
   it('reconferir enfileira de novo; pedidos antes de o job rodar viram um só', async () => {
     await seed('1.2.0');
-    await check('1.2.0', false);
 
     expect(await db.transaction((tx) => requestReleaseImageCheck(tx, operacao, '1.2.0'))).toEqual({
       ok: true,
