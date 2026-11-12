@@ -75,7 +75,7 @@ function PendingChanges({
 /**
  * Resumo da página do site (#370), o cartão de perfil do `CustomerDetails` do Ecme: só o estado
  * atual do site no `InfoList` (com o uso do limite diário de hoje), sem botões (#595): as ações
- * de operação ficam no cabeçalho (`SiteOperations`) e o histórico na aba "Publicação". Sem
+ * de operação ficam nas etapas e o histórico na aba "Publicação" (`SiteOperations`, #648). Sem
  * estado: serve ao Server Component da página.
  */
 export function SiteSummaryCard({

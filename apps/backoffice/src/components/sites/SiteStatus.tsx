@@ -232,11 +232,11 @@ const RESUME_SITE: ConfirmedSiteAction = {
   ),
 };
 
-/** Texto de "Publicar agora" e de quando está na fila (menu da lista, cabeçalho do site). */
+/** Texto de "Publicar agora" e de quando está na fila (menu da lista, etapa Build do site). */
 export const PUBLISH_NOW_LABEL = { idle: PUBLISH_NOW.label, pending: PUBLISH_NOW.pendingLabel };
 
 /**
- * A confirmação de "Publicar agora" sem o botão (lista de sites, #586; cabeçalho do site, #595):
+ * A confirmação de "Publicar agora" sem o botão (lista de sites, #586; etapa Build do site, #648):
  * quem a abre guarda o estado, roda a ação no `onConfirm` e devolve o foco no `onAfterClose`.
  */
 export function PublishNowDialog({
@@ -267,11 +267,11 @@ export function PublishNowDialog({
 
 export type ResumeSite = (siteId: string) => Promise<ActionResult>;
 
-/** Texto de "Retomar" e de quando está na fila (cabeçalho do site pausado). */
+/** Texto de "Retomar" e de quando está na fila (linha Site do site pausado). */
 export const RESUME_SITE_LABEL = { idle: RESUME_SITE.label, pending: RESUME_SITE.pendingLabel };
 
 /**
- * A confirmação de "Retomar" o site pausado (L4) sem o botão (cabeçalho do site, #595): volta a
+ * A confirmação de "Retomar" o site pausado (L4) sem o botão (linha Site do painel, #648): volta a
  * receber builds e enfileira o próximo já. Quem a abre guarda o estado, como no
  * `PublishNowDialog`.
  */
