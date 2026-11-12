@@ -7,11 +7,13 @@ import {
   contentLinkChecks,
   contents,
   contentVersions,
+  reviewConfirmations,
   reviews,
 } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import { GENERATOR_ACTOR, SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import {
+  amendInReview,
   countContentsByStatus,
   countReviewQueues,
   createContent,
@@ -24,6 +26,7 @@ import {
   type EditBlock,
 } from '../../src/domain/content/contents.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
+import { setAllConfirmations } from '../../src/domain/reviews/confirmations.ts';
 import { unpublishContent } from '../../src/domain/publications/unpublish.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { createVolumeSite, seedContents } from '../volume.ts';
@@ -800,5 +803,185 @@ describe('lista com 2.000 conteúdos (#461)', () => {
     expect(seqScans).not.toContain('content_versions');
     expect(seqScans).not.toContain('contents');
     expect(ms).toBeLessThan(300);
+  });
+});
+
+describe('corrigir em revisão (#750)', () => {
+  const REVISOR = { email: 'revisor@orakel.local', roles: ['revisor' as const] };
+  const EDITOR = { email: 'editor@orakel.local', roles: ['editor' as const] };
+
+  const amend = (contentId: number, version: number, input: ContentEdit, actor = REVISOR) =>
+    db.transaction((tx) => amendInReview(tx, actor, SITE, contentId, version, input));
+
+  /** Conteúdo 1 com a versão 2 em revisão e as três confirmações gravadas pelo revisor. */
+  async function inReview() {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await submit(1);
+    const confirmed = await db.transaction((tx) =>
+      setAllConfirmations(tx, REVISOR, SITE, 1, 2, true),
+    );
+    if (!confirmed.ok) throw new Error(JSON.stringify(confirmed.issues));
+  }
+
+  const confirmationsOf = async (version: number) =>
+    (
+      await db
+        .select({ key: reviewConfirmations.key, confirmedBy: reviewConfirmations.confirmedBy })
+        .from(reviewConfirmations)
+        .where(
+          and(
+            eq(reviewConfirmations.siteId, SITE),
+            eq(reviewConfirmations.contentId, 1),
+            eq(reviewConfirmations.version, version),
+          ),
+        )
+        .orderBy(asc(reviewConfirmations.key))
+    ).map((row) => row.key);
+
+  it('grava a N+1 em revisão com o revisor como autor e leva a N a substituido', async () => {
+    await inReview();
+    const pending = await unresolvedPendingChangeIds(db, SITE);
+
+    const result = await amend(1, 2, { ...(await latest(1)), title: 'Guia corrigido' });
+
+    expect(result).toEqual({ ok: true, value: { version: 3, created: true } });
+    const rows = await versions(1);
+    expect(rows.map((row) => [row.version, row.status, row.createdBy])).toEqual([
+      [1, 'publicado', 'system'],
+      [2, 'substituido', 'system'],
+      [3, 'em_revisao', REVISOR.email],
+    ]);
+    expect(rows[2]?.data.title).toBe('Guia corrigido');
+    expect((await unresolvedPendingChangeIds(db, SITE)).length).toBe(pending.length + 1);
+  });
+
+  it('a fila e o selo contam o conteúdo uma vez, pela N+1', async () => {
+    await inReview();
+
+    await amend(1, 2, { ...(await latest(1)), title: 'Guia corrigido' });
+
+    const queue = await listReviewQueue(db, SYSTEM_ACTOR, SITE);
+    expect(queue.ok && queue.value.map(({ id, version }) => ({ id, version }))).toEqual([
+      { id: 1, version: 3 },
+    ]);
+    expect(await countReviewQueues(db, SYSTEM_ACTOR)).toEqual({ ok: true, value: { [SITE]: 1 } });
+  });
+
+  it('metadado que não é texto mantém valor original e políticas e derruba a visualização', async () => {
+    await inReview();
+
+    await amend(1, 2, { ...(await latest(1)), publishedAt: '2026-11-01T12:00:00-03:00' });
+
+    expect(await confirmationsOf(3)).toEqual(['politicas_anuncios_afiliados', 'valor_original']);
+    const [kept] = await db
+      .select({ confirmedBy: reviewConfirmations.confirmedBy })
+      .from(reviewConfirmations)
+      .where(and(eq(reviewConfirmations.siteId, SITE), eq(reviewConfirmations.version, 3)));
+    expect(kept?.confirmedBy).toBe(REVISOR.email);
+    expect(await confirmationsOf(2)).toHaveLength(3);
+  });
+
+  it.each([
+    ['o título', (data: Omit<Content, 'id'>) => ({ ...data, title: 'Guia corrigido' })],
+    ['a descrição', (data: Omit<Content, 'id'>) => ({ ...data, description: 'Outra descrição' })],
+    [
+      'os blocos',
+      (data: Omit<Content, 'id'>): ContentEdit => ({
+        ...data,
+        blocks: [...data.blocks, newText('mais um parágrafo')],
+      }),
+    ],
+  ])('mudar %s derruba as três confirmações', async (_what, change) => {
+    await inReview();
+
+    expect(await amend(1, 2, change(await latest(1)))).toMatchObject({
+      ok: true,
+      value: { version: 3 },
+    });
+
+    expect(await confirmationsOf(3)).toEqual([]);
+  });
+
+  it('dados iguais não criam versão nem mexem nas confirmações', async () => {
+    await inReview();
+    const pending = await unresolvedPendingChangeIds(db, SITE);
+
+    expect(await amend(1, 2, await latest(1))).toEqual({
+      ok: true,
+      value: { version: 2, created: false },
+    });
+
+    expect((await versions(1)).map((v) => [v.version, v.status])).toEqual([
+      [1, 'publicado'],
+      [2, 'em_revisao'],
+    ]);
+    expect(await confirmationsOf(2)).toHaveLength(3);
+    expect(await unresolvedPendingChangeIds(db, SITE)).toEqual(pending);
+  });
+
+  it('enfileira a checagem de links da versão nova (#745)', async () => {
+    await inReview();
+
+    await amend(1, 2, { ...(await latest(1)), title: 'Guia corrigido' });
+
+    const { rows } = await db.execute<{ key: string }>(
+      sql`select j.key from graphile_worker._private_jobs j
+        join graphile_worker._private_tasks t on t.id = j.task_id
+        where t.identifier = 'check-content-links' order by j.key`,
+    );
+    expect(rows.map((row) => row.key)).toEqual([
+      `content-links:${SITE}:1:2`,
+      `content-links:${SITE}:1:3`,
+    ]);
+    expect(
+      await db
+        .select({ version: contentLinkChecks.version })
+        .from(contentLinkChecks)
+        .where(eq(contentLinkChecks.version, 3)),
+    ).toEqual([{ version: 3 }]);
+  });
+
+  it('recusa versão fora de revisão: rascunho, aprovado e publicado', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    expect(await amend(1, 2, await latest(1))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'review.not_in_review' }],
+    });
+
+    expect(await amend(2, 1, { ...(await latest(2)), title: 'Outro' })).toMatchObject({
+      ok: false,
+      issues: [{ code: 'review.not_in_review' }],
+    });
+
+    await submit(1);
+    const approved = await db.transaction((tx) => confirmAndApprove(tx, REVISOR, SITE, 1, 2));
+    if (!approved.ok) throw new Error(JSON.stringify(approved.issues));
+    expect(await amend(1, 2, { ...(await latest(1)), title: 'Guia corrigido' })).toMatchObject({
+      ok: false,
+      issues: [{ code: 'review.not_in_review' }],
+    });
+    expect((await versions(1)).map((v) => v.status)).toEqual(['publicado', 'aprovado']);
+  });
+
+  it('recusa versão que não é a mais recente, sem gravar nada', async () => {
+    await inReview();
+
+    expect(await amend(1, 1, { ...(await latest(1)), title: 'Guia corrigido' })).toMatchObject({
+      ok: false,
+      issues: [{ code: 'review.not_latest' }],
+    });
+    expect(await versions(1)).toHaveLength(2);
+  });
+
+  it('o editor é recusado em amendInReview, e o revisor continua recusado em updateContent', async () => {
+    await inReview();
+
+    expect(
+      await amend(1, 2, { ...(await latest(1)), title: 'Guia corrigido' }, EDITOR),
+    ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await edit(1, { ...(await latest(1)), title: 'Guia corrigido' }, REVISOR)).toMatchObject(
+      { ok: false, issues: [{ code: 'forbidden' }] },
+    );
+    expect(await versions(1)).toHaveLength(2);
   });
 });
