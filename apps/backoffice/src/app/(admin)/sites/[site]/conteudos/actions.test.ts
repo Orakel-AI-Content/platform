@@ -5,12 +5,14 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 
 import {
   cancelScheduledPublicationAction,
+  createAndSubmitContentAction,
   createContentAction,
   publishVersionAction,
   schedulePublicationAction,
   submitForReviewAction,
   unpublishContentAction,
   unpublishContentsAction,
+  updateAndSubmitContentAction,
   updateContentAction,
 } from './actions.ts';
 
@@ -21,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   currentActor: vi.fn(),
   createContent: vi.fn(),
   updateContent: vi.fn(),
+  createAndSubmit: vi.fn(),
+  updateAndSubmit: vi.fn(),
   listContentVersions: vi.fn(),
   submitForReview: vi.fn(),
   unpublishContents: vi.fn(),
@@ -40,6 +44,8 @@ vi.mock('@/db/client.ts', () => ({
 vi.mock('@/domain/content/contents.ts', () => ({
   createContent: mocks.createContent,
   updateContent: mocks.updateContent,
+  createAndSubmit: mocks.createAndSubmit,
+  updateAndSubmit: mocks.updateAndSubmit,
   listContentVersions: mocks.listContentVersions,
   submitForReview: mocks.submitForReview,
 }));
@@ -179,6 +185,115 @@ describe('ações do editor de conteúdo', () => {
     });
     expect(mocks.updateContent).toHaveBeenCalledWith({}, editor, 'exemplo-b', 2, input, withoutFaq);
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe('salvar e enviar para revisão (#778)', () => {
+  const revalidatedContentAndReview = (contentId: number) => {
+    expect(mocks.revalidatePath).toHaveBeenNthCalledWith(1, '/sites/exemplo-a/conteudos');
+    expect(mocks.revalidatePath).toHaveBeenNthCalledWith(
+      2,
+      `/sites/exemplo-a/conteudos/${contentId}`,
+    );
+    expect(mocks.revalidatePath).toHaveBeenNthCalledWith(3, '/sites/exemplo-a/revisao');
+  };
+
+  it('sem sessão não chama o domínio nem revalida', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    const noSession = { ok: false, message: 'Sessão inválida; entre de novo.', issues: [] };
+    expect(await createAndSubmitContentAction('exemplo-a', input)).toEqual(noSession);
+    expect(await updateAndSubmitContentAction('exemplo-a', 2, input)).toEqual(noSession);
+    expect(mocks.createAndSubmit).not.toHaveBeenCalled();
+    expect(mocks.updateAndSubmit).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('recusa do domínio volta com as issues e o path, como no salvar, e não revalida', async () => {
+    const notDraft = {
+      ok: false,
+      issues: [
+        {
+          code: 'content.not_draft',
+          message: 'Só um rascunho vai para revisão: a versão 2 está em_revisao',
+          path: [],
+        },
+      ],
+    };
+    const invalid = {
+      ok: false,
+      issues: [{ code: 'schema.too_small', message: 'Título obrigatório', path: ['title'] }],
+    };
+    mocks.createAndSubmit.mockResolvedValue(invalid);
+    mocks.updateAndSubmit.mockResolvedValue(notDraft);
+
+    expect(await createAndSubmitContentAction('exemplo-a', input)).toEqual({
+      ok: false,
+      message: 'Não foi possível salvar o conteúdo.',
+      issues: [{ path: ['title'], message: 'Título obrigatório' }],
+    });
+    expect(await updateAndSubmitContentAction('exemplo-a', 2, input)).toEqual({
+      ok: false,
+      message: 'Não foi possível salvar o conteúdo.',
+      issues: [
+        { path: [], message: 'Só um rascunho vai para revisão: a versão 2 está em_revisao' },
+      ],
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('criar e enviar delega com o ator e os recursos do site e revalida conteúdo, lista e revisão', async () => {
+    mocks.createAndSubmit.mockResolvedValue({ ok: true, value: { id: 4, version: 1 } });
+
+    expect(await createAndSubmitContentAction('exemplo-a', input)).toEqual({
+      ok: true,
+      message: 'Conteúdo criado e enviado para revisão.',
+      id: 4,
+    });
+    expect(mocks.resourcesFor).toHaveBeenCalledWith({}, 'exemplo-a');
+    expect(mocks.createAndSubmit).toHaveBeenCalledWith({}, editor, 'exemplo-a', input, RESOURCES);
+    revalidatedContentAndReview(4);
+  });
+
+  it('editar e enviar devolve a versão enviada relida do servidor e revalida', async () => {
+    mocks.updateAndSubmit.mockResolvedValue({ ok: true, value: { version: 3, created: true } });
+    const saved = { ...input, title: 'Guia revisado' };
+    mocks.listContentVersions.mockResolvedValue({
+      ok: true,
+      value: [
+        { version: 2, data: input },
+        { version: 3, data: saved },
+      ],
+    });
+
+    expect(await updateAndSubmitContentAction('exemplo-a', 2, input)).toEqual({
+      ok: true,
+      message: 'Versão 3 salva e enviada para revisão.',
+      id: 2,
+      saved,
+    });
+    expect(mocks.updateAndSubmit).toHaveBeenCalledWith(
+      {},
+      editor,
+      'exemplo-a',
+      2,
+      input,
+      RESOURCES,
+    );
+    revalidatedContentAndReview(2);
+  });
+
+  it('editar sem alteração só envia a versão atual e revalida, com mensagem própria', async () => {
+    mocks.updateAndSubmit.mockResolvedValue({ ok: true, value: { version: 2, created: false } });
+    mocks.listContentVersions.mockResolvedValue({ ok: true, value: [{ version: 2, data: input }] });
+
+    expect(await updateAndSubmitContentAction('exemplo-a', 2, input)).toEqual({
+      ok: true,
+      message: 'Nenhuma alteração; a versão 2 foi enviada para revisão.',
+      id: 2,
+      saved: input,
+    });
+    revalidatedContentAndReview(2);
   });
 });
 
