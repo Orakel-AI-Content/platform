@@ -80,7 +80,8 @@ export const RELEASE_ROLLOUT_SITE_STATES = [
 /**
  * "Atualizar todos os sites" (workspace#83): leva a release de destino a todos os sites, um por
  * vez, começando pelo primeiro da ordem (canário). Operacional: fora do snapshot. Só uma
- * `em_andamento` por vez (índice único parcial). `finishedAt` nulo enquanto aberta.
+ * `em_andamento` por vez (índice único parcial). `finishedAt` nulo enquanto aberta; ao
+ * interromper, grava quem e quando e fecha.
  */
 export const releaseRollouts = pgTable(
   'release_rollouts',
@@ -94,6 +95,9 @@ export const releaseRollouts = pgTable(
     requestedBy: text().notNull(),
     startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp({ withTimezone: true }),
+    /** E-mail de quem interrompeu; nulo se não foi interrompida. */
+    interruptedBy: text(),
+    interruptedAt: timestamp({ withTimezone: true }),
   },
   (t) => [
     uniqueIndex('release_rollouts_open_unique')

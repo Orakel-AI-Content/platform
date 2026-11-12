@@ -2,8 +2,8 @@
 // sites, um por vez, começando pelo de menor audiência (canário). A atualização é um registro
 // próprio (`release_rollouts` e seus sites), não deduzida de `sites.state`. Aqui: iniciar, que
 // grava o registro e promove o primeiro site; avançar, na transação que fecha o build do site
-// em andamento; e a leitura do progresso. Interromper fica na Task seguinte. Toda escrita em
-// `sites` passa por `site-state.ts`.
+// em andamento; interromper, que encerra o registro sem tocar nos sites; e a leitura do
+// progresso. Toda escrita em `sites` passa por `site-state.ts`.
 import type { Result } from '@orakel/content-model';
 import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 
@@ -47,6 +47,9 @@ export type Rollout = {
   requestedBy: string;
   startedAt: Date;
   finishedAt: Date | null;
+  /** E-mail de quem interrompeu; nulo se não foi interrompida. */
+  interruptedBy: string | null;
+  interruptedAt: Date | null;
   sites: RolloutSite[];
 };
 
@@ -330,6 +333,47 @@ export async function advanceRollout(
   }
 }
 
+/**
+ * Interrompe a atualização em andamento: grava quem pediu e quando, e fecha `interrompida`,
+ * liberando o início de outra. Não toca em sites, builds nem mudanças pendentes: o site
+ * `em_andamento` termina o build na versão nova e `advanceRollout` registra o resultado dele sem
+ * promover o próximo; os `aguardando` ficam como estão, na versão anterior. Recusa sem gravar
+ * nada se não há uma em andamento.
+ */
+export async function interruptRollout(
+  tx: Executor,
+  actor: Actor,
+  now: Date = new Date(),
+): Promise<Result<Rollout>> {
+  const allowed = requireRole(actor, 'release.promote');
+  if (!allowed.ok) return allowed;
+
+  // O UPDATE trava a linha como o `for update` do avanço: interromper e avançar se serializam.
+  const [rollout] = await tx
+    .update(releaseRollouts)
+    .set({ state: 'interrompida', interruptedBy: actor.email, interruptedAt: now, finishedAt: now })
+    .where(eq(releaseRollouts.state, 'em_andamento'))
+    .returning();
+  if (rollout === undefined) {
+    return rejected('rollout.not_open', 'Não há atualização de todos os sites em andamento');
+  }
+  return { ok: true, value: { ...rollout, sites: await rolloutSites(tx, rollout.id) } };
+}
+
+/** Os sites da atualização, na ordem. */
+function rolloutSites(db: Executor, rolloutId: number): Promise<RolloutSite[]> {
+  return db
+    .select({
+      siteId: releaseRolloutSites.siteId,
+      position: releaseRolloutSites.position,
+      state: releaseRolloutSites.state,
+      previousRelease: releaseRolloutSites.previousRelease,
+    })
+    .from(releaseRolloutSites)
+    .where(eq(releaseRolloutSites.rolloutId, rolloutId))
+    .orderBy(asc(releaseRolloutSites.position));
+}
+
 /** A atualização mais recente com o estado de cada site, ou `null` sem nenhuma. */
 export async function latestRollout(db: Executor, actor: Actor): Promise<Result<Rollout | null>> {
   const allowed = requireRole(actor, 'release.promote');
@@ -342,15 +386,5 @@ export async function latestRollout(db: Executor, actor: Actor): Promise<Result<
     .limit(1);
   if (rollout === undefined) return { ok: true, value: null };
 
-  const rows = await db
-    .select({
-      siteId: releaseRolloutSites.siteId,
-      position: releaseRolloutSites.position,
-      state: releaseRolloutSites.state,
-      previousRelease: releaseRolloutSites.previousRelease,
-    })
-    .from(releaseRolloutSites)
-    .where(eq(releaseRolloutSites.rolloutId, rollout.id))
-    .orderBy(asc(releaseRolloutSites.position));
-  return { ok: true, value: { ...rollout, sites: rows } };
+  return { ok: true, value: { ...rollout, sites: await rolloutSites(db, rollout.id) } };
 }

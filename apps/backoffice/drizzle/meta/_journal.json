@@ -183,6 +183,13 @@
       "when": 1794506360734,
       "tag": "0025_estado_da_previa",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794507851914,
+      "tag": "0026_interrupcao_da_atualizacao",
+      "breakpoints": true
     }
   ]
 }
