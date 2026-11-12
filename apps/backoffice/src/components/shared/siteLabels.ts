@@ -172,6 +172,46 @@ export function liveResultText(item: ExecutionHistoryItem, timeZone: string): st
   return `${kind} ${LIVE_RESULT_LABEL[item.status]} em ${formatDateTime(item.at, timeZone)}`;
 }
 
+/** Etapas do painel da aba "Publicação" (#647), na ordem em que aparecem. */
+export const PUBLICATION_STEPS = ['infra', 'versao', 'build', 'no_ar', 'site'] as const;
+
+export type PublicationStep = (typeof PUBLICATION_STEPS)[number];
+
+export const PUBLICATION_STEP_LABEL: Record<PublicationStep, string> = {
+  infra: 'Infra e zona',
+  versao: 'Versão',
+  build: 'Build',
+  no_ar: 'No ar',
+  site: 'Site',
+};
+
+/** Estado da etapa "Infra e zona" a partir do ciclo de vida (#647). */
+export const INFRA_STEP_TEXT: Record<SiteSummary['lifecycle'], string> = {
+  cadastrado: 'Infra e zona pendentes',
+  infra_aplicada: 'Infra aplicada, zona pendente',
+  zona_ativa: 'Infra aplicada e zona ativa',
+  publicado: 'Infra aplicada e zona ativa',
+};
+
+/**
+ * Texto da etapa "No ar" (#647): a versão, as páginas e quando entrou no ar, no fuso do site, e
+ * por quem, quando há autor.
+ */
+export function liveVersionText(
+  versionId: string,
+  pages: number | null,
+  since: { at: Date; by: string | null } | null,
+  timeZone: string,
+): string {
+  const parts = [versionId];
+  if (pages !== null) parts.push(`${pages} ${pages === 1 ? 'página' : 'páginas'}`);
+  if (since !== null) {
+    const when = `no ar desde ${formatDateTime(since.at, timeZone)}`;
+    parts.push(since.by === null ? when : `${when}, por ${since.by}`);
+  }
+  return parts.join(' · ');
+}
+
 const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
 
 /**
