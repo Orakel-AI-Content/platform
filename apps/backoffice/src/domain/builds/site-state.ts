@@ -685,6 +685,18 @@ export async function recordInfraCheck(
   return site?.lifecycle;
 }
 
+/** `job_key` da conferência de um site: um job por site na fila (`scheduleSiteInfraCheck`). */
+export function siteInfraJobKey(siteId: string): string {
+  return `site-infra:${siteId}`;
+}
+
+/** Etapa em que a conferência ainda tem o que avançar (`cadastrado` ou `infra_aplicada`). */
+export function isInfraCheckStep(
+  lifecycle: (typeof sites.$inferSelect)['lifecycle'],
+): lifecycle is (typeof INFRA_CHECK_STEPS)[number] {
+  return (INFRA_CHECK_STEPS as readonly string[]).includes(lifecycle);
+}
+
 /**
  * Enfileira a conferência da infra de um site ("Conferir agora"), na transação de quem pede.
  * `job_key` por site com `replace`: pedidos repetidos antes de o job rodar viram um só. Uma
@@ -696,7 +708,7 @@ export async function scheduleSiteInfraCheck(tx: Executor, siteId: string): Prom
       identifier => ${CHECK_SITE_INFRA_TASK},
       payload => ${JSON.stringify({ siteId })}::json,
       max_attempts => 1,
-      job_key => ${`site-infra:${siteId}`},
+      job_key => ${siteInfraJobKey(siteId)},
       job_key_mode => 'replace'
     )`);
 }

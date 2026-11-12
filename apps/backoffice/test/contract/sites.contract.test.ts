@@ -36,7 +36,9 @@ import {
   createSite,
   exportSitesTfvars,
   listSites,
+  readSiteInfraCheck,
   readSiteInstance,
+  requestSiteInfraCheck,
   resourcesFor,
   unresolvedPendingChangeIds,
   updateSiteConfig,
@@ -999,5 +1001,115 @@ describe('conferência automática da infra (#718)', () => {
       { key: 'site-infra:exemplo-a', payload: { siteId: 'exemplo-a' }, max_attempts: 1 },
       { key: 'site-infra:exemplo-b', payload: { siteId: 'exemplo-b' }, max_attempts: 1 },
     ]);
+  });
+});
+
+describe('"Conferir agora" e leitura da conferência (#716)', () => {
+  const T1 = Date.parse('2026-11-12T12:00:00Z');
+  const operacao = { email: 'operacao@orakel.local', roles: ['operacao' as const] };
+  const editor = { email: 'editor@orakel.local', roles: ['editor' as const] };
+
+  async function infraJobs() {
+    const { rows } = await db.execute<{ key: string }>(
+      sql`select j.key from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+          where t.identifier = ${CHECK_SITE_INFRA_TASK} order by j.key`,
+    );
+    return rows.map((row) => row.key);
+  }
+
+  it('enfileira a conferência só do site, em cadastrado e em infra_aplicada', async () => {
+    expect(await db.transaction((tx) => requestSiteInfraCheck(tx, operacao, 'exemplo-a'))).toEqual({
+      ok: true,
+      value: undefined,
+    });
+    await db.update(sites).set({ lifecycle: 'infra_aplicada' }).where(eq(sites.id, 'exemplo-b'));
+    expect(await db.transaction((tx) => requestSiteInfraCheck(tx, operacao, 'exemplo-b'))).toEqual({
+      ok: true,
+      value: undefined,
+    });
+
+    expect(await infraJobs()).toEqual(['site-infra:exemplo-a', 'site-infra:exemplo-b']);
+  });
+
+  it('sem site.configure, recusa e não enfileira', async () => {
+    expect(
+      await db.transaction((tx) => requestSiteInfraCheck(tx, editor, 'exemplo-a')),
+    ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await infraJobs()).toEqual([]);
+  });
+
+  it.each(['zona_ativa', 'publicado'] as const)(
+    'em %s, recusa e não enfileira',
+    async (lifecycle) => {
+      await db.update(sites).set({ lifecycle }).where(eq(sites.id, 'exemplo-a'));
+      expect(
+        await db.transaction((tx) => requestSiteInfraCheck(tx, operacao, 'exemplo-a')),
+      ).toMatchObject({ ok: false, issues: [{ code: 'site.infra_check_step' }] });
+      expect(await infraJobs()).toEqual([]);
+    },
+  );
+
+  it('site inexistente, recusa', async () => {
+    expect(
+      await db.transaction((tx) => requestSiteInfraCheck(tx, operacao, 'nao-existe')),
+    ).toMatchObject({ ok: false, issues: [{ code: 'site.not_found' }] });
+  });
+
+  it('lê a etapa e a última conferência; nunca conferido vem nulo e fora da fila', async () => {
+    expect(await readSiteInfraCheck(db, editor, 'exemplo-a')).toEqual({
+      ok: true,
+      value: { lifecycle: 'cadastrado', checkedAt: null, error: null, queued: false },
+    });
+
+    await db
+      .update(sites)
+      .set({ infraCheckedAt: new Date(T1), infraCheckError: 'Cloudflare respondeu 503' })
+      .where(eq(sites.id, 'exemplo-a'));
+    expect(await readSiteInfraCheck(db, editor, 'exemplo-a')).toEqual({
+      ok: true,
+      value: {
+        lifecycle: 'cadastrado',
+        checkedAt: new Date(T1),
+        error: 'Cloudflare respondeu 503',
+        queued: false,
+      },
+    });
+  });
+
+  it('na fila enquanto o job vai rodar ou roda; o que falhou de vez não conta', async () => {
+    await db.transaction((tx) => requestSiteInfraCheck(tx, operacao, 'exemplo-a'));
+    const queued = async () => {
+      const result = await readSiteInfraCheck(db, operacao, 'exemplo-a');
+      return result.ok && result.value.queued;
+    };
+    expect(await queued()).toBe(true);
+
+    const key = 'site-infra:exemplo-a';
+    await db.execute(sql`update graphile_worker._private_jobs
+      set attempts = 1, locked_at = now(), locked_by = 'w' where key = ${key}`);
+    expect(await queued()).toBe(true);
+
+    await db.execute(sql`update graphile_worker._private_jobs
+      set locked_at = null, locked_by = null where key = ${key}`);
+    expect(await queued()).toBe(false);
+  });
+
+  it('a fila de um site não vale para outro', async () => {
+    await db.transaction((tx) => requestSiteInfraCheck(tx, operacao, 'exemplo-a'));
+    expect(await readSiteInfraCheck(db, operacao, 'exemplo-b')).toMatchObject({
+      ok: true,
+      value: { queued: false },
+    });
+  });
+
+  it('sem site.read, recusa a leitura; site inexistente também', async () => {
+    expect(
+      await readSiteInfraCheck(db, { email: 'x@orakel.local', roles: [] }, 'exemplo-a'),
+    ).toMatchObject({ ok: false, issues: [{ code: 'forbidden' }] });
+    expect(await readSiteInfraCheck(db, operacao, 'nao-existe')).toMatchObject({
+      ok: false,
+      issues: [{ code: 'site.not_found' }],
+    });
   });
 });
