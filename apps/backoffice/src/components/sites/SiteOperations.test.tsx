@@ -20,7 +20,7 @@ import { type PublicationSite, SitePublicationSteps } from './SitePublicationSte
 
 // Ações de operação nas etapas da aba "Publicação" (#648; antes no cabeçalho, #595):
 // "Reconstruir na release" na Versão, "Publicar agora" na Build, "Escolher outra versão" na No ar
-// e, pausado, "Retomar" na linha Site, cada uma com a confirmação de hoje (#327, #514, #515); o
+// e, na linha Site, "Pausar" com motivo (#650) ou, pausado, "Retomar", cada uma com a confirmação de hoje (#327, #514, #515); o
 // sucesso vai ao toast e a recusa de qualquer uma ao `SiteOperationsAlert`, abaixo do painel.
 // Foco no navegador, em `SiteOperations.browser.test.tsx`.
 
@@ -77,7 +77,7 @@ const SITE: PublicationSite = {
 type Props = Partial<Omit<ComponentProps<typeof SiteOperationsScope>, 'children'>>;
 
 /** O painel com os botões nas etapas, como a página monta com operations.run. */
-function Panel(props: Props) {
+function Panel({ pausedReason = null, ...props }: Props & { pausedReason?: string | null }) {
   const paused = props.paused ?? false;
   return (
     <>
@@ -89,14 +89,19 @@ function Panel(props: Props) {
         paused={paused}
       >
         <SitePublicationSteps
-          site={{ ...SITE, state: paused ? 'pausado' : 'ativo' }}
+          site={{ ...SITE, state: paused ? 'pausado' : 'ativo', pausedReason }}
           instance={{ activePages: 120, activeSince: null }}
           activity={{ open: null, history: [] }}
           actions={{
             versao: <SiteOperationButton operation="rebuild" />,
             build: <SiteOperationButton operation="publish" />,
             no_ar: <SiteOperationButton operation="rollback" />,
-            site: <SiteOperationButton operation="resume" />,
+            site: (
+              <>
+                <SiteOperationButton operation="pause" />
+                <SiteOperationButton operation="resume" />
+              </>
+            ),
           }}
         />
         <div data-testid="alert">
@@ -110,12 +115,13 @@ function Panel(props: Props) {
 
 const ALL: Props = {
   publish: ok('Build de exemplo-a enfileirado.'),
+  pause: ok('exemplo-a pausado.'),
   resume: ok('exemplo-a retomado; build enfileirado.'),
   rebuild: { releases: RELEASES, action: ok('Build enfileirado.') },
   rollback: { versions: VERSIONS, action: ok('Reversão enfileirada.') },
 };
 
-function renderPanel(props: Props) {
+function renderPanel(props: ComponentProps<typeof Panel>) {
   return render(<Panel {...props} />, { container: app });
 }
 
@@ -133,25 +139,26 @@ const stepButtons = (index: number) =>
 const alert = () => within(screen.getByTestId('alert')).getByRole('alert');
 
 describe('ações nas etapas', () => {
-  it('cada ação na sua etapa: Versão, Build e No ar; nenhuma em Infra e zona nem em Site', () => {
+  it('cada ação na sua etapa: Versão, Build, No ar e "Pausar" em Site; nenhuma em Infra e zona', () => {
     renderPanel(ALL);
 
     expect(stepButtons(0)).toEqual([]);
     expect(stepButtons(1)).toEqual(['Reconstruir na release exemplo-a']);
     expect(stepButtons(2)).toEqual(['Publicar agora exemplo-a']);
     expect(stepButtons(3)).toEqual(['Escolher outra versão exemplo-a']);
-    expect(stepButtons(4)).toEqual([]);
+    expect(stepButtons(4)).toEqual(['Pausar exemplo-a']);
     const publish = screen.getByRole('button', { name: 'Publicar agora exemplo-a' });
     expect(publish.className).toContain('text-error');
     expect(publish.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
   });
 
-  it('pausado, "Retomar" na linha Site e "Publicar agora" some', () => {
+  it('pausado, "Retomar" no lugar de "Pausar" na linha Site e "Publicar agora" some', () => {
     renderPanel({ ...ALL, paused: true });
 
     expect(stepButtons(2)).toEqual([]);
     expect(stepButtons(4)).toEqual(['Retomar exemplo-a']);
     expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Pausar/ })).toBeNull();
   });
 
   it('sem a lista de releases ou de versões, o botão da etapa não aparece', () => {
@@ -224,6 +231,36 @@ describe('confirmação', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Reverter' }));
 
     await waitFor(() => expect(action).toHaveBeenCalledWith('20261001T120000Z-aaaaaaaa'));
+  });
+
+  it('"Pausar" roda a action com o motivo; revalidada, a linha Site mostra o motivo', async () => {
+    const user = userEvent.setup();
+    const pause = ok('exemplo-a pausado.');
+    const { rerender } = renderPanel({ ...ALL, pause });
+
+    await user.click(screen.getByRole('button', { name: 'Pausar exemplo-a' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Pausar exemplo-a?' });
+    await user.type(within(dialog).getByRole('textbox', { name: /Motivo/ }), 'migração de domínio');
+    await user.click(within(dialog).getByRole('button', { name: 'Pausar' }));
+
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('exemplo-a pausado.'));
+    expect(pause).toHaveBeenCalledWith('migração de domínio');
+    // A revalidação da Server Action traz o site pausado com o motivo.
+    rerender(<Panel {...ALL} pause={pause} paused pausedReason="migração de domínio" />);
+    expect(step(4).textContent).toContain('Pausado: migração de domínio');
+    expect(stepButtons(4)).toEqual(['Retomar exemplo-a']);
+  });
+
+  it('a recusa de "Pausar" vai ao alerta único do painel', async () => {
+    const user = userEvent.setup();
+    renderPanel({ ...ALL, pause: refused('O site já está pausado.') });
+
+    await user.click(screen.getByRole('button', { name: 'Pausar exemplo-a' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Pausar exemplo-a?' });
+    await user.type(within(dialog).getByRole('textbox', { name: /Motivo/ }), 'manutenção');
+    await user.click(within(dialog).getByRole('button', { name: 'Pausar' }));
+
+    await waitFor(() => expect(alert().textContent).toBe('O site já está pausado.'));
   });
 
   it('Cancelar não roda a ação', async () => {

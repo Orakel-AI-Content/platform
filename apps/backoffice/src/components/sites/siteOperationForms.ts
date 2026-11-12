@@ -26,3 +26,9 @@ export const DailyPublishLimitSchema = z.object({
   dailyPublishLimit: z.number({ error: LIMIT_MESSAGE }).int(LIMIT_MESSAGE).min(1, LIMIT_MESSAGE),
 });
 export type DailyPublishLimitValue = z.infer<typeof DailyPublishLimitSchema>;
+
+/** Motivo da pausa manual (#650): aparado e obrigatório, com a mensagem do domínio. */
+export const PauseReasonSchema = z.object({
+  reason: z.string().trim().min(1, 'Informe o motivo da pausa'),
+});
+export type PauseReasonValue = z.infer<typeof PauseReasonSchema>;

@@ -544,7 +544,8 @@ página de uma coisa só (site, conteúdo, versão, revisão), definido na #368:
   operação (#648) vêm prontas da página em `actions`, uma por etapa, abaixo do estado, como o
   "Marcar…": "Reconstruir na release" na Versão (só com a lista de releases), "Publicar agora"
   na Build (fora da pausa), "Escolher outra versão" na No ar (o "Reverter", só com a lista de
-  versões) e "Retomar" na linha Site (só pausado). Sem operations.run, o painel não tem botões
+  versões) e, na linha Site, "Pausar" (só ativo, com motivo obrigatório no diálogo, #650) ou
+  "Retomar" (só pausado). Sem operations.run, o painel não tem botões
   de operação e mostra os mesmos estados.
 
 ### Mídia
@@ -673,8 +674,10 @@ Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
   - **ações que afetam o site publicado:** "Publicar agora" (lista e etapa Build da página do
     site), que muda o site no ar sem esperar a janela de agrupamento; "Reconstruir na release"
     (etapa Versão), que troca a release e enfileira um build; "Escolher outra versão" (etapa No
-    ar), que reverte o site no ar para uma versão anterior; e "Retomar" (linha Site), que tira o
-    site da pausa e enfileira o próximo build. Salvar configuração ou conteúdo,
+    ar), que reverte o site no ar para uma versão anterior; "Pausar" (linha Site), que para os
+    builds do site até ser retomado e pede o motivo no diálogo (vazio, o erro fica no campo e o
+    diálogo não confirma); e "Retomar" (linha Site), que tira o site da pausa e enfileira o
+    próximo build. Salvar configuração ou conteúdo,
     aprovar na revisão, as etapas do ciclo de vida, o G1 e a janela não confirmam: passam pela
     janela ou não mudam o que está no ar.
 
