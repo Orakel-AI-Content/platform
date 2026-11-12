@@ -464,6 +464,51 @@ export async function advanceLifecycle(
 }
 
 /**
+ * Desmarca uma etapa manual do ciclo de vida, voltando só à anterior (`zona_ativa →
+ * infra_aplicada`, `infra_aplicada → cadastrado`); `publicado` e `cadastrado` não voltam. Quem
+ * pede diz qual etapa espera desmarcar: o update condicional decide a corrida, e dois pedidos
+ * simultâneos não descem duas etapas. Nenhum estado novo: se o provedor ainda confirmar, a
+ * próxima conferência automática marca de novo.
+ */
+export async function retreatLifecycle(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  step: ManualLifecycleStep,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  const updated = await tx
+    .update(sites)
+    .set({ lifecycle: MANUAL_STEPS[step] })
+    .where(and(eq(sites.id, siteId), eq(sites.lifecycle, step)))
+    .returning({ id: sites.id });
+  if (updated.length > 0) return { ok: true, value: undefined };
+
+  const [site] = await tx
+    .select({ lifecycle: sites.lifecycle })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) {
+    return {
+      ok: false,
+      issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+    };
+  }
+  return {
+    ok: false,
+    issues: [
+      {
+        code: 'site.lifecycle_undo_order',
+        message: `${step} só pode ser desmarcada com o site em ${step}; o site está em ${site.lifecycle}`,
+        path: ['lifecycle'],
+      },
+    ],
+  };
+}
+
+/**
  * Define a janela de agrupamento dos builds do site, em segundos; `null` volta à padrão
  * (BUILD_WINDOW_SECONDS). Vale da próxima publicação em diante: um build já agendado mantém
  * o horário.
