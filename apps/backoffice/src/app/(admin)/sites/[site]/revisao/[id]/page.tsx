@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { noRead } from '@/components/shared/ForbiddenScreen';
@@ -83,10 +84,27 @@ export default async function ReviewPage({ params }: Params) {
         title={<>Revisão de “{latest.data.title}”</>}
         action={
           // O mesmo `Button` e variante do "Ver prévia" do editor, em `sm` como as ações de
-          // cabeçalho do guia.
-          <Button asElement="a" href={preview} target="_blank" rel="noopener noreferrer" size="sm">
-            Abrir prévia<span className="sr-only"> (abre em nova aba)</span>
-          </Button>
+          // cabeçalho do guia. "Corrigir" (#751) só com a permissão e a versão em revisão.
+          <div className="flex flex-wrap gap-2">
+            {can(actor, 'content.amend') && latest.status === 'em_revisao' && (
+              <Button
+                asElement={Link}
+                href={`/sites/${site.id}/revisao/${contentId}/corrigir`}
+                size="sm"
+              >
+                Corrigir
+              </Button>
+            )}
+            <Button
+              asElement="a"
+              href={preview}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="sm"
+            >
+              Abrir prévia<span className="sr-only"> (abre em nova aba)</span>
+            </Button>
+          </div>
         }
       />
       <PageMeta
