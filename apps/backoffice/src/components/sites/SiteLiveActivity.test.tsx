@@ -84,9 +84,9 @@ afterEach(() => {
 describe('SiteLiveActivity', () => {
   it('acompanha a execução da fila ao resultado, sem recarregar a página', async () => {
     status
-      .mockResolvedValueOnce({ open: running, history: [PAUSE] })
-      .mockResolvedValueOnce({ open: null, history: [finished, PAUSE] });
-    renderLive({ open: queued, history: [PAUSE] });
+      .mockResolvedValueOnce({ open: running, openInfra: null, history: [PAUSE] })
+      .mockResolvedValueOnce({ open: null, openInfra: null, history: [finished, PAUSE] });
+    renderLive({ open: queued, openInfra: null, history: [PAUSE] });
 
     expect(region().textContent).toBe('Publicação na fila, prevista para 11/10/2026, 14:00 BRT');
     await tick();
@@ -96,8 +96,8 @@ describe('SiteLiveActivity', () => {
   });
 
   it('a linha do tempo do histórico passa a mostrar a execução que terminou', async () => {
-    status.mockResolvedValue({ open: null, history: [finished, PAUSE] });
-    renderLive({ open: running, history: [PAUSE] });
+    status.mockResolvedValue({ open: null, openInfra: null, history: [finished, PAUSE] });
+    renderLive({ open: running, openInfra: null, history: [PAUSE] });
 
     expect(within(screen.getByRole('list')).queryByText('Falhou')).toBeNull();
     await tick();
@@ -108,7 +108,7 @@ describe('SiteLiveActivity', () => {
   });
 
   it('sem execução aberta, não consulta a Server Action nem mostra faixa', async () => {
-    renderLive({ open: null, history: [finished, PAUSE] });
+    renderLive({ open: null, openInfra: null, history: [finished, PAUSE] });
 
     expect(region().textContent).toBe('');
     expect(vi.getTimerCount()).toBe(0);
@@ -117,8 +117,8 @@ describe('SiteLiveActivity', () => {
   });
 
   it('depois que a execução fecha, as consultas param', async () => {
-    status.mockResolvedValue({ open: null, history: [finished, PAUSE] });
-    renderLive({ open: running, history: [PAUSE] });
+    status.mockResolvedValue({ open: null, openInfra: null, history: [finished, PAUSE] });
+    renderLive({ open: running, openInfra: null, history: [PAUSE] });
 
     await tick();
     expect(status).toHaveBeenCalledTimes(1);
@@ -128,8 +128,10 @@ describe('SiteLiveActivity', () => {
   });
 
   it('uma leitura recusada mantém o que está na tela e tenta de novo', async () => {
-    status.mockResolvedValueOnce(null).mockResolvedValueOnce({ open: running, history: [PAUSE] });
-    renderLive({ open: queued, history: [PAUSE] });
+    status
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ open: running, openInfra: null, history: [PAUSE] });
+    renderLive({ open: queued, openInfra: null, history: [PAUSE] });
 
     await tick();
     expect(region().textContent).toContain('na fila');
@@ -138,8 +140,8 @@ describe('SiteLiveActivity', () => {
   });
 
   it('a região viva fica no mesmo nó e troca o texto a cada mudança de estado', async () => {
-    status.mockResolvedValue({ open: running, history: [PAUSE] });
-    renderLive({ open: queued, history: [PAUSE] });
+    status.mockResolvedValue({ open: running, openInfra: null, history: [PAUSE] });
+    renderLive({ open: queued, openInfra: null, history: [PAUSE] });
 
     const before = region();
     await tick();
@@ -148,13 +150,13 @@ describe('SiteLiveActivity', () => {
   });
 
   it('dados novos da página substituem os do polling', async () => {
-    const { rerender } = renderLive({ open: null, history: [PAUSE] });
+    const { rerender } = renderLive({ open: null, openInfra: null, history: [PAUSE] });
     expect(status).not.toHaveBeenCalled();
 
-    status.mockResolvedValue({ open: running, history: [PAUSE] });
+    status.mockResolvedValue({ open: running, openInfra: null, history: [PAUSE] });
     rerender(
       <SiteLiveActivity
-        activity={{ open: queued, history: [PAUSE] }}
+        activity={{ open: queued, openInfra: null, history: [PAUSE] }}
         status={status}
         timeZone={TZ}
         pollMs={POLL_MS}

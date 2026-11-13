@@ -23,6 +23,7 @@ import {
   type SiteEventKind,
 } from '../../db/schema/index.ts';
 import { requireRole, SYSTEM_ACTOR, type Actor } from '../access/rbac.ts';
+import { infraActivity, type InfraHistoryItem, type OpenInfraRun } from '../infra/runs.ts';
 import { advanceRollout } from '../releases/rollout.ts';
 import { currentConfig } from '../sites/sites.ts';
 import type { BuildOutcome, BuildStage } from './run-build.ts';
@@ -548,11 +549,13 @@ export type EventHistoryItem = {
   release: string | null;
 };
 
-export type SiteHistoryItem = ExecutionHistoryItem | EventHistoryItem;
+export type SiteHistoryItem = ExecutionHistoryItem | EventHistoryItem | InfraHistoryItem;
 
 /** O que está acontecendo no site e o que já aconteceu, do mais recente ao mais antigo. */
 export type SiteActivity = {
   open: OpenExecution | null;
+  /** Criação da infraestrutura em andamento (`infra_runs`), à parte do build. */
+  openInfra: OpenInfraRun | null;
   history: SiteHistoryItem[];
 };
 
@@ -563,8 +566,9 @@ export const SITE_HISTORY_LIMIT = 50;
  * Atividade do site, para o status ao vivo e o histórico da página do site: a execução aberta
  * (a `rodando` antes da `na_fila`, quando um pedido durante o build deixa as duas) e o
  * histórico que une as execuções terminadas de `builds` (builds e rollbacks, inclusive
- * cancelados) aos eventos de `site_events`. Cada tabela é lida até o limite, e as duas listas
- * são intercaladas pelo horário e cortadas no limite. A execução aberta fica fora do histórico.
+ * cancelados), os eventos de `site_events` e as criações da infraestrutura de `infra_runs`.
+ * Cada tabela é lida até o limite, e as listas são intercaladas pelo horário e cortadas no
+ * limite. As execuções abertas (a de build e a de infra) ficam fora do histórico.
  * Exige só `site.read`: a aba "Publicação" (#647) aparece para todos os perfis, como a "Builds" que ela
  * substitui (#637), inclusive a mensagem e o fim do log das falhas.
  */
@@ -613,6 +617,7 @@ export async function siteActivity(
     .where(eq(siteEvents.siteId, siteId))
     .orderBy(desc(siteEvents.createdAt), desc(siteEvents.id))
     .limit(limit);
+  const infra = await infraActivity(db, siteId, limit);
 
   const history: SiteHistoryItem[] = [
     ...executions.flatMap(({ status, finishedAt, ...row }): ExecutionHistoryItem[] =>
@@ -651,11 +656,12 @@ export async function siteActivity(
       previousRelease: row.previousRelease,
       release: row.release,
     })),
+    ...infra.history,
   ]
     .sort((a, b) => b.at.getTime() - a.at.getTime())
     .slice(0, limit);
 
-  return { ok: true, value: { open, history } };
+  return { ok: true, value: { open, openInfra: infra.open, history } };
 }
 
 /**

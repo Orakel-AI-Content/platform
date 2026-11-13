@@ -41,7 +41,7 @@ const QUEUED: OpenExecution = {
   cancelRequestedAt: null,
 };
 const RUNNING: OpenExecution = { ...QUEUED, status: 'rodando', currentStage: 'render' };
-const IDLE: SiteActivity = { open: null, history: [] };
+const IDLE: SiteActivity = { open: null, openInfra: null, history: [] };
 
 const ok = () => vi.fn(() => Promise.resolve({ ok: true as const, message: 'ok' }));
 
@@ -194,7 +194,7 @@ const CASES = [
 
 /** O painel cuja publicação fecha quando o "Cancelar" responde, como o polling traria. */
 function ClosingPanel({ actions, open }: { actions: Actions; open: OpenExecution }) {
-  const [activity, setActivity] = useState<SiteActivity>({ open, history: [] });
+  const [activity, setActivity] = useState<SiteActivity>({ open, openInfra: null, history: [] });
   const cancel = vi.fn(() => {
     setActivity(IDLE);
     return actions.cancel();
@@ -212,7 +212,7 @@ describe('ações nas etapas no navegador', () => {
         <Panel
           paused={paused}
           actions={actions}
-          activity={operation === 'cancel' ? { open: RUNNING, history: [] } : IDLE}
+          activity={operation === 'cancel' ? { open: RUNNING, openInfra: null, history: [] } : IDLE}
         />,
       );
       const trigger = page.getByRole('button', { name: button });

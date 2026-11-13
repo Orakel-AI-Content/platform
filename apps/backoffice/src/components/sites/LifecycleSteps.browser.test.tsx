@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // comportamento, sem axe (ADR 0020).
 
 const POLL_MS = 50;
-const IDLE: SiteActivity = { open: null, history: [] };
+const IDLE: SiteActivity = { open: null, openInfra: null, history: [] };
 const CHECK: SiteInfraCheck = {
   lifecycle: 'cadastrado',
   checkedAt: null,

@@ -1718,7 +1718,12 @@ describe('atividade do site', () => {
     if (!result.ok) throw new Error('consulta recusada');
     expect(result.value.open).toBeNull();
     expect(
-      result.value.history.map((item) => [item.type, item.kind, item.requestedBy, item.at]),
+      result.value.history.map((item) => [
+        item.type,
+        'kind' in item ? item.kind : null,
+        item.requestedBy,
+        item.at,
+      ]),
     ).toEqual([
       ['execucao', 'build', 'system', at(6)],
       ['evento', 'troca_de_versao', operacao.email, at(5)],

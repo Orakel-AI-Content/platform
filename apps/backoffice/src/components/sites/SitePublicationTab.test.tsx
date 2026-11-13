@@ -119,7 +119,7 @@ afterEach(() => {
 
 describe('aba Publicação', () => {
   it('mostra o painel em cima e o histórico embaixo', () => {
-    renderTab({ open: null, history: [finished] });
+    renderTab({ open: null, openInfra: null, history: [finished] });
 
     const heading = screen.getByRole('heading', { name: 'Histórico' });
     // O histórico é a linha do tempo fora do painel de etapas (#651).
@@ -138,9 +138,9 @@ describe('aba Publicação', () => {
 
   it('a etapa Build acompanha a execução da fila ao resultado, sem recarregar', async () => {
     status
-      .mockResolvedValueOnce({ open: running, history: [] })
-      .mockResolvedValueOnce({ open: null, history: [finished] });
-    renderTab({ open: queued, history: [] });
+      .mockResolvedValueOnce({ open: running, openInfra: null, history: [] })
+      .mockResolvedValueOnce({ open: null, openInfra: null, history: [finished] });
+    renderTab({ open: queued, openInfra: null, history: [] });
 
     expect(buildStep()).toBe('Publicação na fila, prevista para 11/10/2026, 14:00 BRT');
     await tick();
@@ -153,10 +153,10 @@ describe('aba Publicação', () => {
 
   it('"Cancelar" acompanha a publicação aberta e sai quando ela fecha (#649)', async () => {
     status
-      .mockResolvedValueOnce({ open: running, history: [] })
-      .mockResolvedValueOnce({ open: null, history: [finished] });
+      .mockResolvedValueOnce({ open: running, openInfra: null, history: [] })
+      .mockResolvedValueOnce({ open: null, openInfra: null, history: [finished] });
     renderTab(
-      { open: queued, history: [] },
+      { open: queued, openInfra: null, history: [] },
       {
         build: <button type="button">Publicar agora</button>,
         cancel: <button type="button">Cancelar</button>,
@@ -177,7 +177,7 @@ describe('aba Publicação', () => {
 });
 
 describe('conferência da infra na etapa Infra e zona (#716)', () => {
-  const idle: SiteActivity = { open: null, history: [finished] };
+  const idle: SiteActivity = { open: null, openInfra: null, history: [finished] };
   const infraItem = () => within(panel()).getAllByRole('listitem')[0]!;
   const infraStep = () => infraItem().querySelector('.step-item-description')?.textContent;
   const check = (over: Partial<SiteInfraCheck>): InfraCheckView => ({
