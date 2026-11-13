@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useId, useRef, useState, type ReactNode } from 'react';
 import * as z from 'zod';
 
@@ -19,32 +20,55 @@ import { Button } from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Checkbox from '@/components/ui/Checkbox';
 import Input from '@/components/ui/Input';
+import { Steps } from '@/components/ui/Steps';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
 // Painel da tela de revisão (#75), ao lado da visualização a partir de `xl` e abaixo dela antes
-// (#373): checagens automáticas (`checks`, workspace#87), checklist e aprovação. A página decide
-// permissão e estado no servidor e passa os itens do checklist (REVIEW_CHECKLIST, do domínio, que
-// não pode ir para o bundle do cliente) e as confirmações já gravadas na versão (#749). Cada caixa
-// grava ao ser clicada (#752): a tela muda na hora e fica com as chaves que o domínio devolve; uma
-// recusa desfaz a mudança e aparece no `ActionAlert` do cartão. "Marcar todos" grava as três.
-// As aprovações não enviam nada: só ficam habilitadas com todas gravadas e o domínio confere de
-// novo. São três (workspace#89): "Aprovar e publicar agora", "Aprovar e agendar" (o Dialog de
-// agendamento da página do conteúdo) e "Só aprovar", o envio do formulário; as duas primeiras são
-// ações próprias do rodapé (`card.actions`), com o mesmo resumo de erros. Depois de publicar ou
-// agendar, o desfecho ("foi ao ar", "agendado para…") fica no cartão do checklist, com o aviso
-// quando o dia pedido estava cheio e a publicação foi para a próxima vaga; o toast repete os dois.
-// Visual do Ecme (#277): o conteúdo em `Card`s, com as cores do `@theme`; o `<aside>` fica por fora
-// para manter o landmark. O checklist tem cartão próprio, com "Aprovar" no rodapé dele (#333) e
-// "Marcar todos" no topo. As seções são seções da tela (`h2`, como "Dados" e "Blocos" na versão,
-// #372); o `<aside>` tem o nome por `aria-label`, sem `h2` oculto, e a prévia em nova aba é ação do
-// cabeçalho da página. A validação da release é um item das checagens (`erro`): só ela, além do
-// checklist, bloqueia "Aprovar" (`blocked`), com o aviso no `Alert` de erro do Ecme (#444), sem
-// `role="alert"`: chega no carregamento, não é retorno de uma ação. Abaixo do checklist, "Devolver
-// ao editor" (#598) em cartão próprio, com o comentário obrigatório: não depende do checklist nem
-// da validação, porque devolver não leva nada ao site. Decidida a versão (aprovada ou devolvida),
-// os dois formulários saem.
+// (#373). É um wizard de quatro passos (#766) sobre o `Steps` do Ecme, no exemplo "Controlled":
+// Checagens (`checks`, workspace#87), Ajustes (vazio por ora; a correção entra na #767), Leitura
+// (o checklist) e Decisão (as aprovações e a devolução), com "Anterior" e "Próximo" no rodapé.
+// Os quatro passos ficam montados e os inativos levam `hidden`: voltar a um passo encontra as
+// caixas e o comentário digitado como estavam. O passo atual fica em `?passo=` (`router.replace`,
+// como o período da audiência), e a página o devolve na prop `step`: a troca de versão remonta o
+// painel (`key`) no mesmo passo. Quando o botão acionado fica desabilitado (primeiro ou último
+// passo), o foco vai para o outro, e não para o `body`.
+// A página decide permissão e estado no servidor e passa os itens do checklist (REVIEW_CHECKLIST,
+// do domínio, que não pode ir para o bundle do cliente) e as confirmações já gravadas na versão
+// (#749). Cada caixa grava ao ser clicada (#752): a tela muda na hora e fica com as chaves que o
+// domínio devolve; uma recusa desfaz a mudança e aparece no `ActionAlert` do cartão. "Marcar
+// todos" grava as três. As aprovações não enviam nada: só ficam habilitadas com todas gravadas, e
+// o domínio confere de novo. São três (workspace#89): "Aprovar e publicar agora", "Aprovar e
+// agendar" (o Dialog de agendamento da página do conteúdo) e "Só aprovar", o envio do
+// formulário; as duas primeiras são ações próprias do rodapé (`card.actions`), com o mesmo resumo
+// de erros. Depois de publicar ou agendar, o desfecho ("foi ao ar", "agendado para…") fica no
+// cartão da decisão, com o aviso quando o dia pedido estava cheio e a publicação foi para a
+// próxima vaga; o toast repete os dois. Visual do Ecme (#277): o conteúdo em `Card`s; o `<aside>`
+// fica por fora para manter o landmark e tem o nome por `aria-label`. As seções são seções da tela
+// (`h2`, #372). A validação da release é um item das checagens (`erro`): só ela, além do
+// checklist, bloqueia as aprovações (`blocked`), com o aviso no `Alert` de erro do Ecme (#444),
+// sem `role="alert"`: chega no carregamento. "Devolver ao editor" (#598) tem cartão próprio, com
+// o comentário obrigatório, e não depende do checklist nem da validação. Decidida a versão, os
+// dois formulários saem.
 
 export type ChecklistItem = { key: string; label: string };
+
+/** Os passos da revisão, na ordem; `key` é o valor de `?passo=`. */
+const STEPS = [
+  { key: 'checagens', title: 'Checagens' },
+  { key: 'ajustes', title: 'Ajustes' },
+  { key: 'leitura', title: 'Leitura' },
+  { key: 'decisao', title: 'Decisão' },
+] as const;
+
+const STEP_PARAM = 'passo';
+const LAST_STEP = STEPS.length - 1;
+
+/** Índice do passo de `?passo=`; ausente ou desconhecido é o primeiro. */
+const stepIndex = (step: string | undefined) =>
+  Math.max(
+    0,
+    STEPS.findIndex((item) => item.key === step),
+  );
 
 type FormAction = () => Promise<FormActionResult<SchemaFormIssue>>;
 
@@ -132,6 +156,7 @@ function useConfirmations(initial: readonly string[]) {
 export function ReviewPanel({
   version,
   status,
+  step,
   checks,
   blocked,
   checklist,
@@ -146,9 +171,11 @@ export function ReviewPanel({
 }: {
   version: number;
   status: ContentListItem['status'];
-  /** Seção de checagens automáticas (`ReviewChecks`), no topo do painel. */
+  /** O passo de `?passo=`, lido pela página (`checagens`, `ajustes`, `leitura` ou `decisao`). */
+  step?: string;
+  /** Seção de checagens automáticas (`ReviewChecks`), no passo Checagens. */
   checks?: ReactNode;
-  /** Alguma checagem com `erro` (a validação da release): "Aprovar" fica desabilitado. */
+  /** Alguma checagem com `erro` (a validação da release): as aprovações ficam desabilitadas. */
   blocked: boolean;
   checklist: readonly ChecklistItem[];
   /** Chaves do checklist já gravadas na versão (`reviewConfirmations`). */
@@ -169,9 +196,15 @@ export function ReviewPanel({
   giveBack: (comment: string) => Promise<FormActionResult<SchemaFormIssue>>;
 }) {
   const id = useId();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const [current, setCurrent] = useState(() => stepIndex(step));
+  const previousRef = useRef<HTMLButtonElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
   // Decidida nesta tela: os formulários saem e a confirmação vai para o toast (pelo SchemaForm).
   const [decided, setDecided] = useState(false);
-  // Desfecho de publicar ou agendar, que fica no cartão do checklist depois da decisão.
+  // Desfecho de publicar ou agendar, que fica no cartão da decisão.
   const [outcome, setOutcome] = useState<Decided | null>(null);
   // Qual das ações próprias do rodapé está em curso, para o rótulo dela.
   const [running, setRunning] = useState<'publish' | 'schedule' | null>(null);
@@ -183,6 +216,17 @@ export function ReviewPanel({
   const approveDescribedBy =
     [blocked && `${id}-blocked`, !complete && `${id}-incomplete`].filter(Boolean).join(' ') ||
     undefined;
+
+  /** Vai ao passo `index` e o grava em `?passo=`, sem mexer nos outros parâmetros. */
+  const goTo = (index: number) => {
+    // O botão acionado fica desabilitado no primeiro e no último passo: o foco passa ao outro.
+    if (index === LAST_STEP) previousRef.current?.focus();
+    if (index === 0) nextRef.current?.focus();
+    setCurrent(index);
+    const next = new URLSearchParams(params);
+    next.set(STEP_PARAM, STEPS[index]!.key);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
 
   /** Roda publicar ou agendar pelo formulário: a recusa vai ao resumo e o sucesso fica no cartão. */
   const decide = (
@@ -202,168 +246,210 @@ export function ReviewPanel({
         setRunning(null);
       }
     });
-  const checklistTitle = (
-    <h2 id={`${id}-checklist`} className={SECTION_TITLE_CLASS}>
-      Checklist
-    </h2>
-  );
+
+  const decisionTitle = <h2 className={SECTION_TITLE_CLASS}>Decisão</h2>;
+
+  const panels: Record<(typeof STEPS)[number]['key'], ReactNode> = {
+    checagens: checks,
+    ajustes: (
+      <Card bodyClass="space-y-3">
+        <h2 className={SECTION_TITLE_CLASS}>Ajustes</h2>
+        <p className={SECTION_HINT_CLASS}>Nada a ajustar nesta versão? Siga para a leitura.</p>
+      </Card>
+    ),
+    leitura: (
+      <Card bodyClass="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className={SECTION_TITLE_CLASS}>Checklist</h2>
+          {open && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                const before = confirmed;
+                void write(
+                  () => checklist.map((item) => item.key),
+                  () => before,
+                  () => confirmAll(true),
+                );
+              }}
+            >
+              Marcar todos
+            </Button>
+          )}
+        </div>
+        {open ? (
+          <div className="flex flex-col gap-3">
+            {checklist.map((item) => (
+              <Checkbox
+                key={item.key}
+                name={item.key}
+                checked={confirmed.includes(item.key)}
+                onChange={(checked) => {
+                  void write(
+                    (keys) => (checked ? withKey(keys, item.key) : withoutKey(keys, item.key)),
+                    (keys) => (checked ? withoutKey(keys, item.key) : withKey(keys, item.key)),
+                    () => confirm(item.key, checked),
+                  );
+                }}
+              >
+                {item.label}
+              </Checkbox>
+            ))}
+          </div>
+        ) : (
+          <ul className="list-disc space-y-1 pl-5 text-sm">
+            {checklist.map((item) => (
+              <li key={item.key}>{item.label}</li>
+            ))}
+          </ul>
+        )}
+        <ActionAlert error={error} />
+      </Card>
+    ),
+    decisao: open ? (
+      <div className="flex flex-col gap-4">
+        <SchemaForm
+          schema={approveSchema}
+          defaultValues={{}}
+          card={{
+            intro: (
+              <>
+                {decisionTitle}
+                {blocked && (
+                  <Alert type="danger" showIcon duration={0}>
+                    <p id={`${id}-blocked`} className="text-sm">
+                      Corrija os erros das checagens automáticas antes de aprovar.
+                    </p>
+                  </Alert>
+                )}
+                {!complete && (
+                  <p id={`${id}-incomplete`} className={SECTION_HINT_CLASS}>
+                    Marque todos os itens para aprovar.
+                  </p>
+                )}
+              </>
+            ),
+            actions: (helpers) => (
+              <>
+                <ScheduleDialog
+                  label={running === 'schedule' ? 'Agendando…' : 'Aprovar e agendar'}
+                  disabled={approveDisabled || helpers.pending}
+                  describedBy={approveDescribedBy}
+                  onSchedule={(at) =>
+                    decide(helpers, 'schedule', () => approveSchedule(at.toISOString()))
+                  }
+                />
+                <Button
+                  type="button"
+                  disabled={approveDisabled || helpers.pending}
+                  aria-describedby={approveDescribedBy}
+                  onClick={() => decide(helpers, 'publish', approvePublish)}
+                >
+                  {running === 'publish' ? 'Publicando…' : 'Aprovar e publicar agora'}
+                </Button>
+              </>
+            ),
+          }}
+          submitLabel="Só aprovar"
+          pendingLabel="Aprovando…"
+          submitDisabled={approveDisabled}
+          submitDescribedBy={approveDescribedBy}
+          onSubmit={async () => {
+            const result = await approve();
+            if (!result.ok) return result.issues;
+            setDecided(true);
+            return { success: result.message };
+          }}
+        />
+        <SchemaForm
+          schema={returnSchema}
+          defaultValues={{ comment: '' }}
+          labels={{ comment: 'O que corrigir' }}
+          fields={RETURN_FIELDS}
+          card={{
+            intro: (
+              <>
+                <h2 className={SECTION_TITLE_CLASS}>Devolver ao editor</h2>
+                <p className={SECTION_HINT_CLASS}>
+                  A versão volta a rascunho e sai da fila; o comentário aparece para quem edita.
+                </p>
+              </>
+            ),
+          }}
+          submitLabel="Devolver ao editor"
+          pendingLabel="Devolvendo…"
+          onSubmit={async ({ comment }) => {
+            const result = await giveBack(comment);
+            if (!result.ok) return result.issues;
+            setDecided(true);
+            return { success: result.message };
+          }}
+        />
+      </div>
+    ) : (
+      <Card bodyClass="space-y-3">
+        {decisionTitle}
+        {outcome !== null && (
+          <div className="space-y-2">
+            <Alert type="success" showIcon duration={0}>
+              <p className="text-sm">{outcome.message}</p>
+            </Alert>
+            {outcome.warning !== undefined && (
+              <Alert type="warning" showIcon duration={0}>
+                <p className="text-sm">{outcome.warning}</p>
+              </Alert>
+            )}
+          </div>
+        )}
+        {!inReview && !decided && (
+          <p className={SECTION_HINT_CLASS}>
+            Esta versão está {CONTENT_STATUS_LABEL[status].toLowerCase()}: só uma versão em revisão
+            pode ser aprovada.
+          </p>
+        )}
+        {inReview && !canApprove && (
+          <p className={SECTION_HINT_CLASS}>Só quem pode publicar decide a revisão.</p>
+        )}
+      </Card>
+    ),
+  };
 
   return (
     <aside aria-label={`Revisão da versão ${version}`} className="flex flex-col gap-4">
-      {checks}
+      <Card>
+        <Steps current={current} aria-label="Passos da revisão">
+          {STEPS.map((item) => (
+            <Steps.Item key={item.key} title={item.title} />
+          ))}
+        </Steps>
+      </Card>
 
-      <section aria-labelledby={`${id}-checklist`}>
-        {open ? (
-          <SchemaForm
-            schema={approveSchema}
-            defaultValues={{}}
-            card={{
-              intro: (
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    {checklistTitle}
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        const before = confirmed;
-                        void write(
-                          () => checklist.map((item) => item.key),
-                          () => before,
-                          () => confirmAll(true),
-                        );
-                      }}
-                    >
-                      Marcar todos
-                    </Button>
-                  </div>
-                  {blocked && (
-                    <Alert type="danger" showIcon duration={0}>
-                      <p id={`${id}-blocked`} className="text-sm">
-                        Corrija os erros das checagens automáticas antes de aprovar.
-                      </p>
-                    </Alert>
-                  )}
-                  <div className="flex flex-col gap-3">
-                    {checklist.map((item) => (
-                      <Checkbox
-                        key={item.key}
-                        name={item.key}
-                        checked={confirmed.includes(item.key)}
-                        onChange={(checked) => {
-                          void write(
-                            (keys) =>
-                              checked ? withKey(keys, item.key) : withoutKey(keys, item.key),
-                            (keys) =>
-                              checked ? withoutKey(keys, item.key) : withKey(keys, item.key),
-                            () => confirm(item.key, checked),
-                          );
-                        }}
-                      >
-                        {item.label}
-                      </Checkbox>
-                    ))}
-                  </div>
-                  {!complete && (
-                    <p id={`${id}-incomplete`} className={SECTION_HINT_CLASS}>
-                      Marque todos os itens para aprovar.
-                    </p>
-                  )}
-                  <ActionAlert error={error} />
-                </>
-              ),
-              actions: (helpers) => (
-                <>
-                  <ScheduleDialog
-                    label={running === 'schedule' ? 'Agendando…' : 'Aprovar e agendar'}
-                    disabled={approveDisabled || helpers.pending}
-                    describedBy={approveDescribedBy}
-                    onSchedule={(at) =>
-                      decide(helpers, 'schedule', () => approveSchedule(at.toISOString()))
-                    }
-                  />
-                  <Button
-                    type="button"
-                    disabled={approveDisabled || helpers.pending}
-                    aria-describedby={approveDescribedBy}
-                    onClick={() => decide(helpers, 'publish', approvePublish)}
-                  >
-                    {running === 'publish' ? 'Publicando…' : 'Aprovar e publicar agora'}
-                  </Button>
-                </>
-              ),
-            }}
-            submitLabel="Só aprovar"
-            pendingLabel="Aprovando…"
-            submitDisabled={approveDisabled}
-            submitDescribedBy={approveDescribedBy}
-            onSubmit={async () => {
-              const outcome = await approve();
-              if (!outcome.ok) return outcome.issues;
-              setDecided(true);
-              return { success: outcome.message };
-            }}
-          />
-        ) : (
-          <Card bodyClass="space-y-3">
-            {checklistTitle}
-            <ul className="list-disc space-y-1 pl-5 text-sm">
-              {checklist.map((item) => (
-                <li key={item.key}>{item.label}</li>
-              ))}
-            </ul>
-            {outcome !== null && (
-              <div className="space-y-2">
-                <Alert type="success" showIcon duration={0}>
-                  <p className="text-sm">{outcome.message}</p>
-                </Alert>
-                {outcome.warning !== undefined && (
-                  <Alert type="warning" showIcon duration={0}>
-                    <p className="text-sm">{outcome.warning}</p>
-                  </Alert>
-                )}
-              </div>
-            )}
-            {!inReview && !decided && (
-              <p className={SECTION_HINT_CLASS}>
-                Esta versão está {CONTENT_STATUS_LABEL[status].toLowerCase()}: só uma versão em
-                revisão pode ser aprovada.
-              </p>
-            )}
-          </Card>
-        )}
-      </section>
+      {STEPS.map((item, index) => (
+        <div key={item.key} hidden={index !== current} data-step={item.key}>
+          {panels[item.key]}
+        </div>
+      ))}
 
-      {open && (
-        <section aria-labelledby={`${id}-return`}>
-          <SchemaForm
-            schema={returnSchema}
-            defaultValues={{ comment: '' }}
-            labels={{ comment: 'O que corrigir' }}
-            fields={RETURN_FIELDS}
-            card={{
-              intro: (
-                <>
-                  <h2 id={`${id}-return`} className={SECTION_TITLE_CLASS}>
-                    Devolver ao editor
-                  </h2>
-                  <p className={SECTION_HINT_CLASS}>
-                    A versão volta a rascunho e sai da fila; o comentário aparece para quem edita.
-                  </p>
-                </>
-              ),
-            }}
-            submitLabel="Devolver ao editor"
-            pendingLabel="Devolvendo…"
-            onSubmit={async ({ comment }) => {
-              const outcome = await giveBack(comment);
-              if (!outcome.ok) return outcome.issues;
-              setDecided(true);
-              return { success: outcome.message };
-            }}
-          />
-        </section>
-      )}
+      <div className="flex justify-end gap-2">
+        <Button
+          ref={previousRef}
+          type="button"
+          disabled={current === 0}
+          onClick={() => goTo(current - 1)}
+        >
+          Anterior
+        </Button>
+        <Button
+          ref={nextRef}
+          type="button"
+          variant="solid"
+          disabled={current === LAST_STEP}
+          onClick={() => goTo(current + 1)}
+        >
+          Próximo
+        </Button>
+      </div>
     </aside>
   );
 }
