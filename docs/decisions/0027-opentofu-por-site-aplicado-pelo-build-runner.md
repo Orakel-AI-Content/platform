@@ -41,8 +41,11 @@ por botão, com o plano mostrado antes da confirmação. Esta ADR revê a ADR-02
   destino do Email Routing (`cloudflare_email_routing_address`), os buckets e os tokens ficam
   fora do módulo.
 - **Crawler Hints fora do módulo.** O provider v5 (conferido na 5.28.1) não tem recurso nem
-  `setting_id` para ele: na API, é uma _flag_ de produto da zona, não um _zone setting_. Até o
-  provider modelá-la, ele é ligado à mão em cada site (passo 6 abaixo).
+  `setting_id` para ele: na API, é uma _flag_ de produto da zona, não um _zone setting_. O
+  `apply` do `infra-runner` o liga depois do `tofu apply`, pela rota de flags da zona
+  (`POST /zones/{zone_id}/flags/products/cache/changes`, `crawlhints_enabled`), com o mesmo
+  token. Essa rota não é documentada pela Cloudflare (platform#823): a falha não derruba o
+  `apply`, só marca `crawlerHints: "falhou"` no resultado, e o passo 6 abaixo é a alternativa.
 - O CI roda `tofu fmt -check` e `tofu validate`, sem credenciais (`init -backend=false`).
 
 ### Passos manuais
@@ -58,7 +61,8 @@ Os detalhes e os comandos ficam em `infra/site/README.md`.
    central).
 5. Depois de cada `apply` de um site novo, trocar os nameservers no registrador pelos da saída
    `name_servers`.
-6. Ligar o Crawler Hints na zona: painel → Caching → Configuration → Crawler Hints.
+6. Só se o `apply` registrar `crawlerHints: "falhou"` (ou num `apply` à mão): ligar o Crawler
+   Hints na zona, em painel → Caching → Configuration → Crawler Hints.
 
 ## Alternativas consideradas
 

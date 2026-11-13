@@ -19,6 +19,7 @@ flowchart LR
     BO[Backoffice Next.js<br/>UI · Publish API · API de exportação]
     W[backoffice-worker]
     BR[build-runner]
+    IR[imagem infra-runner<br/>docker/infra-runner]
     AG[agregador<br/>job do backoffice-worker]
     PG[(Postgres 18)]
     S3[(S3)]
@@ -37,6 +38,7 @@ flowchart LR
     Q[[Cloudflare Queues]]
   end
   BR -->|dispara| SB
+  BR -->|plan e apply da infra do site| IR
   SB -->|NDJSON em streaming| BO
   SB -->|publica| SITE
   SITE -->|eventos anônimos| EW
@@ -67,6 +69,7 @@ flowchart LR
 | API de exportação (NDJSON em streaming, uma entidade por linha)   | backoffice               | `@orakel/content-client` (loader Astro, leitura ao vivo)     |
 | Formato de eventos (payload, layout do AE, mensagem de fila)      | `@orakel/events`         | blog-worker, agregador                                       |
 | Volume `/build` (`result.json`, `publish.json`, códigos de saída) | `@orakel/build-contract` | build-site (escreve), build-runner do backoffice, edge-local |
+| Volume `/infra` (`infra-plan.json`, `infra-apply.json`)           | `@orakel/build-contract` | infra-runner (escreve), build-runner do backoffice           |
 | Variáveis CSS dos temas                                           | `@orakel/tokens`         | elements, ui, blog                                           |
 
 Regras de evolução: aditiva dentro de uma versão; mudança incompatível cria a próxima
@@ -102,15 +105,16 @@ passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`
 
 ## Raiz do repositório
 
-| Pasta/arquivo                                                    | Conteúdo                                           |
-| ---------------------------------------------------------------- | -------------------------------------------------- |
-| `tooling/{tsconfig,eslint-config,prettier-config,vitest-config}` | Configurações compartilhadas                       |
-| `infra/vps/compose.yaml`                                         | Compose base (produção) e redes (ADR 0010)         |
-| `infra/local/`                                                   | Override local, Caddy, init, seeds e `local:*`     |
-| `infra/site/`, `infra/modules/site/`                             | OpenTofu por site: zona, DNS e e-mail (ADR 0027)   |
-| `docker/docker-bake.hcl`, `docker/bake.sh`                       | Alvos e tags das imagens                           |
-| `.github/workflows/`                                             | `ci`, `images`, `release`, `e2e`, `add-to-project` |
-| `turbo.json`, `pnpm-workspace.yaml`                              | Tarefas e catálogo de versões                      |
+| Pasta/arquivo                                                    | Conteúdo                                                                                      |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `tooling/{tsconfig,eslint-config,prettier-config,vitest-config}` | Configurações compartilhadas                                                                  |
+| `infra/vps/compose.yaml`                                         | Compose base (produção) e redes (ADR 0010)                                                    |
+| `infra/local/`                                                   | Override local, Caddy, init, seeds e `local:*`                                                |
+| `infra/site/`, `infra/modules/site/`                             | OpenTofu por site: zona, DNS e e-mail (ADR 0027)                                              |
+| `docker/infra-runner/`                                           | Imagem do `plan` e do `apply` da infra de um site, com a raiz e o módulo embutidos (ADR 0027) |
+| `docker/docker-bake.hcl`, `docker/bake.sh`                       | Alvos e tags das imagens                                                                      |
+| `.github/workflows/`                                             | `ci`, `images`, `release`, `e2e`, `add-to-project`                                            |
+| `turbo.json`, `pnpm-workspace.yaml`                              | Tarefas e catálogo de versões                                                                 |
 
 ## Como criar uma unidade
 
