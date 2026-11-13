@@ -5,6 +5,7 @@ import type {
   BuildKind,
   BuildStatus,
   InfraResourceStep,
+  InfraStep,
   SiteEventKind,
 } from '@/db/schema/operations.ts';
 import type {
@@ -13,6 +14,7 @@ import type {
   SiteHistoryItem,
 } from '@/domain/builds/builds.ts';
 import type { BuildStage } from '@/domain/builds/run-build.ts';
+import type { InfraHistoryItem, OpenInfraRun } from '@/domain/infra/runs.ts';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 import type { PendingOrigin } from '@/domain/pending-changes/record.ts';
 import type { SiteInfraCheck, SiteSummary } from '@/domain/sites/sites.ts';
@@ -146,7 +148,7 @@ export const HISTORY_KIND_LABEL: Record<BuildKind | SiteEventKind, string> = {
   troca_de_versao: 'Troca de versão',
 };
 
-/** Item do histórico de uma criação da infraestrutura (`infra_runs`); o detalhe é da #826. */
+/** Item do histórico de uma criação da infraestrutura (`infra_runs`). */
 export const INFRA_RUN_LABEL = 'Criação da infraestrutura';
 
 /**
@@ -182,6 +184,49 @@ export function infraStepChangesText(changes: readonly InfraChange[]): string {
     .join(' · ');
 }
 
+/** Etapa de uma execução de infra: as do módulo e, só na remoção, as páginas do site. */
+export function infraRunStepLabel(step: InfraStep): string {
+  return step === 'paginas' ? 'Páginas do site' : INFRA_STEP_LABEL[step];
+}
+
+/**
+ * A criação da infraestrutura mais recente do histórico (#826), que decide "Tentar de novo" e
+ * os nameservers da etapa Infra e zona; `undefined` se o site nunca teve uma.
+ */
+export function latestInfraCreation(
+  history: readonly SiteHistoryItem[],
+): InfraHistoryItem | undefined {
+  return history.find(
+    (item): item is InfraHistoryItem => item.type === 'infra' && item.kind === 'criar',
+  );
+}
+
+/** Faixa ao vivo da criação aplicando (#826): a etapa corrente, quando já há uma. */
+export function infraLiveStatusText(open: Pick<OpenInfraRun, 'currentStep'>): string {
+  return open.currentStep === null
+    ? `${INFRA_RUN_LABEL} em andamento`
+    : `${INFRA_RUN_LABEL} em andamento, etapa: ${infraRunStepLabel(open.currentStep)}`;
+}
+
+/** "falhou", com a etapa quando a falha teve uma. */
+const infraFailedText = (step: InfraStep | null) =>
+  step === null ? 'falhou' : `falhou na etapa ${infraRunStepLabel(step)}`;
+
+/** A falha de uma execução de infra no histórico: a etapa, quando houve uma, e o motivo. */
+export function infraFailureText(failure: NonNullable<InfraHistoryItem['failure']>): string {
+  const failed = infraFailedText(failure.step);
+  return failure.message === null ? failed : `${failed}: ${failure.message}`;
+}
+
+/** Faixa quando a criação acompanhada termina (#826): concluída, ou a etapa e o motivo da falha. */
+export function infraLiveResultText(item: InfraHistoryItem, timeZone: string): string {
+  const at = formatDateTime(item.at, timeZone);
+  if (item.status === 'ok') return `${INFRA_RUN_LABEL} concluída em ${at}`;
+  const { step, message } = item.failure ?? { step: null, message: null };
+  const text = `${INFRA_RUN_LABEL} ${infraFailedText(step)} em ${at}`;
+  return message === null ? text : `${text}: ${message}`;
+}
+
 /** Etapa de uma execução de build, no detalhe de uma falha (#637). */
 export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {
   image: 'Imagem',
@@ -195,7 +240,9 @@ export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {
  */
 export function historyItemTitle(item: SiteHistoryItem): string {
   if (item.type === 'infra') {
-    return item.status === 'falhou' ? `${INFRA_RUN_LABEL} · falhou` : INFRA_RUN_LABEL;
+    return item.status === 'falhou'
+      ? `${INFRA_RUN_LABEL} · ${infraFailedText(item.failure?.step ?? null)}`
+      : INFRA_RUN_LABEL;
   }
   const kind = HISTORY_KIND_LABEL[item.kind];
   if (item.type === 'evento') {
