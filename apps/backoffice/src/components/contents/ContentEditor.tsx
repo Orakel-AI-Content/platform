@@ -71,6 +71,8 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 // nota ligada a ele diz por quê; o formulário não envia, nem pelo Enter num campo.
 // Na criação (#590), o slug acompanha o título até a pessoa editar o slug; o título e a descrição
 // para buscadores mostram quantos caracteres têm.
+// Fora da correção (#780), "Salvar e enviar para revisão" grava e envia numa transação só e leva
+// ao detalhe do conteúdo; vale também sem alteração, que envia o rascunho mais recente.
 
 const META_HINTS: Record<string, string> = {
   slug: 'Minúsculas, números e hífens.',
@@ -106,6 +108,9 @@ const SUBMIT_LABEL = {
   edit: { idle: 'Salvar', pending: 'Salvando…' },
   amend: { idle: 'Salvar correção', pending: 'Salvando correção…' },
 } as const;
+
+/** Rótulo de "Salvar e enviar para revisão" (#780), parado e durante o envio. */
+const SEND_LABEL = { idle: 'Salvar e enviar para revisão', pending: 'Enviando…' } as const;
 
 /** Por quanto tempo o "Desfazer" da remoção de bloco fica disponível no toast (#112). */
 export const UNDO_MS = 10_000;
@@ -178,6 +183,7 @@ export function ContentEditor({
   defaultValues,
   options,
   action,
+  submitAction,
   backHref,
   contentClassName,
   created = false,
@@ -196,6 +202,11 @@ export function ContentEditor({
   options: ContentEditorOptions;
   action: (input: ContentEdit) => Promise<ContentFormResult>;
   /**
+   * Salvar e enviar para revisão numa transação só (#780). Com ela, fora do `amend`, a barra
+   * ganha o botão; o sucesso vai para o detalhe do conteúdo.
+   */
+  submitAction?: (input: ContentEdit) => Promise<ContentFormResult>;
+  /**
    * Destino de "Voltar" (edição: link, com o aviso de saída) e de "Descartar" (criação:
    * confirmado num diálogo): o nível anterior da trilha.
    */
@@ -211,6 +222,8 @@ export function ContentEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [summary, setSummary] = useState<string[]>([]);
+  // Qual botão enviou: o rótulo de espera vai só nele.
+  const [sending, setSending] = useState(false);
   // Toast do último bloco removido (#112): o "Desfazer" o devolve por 10 s, ou até salvar.
   const undoToast = useRef<string | null>(null);
   const form = useForm<FieldValues>({
@@ -366,13 +379,23 @@ export function ContentEditor({
     );
   };
 
-  const onValid = (value: FieldValues) =>
+  /** Envio validado: salva (`action`) ou salva e envia para revisão (`submitAction`, #780). */
+  const onValid = (send: boolean) => (value: FieldValues) =>
     startTransition(async () => {
       setSummary([]);
       // Valores crus da tela (o `value` do resolver já vem sem os vazios): base do reset.
       const sent = form.getValues();
-      const result = await action(value as ContentEdit);
+      const run = send && submitAction ? submitAction : action;
+      const result = await run(value as ContentEdit);
       if (result.ok) {
+        if (send) {
+          // O detalhe mostra o conteúdo em revisão; o toast confirma depois da navegação.
+          form.reset(sent);
+          dropUndo();
+          pushSuccess(result.message);
+          router.push(`/sites/${siteId}/conteudos/${result.id}`);
+          return;
+        }
         if (mode === 'create') {
           router.replace(`/sites/${siteId}/conteudos/${result.id}/editar?criado=1`);
           return;
@@ -404,6 +427,18 @@ export function ContentEditor({
       setSummary(top.length > 0 ? top : [result.message]);
     });
 
+  /** Validação do cliente recusada: o resumo, e os blocos e o SEO com erro abertos. */
+  const onInvalid = (errors: FieldValues) => {
+    setSummary(['Corrija os campos destacados.']);
+    const blockErrors: unknown = errors.blocks;
+    revealErrors(
+      Array.isArray(blockErrors)
+        ? blockErrors.flatMap((error, index) => (error ? [index] : []))
+        : [],
+      errors.seo !== undefined,
+    );
+  };
+
   // Os valores iniciais vêm sem os campos vazios (descrição, SEO, capa), que a tela registra
   // com `''`: sem completar, editar e desfazer deixaria o formulário "alterado" (#111). Uma
   // vez, ao montar: um `router.refresh` depois não pode apagar o que se digita.
@@ -423,6 +458,8 @@ export function ContentEditor({
       : '';
   // Edição sem alteração (#525): nada a enviar; o domínio também não grava (#523).
   const unchanged = mode !== 'create' && !form.formState.isDirty;
+  // Fora da correção, e só se a página passa a action (#780).
+  const canSend = mode !== 'amend' && submitAction !== undefined;
   return (
     <FormProvider {...form}>
       <form
@@ -434,16 +471,8 @@ export function ContentEditor({
             event.preventDefault();
             return;
           }
-          void form.handleSubmit(onValid, (errors) => {
-            setSummary(['Corrija os campos destacados.']);
-            const blockErrors: unknown = errors.blocks;
-            revealErrors(
-              Array.isArray(blockErrors)
-                ? blockErrors.flatMap((error, index) => (error ? [index] : []))
-                : [],
-              errors.seo !== undefined,
-            );
-          })(event);
+          setSending(false);
+          void form.handleSubmit(onValid(false), onInvalid)(event);
         }}
       >
         {/* Duas colunas a partir de `xl` (#591), como o `ProductForm` do Ecme: os dados vêm
@@ -613,25 +642,42 @@ export function ContentEditor({
               aria-describedby={unchanged ? `${id}-save-note` : undefined}
               className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
             >
-              {SUBMIT_LABEL[mode][busy ? 'pending' : 'idle']}
+              {SUBMIT_LABEL[mode][busy && !sending ? 'pending' : 'idle']}
             </Button>
           }
           extra={
-            previewUrl ? (
-              <Button
-                asElement="a"
-                href={previewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-describedby={`${id}-preview-note`}
-              >
-                Ver prévia<span className="sr-only"> (abre em nova aba)</span>
-              </Button>
-            ) : (
-              <Button type="button" disabled aria-describedby={`${id}-preview-note`}>
-                Ver prévia
-              </Button>
-            )
+            <>
+              {previewUrl ? (
+                <Button
+                  asElement="a"
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-describedby={`${id}-preview-note`}
+                >
+                  Ver prévia<span className="sr-only"> (abre em nova aba)</span>
+                </Button>
+              ) : (
+                <Button type="button" disabled aria-describedby={`${id}-preview-note`}>
+                  Ver prévia
+                </Button>
+              )}
+              {canSend && (
+                // Fora do `onSubmit`: o Enter num campo segue sendo "Salvar", e sem alteração
+                // este botão ainda envia o rascunho mais recente.
+                <Button
+                  type="button"
+                  disabled={busy}
+                  onClick={(event) => {
+                    // Antes da validação: o `isSubmitting` já põe a espera neste botão.
+                    setSending(true);
+                    void form.handleSubmit(onValid(true), onInvalid)(event);
+                  }}
+                >
+                  {SEND_LABEL[busy && sending ? 'pending' : 'idle']}
+                </Button>
+              )}
+            </>
           }
         >
           {/* aria-live sem role: o `status` é o do toast, que confirma o salvamento. */}

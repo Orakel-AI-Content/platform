@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 
 import { noWrite, sitePageContext } from '../../editorial-page.tsx';
-import { createContentAction } from '../actions.ts';
+import { createAndSubmitContentAction, createContentAction } from '../actions.ts';
 import { editorOptions } from '../editor-options.ts';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +52,7 @@ export default async function NewContentPage({ params }: { params: Promise<{ sit
         }}
         options={options}
         action={createContentAction.bind(null, site.id)}
+        submitAction={createAndSubmitContentAction.bind(null, site.id)}
       />
     </section>
   );
