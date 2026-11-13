@@ -267,6 +267,13 @@
       "when": 1794597590630,
       "tag": "0037_conferencia_da_descricao_da_infra",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794601270486,
+      "tag": "0038_lote_de_reaplicacao_da_infra",
+      "breakpoints": true
     }
   ]
 }

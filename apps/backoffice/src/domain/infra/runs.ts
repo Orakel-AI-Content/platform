@@ -5,16 +5,21 @@
 // fora de ordem, devolve issue de domínio sem gravar. No `ok`, na mesma transação e em nome de quem
 // confirmou, a criação leva o site a `infra_aplicada`, a remoção o devolve a `cadastrado` e a
 // reaplicação mantém o lifecycle e marca a infra como em dia. O histórico do site lê daqui
-// (`infraActivity`).
+// (`infraActivity`). O lote de reaplicação (`infra_batches`) agrupa execuções `reaplicar`: todos os
+// planos antes, uma confirmação para todas e o apply de um site por vez, parando na primeira falha;
+// o avanço e a parada acontecem na transação que grava o plano ou fecha a execução.
 import type { Issue, Result } from '@orakel/content-model';
-import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, notExists } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import {
+  infraBatches,
   infraRuns,
+  OPEN_INFRA_BATCH_STATES,
   OPEN_INFRA_RUN_STATUSES,
   siteConfigs,
   sites,
+  type InfraBatchState,
   type InfraRunKind,
   type InfraRunStatus,
   type InfraStep,
@@ -105,12 +110,14 @@ export async function recordInfraPlan(
   runId: number,
   planSummary: string,
 ): Promise<Result<void>> {
-  const updated = await tx
+  const [updated] = await tx
     .update(infraRuns)
     .set({ status: 'aguardando_confirmacao', planSummary })
     .where(and(eq(infraRuns.id, runId), eq(infraRuns.status, 'planejando')))
-    .returning({ id: infraRuns.id });
-  return updated.length > 0 ? done : wrongState(tx, runId, ['planejando']);
+    .returning({ batchId: infraRuns.batchId });
+  if (updated === undefined) return wrongState(tx, runId, ['planejando']);
+  if (updated.batchId !== null) await batchPlanned(tx, updated.batchId);
+  return done;
 }
 
 /** Confirma o plano: `aguardando_confirmacao → aplicando`, com quem confirmou e quando. */
@@ -385,10 +392,17 @@ export type InfraRunClosing =
 const CLOSING_FROM = {
   ok: ['aplicando'],
   falhou: ['planejando', 'aplicando'],
-} as const satisfies Record<ClosedInfraRunStatus, readonly OpenInfraRunStatus[]>;
+} as const satisfies Record<InfraRunClosing['status'], readonly OpenInfraRunStatus[]>;
+
+/** Execução de um lote liberada pelo fechamento da anterior, para enfileirar o apply dela. */
+export type InfraBatchRun = { siteId: string; runId: number };
+
+/** O que o fechamento libera: a próxima execução do lote, ou `null` (fora de lote, fim ou falha). */
+export type InfraRunFinished = { next: InfraBatchRun | null };
 
 /**
- * Fecha a execução. No `ok`, pelo `tipo` gravado e em nome de quem confirmou: a criação grava os
+ * Fecha a execução. Numa execução de lote, a falha interrompe o lote (`stopInfraBatch`) e o `ok`
+ * libera o próximo site (`advanceInfraBatch`), devolvido em `next`. No `ok`, pelo `tipo` gravado e em nome de quem confirmou: a criação grava os
  * nameservers e leva o site a `infra_aplicada` (`advanceLifecycle`); a remoção devolve o site a
  * `cadastrado` (`resetSiteInfra`); a reaplicação mantém o lifecycle e marca a infra como em dia
  * (`recordInfraDrift`). A linha é travada antes, e a recusa do site devolve a issue sem gravar
@@ -398,10 +412,16 @@ export async function finishInfraRun(
   tx: Executor,
   runId: number,
   closing: InfraRunClosing,
-): Promise<Result<void>> {
+): Promise<Result<InfraRunFinished>> {
   const from = CLOSING_FROM[closing.status];
   const [run] = await tx
-    .select({ siteId: infraRuns.siteId, tipo: infraRuns.tipo, confirmedBy: infraRuns.confirmedBy })
+    .select({
+      siteId: infraRuns.siteId,
+      tipo: infraRuns.tipo,
+      confirmedBy: infraRuns.confirmedBy,
+      batchId: infraRuns.batchId,
+      batchPosition: infraRuns.batchPosition,
+    })
     .from(infraRuns)
     .where(and(eq(infraRuns.id, runId), inArray(infraRuns.status, from)))
     .for('update');
@@ -419,7 +439,8 @@ export async function finishInfraRun(
         finishedAt,
       })
       .where(eq(infraRuns.id, runId));
-    return done;
+    if (run.batchId !== null) await stopInfraBatch(tx, run.batchId, finishedAt);
+    return { ok: true, value: { next: null } };
   }
 
   if (run.confirmedBy === null) {
@@ -436,7 +457,11 @@ export async function finishInfraRun(
     .set({ status: 'ok', currentStep: null, nameservers, finishedAt })
     .where(eq(infraRuns.id, runId));
   if (run.tipo === 'criar') await enqueueRestoreMedia(tx, run.siteId);
-  return done;
+  const next =
+    run.batchId !== null && run.batchPosition !== null
+      ? await advanceInfraBatch(tx, run.batchId, run.batchPosition, finishedAt)
+      : null;
+  return { ok: true, value: { next } };
 }
 
 /** Criação, remoção ou reaplicação da infraestrutura em andamento, para o status ao vivo. */
@@ -544,6 +569,280 @@ export async function loadInfraRun(
     .from(infraRuns)
     .where(eq(infraRuns.id, runId));
   return run;
+}
+
+const batchRefused = (batchId: number, state: InfraBatchState, expected: InfraBatchState) =>
+  refused(
+    'infra.batch_state',
+    `O lote ${batchId} está em ${state}; a transição exige ${expected}`,
+    ['state'],
+  );
+
+/**
+ * Pede o lote "reaplicar em todos os desatualizados": uma execução `reaplicar` em `planejando`
+ * por site marcado `desatualizado`, de `infra_aplicada` em diante e sem execução aberta (esse já
+ * está sendo tratado), na ordem do id do site. Quem opera (`site.configure`). Recusa sem gravar
+ * nada se já há um lote aberto ou se não há site a reaplicar. Devolve as execuções criadas, na
+ * ordem, para enfileirar os planos.
+ */
+export async function requestInfraBatch(
+  tx: Executor,
+  actor: Actor,
+): Promise<Result<{ id: number; runs: InfraBatchRun[] }>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  const [open] = await tx
+    .select({ id: infraBatches.id })
+    .from(infraBatches)
+    .where(inArray(infraBatches.state, OPEN_INFRA_BATCH_STATES));
+  if (open !== undefined) {
+    return refused('infra.batch_open', `O lote ${open.id} de reaplicação ainda está aberto`);
+  }
+
+  const outdated = await tx
+    .select({ id: sites.id })
+    .from(sites)
+    .where(
+      and(
+        eq(sites.infraDriftStatus, 'desatualizado'),
+        inArray(sites.lifecycle, INFRA_DRIFT_STEPS),
+        notExists(
+          tx
+            .select({ id: infraRuns.id })
+            .from(infraRuns)
+            .where(
+              and(
+                eq(infraRuns.siteId, sites.id),
+                inArray(infraRuns.status, OPEN_INFRA_RUN_STATUSES),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(asc(sites.id))
+    .for('update');
+  if (outdated.length === 0) {
+    return refused('infra.batch_empty', 'Nenhum site está com a infraestrutura desatualizada');
+  }
+
+  const [batch] = await tx
+    .insert(infraBatches)
+    .values({ requestedBy: actor.email })
+    .onConflictDoNothing()
+    .returning({ id: infraBatches.id });
+  if (batch === undefined) {
+    return refused('infra.batch_open', 'Já há um lote de reaplicação aberto');
+  }
+
+  const runs = await tx
+    .insert(infraRuns)
+    .values(
+      outdated.map((site, position) => ({
+        siteId: site.id,
+        tipo: 'reaplicar' as const,
+        status: 'planejando' as const,
+        requestedBy: actor.email,
+        batchId: batch.id,
+        batchPosition: position,
+      })),
+    )
+    .returning({
+      siteId: infraRuns.siteId,
+      runId: infraRuns.id,
+      position: infraRuns.batchPosition,
+    });
+  runs.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  return {
+    ok: true,
+    value: { id: batch.id, runs: runs.map(({ siteId, runId }) => ({ siteId, runId })) },
+  };
+}
+
+/** Trava o lote aberto até o fim da transação; `undefined` se não existe ou já fechou. */
+async function lockOpenBatch(tx: Executor, batchId: number) {
+  const [batch] = await tx
+    .select({ id: infraBatches.id, state: infraBatches.state })
+    .from(infraBatches)
+    .where(and(eq(infraBatches.id, batchId), inArray(infraBatches.state, OPEN_INFRA_BATCH_STATES)))
+    .for('update');
+  return batch;
+}
+
+/** Com o último plano gravado, o lote passa de `planejando` a `aguardando_confirmacao`. */
+async function batchPlanned(tx: Executor, batchId: number): Promise<void> {
+  const batch = await lockOpenBatch(tx, batchId);
+  if (batch?.state !== 'planejando') return;
+  const [pending] = await tx
+    .select({ id: infraRuns.id })
+    .from(infraRuns)
+    .where(and(eq(infraRuns.batchId, batchId), eq(infraRuns.status, 'planejando')))
+    .limit(1);
+  if (pending !== undefined) return;
+  await tx
+    .update(infraBatches)
+    .set({ state: 'aguardando_confirmacao' })
+    .where(eq(infraBatches.id, batchId));
+}
+
+/**
+ * Confirma o lote: uma confirmação vale para todas as execuções, que recebem quem confirmou e
+ * quando. Só a primeira (posição 0) vai a `aplicando`; as demais esperam a vez em
+ * `aguardando_confirmacao`, já confirmadas. O lote vai a `aplicando`. Devolve a execução liberada,
+ * para enfileirar o apply. Só com o lote em `aguardando_confirmacao` (todos os planos gravados).
+ */
+export async function confirmInfraBatch(
+  tx: Executor,
+  actor: Actor,
+  batchId: number,
+): Promise<Result<InfraBatchRun>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  const [batch] = await tx
+    .select({ state: infraBatches.state })
+    .from(infraBatches)
+    .where(eq(infraBatches.id, batchId))
+    .for('update');
+  if (batch === undefined) {
+    return refused('infra.batch_not_found', `Lote de reaplicação ${batchId} não encontrado`);
+  }
+  if (batch.state !== 'aguardando_confirmacao') {
+    return batchRefused(batchId, batch.state, 'aguardando_confirmacao');
+  }
+
+  const confirmedAt = new Date();
+  await tx
+    .update(infraRuns)
+    .set({ confirmedBy: actor.email, confirmedAt })
+    .where(and(eq(infraRuns.batchId, batchId), eq(infraRuns.status, 'aguardando_confirmacao')));
+  const [first] = await tx
+    .update(infraRuns)
+    .set({ status: 'aplicando' })
+    .where(
+      and(
+        eq(infraRuns.batchId, batchId),
+        eq(infraRuns.batchPosition, 0),
+        eq(infraRuns.status, 'aguardando_confirmacao'),
+      ),
+    )
+    .returning({ siteId: infraRuns.siteId, runId: infraRuns.id });
+  if (first === undefined) {
+    throw new Error(`Lote ${batchId} em aguardando_confirmacao sem a execução da posição 0`);
+  }
+  await tx.update(infraBatches).set({ state: 'aplicando' }).where(eq(infraBatches.id, batchId));
+  return { ok: true, value: first };
+}
+
+/**
+ * O `ok` de um site do lote: o próximo na ordem vai a `aplicando` e é devolvido; sem próximo, o
+ * lote fecha `concluido`.
+ */
+async function advanceInfraBatch(
+  tx: Executor,
+  batchId: number,
+  position: number,
+  now: Date,
+): Promise<InfraBatchRun | null> {
+  const batch = await lockOpenBatch(tx, batchId);
+  if (batch?.state !== 'aplicando') return null;
+
+  const [next] = await tx
+    .select({ id: infraRuns.id })
+    .from(infraRuns)
+    .where(
+      and(
+        eq(infraRuns.batchId, batchId),
+        gt(infraRuns.batchPosition, position),
+        eq(infraRuns.status, 'aguardando_confirmacao'),
+      ),
+    )
+    .orderBy(asc(infraRuns.batchPosition))
+    .limit(1);
+  if (next === undefined) {
+    await tx
+      .update(infraBatches)
+      .set({ state: 'concluido', finishedAt: now })
+      .where(eq(infraBatches.id, batchId));
+    return null;
+  }
+  const [released] = await tx
+    .update(infraRuns)
+    .set({ status: 'aplicando' })
+    .where(eq(infraRuns.id, next.id))
+    .returning({ siteId: infraRuns.siteId, runId: infraRuns.id });
+  return released ?? null;
+}
+
+/**
+ * A falha de um site do lote (no plano ou no apply): as execuções ainda abertas fecham `cancelado`,
+ * sem apply, e o lote fecha `interrompido`. Os sites cancelados continuam desatualizados.
+ */
+async function stopInfraBatch(tx: Executor, batchId: number, now: Date): Promise<void> {
+  const batch = await lockOpenBatch(tx, batchId);
+  if (batch === undefined) return;
+  await tx
+    .update(infraRuns)
+    .set({ status: 'cancelado', currentStep: null, finishedAt: now })
+    .where(and(eq(infraRuns.batchId, batchId), inArray(infraRuns.status, OPEN_INFRA_RUN_STATUSES)));
+  await tx
+    .update(infraBatches)
+    .set({ state: 'interrompido', finishedAt: now })
+    .where(eq(infraBatches.id, batchId));
+}
+
+/** Um site do lote, na ordem: o estado da execução e, no que falhou, a etapa e o motivo. */
+export type InfraBatchSite = {
+  siteId: string;
+  runId: number;
+  position: number;
+  status: InfraRunStatus;
+  /** Etapa em andamento, enquanto `aplicando`. */
+  currentStep: InfraStep | null;
+  planSummary: string | null;
+  /** Só no `falhou`. */
+  failure: { step: InfraStep | null; message: string | null } | null;
+};
+
+export type InfraBatch = {
+  id: number;
+  state: InfraBatchState;
+  requestedBy: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+  sites: InfraBatchSite[];
+};
+
+/** O lote mais recente com o progresso de cada site, ou `null` sem nenhum. Quem opera. */
+export async function latestInfraBatch(
+  db: Executor,
+  actor: Actor,
+): Promise<Result<InfraBatch | null>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  const [batch] = await db
+    .select()
+    .from(infraBatches)
+    .orderBy(desc(infraBatches.startedAt), desc(infraBatches.id))
+    .limit(1);
+  if (batch === undefined) return { ok: true, value: null };
+
+  const rows = await db
+    .select()
+    .from(infraRuns)
+    .where(eq(infraRuns.batchId, batch.id))
+    .orderBy(asc(infraRuns.batchPosition));
+  const batchSites = rows.map((row): InfraBatchSite => ({
+    siteId: row.siteId,
+    runId: row.id,
+    position: row.batchPosition ?? 0,
+    status: row.status,
+    currentStep: row.currentStep,
+    planSummary: row.planSummary,
+    failure: row.status === 'falhou' ? { step: row.failedStep, message: row.failureMessage } : null,
+  }));
+  return { ok: true, value: { ...batch, sites: batchSites } };
 }
 
 /** O site tem execução de infra aberta (criação, remoção ou reaplicação em andamento)? */
