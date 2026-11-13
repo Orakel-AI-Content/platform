@@ -303,6 +303,7 @@ describe('siteActivity', () => {
       requestedBy: admin.email,
       requestedAt: row(open)?.requestedAt,
       confirmedBy: null,
+      inBatch: false,
     });
     expect(result.value.history).toEqual([
       {

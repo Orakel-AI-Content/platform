@@ -183,6 +183,7 @@ describe('SiteLiveActivity na criação da infraestrutura (#826)', () => {
     requestedBy: 'operacao@orakel.local',
     requestedAt: new Date('2026-10-11T16:58:00Z'),
     confirmedBy: 'operacao@orakel.local',
+    inBatch: false,
   };
   const closed = (over: Partial<InfraHistoryItem>): InfraHistoryItem => ({
     type: 'infra',

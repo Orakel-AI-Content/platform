@@ -8,6 +8,7 @@ import { upsertUser } from '../../src/domain/access/users.ts';
 import {
   confirmInfraBatch,
   finishInfraRun,
+  infraActivity,
   latestInfraBatch,
   recordInfraPlan,
   recordInfraStep,
@@ -172,6 +173,17 @@ describe('pedir o lote', () => {
     const result = await db.transaction((tx) => requestInfraBatch(tx, operacao));
     expect(codes(result)).toEqual(['infra.batch_open']);
     expect(await db.select().from(infraBatches)).toHaveLength(1);
+  });
+
+  it('a execução aberta do site no lote vem marcada inBatch; a pedida no site, não', async () => {
+    await seedNetwork();
+    await request();
+    await site('avulso', { lifecycle: 'publicado' });
+    const single = await db.transaction((tx) => requestInfraReapply(tx, operacao, 'avulso'));
+    expect(single.ok).toBe(true);
+
+    expect((await infraActivity(db, 'site-a', 10)).open).toMatchObject({ inBatch: true });
+    expect((await infraActivity(db, 'avulso', 10)).open).toMatchObject({ inBatch: false });
   });
 
   it('o banco recusa dois lotes abertos (índice único parcial)', async () => {
