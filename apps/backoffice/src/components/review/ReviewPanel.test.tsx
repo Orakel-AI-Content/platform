@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import { toast, ToastProvider } from '@/components/ui/toast';
 
+import { ReviewChanges } from './ReviewChanges.tsx';
 import { ReviewChecks } from './ReviewChecks.tsx';
 import type { ReviewCheckItem } from './reviewCheckItems.ts';
 import { ReviewPanel } from './ReviewPanel.tsx';
@@ -19,6 +20,7 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 // "Devolver ao editor" (#598) tem cartão próprio, com o comentário obrigatório. Em passos (#766):
 // Checagens, Ajustes, Leitura (o checklist) e Decisão (as aprovações e a devolução), todos
 // montados e os inativos com `hidden`; o passo vem da prop `step` e a troca vai a `?passo=`.
+// "O que mudou" (#768) fica em Checagens, abaixo das checagens, só quando a página o passa.
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
 const search = vi.hoisted(() => ({ value: '' }));
@@ -273,6 +275,37 @@ describe('painel de revisão', () => {
       'Falta a fonte da tabela.',
     );
     expect(actions.confirm).toHaveBeenCalledOnce();
+  });
+
+  it('"O que mudou" fica no passo Checagens, abaixo das checagens; na primeira revisão, não aparece', () => {
+    const changes = (
+      <ReviewChanges
+        changes={{
+          baseVersion: 1,
+          version: 2,
+          fields: [{ field: 'title', before: 'Antigo', after: 'Novo' }],
+          blocks: [],
+        }}
+        references={{ authors: new Map(), taxonomies: new Map(), media: new Map() }}
+        timeZone="America/Sao_Paulo"
+      />
+    );
+    const { unmount } = renderPanel({ checks: <ReviewChecks items={warnings} />, changes });
+
+    const step = document.querySelector<HTMLElement>('[data-step="checagens"]')!;
+    const section = screen.getByRole('region', { name: 'O que mudou' });
+    expect(step.contains(section)).toBe(true);
+    expect([...step.querySelectorAll('h2')].map((heading) => heading.textContent)).toEqual([
+      'Checagens automáticas',
+      'O que mudou',
+    ]);
+    expect(section.textContent).toContain('Antes: Antigo');
+    expect(section.textContent).toContain('Depois: Novo');
+    unmount();
+
+    renderPanel({ checks: <ReviewChecks items={warnings} /> });
+    expect(screen.queryByRole('region', { name: 'O que mudou' })).toBeNull();
+    expect(screen.queryByText('O que mudou')).toBeNull();
   });
 
   it('títulos na escala do guia: as seções em h2, nenhum h3 no tamanho de h2, sem o link da prévia', () => {

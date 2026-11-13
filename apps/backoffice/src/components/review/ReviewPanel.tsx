@@ -25,8 +25,9 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 
 // Painel da tela de revisão (#75), ao lado da visualização a partir de `xl` e abaixo dela antes
 // (#373). É um wizard de quatro passos (#766) sobre o `Steps` do Ecme, no exemplo "Controlled":
-// Checagens (`checks`, workspace#87), Ajustes (vazio por ora; a correção entra na #767), Leitura
-// (o checklist) e Decisão (as aprovações e a devolução), com "Anterior" e "Próximo" no rodapé.
+// Checagens (`checks`, workspace#87, e `changes`, o que mudou desde a última revisão, #768),
+// Ajustes (vazio por ora; a correção entra na #767), Leitura (o checklist) e Decisão (as
+// aprovações e a devolução), com "Anterior" e "Próximo" no rodapé.
 // Os quatro passos ficam montados e os inativos levam `hidden`: voltar a um passo encontra as
 // caixas e o comentário digitado como estavam. O passo atual fica em `?passo=` (`router.replace`,
 // como o período da audiência), e a página o devolve na prop `step`: a troca de versão remonta o
@@ -158,6 +159,7 @@ export function ReviewPanel({
   status,
   step,
   checks,
+  changes,
   blocked,
   checklist,
   confirmed: initialConfirmed,
@@ -175,6 +177,8 @@ export function ReviewPanel({
   step?: string;
   /** Seção de checagens automáticas (`ReviewChecks`), no passo Checagens. */
   checks?: ReactNode;
+  /** Seção "O que mudou" (`ReviewChanges`), abaixo das checagens; ausente na primeira revisão. */
+  changes?: ReactNode;
   /** Alguma checagem com `erro` (a validação da release): as aprovações ficam desabilitadas. */
   blocked: boolean;
   checklist: readonly ChecklistItem[];
@@ -250,7 +254,12 @@ export function ReviewPanel({
   const decisionTitle = <h2 className={SECTION_TITLE_CLASS}>Decisão</h2>;
 
   const panels: Record<(typeof STEPS)[number]['key'], ReactNode> = {
-    checagens: checks,
+    checagens: (
+      <div className="flex flex-col gap-4">
+        {checks}
+        {changes}
+      </div>
+    ),
     ajustes: (
       <Card bodyClass="space-y-3">
         <h2 className={SECTION_TITLE_CLASS}>Ajustes</h2>
