@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Db } from '../../src/db/client.ts';
@@ -78,6 +78,15 @@ async function applying(confirmer: Actor = admin): Promise<number> {
   expect((await recordInfraPlan(db, id, '3 a criar')).ok).toBe(true);
   expect((await confirmInfraRun(db, confirmer, id)).ok).toBe(true);
   return id;
+}
+
+/** Chaves dos jobs de regravação das variantes na fila (#843). */
+async function restoreJobs(): Promise<string[]> {
+  const result = await db.execute(sql`
+    select j.key from graphile_worker._private_jobs j
+    join graphile_worker._private_tasks t on t.id = j.task_id
+    where t.identifier = 'restore-site-media' order by j.key`);
+  return (result.rows as { key: string }[]).map((row) => row.key);
 }
 
 function codes(result: { ok: boolean; issues?: { code: string }[] }): string[] {
@@ -199,6 +208,31 @@ describe('fechar', () => {
     expect(await lifecycle()).toBe('infra_aplicada');
   });
 
+  it('com ok enfileira, na mesma transação, a regravação das variantes do site', async () => {
+    const id = await applying();
+    await db
+      .transaction(async (tx) => {
+        expect((await finishInfraRun(tx, id, { status: 'ok', nameservers: NAMESERVERS })).ok).toBe(
+          true,
+        );
+        tx.rollback();
+      })
+      .catch(() => undefined);
+    expect(await restoreJobs()).toEqual([]);
+    expect((await runs())[0]?.status).toBe('aplicando');
+
+    await db.transaction((tx) =>
+      finishInfraRun(tx, id, { status: 'ok', nameservers: NAMESERVERS }),
+    );
+    expect(await restoreJobs()).toEqual(['restore-site-media:exemplo-a']);
+  });
+
+  it('com falhou, não enfileira a regravação', async () => {
+    const id = await applying();
+    await finishInfraRun(db, id, { status: 'falhou', step: 'dns', message: 'x' });
+    expect(await restoreJobs()).toEqual([]);
+  });
+
   it('com falhou grava a etapa e o motivo, sem mudar o lifecycle', async () => {
     const id = await applying();
     await recordInfraStep(db, id, 'regras');
@@ -228,6 +262,7 @@ describe('fechar', () => {
     const result = await finishInfraRun(db, id, { status: 'ok', nameservers: NAMESERVERS });
     expect(codes(result)).toEqual(['site.lifecycle_order']);
     expect(await runs()).toEqual(before);
+    expect(await restoreJobs()).toEqual([]);
     expect(await lifecycle()).toBe('zona_ativa');
   });
 
@@ -473,6 +508,7 @@ describe('remoção', () => {
         pausedReason: 'remoção da infra',
         release: 'site-builder:1.2.0',
       });
+      expect(await restoreJobs()).toEqual([]);
     });
 
     it('com falhou, grava a etapa e o site fica como estava', async () => {
