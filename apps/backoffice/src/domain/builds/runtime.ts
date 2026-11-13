@@ -41,7 +41,8 @@ export interface ContainerRuntime {
   imageExists(image: string): Promise<boolean>;
   /**
    * Baixa a imagem do registry (sem credencial: o pacote é público). Só aceita
-   * `SITE_BUILDER_IMAGE:<tag>`; o proxy libera a rota, mas não enxerga o nome (ADR 0021 da raiz).
+   * `SITE_BUILDER_IMAGE:<tag>` ou `INFRA_RUNNER_IMAGE:<tag>`; o proxy libera a rota, mas não
+   * enxerga o nome (ADR 0021 da raiz).
    */
   pullImage(image: string): Promise<void>;
   /**
@@ -50,7 +51,10 @@ export interface ContainerRuntime {
    */
   tagImage(source: string, target: string): Promise<void>;
   createVolume(name: string, labels: Record<string, string>): Promise<void>;
-  /** Cria e inicia; devolve o ID do container. */
+  /**
+   * Cria e inicia; devolve o ID do container. Só aceita `SITE_BUILDER_IMAGE:<tag>` (render,
+   * publish) ou `INFRA_RUNNER_IMAGE:<tag>` (plano e apply da infra do site).
+   */
   start(spec: ContainerSpec): Promise<string>;
   /**
    * Cria e inicia um container de serviço; devolve o ID. Só aceita `SITE_BUILDER_IMAGE:<tag>`.

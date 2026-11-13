@@ -80,8 +80,21 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
 }
 
 /**
- * Só o build-runner (12.0, L3): como criar os containers do site-builder e o que entregar a
- * cada um. O token de deploy da Cloudflare só existe aqui e só vai para o container publish.
+ * Segredos da infra do site (ADR 0027 da raiz): só o build-runner os conhece e só o container do
+ * infra-runner os recebe. Obrigatórios com INFRA_DRIVER=tofu; um `refine` por segredo, para o
+ * erro dizer qual falta (nunca o valor).
+ */
+const INFRA_SECRETS = [
+  'CLOUDFLARE_INFRA_TOKEN',
+  'TOFU_STATE_ACCESS_KEY_ID',
+  'TOFU_STATE_SECRET_ACCESS_KEY',
+  'TOFU_STATE_PASSPHRASE',
+] as const;
+
+/**
+ * Só o build-runner (12.0, L3): como criar os containers do site-builder e do infra-runner e o
+ * que entregar a cada um. O token de deploy da Cloudflare só existe aqui e só vai para o
+ * container publish; os segredos de infra, só para o container de infra.
  */
 export const BuildRunnerEnvSchema = z
   .object({
@@ -89,6 +102,8 @@ export const BuildRunnerEnvSchema = z
     DOCKER_HOST: z.string().regex(/^(tcp|http):\/\/[^/]+$/, 'Use tcp://host:porta'),
     /** Imagem sem tag; a tag é a release do site. */
     SITE_BUILDER_IMAGE: z.string().min(1),
+    /** Imagem do plano e do apply da infra do site, sem tag (ADR 0027 da raiz). */
+    INFRA_RUNNER_IMAGE: z.string().min(1),
     /**
      * Tag usada pelo site ainda sem release (só no local e no E2E). Sem ela, site sem versão é
      * recusado no build; obrigatória com RELEASE_DRIVER=local, que etiqueta essa imagem.
@@ -126,6 +141,19 @@ export const BuildRunnerEnvSchema = z
         .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, 'Use dono/nome')
         .default('Orakel-AI-Content/platform'),
     ),
+    /**
+     * Como "Criar infraestrutura" aplica a infra do site (ADR 0027 da raiz): `tofu` roda o plano e
+     * o apply no container do infra-runner; `local` simula as etapas, sem rede nem segredos
+     * (compose local e E2E).
+     */
+    INFRA_DRIVER: blankAsUndefined(z.enum(['tofu', 'local']).default('tofu')),
+    /** Token de infra da Cloudflare, restrito ao IP da VPS; nem o de deploy nem o de leitura. */
+    CLOUDFLARE_INFRA_TOKEN: optional(z.string().min(32)),
+    /** Credenciais S3 (R2) do bucket `tofu-state`, onde fica o estado de cada site. */
+    TOFU_STATE_ACCESS_KEY_ID: optional(z.string().min(1)),
+    TOFU_STATE_SECRET_ACCESS_KEY: optional(z.string().min(1)),
+    /** Senha da cifragem do estado e do plano (`pbkdf2` do OpenTofu: 16 caracteres ou mais). */
+    TOFU_STATE_PASSPHRASE: optional(z.string().min(16, 'Use pelo menos 16 caracteres')),
   })
   .refine((env) => env.DEPLOY_TARGET !== 'local' || env.EDGE_LOCAL_URL !== undefined, {
     message: 'Defina EDGE_LOCAL_URL com DEPLOY_TARGET=local',
@@ -147,6 +175,17 @@ export const BuildRunnerEnvSchema = z
   .refine((env) => env.RELEASE_DRIVER !== 'local' || env.SITE_BUILDER_TAG !== undefined, {
     message: 'Defina SITE_BUILDER_TAG com RELEASE_DRIVER=local (a imagem que vira a versão)',
     path: ['SITE_BUILDER_TAG'],
+  })
+  .superRefine((env, ctx) => {
+    if (env.INFRA_DRIVER !== 'tofu') return;
+    for (const name of INFRA_SECRETS) {
+      if (env[name] !== undefined) continue;
+      ctx.addIssue({
+        code: 'custom',
+        message: `Defina ${name}, ou INFRA_DRIVER=local para simular a infra sem a Cloudflare`,
+        path: [name],
+      });
+    }
   });
 
 export type BuildRunnerEnv = z.infer<typeof BuildRunnerEnvSchema>;

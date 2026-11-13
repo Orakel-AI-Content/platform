@@ -73,6 +73,7 @@ await runProcess('build-runner', async (logger) => {
       runtime: dockerRuntime({
         host: runner.DOCKER_HOST,
         siteBuilderImage: runner.SITE_BUILDER_IMAGE,
+        infraRunnerImage: runner.INFRA_RUNNER_IMAGE,
       }),
       settings: settingsFrom(env, runner),
       driver: releaseDriverFrom(runner),

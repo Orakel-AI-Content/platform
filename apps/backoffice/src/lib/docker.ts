@@ -16,8 +16,10 @@ import { firstTarFile } from './tar.ts';
 type Options = {
   /** DOCKER_HOST: tcp://docker-socket-proxy:2375. */
   host: string;
-  /** SITE_BUILDER_IMAGE (sem tag): única imagem que `pullImage` e `tagImage` aceitam. */
+  /** SITE_BUILDER_IMAGE (sem tag): única imagem de `tagImage` e `startService`. */
   siteBuilderImage: string;
+  /** INFRA_RUNNER_IMAGE (sem tag): a outra imagem que `pullImage` e `start` aceitam. */
+  infraRunnerImage: string;
   pollMs?: number;
   fetch?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
@@ -117,14 +119,35 @@ export function dockerRuntime(options: Options): ContainerRuntime {
     return info.State;
   }
 
-  /** Tag de `SITE_BUILDER_IMAGE:<tag>`; outra imagem é recusada antes de chegar ao Docker. */
-  function siteBuilderTag(image: string, operation: 'pull' | 'tag' | 'serviço'): string {
-    const prefix = `${options.siteBuilderImage}:`;
-    const tag = image.startsWith(prefix) ? image.slice(prefix.length) : undefined;
-    if (tag === undefined || !TAG.test(tag)) {
-      throw new Error(`${operation} recusado: ${image} não é ${prefix}<tag>`);
+  type Operation = 'pull' | 'tag' | 'serviço' | 'container';
+
+  /**
+   * Repositório e tag de `<repositório>:<tag>`, só para os repositórios dados; outra imagem é
+   * recusada antes de chegar ao Docker (o proxy não enxerga o nome nem o corpo do create).
+   */
+  function allowedImage(
+    image: string,
+    operation: Operation,
+    repositories: readonly string[],
+  ): { repository: string; tag: string } {
+    for (const repository of repositories) {
+      const prefix = `${repository}:`;
+      if (!image.startsWith(prefix)) continue;
+      const tag = image.slice(prefix.length);
+      if (TAG.test(tag)) return { repository, tag };
     }
-    return tag;
+    const expected = repositories.map((repository) => `${repository}:<tag>`).join(' ou ');
+    throw new Error(`${operation} recusado: ${image} não é ${expected}`);
+  }
+
+  /** Tag de `SITE_BUILDER_IMAGE:<tag>` (release e prévia). */
+  function siteBuilderTag(image: string, operation: Operation): string {
+    return allowedImage(image, operation, [options.siteBuilderImage]).tag;
+  }
+
+  /** Imagens dos containers efêmeros: o site-builder e o infra-runner. */
+  function runnableImage(image: string, operation: Operation) {
+    return allowedImage(image, operation, [options.siteBuilderImage, options.infraRunnerImage]);
   }
 
   return {
@@ -135,10 +158,10 @@ export function dockerRuntime(options: Options): ContainerRuntime {
     },
 
     async pullImage(image) {
-      const tag = siteBuilderTag(image, 'pull');
+      const { repository, tag } = runnableImage(image, 'pull');
       const response = await call(
         'POST',
-        `/images/create?fromImage=${encodeURIComponent(options.siteBuilderImage)}&tag=${encodeURIComponent(tag)}`,
+        `/images/create?fromImage=${encodeURIComponent(repository)}&tag=${encodeURIComponent(tag)}`,
       ).catch((error: unknown) => {
         if (error instanceof RuntimeError && UNAVAILABLE.test(error.message)) {
           throw new ImageUnavailableError(error.message, { cause: error });
@@ -190,6 +213,7 @@ export function dockerRuntime(options: Options): ContainerRuntime {
     },
 
     async start(spec: ContainerSpec) {
+      runnableImage(spec.image, 'container');
       const response = await call('POST', `/containers/create?name=${spec.name}`, {
         Image: spec.image,
         Cmd: spec.command,

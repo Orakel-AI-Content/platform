@@ -207,6 +207,9 @@ services:
       RELEASE_DRIVER: ${LOCAL_RELEASE_DRIVER:-local}
       # Imagem do site ainda sem versão e origem do driver local; na VPS ela não existe.
       SITE_BUILDER_TAG: ${SITE_BUILDER_TAG:-local}
+      # "Criar infraestrutura" simulado, sem Cloudflare nem os segredos de infra (ADR 0027 da
+      # raiz). A rodada com o tofu de verdade: LOCAL_INFRA_DRIVER=tofu e os segredos no .env.local.
+      INFRA_DRIVER: ${LOCAL_INFRA_DRIVER:-local}
     depends_on:
       s3-init:
         condition: service_completed_successfully
