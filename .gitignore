@@ -31,3 +31,10 @@ CLAUDE.local.md
 # Sistema
 .DS_Store
 *.log
+
+# OpenTofu (infra/site, ADR 0027): provider baixado, estado e plano locais. O
+# .terraform.lock.hcl é versionado.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
