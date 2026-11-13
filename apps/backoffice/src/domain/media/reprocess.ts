@@ -77,9 +77,6 @@ export async function reprocessSiteMedia(
   return report;
 }
 
-/** Regravação das variantes registradas ao criar a infra do site (workspace#97). */
-export const RESTORE_MEDIA_TASK = 'restore-site-media';
-
 export type RestoreReport = {
   /** Mídias que tiveram alguma variante regravada. */
   restored: number[];
@@ -122,21 +119,6 @@ export async function restoreSiteMedia(
     if (generated.written > 0) report.restored.push(item.id);
   }
   return report;
-}
-
-/**
- * Enfileira a regravação das variantes do site, na transação do `ok` da criação da infra; com o
- * mesmo `job_key`, pedir de novo enquanto o job espera na fila não cria outro.
- */
-export async function enqueueRestoreMedia(tx: Executor, siteId: string): Promise<void> {
-  await tx.execute(sql`
-    select graphile_worker.add_job(
-      identifier => ${RESTORE_MEDIA_TASK},
-      payload => ${JSON.stringify({ siteId })}::json,
-      max_attempts => 5,
-      job_key => ${`${RESTORE_MEDIA_TASK}:${siteId}`},
-      job_key_mode => 'preserve_run_at'
-    )`);
 }
 
 type MediaRow = Pick<Media, 'id' | 'width' | 'height' | 'variants'> & {

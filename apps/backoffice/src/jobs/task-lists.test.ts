@@ -9,7 +9,7 @@ import type { ContainerRuntime } from '../domain/builds/runtime.ts';
 import { CHECK_SITE_INFRA_TASK } from '../domain/builds/site-state.ts';
 import { resolveModel } from '../domain/generation/generate.ts';
 import { CORRECT_ARTICLE_TASK, GENERATE_ARTICLE_TASK } from '../domain/generation/runs.ts';
-import { RESTORE_MEDIA_TASK } from '../domain/media/reprocess.ts';
+import { RESTORE_MEDIA_TASK } from '../domain/media/schedule.ts';
 import type { ObjectStore } from '../domain/media/store.ts';
 import { EMPTY_SITE_MEDIA_TASK } from '../domain/media/variants.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';

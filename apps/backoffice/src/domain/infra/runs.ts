@@ -21,7 +21,7 @@ import {
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { resolveActor } from '../access/users.ts';
 import { advanceLifecycle, resetSiteInfra } from '../builds/site-state.ts';
-import { enqueueRestoreMedia } from '../media/reprocess.ts';
+import { enqueueRestoreMedia } from '../media/schedule.ts';
 
 type OpenInfraRunStatus = (typeof OPEN_INFRA_RUN_STATUSES)[number];
 type ClosedInfraRunStatus = Exclude<InfraRunStatus, OpenInfraRunStatus>;
