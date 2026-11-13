@@ -4,6 +4,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Executor } from '../../db/client.ts';
 import {
   authors,
+  contentVersions,
   editorialContexts,
   generationRuns,
   type GenerationStatus,
@@ -163,7 +164,6 @@ export async function scheduleCorrection(
 export type GenerationRunSummary = {
   id: number;
   createdAt: Date;
-  topic: string;
   status: GenerationStatus;
   provider: string | null;
   model: string | null;
@@ -172,14 +172,26 @@ export type GenerationRunSummary = {
   /** Em dólares; nulo com a execução `pendente` ou o modelo fora de `LLM_PRICING`. */
   costUsd: number | null;
   durationMs: number | null;
-  /** Conteúdo gerado, com a execução `ok`. */
-  contentId: number | null;
-};
+} & (
+  | {
+      kind: 'geracao';
+      topic: string;
+      /** Conteúdo gerado, com a execução `ok`. */
+      contentId: number | null;
+    }
+  | {
+      kind: 'correcao';
+      /** Título da versão devolvida que a correção corrige. */
+      contentTitle: string;
+      /** Conteúdo corrigido, desde o pedido. */
+      contentId: number;
+    }
+);
 
 /**
- * Execuções de geração do site, da mais recente para a primeira (índice
- * `generation_runs_site_created_idx`); as de correção ficam de fora por enquanto. Ler exige
- * site.read; o prompt e o erro completo ficam de fora (não há tela de detalhe).
+ * Execuções do site, de geração e de correção, da mais recente para a primeira (índice
+ * `generation_runs_site_created_idx`). Ler exige site.read; o prompt e o erro completo ficam de
+ * fora (não há tela de detalhe).
  */
 export async function listGenerationRuns(
   db: Executor,
@@ -192,8 +204,9 @@ export async function listGenerationRuns(
     .select({
       id: generationRuns.id,
       createdAt: generationRuns.createdAt,
-      // O CHECK `generation_runs_geracao_check` garante o tema na `geracao`.
-      topic: sql<string>`${generationRuns.topic}`,
+      kind: generationRuns.kind,
+      topic: generationRuns.topic,
+      contentTitle: sql<string | null>`${contentVersions.data}->>'title'`,
       status: generationRuns.status,
       provider: generationRuns.provider,
       model: generationRuns.model,
@@ -204,9 +217,26 @@ export async function listGenerationRuns(
       contentId: generationRuns.contentId,
     })
     .from(generationRuns)
-    .where(and(eq(generationRuns.siteId, siteId), eq(generationRuns.kind, 'geracao')))
+    .leftJoin(
+      contentVersions,
+      and(
+        eq(contentVersions.siteId, generationRuns.siteId),
+        eq(contentVersions.contentId, generationRuns.contentId),
+        eq(contentVersions.version, generationRuns.baseVersion),
+      ),
+    )
+    .where(eq(generationRuns.siteId, siteId))
     .orderBy(desc(generationRuns.createdAt), desc(generationRuns.id));
-  return { ok: true, value: rows };
+  // Os CHECKs `generation_runs_geracao_check` e `generation_runs_correcao_check` garantem o tema
+  // na `geracao` e a versão-base (com o título, obrigatório no content-model) na `correcao`.
+  return {
+    ok: true,
+    value: rows.map(({ kind, topic, contentTitle, contentId, ...run }) =>
+      kind === 'correcao'
+        ? { ...run, kind, contentTitle: contentTitle ?? '', contentId: contentId ?? 0 }
+        : { ...run, kind, topic: topic ?? '', contentId },
+    ),
+  };
 }
 
 export type PendingRun = { runId: number; siteId: string; input: GenerationInput };
