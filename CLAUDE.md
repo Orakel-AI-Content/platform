@@ -35,6 +35,7 @@ Geradas:
 - `packages/build-contract` – contrato do volume `/build` (`result.json`, `publish.json`), só Zod
 - `tooling/build-site` – entrypoints `render`, `publish` e `ssr` da imagem `site-builder`
 - `infra/local/edge-local` – substituto local do deploy: um Worker por site, versões, rollback e `ae-sim`
+- `infra/site` – raiz OpenTofu por site (estado próprio, cifrado) e módulo `infra/modules/site`: zona, DNS e e-mail (ADR 0027)
 
 Previstas (gere com `/scaffold` no caminho da unidade):
 

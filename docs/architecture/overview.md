@@ -80,7 +80,7 @@ No local, o driver `local` dispensa o GitHub e etiqueta a `site-builder:local` d
 
 ## Mapa das unidades
 
-Estado atual: a raiz, `packages/content-model`, `packages/content-client`, `packages/core`, `packages/elements`, `packages/tokens`, `packages/events`, `packages/build-contract`, `apps/blog`, `apps/blog/worker`, `apps/backoffice`, `tooling/build-site` e `infra/local/edge-local`. Cada unidade é gerada com `/scaffold` (modo `unit`) e
+Estado atual: a raiz, `packages/content-model`, `packages/content-client`, `packages/core`, `packages/elements`, `packages/tokens`, `packages/events`, `packages/build-contract`, `apps/blog`, `apps/blog/worker`, `apps/backoffice`, `tooling/build-site`, `infra/local/edge-local` e `infra/site` (com o módulo `infra/modules/site`). Cada unidade é gerada com `/scaffold` (modo `unit`) e
 passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`.
 
 | Caminho                   | Pacote                   | Camada ESLint              | Papel                                                                  |
@@ -107,6 +107,7 @@ passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`
 | `tooling/{tsconfig,eslint-config,prettier-config,vitest-config}` | Configurações compartilhadas                       |
 | `infra/vps/compose.yaml`                                         | Compose base (produção) e redes (ADR 0010)         |
 | `infra/local/`                                                   | Override local, Caddy, init, seeds e `local:*`     |
+| `infra/site/`, `infra/modules/site/`                             | OpenTofu por site: zona, DNS e e-mail (ADR 0027)   |
 | `docker/docker-bake.hcl`, `docker/bake.sh`                       | Alvos e tags das imagens                           |
 | `.github/workflows/`                                             | `ci`, `images`, `release`, `e2e`, `add-to-project` |
 | `turbo.json`, `pnpm-workspace.yaml`                              | Tarefas e catálogo de versões                      |
