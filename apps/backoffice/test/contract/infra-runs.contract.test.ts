@@ -9,17 +9,20 @@ import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { upsertUser } from '../../src/domain/access/users.ts';
 import { siteActivity } from '../../src/domain/builds/builds.ts';
 import {
+  confirmInfraRemoval,
   confirmInfraRun,
   finishInfraRun,
   recordInfraPlan,
   recordInfraStep,
+  requestInfraRemoval,
   requestInfraRun,
 } from '../../src/domain/infra/runs.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
 // Execuções da criação da infraestrutura (#821): o pedido, a confirmação e as gravações do
-// infra-runner em `infra_runs`, o avanço do site a `infra_aplicada` no `ok` e o histórico.
+// infra-runner em `infra_runs`, o avanço do site a `infra_aplicada` no `ok` e o histórico. E as da
+// remoção (#836): só admin, site pausado, domínio digitado e a volta do site a `cadastrado`.
 
 let db: Db;
 let close: () => Promise<void>;
@@ -255,6 +258,7 @@ describe('siteActivity', () => {
     const row = (id: number) => rows.find((r) => r.id === id);
     expect(result.value.openInfra).toEqual({
       id: open,
+      kind: 'criar',
       status: 'aguardando_confirmacao',
       currentStep: null,
       planSummary: '2 a criar',
@@ -266,6 +270,7 @@ describe('siteActivity', () => {
       {
         type: 'infra',
         id: succeeded,
+        kind: 'criar',
         status: 'ok',
         requestedBy: operacao.email,
         requestedAt: row(succeeded)?.requestedAt,
@@ -277,6 +282,7 @@ describe('siteActivity', () => {
       {
         type: 'infra',
         id: failed,
+        kind: 'criar',
         status: 'falhou',
         requestedBy: operacao.email,
         requestedAt: row(failed)?.requestedAt,
@@ -293,5 +299,218 @@ describe('siteActivity', () => {
     if (!result.ok) throw new Error('consulta recusada');
     expect(result.value.openInfra).toBeNull();
     expect(result.value.history).toEqual([]);
+  });
+});
+
+describe('remoção', () => {
+  async function site() {
+    const [row] = await db.select().from(sites).where(eq(sites.id, 'exemplo-a'));
+    return row;
+  }
+
+  /** Site publicado e pausado, com versão no ar, release e conferência da infra gravadas. */
+  async function pausedLive(): Promise<void> {
+    await db
+      .update(sites)
+      .set({
+        lifecycle: 'publicado',
+        state: 'pausado',
+        pausedReason: 'remoção da infra',
+        activeVersionId: 'v-123',
+        release: 'site-builder:1.2.0',
+        infraCheckedAt: new Date(),
+        infraCheckError: 'zona sumiu',
+      })
+      .where(eq(sites.id, 'exemplo-a'));
+  }
+
+  async function requestRemoval(actor: Actor = admin): Promise<number> {
+    const result = await db.transaction((tx) => requestInfraRemoval(tx, actor, 'exemplo-a'));
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value.id;
+  }
+
+  /** Remoção com o plano gravado, `aguardando_confirmacao`. */
+  async function waitingRemoval(): Promise<number> {
+    const id = await requestRemoval();
+    expect((await recordInfraPlan(db, id, '7 a destruir')).ok).toBe(true);
+    return id;
+  }
+
+  const DOMAIN = () => config.domains[0] ?? '';
+
+  beforeEach(pausedLive);
+
+  describe('pedir', () => {
+    it('o admin, num site pausado depois de cadastrado, grava a linha remover em planejando', async () => {
+      await requestRemoval();
+      expect(await runs()).toEqual([
+        expect.objectContaining({
+          tipo: 'remover',
+          status: 'planejando',
+          requestedBy: admin.email,
+          finishedAt: null,
+        }),
+      ]);
+    });
+
+    it.each([operacao, editor, revisor])('$roles.0 recebe forbidden sem gravar', async (actor) => {
+      const result = await db.transaction((tx) => requestInfraRemoval(tx, actor, 'exemplo-a'));
+      expect(codes(result)).toEqual(['forbidden']);
+      expect(await runs()).toEqual([]);
+    });
+
+    it('com o site ativo, devolve issue sem gravar', async () => {
+      await db.update(sites).set({ state: 'ativo', pausedReason: null });
+      const result = await db.transaction((tx) => requestInfraRemoval(tx, admin, 'exemplo-a'));
+      expect(codes(result)).toEqual(['infra.site_not_paused']);
+      expect(await runs()).toEqual([]);
+    });
+
+    it('com o site em cadastrado, devolve issue sem gravar', async () => {
+      await setLifecycle('cadastrado');
+      const result = await db.transaction((tx) => requestInfraRemoval(tx, admin, 'exemplo-a'));
+      expect(codes(result)).toEqual(['infra.lifecycle']);
+      expect(await runs()).toEqual([]);
+    });
+
+    it('criação e remoção não ficam abertas juntas no mesmo site', async () => {
+      await requestRemoval();
+      await setLifecycle('cadastrado');
+      const creation = await db.transaction((tx) => requestInfraRun(tx, admin, 'exemplo-a'));
+      expect(codes(creation)).toEqual(['infra.run_open']);
+
+      await setLifecycle('publicado');
+      const again = await db.transaction((tx) => requestInfraRemoval(tx, admin, 'exemplo-a'));
+      expect(codes(again)).toEqual(['infra.run_open']);
+      expect(await runs()).toHaveLength(1);
+    });
+  });
+
+  describe('confirmar', () => {
+    it('com o domínio exato, passa a aplicando com quem confirmou', async () => {
+      const id = await waitingRemoval();
+      expect((await confirmInfraRemoval(db, admin, id, DOMAIN())).ok).toBe(true);
+      expect((await runs())[0]).toMatchObject({ status: 'aplicando', confirmedBy: admin.email });
+      expect((await runs())[0]?.confirmedAt).toBeInstanceOf(Date);
+    });
+
+    it.each<[string, (domain: string) => string]>([
+      ['com www.', (domain) => `www.${domain}`],
+      ['em maiúsculas', (domain) => domain.toUpperCase()],
+      ['vazio', () => ''],
+      ['de outro site', () => 'outro.example'],
+    ])('com o domínio %s, recusa sem gravar', async (_, typed) => {
+      const id = await waitingRemoval();
+      const before = await runs();
+      expect(codes(await confirmInfraRemoval(db, admin, id, typed(DOMAIN())))).toEqual([
+        'infra.domain_mismatch',
+      ]);
+      expect(await runs()).toEqual(before);
+    });
+
+    it('operação recebe forbidden sem gravar', async () => {
+      const id = await waitingRemoval();
+      const before = await runs();
+      expect(codes(await confirmInfraRemoval(db, operacao, id, DOMAIN()))).toEqual(['forbidden']);
+      expect(await runs()).toEqual(before);
+    });
+
+    it('com o site retomado depois do pedido, recusa sem gravar', async () => {
+      const id = await waitingRemoval();
+      await db.update(sites).set({ state: 'ativo', pausedReason: null });
+      const before = await runs();
+      expect(codes(await confirmInfraRemoval(db, admin, id, DOMAIN()))).toEqual([
+        'infra.site_not_paused',
+      ]);
+      expect(await runs()).toEqual(before);
+    });
+
+    it('fora de aguardando_confirmacao, recusa', async () => {
+      const id = await requestRemoval();
+      expect(codes(await confirmInfraRemoval(db, admin, id, DOMAIN()))).toEqual([
+        'infra.run_state',
+      ]);
+    });
+
+    it('a confirmação da criação não confirma uma remoção', async () => {
+      const removal = await waitingRemoval();
+      const before = await runs();
+      expect(codes(await confirmInfraRun(db, operacao, removal))).toEqual(['infra.run_kind']);
+      expect(await runs()).toEqual(before);
+    });
+
+    it('a confirmação da remoção não confirma uma criação', async () => {
+      await setLifecycle('cadastrado');
+      const creation = await request(admin);
+      await recordInfraPlan(db, creation, 'resumo');
+      const before = await runs();
+      expect(codes(await confirmInfraRemoval(db, admin, creation, DOMAIN()))).toEqual([
+        'infra.run_kind',
+      ]);
+      expect(await runs()).toEqual(before);
+    });
+  });
+
+  describe('fechar', () => {
+    it('com ok, o site volta a cadastrado sem versão nem conferência, ainda pausado e com a release', async () => {
+      const id = await waitingRemoval();
+      await confirmInfraRemoval(db, admin, id, DOMAIN());
+      expect((await recordInfraStep(db, id, 'paginas')).ok).toBe(true);
+
+      expect((await finishInfraRun(db, id, { status: 'ok' })).ok).toBe(true);
+      expect((await runs())[0]).toMatchObject({
+        status: 'ok',
+        currentStep: null,
+        nameservers: null,
+      });
+      expect(await site()).toMatchObject({
+        lifecycle: 'cadastrado',
+        activeVersionId: null,
+        infraCheckedAt: null,
+        infraCheckError: null,
+        state: 'pausado',
+        pausedReason: 'remoção da infra',
+        release: 'site-builder:1.2.0',
+      });
+    });
+
+    it('com falhou, grava a etapa e o site fica como estava', async () => {
+      const id = await waitingRemoval();
+      await confirmInfraRemoval(db, admin, id, DOMAIN());
+      await recordInfraStep(db, id, 'paginas');
+      await finishInfraRun(db, id, { status: 'falhou', step: 'paginas', message: 'token' });
+      expect((await runs())[0]).toMatchObject({ status: 'falhou', failedStep: 'paginas' });
+      expect(await site()).toMatchObject({ lifecycle: 'publicado', activeVersionId: 'v-123' });
+    });
+
+    it('em nome de quem confirmou: sem site.destroy, recusa sem gravar', async () => {
+      const id = await waitingRemoval();
+      await confirmInfraRemoval(db, admin, id, DOMAIN());
+      await upsertUser(db, { email: admin.email, name: admin.email, roles: ['operacao'] });
+      expect(codes(await finishInfraRun(db, id, { status: 'ok' }))).toEqual(['forbidden']);
+      expect((await runs())[0]?.status).toBe('aplicando');
+      expect((await site())?.lifecycle).toBe('publicado');
+    });
+  });
+
+  it('o histórico traz o tipo de cada execução', async () => {
+    const id = await waitingRemoval();
+    await confirmInfraRemoval(db, admin, id, DOMAIN());
+    await finishInfraRun(db, id, { status: 'ok' });
+    const creation = await request(admin);
+
+    const result = await siteActivity(db, revisor, 'exemplo-a');
+    if (!result.ok) throw new Error('consulta recusada');
+    expect(result.value.openInfra).toMatchObject({ id: creation, kind: 'criar' });
+    expect(result.value.history).toEqual([
+      expect.objectContaining({
+        type: 'infra',
+        id,
+        kind: 'remover',
+        status: 'ok',
+        nameservers: null,
+      }),
+    ]);
   });
 });

@@ -1,6 +1,10 @@
 import type { Task } from 'graphile-worker';
 
-import { INFRA_STEPS, type InfraStep } from '../../db/schema/index.ts';
+import {
+  INFRA_RESOURCE_STEPS,
+  type InfraResourceStep,
+  type InfraStep,
+} from '../../db/schema/index.ts';
 import { loadBuildTarget } from '../../domain/builds/builds.ts';
 import { InfraPlanSummarySchema } from '../../domain/infra/drivers.ts';
 import {
@@ -13,11 +17,11 @@ import { INFRA_APPLY_TASK } from '../../domain/infra/schedule.ts';
 import { infraPayloadOf, type InfraTaskDeps } from './infra-run.ts';
 
 /** Primeira etapa com recurso no plano: onde o apply estava quando nenhum recurso começou. */
-function firstPlannedStep(planSummary: string | null): InfraStep | null {
+function firstPlannedStep(planSummary: string | null): InfraResourceStep | null {
   if (planSummary === null) return null;
   try {
     const { steps } = InfraPlanSummarySchema.parse(JSON.parse(planSummary));
-    return INFRA_STEPS.find((step) => steps[step].length > 0) ?? null;
+    return INFRA_RESOURCE_STEPS.find((step) => steps[step].length > 0) ?? null;
   } catch {
     return null;
   }

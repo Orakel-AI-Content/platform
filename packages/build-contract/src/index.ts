@@ -139,6 +139,14 @@ export const ARCHIVE_LAYOUT = {
   config: 'wrangler.jsonc',
 } as const;
 
+/**
+ * Nome do Worker do site, o mesmo nos dois alvos: o `name` do wrangler.jsonc gerado, o do
+ * `wrangler rollback`, o que o edge-local confere no publish e o script que a remoção apaga.
+ */
+export function workerName(site: string): string {
+  return `orakel-${site}`;
+}
+
 /** Resposta do `PUT /sites/{site}/versions` do edge-local (12.0, L3). */
 export const EdgeLocalVersionSchema = z.object({ id: z.string().min(1) });
 
@@ -154,8 +162,10 @@ export function exitCodeOf(result: { status: 'ok' } | { status: 'failed'; failur
 // /build: os containers de site e de infra não compartilham volume.
 //
 //   /infra/site.tfplan       plano salvo, cifrado (aes_gcm), escrito pelo plan
-//   /infra/infra-plan.json   escrito pelo plan, sempre
+//   /infra/infra-plan.json   escrito pelo plan, sempre; o apply lê dele o modo do plano
 //   /infra/infra-apply.json  escrito pelo apply, sempre
+//
+// O modo do plan vem de INFRA_MODE (`create`, o padrão, ou `destroy`: `tofu plan -destroy`).
 //
 // O andamento (`tofu … -json`) sai no stdout; os arquivos só trazem o resultado.
 
@@ -180,6 +190,13 @@ export const InfraChangeSchema = z.object({
 });
 export type InfraChange = z.infer<typeof InfraChangeSchema>;
 
+/**
+ * Modo do plano: `create` cria ou atualiza a infra do site; `destroy` a remove inteira
+ * (`tofu plan -destroy`). A trava contra a remoção é o Backoffice (ADR 0027).
+ */
+export const INFRA_MODES = ['create', 'destroy'] as const;
+export type InfraMode = (typeof INFRA_MODES)[number];
+
 const InfraBase = {
   formatVersion: z.literal(CONTRACT_VERSION),
   /** SITE_ID: também a chave do estado (`sites/<SITE_ID>.tfstate`). */
@@ -194,6 +211,8 @@ export const InfraPlanResultSchema = z.discriminatedUnion('status', [
   z.object({
     ...InfraBase,
     status: z.literal('ok'),
+    /** Modo do plano salvo; ausente nos resultados anteriores ao modo destroy, lido como `create`. */
+    mode: z.enum(INFRA_MODES).default('create'),
     /** Recursos que mudam; vazio quando o site já está como o código descreve. */
     changes: z.array(InfraChangeSchema),
   }),
@@ -208,7 +227,10 @@ export type InfraPlanResult = z.infer<typeof InfraPlanResultSchema>;
  */
 export const CRAWLER_HINTS_STATES = ['ligado', 'falhou'] as const;
 
-/** Resultado do `apply`: as saídas da raiz `infra/site`. */
+/**
+ * Resultado do `apply`: as saídas da raiz `infra/site` (`ok`) ou, quando o plano salvo era de
+ * destruição, só a confirmação da remoção (`destroyed`: sem saídas e sem Crawler Hints).
+ */
 export const InfraApplyResultSchema = z.discriminatedUnion('status', [
   z.object({
     ...InfraBase,
@@ -218,6 +240,7 @@ export const InfraApplyResultSchema = z.discriminatedUnion('status', [
     zoneId: z.string().min(1),
     crawlerHints: z.enum(CRAWLER_HINTS_STATES),
   }),
+  z.object({ ...InfraBase, status: z.literal('destroyed') }),
   InfraFailed,
 ]);
 export type InfraApplyResult = z.infer<typeof InfraApplyResultSchema>;

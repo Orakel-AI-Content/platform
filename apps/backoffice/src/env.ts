@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-import { INFRA_STEPS } from './db/schema/index.ts';
+import { INFRA_RESOURCE_STEPS } from './db/schema/index.ts';
 import { PricingTableSchema } from './domain/generation/pricing.ts';
 
 // Única leitura de process.env da unidade (convenção da raiz). Falha no boot com a lista
@@ -174,7 +174,7 @@ export const BuildRunnerEnvSchema = z
      * Só com INFRA_DRIVER=local (E2E): a primeira execução de cada site falha nesta etapa, para
      * exercitar "Tentar de novo". Vazio não força falha.
      */
-    INFRA_LOCAL_FAIL_STEP: optional(z.enum(INFRA_STEPS)),
+    INFRA_LOCAL_FAIL_STEP: optional(z.enum(INFRA_RESOURCE_STEPS)),
     /** Token de infra da Cloudflare, restrito ao IP da VPS; nem o de deploy nem o de leitura. */
     CLOUDFLARE_INFRA_TOKEN: optional(z.string().min(32)),
     /** Credenciais S3 (R2) do bucket `tofu-state`, onde fica o estado de cada site. */

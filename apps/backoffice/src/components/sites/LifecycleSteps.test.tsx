@@ -7,8 +7,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
+import { TITLE } from './CreateInfraDialog.tsx';
 import { LifecycleSteps } from './LifecycleSteps.tsx';
-import { LifecycleAction, LifecycleActionScope } from './SiteActions.tsx';
+import { LifecycleAction, LifecycleActionScope, type CreateInfraActions } from './SiteActions.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
@@ -164,5 +165,117 @@ describe('Desmarcar', () => {
     await waitFor(() =>
       expect(region.textContent).toBe('zona_ativa só pode ser desmarcada com o site em zona_ativa'),
     );
+  });
+});
+
+describe('Criar infraestrutura (#825)', () => {
+  const summary = {
+    formatVersion: 1 as const,
+    steps: { endereco: [], dns: [], email: [], regras: [], imagens: [] },
+  };
+  const infraActions = (overrides: Partial<CreateInfraActions> = {}): CreateInfraActions => ({
+    open: null,
+    request: vi.fn<CreateInfraActions['request']>().mockResolvedValue({ ok: true, runId: 7 }),
+    read: vi
+      .fn<CreateInfraActions['read']>()
+      .mockResolvedValue({ status: 'aguardando_confirmacao', summary }),
+    confirm: vi.fn(ok),
+    ...overrides,
+  });
+  const withInfra = (infra: CreateInfraActions, lifecycle: Lifecycle = 'cadastrado') => (
+    <LifecycleActionScope>
+      <LifecycleAction lifecycle={lifecycle} check={ok} undo={ok} infra={infra} />
+    </LifecycleActionScope>
+  );
+  const REVIEW = 'Revisar e confirmar a criação da infraestrutura';
+
+  it('num site cadastrado sem execução aberta, aparece ao lado de "Conferir agora"', () => {
+    render(withInfra(infraActions()));
+
+    expect(buttons()).toEqual(['Criar infraestrutura', 'Conferir agora']);
+  });
+
+  it('sem as actions de infra (sem site.configure na página), não aparece', () => {
+    render(withAction('cadastrado'));
+
+    expect(screen.queryByRole('button', { name: 'Criar infraestrutura' })).toBeNull();
+  });
+
+  it.each(['infra_aplicada', 'zona_ativa', 'publicado'] as const)(
+    'em %s, não aparece',
+    (lifecycle) => {
+      render(withInfra(infraActions(), lifecycle));
+
+      expect(screen.queryByRole('button', { name: /Criar infraestrutura|Revisar/ })).toBeNull();
+    },
+  );
+
+  it.each(['planejando', 'aguardando_confirmacao'] as const)(
+    'com execução %s, vira "Revisar e confirmar" e reabre o diálogo no estado salvo',
+    async (status) => {
+      const user = userEvent.setup();
+      const infra = infraActions({ open: { id: 4, status } });
+      render(withInfra(infra), { container: app });
+
+      expect(screen.queryByRole('button', { name: 'Criar infraestrutura' })).toBeNull();
+      await user.click(screen.getByRole('button', { name: REVIEW }));
+
+      const dialog = screen.getByRole('alertdialog', { name: TITLE });
+      await waitFor(() => expect(within(dialog).queryByRole('list')).not.toBeNull());
+      expect(infra.read).toHaveBeenCalledWith(4);
+      expect(infra.request).not.toHaveBeenCalled();
+    },
+  );
+
+  it('com execução aplicando, nenhuma das duas aparece', () => {
+    render(withInfra(infraActions({ open: { id: 4, status: 'aplicando' } })));
+
+    expect(buttons()).toEqual(['Conferir agora']);
+  });
+
+  it('pede o plano ao abrir e só confirma no "Confirmar"', async () => {
+    const user = userEvent.setup();
+    const infra = infraActions();
+    render(withInfra(infra), { container: app });
+
+    await user.click(screen.getByRole('button', { name: 'Criar infraestrutura' }));
+    const dialog = screen.getByRole('alertdialog', { name: TITLE });
+    await waitFor(() => expect(within(dialog).queryByRole('list')).not.toBeNull());
+    expect(infra.request).toHaveBeenCalledTimes(1);
+    expect(infra.confirm).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar' }));
+    await waitFor(() => expect(infra.confirm).toHaveBeenCalledWith(7));
+    expect(infra.confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Cancelar" fecha o diálogo sem confirmar', async () => {
+    const user = userEvent.setup();
+    const infra = infraActions();
+    render(withInfra(infra), { container: app });
+
+    await user.click(screen.getByRole('button', { name: 'Criar infraestrutura' }));
+    const dialog = screen.getByRole('alertdialog', { name: TITLE });
+    await waitFor(() => expect(within(dialog).queryByRole('list')).not.toBeNull());
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(infra.confirm).not.toHaveBeenCalled();
+  });
+
+  it('a recusa da confirmação vai ao Alert do escopo', async () => {
+    const user = userEvent.setup();
+    const message = 'A execução 7 está em aplicando; a transição exige aguardando_confirmacao';
+    const infra = infraActions({
+      confirm: () => Promise.resolve({ ok: false, message }),
+    });
+    render(withInfra(infra), { container: app });
+
+    await user.click(screen.getByRole('button', { name: 'Criar infraestrutura' }));
+    const dialog = screen.getByRole('alertdialog', { name: TITLE });
+    await waitFor(() => expect(within(dialog).queryByRole('list')).not.toBeNull());
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(message));
   });
 });

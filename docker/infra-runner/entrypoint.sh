@@ -2,12 +2,15 @@
 # Entrypoint do infra-runner (ADR 0027 da raiz). Contrato do volume em @orakel/build-contract
 # (INFRA_DIR, INFRA_PATHS, InfraPlanResultSchema, InfraApplyResultSchema).
 #
-#   plan    tofu init + plan -json -out=/infra/site.tfplan; resumo em /infra/infra-plan.json
+#   plan    tofu init + plan -json -out=/infra/site.tfplan; resumo e modo em /infra/infra-plan.json
+#           (INFRA_MODE=destroy: plan -destroy, a remoção de toda a infra do site)
 #   apply   tofu init + apply -json /infra/site.tfplan (o plano salvo, tal como foi gerado);
-#           saídas em /infra/infra-apply.json e, depois, o Crawler Hints da zona
+#           saídas em /infra/infra-apply.json e, depois, o Crawler Hints da zona. Se o plano
+#           salvo é de destruição (modo lido do infra-plan.json), grava só status destroyed
 #
 # Entrada só pelo ambiente:
 #   SITE_ID, CLOUDFLARE_ACCOUNT_ID, DOMAIN, EMAIL_FORWARD_TO, EMAIL_ALIASES (opcional, JSON)
+#   INFRA_MODE (só no plan, opcional): create (padrão) ou destroy
 #   CLOUDFLARE_INFRA_TOKEN, TOFU_STATE_ACCESS_KEY_ID, TOFU_STATE_SECRET_ACCESS_KEY,
 #   TOFU_STATE_PASSPHRASE (os segredos de infra que só o build-runner conhece)
 #
@@ -21,6 +24,7 @@ set -o pipefail
 
 INFRA_DIR=/infra
 PLAN="$INFRA_DIR/site.tfplan"
+PLAN_RESULT="$INFRA_DIR/infra-plan.json"
 BIN_DIR=$(dirname "$0")
 LOG=/tmp/tofu.jsonl
 START=$(date +%s)
@@ -29,7 +33,7 @@ CF_API=${CLOUDFLARE_API_URL:-https://api.cloudflare.com/client/v4}
 
 cmd=${1:-}
 case "$cmd" in
-  plan) RESULT="$INFRA_DIR/infra-plan.json" ;;
+  plan) RESULT="$PLAN_RESULT" ;;
   apply) RESULT="$INFRA_DIR/infra-apply.json" ;;
   *)
     echo "infra-runner: comando desconhecido '${cmd}'. Use plan ou apply." >&2
@@ -62,8 +66,21 @@ done
 unset value
 [ -z "$missing" ] || fail permanent "Defina $missing no ambiente do infra-runner"
 
-if [ "$cmd" = apply ] && [ ! -s "$PLAN" ]; then
-  fail permanent "Sem plano salvo em $PLAN: gere o plano antes do apply"
+# Modo: no plan, pelo ambiente; no apply, o do plano salvo (gravado junto dele pelo plan), para
+# que o pedido do apply não divirja do plano.
+if [ "$cmd" = plan ]; then
+  mode=${INFRA_MODE:-create}
+  case "$mode" in
+    create | destroy) ;;
+    *) fail permanent "INFRA_MODE desconhecido '$mode'. Use create ou destroy" ;;
+  esac
+else
+  if [ ! -s "$PLAN" ]; then
+    fail permanent "Sem plano salvo em $PLAN: gere o plano antes do apply"
+  fi
+  if ! mode=$(jq -er 'select(.status == "ok") | .mode // "create"' "$PLAN_RESULT" 2>/dev/null); then
+    fail permanent "Sem o resumo do plano em $PLAN_RESULT: gere o plano antes do apply"
+  fi
 fi
 
 # Nomes que a raiz infra/site espera (versions.tf). Os originais saem do ambiente do tofu.
@@ -125,17 +142,31 @@ run_tofu init -input=false -reconfigure -lockfile=readonly
 
 if [ "$cmd" = plan ]; then
   rm -f "$PLAN"
-  run_tofu plan -input=false -out="$PLAN"
+  if [ "$mode" = destroy ]; then
+    run_tofu plan -input=false -destroy -out="$PLAN"
+  else
+    run_tofu plan -input=false -out="$PLAN"
+  fi
   if ! changes=$(tofu show -json "$PLAN" | jq -c -f "$BIN_DIR/summary.jq"); then
     fail permanent "Não foi possível ler o plano salvo"
   fi
-  jq -n --arg site "$SITE_ID" --argjson changes "$changes" --argjson durationMs "$(duration_ms)" \
-    '{formatVersion: 1, status: "ok", site: $site, changes: $changes, durationMs: $durationMs}' \
+  jq -n --arg site "$SITE_ID" --arg mode "$mode" --argjson changes "$changes" \
+    --argjson durationMs "$(duration_ms)" \
+    '{formatVersion: 1, status: "ok", site: $site, mode: $mode, changes: $changes, durationMs: $durationMs}' \
     >"$RESULT"
   exit 0
 fi
 
 run_tofu apply -input=false "$PLAN"
+
+# Destruição: a raiz fica sem saídas e não há zona onde ligar o Crawler Hints.
+if [ "$mode" = destroy ]; then
+  jq -n --arg site "$SITE_ID" --argjson durationMs "$(duration_ms)" \
+    '{formatVersion: 1, status: "destroyed", site: $site, durationMs: $durationMs}' \
+    >"$RESULT"
+  exit 0
+fi
+
 if ! outputs=$(tofu output -json); then
   fail transient "O apply terminou, mas as saídas não foram lidas: rode de novo"
 fi

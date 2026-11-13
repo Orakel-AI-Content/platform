@@ -12,6 +12,7 @@ import type { SiteSummary } from '@/domain/sites/sites.ts';
 export const ACTION_LABEL: Record<Action, string> = {
   'site.read': 'Ver os sites',
   'site.configure': 'Configurar os sites',
+  'site.destroy': 'Remover a infraestrutura dos sites',
   'content.write': 'Editar conteúdo',
   'content.amend': 'Corrigir conteúdo em revisão',
   'content.publish': 'Publicar conteúdo',
