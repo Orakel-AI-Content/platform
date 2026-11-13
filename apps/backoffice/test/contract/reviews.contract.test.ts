@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { Db } from '../../src/db/client.ts';
 import {
   contentVersions,
+  generationRuns,
   publications,
   reviewConfirmations,
   reviews,
@@ -19,6 +20,7 @@ import {
   submitForReview,
   updateContent,
 } from '../../src/domain/content/contents.ts';
+import { CORRECT_ARTICLE_TASK } from '../../src/domain/generation/runs.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../../src/domain/publications/schedule.ts';
 import {
@@ -654,7 +656,20 @@ const giveBack = (
   version: number,
   comment = 'Falta a fonte da tabela de plantio.',
   actor = role('revisor'),
-) => db.transaction((tx) => returnVersion(tx, actor, SITE, contentId, version, comment));
+  options: { autoCorrect?: boolean } = {},
+) => db.transaction((tx) => returnVersion(tx, actor, SITE, contentId, version, comment, options));
+
+type CorrectionJob = { payload: { runId: number }; max_attempts: number; key: string | null };
+
+/** Jobs `correct-article` (a view `jobs` não expõe o payload; a tabela privada sim). */
+async function correctionJobs(): Promise<CorrectionJob[]> {
+  const result = await db.execute(sql`
+    select j.payload, j.max_attempts, j.key
+    from graphile_worker._private_jobs j
+    join graphile_worker._private_tasks t on t.id = j.task_id
+    where t.identifier = ${CORRECT_ARTICLE_TASK}`);
+  return result.rows as CorrectionJob[];
+}
 
 describe('devolver ao editor (#598)', () => {
   it('grava a devolução com o comentário em reviews e leva a versão a rascunho', async () => {
@@ -740,6 +755,70 @@ describe('devolver ao editor (#598)', () => {
       reviewer: 'revisor@orakel.local',
       approvedAt: approval?.createdAt,
     });
+  });
+
+  it('com a correção pedida, grava a execução correcao pendente e o job na mesma transação (#798)', async () => {
+    const version = await draft(1);
+
+    const result = await giveBack(1, version, 'Corrija a fonte.', role('revisor'), {
+      autoCorrect: true,
+    });
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    const { reviewId, runId } = result.value;
+    expect(runId).toBeTypeOf('number');
+    expect(await db.select().from(reviews)).toMatchObject([
+      { id: reviewId, version, decision: 'devolvido', comment: 'Corrija a fonte.' },
+    ]);
+    expect((await versions(1)).at(-1)?.status).toBe('rascunho');
+    expect(await db.select().from(generationRuns)).toMatchObject([
+      {
+        id: runId,
+        kind: 'correcao',
+        siteId: SITE,
+        contentId: 1,
+        baseVersion: version,
+        reviewId,
+        status: 'pendente',
+        topic: null,
+        authorId: null,
+        editorialContextVersion: null,
+        createdBy: 'revisor@orakel.local',
+        finishedAt: null,
+      },
+    ]);
+    expect(await correctionJobs()).toEqual([
+      { payload: { runId }, max_attempts: 1, key: `${CORRECT_ARTICLE_TASK}:${String(reviewId)}` },
+    ]);
+  });
+
+  it('sem a opção, a devolução não grava execução nem job (#798)', async () => {
+    const version = await draft(1);
+
+    const result = await giveBack(1, version);
+
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(Object.keys(result.value)).toEqual(['reviewId']);
+    expect(await db.select().from(generationRuns)).toEqual([]);
+    expect(await correctionJobs()).toEqual([]);
+  });
+
+  it('recusada, a devolução com a correção pedida não grava nada (#798)', async () => {
+    const version = await draft(1);
+    const opts = { autoCorrect: true };
+
+    expect(await giveBack(1, version, '  ', role('revisor'), opts)).toMatchObject({ ok: false });
+    expect(await giveBack(1, version, 'Corrigir.', role('editor'), opts)).toMatchObject({
+      ok: false,
+    });
+    expect(await giveBack(1, version + 1, 'Corrigir.', role('revisor'), opts)).toMatchObject({
+      ok: false,
+    });
+
+    expect(await db.select().from(reviews)).toEqual([]);
+    expect(await db.select().from(generationRuns)).toEqual([]);
+    expect(await correctionJobs()).toEqual([]);
+    expect((await versions(1)).at(-1)?.status).toBe('em_revisao');
   });
 
   it('devolvida e ainda não aprovada, a versão não mostra aprovação', async () => {
