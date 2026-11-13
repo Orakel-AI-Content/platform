@@ -94,6 +94,21 @@ function renderPanel(
 }
 
 describe('painel de etapas', () => {
+  it('com a infra desatualizada, a etapa Infra e zona mostra o selo "Infra desatualizada"', () => {
+    renderPanel({ infraDriftStatus: 'desatualizado' });
+
+    expect(within(items()[0]!).getByText('Infra desatualizada')).not.toBeNull();
+  });
+
+  it.each([['em_dia' as const], [null], [undefined]])(
+    'com a conferência %s, nenhum selo de desatualizada',
+    (infraDriftStatus) => {
+      renderPanel({ infraDriftStatus });
+
+      expect(screen.queryByText('Infra desatualizada')).toBeNull();
+    },
+  );
+
   it('lista as cinco etapas em ordem, com o estado em texto e dito uma vez', () => {
     renderPanel();
 
