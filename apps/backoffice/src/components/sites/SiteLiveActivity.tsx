@@ -34,32 +34,36 @@ type Snapshot = {
   /** A última execução de build vista aberta. */
   watched: number | null;
   /**
-   * A última criação da infraestrutura vista aberta (#826), em qualquer estado: o apply do
-   * driver local termina antes de a página revalidada chegar, e a aba nunca a veria aplicando.
+   * A última criação ou reaplicação da infraestrutura vista aberta (#826, workspace#98), em
+   * qualquer estado: o apply do driver local termina antes de a página revalidada chegar, e a
+   * aba nunca a veria aplicando.
    */
   watchedInfra: number | null;
 };
 
-/** A criação da infraestrutura aberta, do pedido do plano ao fim do apply. */
-function openCreation(activity: SiteActivity): OpenInfraRun | null {
+/**
+ * A criação ou a reaplicação da infraestrutura aberta, do pedido do plano ao fim do apply; a
+ * remoção tem outro desfecho e fica de fora.
+ */
+function openTracked(activity: SiteActivity): OpenInfraRun | null {
   const run = activity.openInfra;
-  return run !== null && run.kind === 'criar' ? run : null;
+  return run !== null && (run.kind === 'criar' || run.kind === 'reaplicar') ? run : null;
 }
 
-/** A criação da infraestrutura aplicando: o andamento que a aba acompanha (#826). */
-function applyingCreation(activity: SiteActivity): OpenInfraRun | null {
-  const run = openCreation(activity);
+/** A criação ou a reaplicação aplicando: o andamento que a aba acompanha (#826). */
+function applyingTracked(activity: SiteActivity): OpenInfraRun | null {
+  const run = openTracked(activity);
   return run?.status === 'aplicando' ? run : null;
 }
 
 const snapshotOf = (activity: SiteActivity, current: Snapshot | null): Snapshot => ({
   activity,
   watched: activity.open?.id ?? current?.watched ?? null,
-  watchedInfra: openCreation(activity)?.id ?? current?.watchedInfra ?? null,
+  watchedInfra: openTracked(activity)?.id ?? current?.watchedInfra ?? null,
 });
 
 const isPolling = (activity: SiteActivity) =>
-  activity.open !== null || applyingCreation(activity) !== null;
+  activity.open !== null || applyingTracked(activity) !== null;
 
 /**
  * Atividade da aba: a da página até o polling trazer outra; quando a página entrega uma nova
@@ -94,7 +98,7 @@ function useSiteActivity(
 }
 
 function finishedInfra({ activity, watchedInfra }: Snapshot): InfraHistoryItem | undefined {
-  if (watchedInfra === null || openCreation(activity) !== null) return undefined;
+  if (watchedInfra === null || openTracked(activity) !== null) return undefined;
   return activity.history.find(
     (item): item is InfraHistoryItem => item.type === 'infra' && item.id === watchedInfra,
   );
@@ -119,9 +123,12 @@ function buildBanner({ activity, watched }: Snapshot, timeZone: string): Banner 
     : null;
 }
 
-/** Faixa da criação da infra (#826): a etapa aplicando ou, quando termina, o resultado. */
+/**
+ * Faixa da criação ou da reaplicação da infra (#826): o tipo e a etapa aplicando ou, quando
+ * termina, o resultado.
+ */
 function infraBanner(snapshot: Snapshot, timeZone: string): Banner | null {
-  const applying = applyingCreation(snapshot.activity);
+  const applying = applyingTracked(snapshot.activity);
   if (applying !== null) return { key: 'infra', type: 'info', text: infraLiveStatusText(applying) };
   const finished = finishedInfra(snapshot);
   return finished
@@ -136,8 +143,8 @@ function infraBanner(snapshot: Snapshot, timeZone: string): Banner | null {
 /**
  * Atividade do site com o status ao vivo (#638): no topo, a faixa com a execução aberta ("na
  * fila" com o horário previsto, "em andamento" com a etapa) e, quando ela termina, o resultado;
- * embaixo, o `SiteBuildsTable` com o histórico relido. A criação da infraestrutura aplicando
- * (#826) entra na mesma faixa, com a etapa corrente e, no fim, concluída ou a etapa e o motivo da
+ * embaixo, o `SiteBuildsTable` com o histórico relido. A criação ou a reaplicação da
+ * infraestrutura aplicando (#826, workspace#98) entra na mesma faixa, com a etapa corrente e, no fim, concluída ou a etapa e o motivo da
  * falha. Enquanto há execução aberta, relê a
  * atividade pela Server Action a cada `pollMs`; sem execução aberta, não consulta. A faixa fica
  * num contêiner `role="status"` sempre montado, para o leitor de tela anunciar cada mudança.
