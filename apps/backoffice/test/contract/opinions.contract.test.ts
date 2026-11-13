@@ -20,7 +20,11 @@ import {
   reviewConfirmations,
   setAllConfirmations,
 } from '../../src/domain/reviews/confirmations.ts';
-import { opinionFor, type OpinionTarget } from '../../src/domain/reviews/opinions.ts';
+import {
+  listReviewOpinions,
+  opinionFor,
+  type OpinionTarget,
+} from '../../src/domain/reviews/opinions.ts';
 import { approveVersion, returnVersion } from '../../src/domain/reviews/reviews.ts';
 import { createReviewOpinionTask } from '../../src/jobs/tasks/review-opinion.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
@@ -346,6 +350,62 @@ describe('parecer automático da revisão (workspace#94)', () => {
 
     expect(await read(target)).toEqual({ ok: true, value: { state: 'ausente' } });
     const denied = await read(target, { email: 'ninguem@orakel.local', roles: [] });
+    expect(denied.ok).toBe(false);
+  });
+});
+
+describe('lista de pareceres do site (#796)', () => {
+  it('lista os pareceres do site, o mais recente primeiro, com título, versão e o custo da chamada', async () => {
+    const first = await submitContentOne();
+    await runJob(first);
+    const copied = await amend(first, { publishedAt: '2026-12-01T12:00:00-03:00' });
+    const pending = await createAndSubmit();
+
+    const listed = await listReviewOpinions(db, revisor, SITE);
+
+    if (!listed.ok) throw new Error(JSON.stringify(listed.issues));
+    const source = await row(first);
+    expect(listed.value).toEqual([
+      expect.objectContaining({
+        contentId: pending.contentId,
+        contentTitle: 'Escrito à mão',
+        version: pending.version,
+        status: 'pendente',
+        copiedFromVersion: null,
+        costUsd: null,
+        inputTokens: null,
+      }),
+      expect.objectContaining({
+        contentId: 1,
+        contentTitle: 'Guia revisado',
+        version: copied.version,
+        status: 'ok',
+        copiedFromVersion: first.version,
+      }),
+      {
+        contentId: 1,
+        contentTitle: 'Guia revisado',
+        version: first.version,
+        status: 'ok',
+        copiedFromVersion: null,
+        provider: 'fixture',
+        model: 'fixture',
+        inputTokens: source?.inputTokens,
+        outputTokens: source?.outputTokens,
+        costUsd: source?.costUsd,
+        durationMs: source?.durationMs,
+        requestedAt: source?.requestedAt,
+      },
+    ]);
+  });
+
+  it('só devolve os pareceres do site pedido; sem site.read, recusa', async () => {
+    const other = await importSnapshot(db, SYSTEM_ACTOR, await readFixture('exemplo-b'));
+    if (!other.ok) throw new Error(JSON.stringify(other.issues));
+    await createAndSubmit();
+
+    expect(await listReviewOpinions(db, revisor, 'exemplo-b')).toEqual({ ok: true, value: [] });
+    const denied = await listReviewOpinions(db, { email: 'ninguem@orakel.local', roles: [] }, SITE);
     expect(denied.ok).toBe(false);
   });
 });

@@ -24,7 +24,7 @@ export const GENERATION_STATUS_LABEL: Record<GenerationStatus, string> = {
   falha: 'Falhou',
 };
 
-const GENERATION_STATUS_TAG: Record<GenerationStatus, StateTagColor> = {
+export const GENERATION_STATUS_TAG: Record<GenerationStatus, StateTagColor> = {
   pendente: 'bg-warning',
   ok: 'bg-success',
   falha: 'bg-error',
