@@ -15,21 +15,23 @@ export function siteOfHost(host: string | undefined): string | undefined {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(site) ? site : undefined;
 }
 
-export function proxyHandler(supervisor: Pick<Supervisor, 'target'>) {
+export function proxyHandler(supervisor: Pick<Supervisor, 'acquire'>) {
   return (req: IncomingMessage, res: ServerResponse) => {
     const site = siteOfHost(req.headers.host);
-    const target = site === undefined ? undefined : supervisor.target(site);
-    if (!target) {
+    const lease = site === undefined ? undefined : supervisor.acquire(site);
+    if (!lease) {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
       res.end(
         site ? `Site "${site}" sem versão publicada no edge-local\n` : 'Use <site>.localhost\n',
       );
       return;
     }
+    // A instância antiga só é desligada depois que a resposta termina (troca sem queda).
+    res.on('close', lease.release);
     const upstream = httpRequest(
       {
-        hostname: target.hostname,
-        port: target.port,
+        hostname: lease.url.hostname,
+        port: lease.url.port,
         method: req.method,
         path: req.url,
         headers: req.headers,
@@ -47,6 +49,6 @@ export function proxyHandler(supervisor: Pick<Supervisor, 'target'>) {
   };
 }
 
-export function startProxy(supervisor: Pick<Supervisor, 'target'>, port: number) {
+export function startProxy(supervisor: Pick<Supervisor, 'acquire'>, port: number) {
   return createServer(proxyHandler(supervisor)).listen(port, '0.0.0.0');
 }

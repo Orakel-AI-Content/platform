@@ -64,6 +64,21 @@ describe('Supervisor', () => {
     expect(await sup.store.active('exemplo-a')).toBe(b);
   });
 
+  it('troca espera as requisições em andamento na antiga antes de desligá-la', async () => {
+    const { sup, disposed } = await supervisor();
+    const archive = await makeArchive('exemplo-a', 'A');
+    await sup.publish('exemplo-a', archive);
+    const lease = sup.acquire('exemplo-a')!;
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const publishing = sup.publish('exemplo-a', archive);
+    await vi.waitFor(() => expect(sup.target('exemplo-a')).not.toEqual(lease.url));
+    expect(disposed).toEqual([]);
+    lease.release();
+    lease.release();
+    await publishing;
+    expect(disposed).toHaveLength(1);
+  });
+
   it('versão que não sobe é apagada e a ativa continua', async () => {
     const { sup } = await supervisor(true);
     await expect(
