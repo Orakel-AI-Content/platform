@@ -1668,6 +1668,7 @@ describe('atividade do site', () => {
           requestedBy: 'system',
           cancelRequestedAt: null,
         },
+        openInfra: null,
         history: [],
       },
     });
@@ -1697,7 +1698,10 @@ describe('atividade do site', () => {
 
   it('sem nada aberto, não há execução aberta', async () => {
     await clearQueue();
-    expect(await activity()).toEqual({ ok: true, value: { open: null, history: [] } });
+    expect(await activity()).toEqual({
+      ok: true,
+      value: { open: null, openInfra: null, history: [] },
+    });
   });
 
   it('o histórico une execuções e eventos, do mais recente ao mais antigo, com tipo, quem, quando e resultado', async () => {
