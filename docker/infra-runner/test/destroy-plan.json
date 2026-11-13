@@ -1,0 +1,410 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.13.9",
+  "planned_values": {
+    "root_module": {}
+  },
+  "resource_changes": [
+    {
+      "address": "module.site.cloudflare_zone.site",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_zone",
+      "name": "site",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_zone_setting.security_header",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_zone_setting",
+      "name": "security_header",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_zone_setting.min_tls_version",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_zone_setting",
+      "name": "min_tls_version",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_zone_setting.always_use_https",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_zone_setting",
+      "name": "always_use_https",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_tiered_cache.site",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_tiered_cache",
+      "name": "site",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_dns_record.spf",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_dns_record",
+      "name": "spf",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_dns_record.dmarc",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_dns_record",
+      "name": "dmarc",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_email_routing_settings.site",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_email_routing_settings",
+      "name": "site",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_email_routing_dns.site",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_email_routing_dns",
+      "name": "site",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_email_routing_rule.alias[\"contato\"]",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_email_routing_rule",
+      "name": "alias",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      },
+      "index": "contato"
+    },
+    {
+      "address": "module.site.cloudflare_email_routing_rule.alias[\"editorial\"]",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_email_routing_rule",
+      "name": "alias",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      },
+      "index": "editorial"
+    },
+    {
+      "address": "module.site.cloudflare_email_routing_catch_all.site",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_email_routing_catch_all",
+      "name": "site",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_r2_bucket.media",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_r2_bucket",
+      "name": "media",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_r2_custom_domain.media",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_r2_custom_domain",
+      "name": "media",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_r2_managed_domain.media",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_r2_managed_domain",
+      "name": "media",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_ruleset.cache",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_ruleset",
+      "name": "cache",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_dns_record.www",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_dns_record",
+      "name": "www",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_ruleset.redirect",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_ruleset",
+      "name": "redirect",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_ruleset.rate_limit",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_ruleset",
+      "name": "rate_limit",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_ruleset.waf",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_ruleset",
+      "name": "waf",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    },
+    {
+      "address": "module.site.cloudflare_bot_management.site",
+      "module_address": "module.site",
+      "mode": "managed",
+      "type": "cloudflare_bot_management",
+      "name": "site",
+      "provider_name": "registry.opentofu.org/cloudflare/cloudflare",
+      "change": {
+        "actions": ["delete"],
+        "before": {
+          "id": "x"
+        },
+        "after": null,
+        "after_unknown": {},
+        "before_sensitive": {},
+        "after_sensitive": false
+      }
+    }
+  ],
+  "output_changes": {
+    "zone_id": {
+      "actions": ["delete"],
+      "before": "023e105f4ecef8ad9ca31a8372d0c353",
+      "after": null,
+      "after_unknown": false,
+      "before_sensitive": false,
+      "after_sensitive": false
+    },
+    "name_servers": {
+      "actions": ["delete"],
+      "before": ["ada.ns.cloudflare.com", "bob.ns.cloudflare.com"],
+      "after": null,
+      "after_unknown": false,
+      "before_sensitive": false,
+      "after_sensitive": false
+    }
+  },
+  "applyable": true,
+  "complete": true,
+  "errored": false
+}
