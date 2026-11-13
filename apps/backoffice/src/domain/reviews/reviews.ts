@@ -44,6 +44,7 @@ import {
 import { linkCheckFor, type LinkCheckState } from './link-checks.ts';
 import { opinionFor, opinionOutlook, type OpinionOutlook } from './opinions.ts';
 import { compareVersions, type VersionChanges } from './changes.ts';
+import { setAllConfirmations } from './confirmations.ts';
 
 export {
   confirmedKeys,
@@ -107,25 +108,30 @@ async function siteCheckContext(
 ): Promise<Result<{ site: SiteCheckContext; resources: Resources }>> {
   const live = await listLiveContents(db, actor, siteId);
   if (!live.ok) return live;
-  const [taxonomyRows, authorRows, redirectRows, config, titleRows, resources] = await Promise.all([
-    db
-      .select({ id: taxonomies.id, kind: taxonomies.kind, slug: taxonomies.slug })
-      .from(taxonomies)
-      .where(eq(taxonomies.siteId, siteId)),
-    db.select({ slug: authors.slug }).from(authors).where(eq(authors.siteId, siteId)),
-    db.select({ from: redirects.from }).from(redirects).where(eq(redirects.siteId, siteId)),
-    currentConfig(db, siteId),
-    // Versão mais recente de cada conteúdo do site, em qualquer status.
-    db
-      .selectDistinctOn([contentVersions.contentId], {
-        contentId: contentVersions.contentId,
-        title: sql<string>`${contentVersions.data}->>'title'`,
-      })
-      .from(contentVersions)
-      .where(eq(contentVersions.siteId, siteId))
-      .orderBy(asc(contentVersions.contentId), desc(contentVersions.version)),
-    resourcesFor(db, siteId),
-  ]);
+  // Em sequência: no lote (#775), `db` é a conexão única da transação, sem consulta paralela.
+  const taxonomyRows = await db
+    .select({ id: taxonomies.id, kind: taxonomies.kind, slug: taxonomies.slug })
+    .from(taxonomies)
+    .where(eq(taxonomies.siteId, siteId));
+  const authorRows = await db
+    .select({ slug: authors.slug })
+    .from(authors)
+    .where(eq(authors.siteId, siteId));
+  const redirectRows = await db
+    .select({ from: redirects.from })
+    .from(redirects)
+    .where(eq(redirects.siteId, siteId));
+  const config = await currentConfig(db, siteId);
+  // Versão mais recente de cada conteúdo do site, em qualquer status.
+  const titleRows = await db
+    .selectDistinctOn([contentVersions.contentId], {
+      contentId: contentVersions.contentId,
+      title: sql<string>`${contentVersions.data}->>'title'`,
+    })
+    .from(contentVersions)
+    .where(eq(contentVersions.siteId, siteId))
+    .orderBy(asc(contentVersions.contentId), desc(contentVersions.version));
+  const resources = await resourcesFor(db, siteId);
   return {
     ok: true,
     value: {
@@ -275,26 +281,50 @@ export async function reviewQueue(
     // A versão listada existe: versões não são apagadas.
     if (data === undefined)
       throw new Error(`versão ${String(item.version)} de ${String(item.id)} sumiu`);
-    const issues = await validationIssues(db, siteId, item.id, data, resources);
-    const checks = computeReviewChecks(data, issues, checkContextFor(site, item.id));
     const target = { siteId, contentId: item.id, version: item.version };
-    const [links, opinion] = await Promise.all([
-      linkCheckFor(db, actor, target),
-      opinionFor(db, actor, target),
-    ]);
-    if (!links.ok) return links;
-    if (!opinion.ok) return opinion;
+    const standing = await reviewStanding(db, actor, target, data, { site, resources });
+    if (!standing.ok) return standing;
     const last = lastReviewOf.get(item.id);
     entries.push({
       ...item,
-      pending: pendingCount(checks, links.value),
-      links: links.value,
+      ...standing.value,
       returned: last?.decision === 'devolvido' && last.version <= item.version,
       autoCorrected: corrected.has(correctionKey(item.id, item.version)),
-      opinion: opinionOutlook(opinion.value),
     });
   }
   return { ok: true, value: entries };
+}
+
+/** O que a fila mostra de uma versão em revisão e o lote exige limpo: pendências, links, parecer. */
+type ReviewStanding = Pick<ReviewQueueEntry, 'pending' | 'links' | 'opinion'>;
+
+/**
+ * Pendências, links e parecer da versão `target`, com os dados `data`, sobre o contexto do site
+ * lido uma vez (`siteCheckContext`): o mesmo cálculo para a fila (#772, #774) e o lote (#775).
+ */
+async function reviewStanding(
+  db: Executor,
+  actor: Actor,
+  target: { siteId: string; contentId: number; version: number },
+  data: ContentData,
+  context: { site: SiteCheckContext; resources: Resources },
+): Promise<Result<ReviewStanding>> {
+  const { siteId, contentId } = target;
+  const issues = await validationIssues(db, siteId, contentId, data, context.resources);
+  const checks = computeReviewChecks(data, issues, checkContextFor(context.site, contentId));
+  // Em sequência: no lote, `db` é a conexão única da transação, que não aceita consulta paralela.
+  const links = await linkCheckFor(db, actor, target);
+  if (!links.ok) return links;
+  const opinion = await opinionFor(db, actor, target);
+  if (!opinion.ok) return opinion;
+  return {
+    ok: true,
+    value: {
+      pending: pendingCount(checks, links.value),
+      links: links.value,
+      opinion: opinionOutlook(opinion.value),
+    },
+  };
 }
 
 /** Muda só o status da versão (ADR 0015): sem mudança pendente, o snapshot não o carrega. */
@@ -514,6 +544,124 @@ export async function approveAndSchedule(
     if (!isDailyLimit(scheduled)) return scheduled;
     return scheduleOnNextSlot(savepoint, actor, siteId, contentId, version, at, now);
   });
+}
+
+/** Artigo do lote: o conteúdo e a versão que o revisor viu no resumo. */
+export type BatchItem = { contentId: number; version: number };
+
+/**
+ * Desfecho de um artigo do lote (#775): aprovado e no ar ou agendado, como em
+ * `approveAndPublish`, ou `failed` com as issues, e nada gravado para ele.
+ */
+export type BatchOutcome = BatchItem & (ApprovalOutcome | { outcome: 'failed'; issues: Issue[] });
+
+/** Interrompe o savepoint de um artigo do lote: desfaz só ele. */
+class BatchItemAborted extends Error {
+  readonly issues: Issue[];
+
+  constructor(issues: Issue[]) {
+    super('Artigo do lote interrompido');
+    this.issues = issues;
+  }
+}
+
+/** Estados da checagem de links que já terminaram. */
+const LINK_CHECK_DONE: readonly LinkCheckState['state'][] = ['verificado', 'sem_links'];
+
+/**
+ * Motivos de a versão travada não entrar no lote, pelo que a fila mostra (vazio: elegível):
+ * pendência, checagem de links não concluída ou parecer que não é favorável.
+ */
+function ineligibility(standing: ReviewStanding): string[] {
+  const reasons: string[] = [];
+  if (standing.pending > 0) reasons.push(`tem ${String(standing.pending)} pendência(s)`);
+  if (!LINK_CHECK_DONE.includes(standing.links.state)) {
+    reasons.push('a checagem de links externos não terminou');
+  }
+  if (standing.opinion !== 'favoravel') {
+    reasons.push(`o parecer automático não é favorável (${standing.opinion})`);
+  }
+  return reasons;
+}
+
+const ineligible = (contentId: number, reasons: readonly string[]): Issue => ({
+  code: 'review.batch_ineligible',
+  message: `O conteúdo ${String(contentId)} não pode ser aprovado em lote: ${reasons.join('; ')}`,
+  path: [],
+});
+
+/**
+ * Aprova e publica em lote os artigos limpos da fila (#775, ADR 0024). Cada artigo roda no
+ * próprio savepoint: trava a versão, confere a elegibilidade (em revisão, sem pendência, links
+ * conferidos e parecer favorável), grava as três confirmações do checklist em nome do revisor
+ * (a confirmação de leitura feita no resumo) e chama `approveAndPublish`, que agenda na próxima
+ * vaga quando o limite diário enche. A recusa de um artigo desfaz só ele, e os outros seguem: o
+ * desfecho volta por artigo, na ordem recebida, que é a que ocupa as vagas do dia.
+ * O lote inteiro só é recusado sem `content.publish` ou vazio.
+ */
+export async function approveAndPublishBatch(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  items: readonly BatchItem[],
+  options: { now?: Date } = {},
+): Promise<Result<BatchOutcome[]>> {
+  const allowed = requireRole(actor, 'content.publish');
+  if (!allowed.ok) return allowed;
+  const unique = items.filter(
+    (item, index) => items.findIndex((other) => other.contentId === item.contentId) === index,
+  );
+  if (unique.length === 0) {
+    return refused('review.empty_batch', 'Escolha ao menos um conteúdo para aprovar', ['items']);
+  }
+  const now = options.now ?? new Date();
+  const context = await siteCheckContext(tx, actor, siteId);
+  if (!context.ok) return context;
+
+  const outcomes: BatchOutcome[] = [];
+  for (const item of unique) {
+    const { contentId, version } = item;
+    try {
+      const approved = await tx.transaction(async (savepoint) => {
+        const locked = await lockVersionInReview(savepoint, siteId, contentId, version, 'aprovada');
+        if (!locked.ok) {
+          const notInReview = locked.issues.find((issue) => issue.code === 'review.not_in_review');
+          if (notInReview === undefined) throw new BatchItemAborted(locked.issues);
+          throw new BatchItemAborted([ineligible(contentId, [notInReview.message])]);
+        }
+        const standing = await reviewStanding(
+          savepoint,
+          actor,
+          { siteId, contentId, version },
+          locked.value.data,
+          context.value,
+        );
+        if (!standing.ok) throw new BatchItemAborted(standing.issues);
+        const reasons = ineligibility(standing.value);
+        if (reasons.length > 0) throw new BatchItemAborted([ineligible(contentId, reasons)]);
+
+        const confirmed = await setAllConfirmations(
+          savepoint,
+          actor,
+          siteId,
+          contentId,
+          version,
+          true,
+        );
+        if (!confirmed.ok) throw new BatchItemAborted(confirmed.issues);
+        const published = await approveAndPublish(savepoint, actor, siteId, contentId, version, {
+          now,
+        });
+        if (!published.ok) throw new BatchItemAborted(published.issues);
+        return published.value;
+      });
+      outcomes.push({ ...item, ...approved });
+    } catch (error) {
+      if (!(error instanceof BatchItemAborted)) throw error;
+      outcomes.push({ ...item, outcome: 'failed', issues: error.issues });
+    }
+  }
+  return { ok: true, value: outcomes };
 }
 
 /**

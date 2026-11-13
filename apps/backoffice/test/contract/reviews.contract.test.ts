@@ -32,6 +32,7 @@ import {
 } from '../../src/domain/reviews/confirmations.ts';
 import {
   approveAndPublish,
+  approveAndPublishBatch,
   approveAndSchedule,
   approveVersion,
   pendingReturn,
@@ -1356,6 +1357,290 @@ describe('fila de revisão com pendências e devolvidos (#772)', () => {
     expect(await reviewQueue(db, { email: 'x@orakel.local', roles: [] }, SITE)).toMatchObject({
       ok: false,
       issues: [{ code: 'forbidden' }],
+    });
+  });
+});
+
+describe('aprovar e publicar em lote (#775)', () => {
+  /** "Agora" do lote: 08:00 de São Paulo de 2026-11-04. */
+  const NOW = new Date('2026-11-04T08:00:00-03:00');
+  const at = (day: string, time = '08:00') => new Date(`${day}T${time}:00-03:00`);
+
+  const setSiteLimit = (limit: number | null) =>
+    db.update(sites).set({ dailyPublishLimit: limit }).where(eq(sites.id, SITE));
+
+  const batch = (items: { contentId: number; version: number }[], actor = role('revisor')) =>
+    db.transaction((tx) => approveAndPublishBatch(tx, actor, SITE, items, { now: NOW }));
+
+  /** Termina a checagem de links da versão, sem link externo (`sem_links`). */
+  const finishLinks = (target: OpinionTarget) =>
+    db.transaction((tx) => recordLinkCheck(tx, target, [], new Date()));
+
+  /** Termina o parecer da versão, favorável ou com ressalvas. */
+  async function finishOpinion(target: OpinionTarget, verdict: 'atende' | 'nao_atende') {
+    const point = (v: 'atende' | 'nao_atende'): OpinionPoint => ({
+      verdict: v,
+      justification: 'Justificativa.',
+      excerpts: ['Trecho.'],
+    });
+    const recorded = await recordOpinion(
+      db,
+      target,
+      {
+        result: {
+          ok: true,
+          opinion: {
+            valor_original: point('atende'),
+            politicas_anuncios_afiliados: point(verdict),
+            linha_editorial: { verdict: 'nao_avaliado' },
+          },
+          prompt: { system: 's', user: 'u' },
+          provider: 'anthropic',
+          model: 'teste',
+          usage: { inputTokens: 1, outputTokens: 1 },
+          costUsd: null,
+          durationMs: 1,
+        },
+        editorialContextVersion: null,
+      },
+      new Date(),
+    );
+    if (!recorded) throw new Error('parecer não gravado');
+  }
+
+  /**
+   * Nova versão em revisão, sem pendência, com links conferidos e parecer favorável. Os conteúdos
+   * 2 e 3 da fixture não têm capa, descrição nem (o 3) categoria: ganham as do conteúdo 1.
+   */
+  async function clean(contentId: number): Promise<OpinionTarget> {
+    const [model] = await versions(1);
+    const last = (await versions(contentId)).at(-1);
+    if (model === undefined || last === undefined) throw new Error('conteúdo sem versão');
+    const saved = await db.transaction((tx) =>
+      updateContent(tx, SYSTEM_ACTOR, SITE, contentId, {
+        ...last.data,
+        title: `${last.data.title} (v${String(last.version + 1)})`,
+        description: last.data.description ?? `Descrição do conteúdo ${String(contentId)}.`,
+        coverMediaId: last.data.coverMediaId ?? model.data.coverMediaId,
+        taxonomyIds:
+          last.data.taxonomyIds.length > 0 ? last.data.taxonomyIds : model.data.taxonomyIds,
+      }),
+    );
+    if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
+    await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
+    const target = { siteId: SITE, contentId, version: saved.value.version };
+    await finishLinks(target);
+    await finishOpinion(target, 'atende');
+    return target;
+  }
+
+  const item = ({ contentId, version }: OpinionTarget) => ({ contentId, version });
+
+  /** Recusa por inelegibilidade cuja mensagem cita `reason`. */
+  const ineligible = (reason: RegExp): unknown => ({
+    code: 'review.batch_ineligible',
+    message: expect.stringMatching(reason) as unknown,
+  });
+
+  const statusOf = async ({ contentId, version }: OpinionTarget) =>
+    (await versions(contentId)).find((v) => v.version === version)?.status;
+
+  /** Nada gravado para o artigo: sem confirmação, sem revisão e a versão onde estava. */
+  async function untouched(target: OpinionTarget, status = 'em_revisao') {
+    expect(await confirmations(target.contentId, target.version)).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(reviews)
+        .where(and(eq(reviews.siteId, SITE), eq(reviews.contentId, target.contentId))),
+    ).toEqual([]);
+    expect(await statusOf(target)).toBe(status);
+  }
+
+  beforeEach(async () => {
+    await setSiteLimit(2);
+    await db.execute(sql`delete from graphile_worker._private_jobs`);
+  });
+
+  it('grava as três confirmações de cada artigo e publica quem cabe no dia, agendando o transbordo', async () => {
+    const [other] = await versions(2);
+    if (other === undefined) throw new Error('conteúdo 2 sem versão');
+    // Uma das duas vagas de hoje já ocupada.
+    await db.insert(publications).values({
+      siteId: SITE,
+      contentId: 2,
+      version: other.version,
+      publishedBy: 'revisor@orakel.local',
+      publishedAt: at('2026-11-04', '07:00'),
+    });
+    const targets = [await clean(1), await clean(2), await clean(3)];
+
+    const result = await batch(targets.map(item));
+
+    expect(result).toEqual({
+      ok: true,
+      value: [
+        expect.objectContaining({
+          ...item(targets[0]!),
+          outcome: 'published',
+          at: NOW,
+          overflowed: false,
+        }),
+        expect.objectContaining({
+          ...item(targets[1]!),
+          outcome: 'scheduled',
+          at: at('2026-11-05'),
+          overflowed: true,
+        }),
+        expect.objectContaining({
+          ...item(targets[2]!),
+          outcome: 'scheduled',
+          at: at('2026-11-05'),
+          overflowed: true,
+        }),
+      ],
+    });
+    for (const target of targets) {
+      const confirmed = await confirmations(target.contentId, target.version);
+      expect(confirmed.map((row) => row.key).sort()).toEqual([...ALL].sort());
+      expect(confirmed.every((row) => row.confirmedBy === 'revisor@orakel.local')).toBe(true);
+    }
+    expect(await statusOf(targets[0]!)).toBe('publicado');
+    expect(
+      await db.select({ contentId: reviews.contentId, decision: reviews.decision }).from(reviews),
+    ).toEqual(
+      expect.arrayContaining(
+        targets.map((target) => ({ contentId: target.contentId, decision: 'aprovado' })),
+      ),
+    );
+  });
+
+  it('recusa com código próprio o artigo com pendência ou com a checagem de links não concluída, e os outros seguem', async () => {
+    const last = (await versions(1)).at(-1);
+    if (last === undefined) throw new Error('conteúdo 1 sem versão');
+    const saved = await db.transaction((tx) =>
+      updateContent(tx, SYSTEM_ACTOR, SITE, 1, { ...last.data, description: undefined }),
+    );
+    if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
+    await db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, 1));
+    const pending = { siteId: SITE, contentId: 1, version: saved.value.version };
+    await finishLinks(pending);
+    await finishOpinion(pending, 'atende');
+    const checking = { siteId: SITE, contentId: 2, version: await draft(2) };
+    await finishOpinion(checking, 'atende');
+    const ok = await clean(3);
+
+    const result = await batch([item(pending), item(checking), item(ok)]);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: [
+        {
+          ...item(pending),
+          outcome: 'failed',
+          issues: [ineligible(/pendência/)],
+        },
+        {
+          ...item(checking),
+          outcome: 'failed',
+          issues: [ineligible(/links externos/)],
+        },
+        { ...item(ok), outcome: 'published' },
+      ],
+    });
+    await untouched(pending);
+    await untouched(checking);
+    expect(await statusOf(ok)).toBe('publicado');
+  });
+
+  it('recusa com código próprio o artigo sem parecer favorável ou fora de em_revisao, e os outros seguem', async () => {
+    const reserved = { siteId: SITE, contentId: 1, version: await draft(1) };
+    await finishLinks(reserved);
+    await finishOpinion(reserved, 'nao_atende');
+    const unopined = { siteId: SITE, contentId: 2, version: await draft(2) };
+    await finishLinks(unopined);
+    const drafted = { siteId: SITE, contentId: 3, version: await draft(3, false) };
+
+    const result = await batch([item(reserved), item(unopined), item(drafted)]);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: [
+        {
+          ...item(reserved),
+          outcome: 'failed',
+          issues: [ineligible(/com_ressalvas/)],
+        },
+        {
+          ...item(unopined),
+          outcome: 'failed',
+          issues: [ineligible(/pendente/)],
+        },
+        {
+          ...item(drafted),
+          outcome: 'failed',
+          issues: [ineligible(/rascunho/)],
+        },
+      ],
+    });
+    await untouched(reserved);
+    await untouched(unopined);
+    await untouched(drafted, 'rascunho');
+
+    // Com o parecer favorável, o mesmo artigo entra no lote.
+    await db.transaction((tx) => enqueueOpinion(tx, reserved));
+    await finishOpinion(reserved, 'atende');
+    expect(await batch([item(reserved)])).toMatchObject({
+      ok: true,
+      value: [{ ...item(reserved), outcome: 'published' }],
+    });
+  });
+
+  it('a versão que não é mais a mais recente é recusada e desfaz só aquele artigo', async () => {
+    const seen = await clean(1);
+    const newer = await clean(1);
+    const ok = await clean(2);
+
+    const result = await batch([item(seen), item(ok)]);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: [
+        { ...item(seen), outcome: 'failed', issues: [{ code: 'review.not_latest' }] },
+        { ...item(ok), outcome: 'published' },
+      ],
+    });
+    expect(await confirmations(1, seen.version)).toEqual([]);
+    await untouched(newer);
+    expect(await statusOf(ok)).toBe('publicado');
+  });
+
+  it('recusa depois das confirmações e da aprovação desfaz as duas, só naquele artigo', async () => {
+    // Limite 0: nenhuma vaga no horizonte, a publicação é recusada depois de aprovar.
+    await setSiteLimit(0);
+    const target = await clean(1);
+
+    const result = await batch([item(target)]);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: [{ ...item(target), outcome: 'failed', issues: [{ code: 'publication.no_slot' }] }],
+    });
+    await untouched(target);
+    expect(await db.select().from(publications)).toEqual([]);
+  });
+
+  it('sem content.publish, o lote inteiro é recusado; vazio também', async () => {
+    const target = await clean(1);
+
+    expect(await batch([item(target)], role('editor'))).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
+    });
+    await untouched(target);
+    expect(await batch([])).toMatchObject({
+      ok: false,
+      issues: [{ code: 'review.empty_batch' }],
     });
   });
 });
