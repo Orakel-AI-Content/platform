@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { ContentEditor } from '@/components/contents/ContentEditor';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { ReviewChecks } from '@/components/review/ReviewChecks';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
@@ -17,18 +18,19 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
 import { Button } from '@/components/ui/Button';
-import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 
 import { itemTitle } from '../../item-title.ts';
 import { previewUrl } from '../../conteudos/content-urls.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
+import { editorOptions } from '../../conteudos/editor-options.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { sitePageContext } from '../../editorial-page.tsx';
 import {
   approveAction,
   approvePublishAction,
   approveScheduleAction,
+  amendAction,
   confirmAction,
   confirmAllAction,
   returnAction,
@@ -57,7 +59,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * na ordem invertida do `CustomerDetails`: a prévia é o conteúdo principal, com a largura do
  * `main`, e o painel fica abaixo dela até `xl` e ao lado a partir dele. O painel é um wizard de
  * quatro passos (#766), com o atual em `?passo=`: a página o lê e o devolve ao painel, que assim
- * volta ao mesmo passo quando remonta numa versão nova.
+ * volta ao mesmo passo quando remonta numa versão nova. No passo Ajustes (#767), com
+ * `content.amend` e a versão em revisão, o editor no modo `amend` (#751, ADR 0022 da unidade):
+ * salvar grava a N+1 em revisão e volta para cá em `?passo=ajustes`, com a prévia nova.
  */
 export default async function ReviewPage({ params, searchParams }: Params & SearchParams) {
   const { site: siteId, id } = await params;
@@ -71,7 +75,7 @@ export default async function ReviewPage({ params, searchParams }: Params & Sear
   // A mesma leitura do título da aba (`cache`): as versões não são buscadas duas vezes.
   const read = await readContentVersions(siteId, contentId);
   if (read === undefined) return null;
-  const { versions } = read;
+  const { versions, timeZone } = read;
   if (!versions.ok) {
     if (versions.issues.some((issue) => issue.code === 'content.not_found')) notFound();
     return noRead;
@@ -85,6 +89,10 @@ export default async function ReviewPage({ params, searchParams }: Params & Sear
   if (!checks.ok || !links.ok || !confirmations.ok) return noRead;
   const items = reviewCheckItems(checks.value.checks, links.value, latest.data.blocks);
   const preview = previewUrl(site.id, latest.data);
+  // As opções do editor só são lidas quando a correção está disponível.
+  const canAmend = can(actor, 'content.amend');
+  const options =
+    canAmend && latest.status === 'em_revisao' ? await editorOptions(db, actor, siteId) : undefined;
 
   return (
     <section aria-labelledby="review-title" className="list-width space-y-4">
@@ -96,23 +104,10 @@ export default async function ReviewPage({ params, searchParams }: Params & Sear
         title={<>Revisão de “{latest.data.title}”</>}
         action={
           // O mesmo `Button` e variante do "Ver prévia" do editor, em `sm` como as ações de
-          // cabeçalho do guia. "Corrigir" (#751) só com a permissão e a versão em revisão.
-          <div className="flex flex-wrap gap-2">
-            {can(actor, 'content.amend') && latest.status === 'em_revisao' && (
-              <ButtonLink href={`/sites/${site.id}/revisao/${contentId}/corrigir`} size="sm">
-                Corrigir
-              </ButtonLink>
-            )}
-            <Button
-              asElement="a"
-              href={preview}
-              target="_blank"
-              rel="noopener noreferrer"
-              size="sm"
-            >
-              Abrir prévia<span className="sr-only"> (abre em nova aba)</span>
-            </Button>
-          </div>
+          // cabeçalho do guia.
+          <Button asElement="a" href={preview} target="_blank" rel="noopener noreferrer" size="sm">
+            Abrir prévia<span className="sr-only"> (abre em nova aba)</span>
+          </Button>
         }
       />
       <PageMeta
@@ -140,6 +135,21 @@ export default async function ReviewPage({ params, searchParams }: Params & Sear
             status={latest.status}
             step={typeof passo === 'string' ? passo : undefined}
             checks={<ReviewChecks items={items} />}
+            canAmend={canAmend}
+            amend={
+              options && (
+                <ContentEditor
+                  mode="amend"
+                  siteId={site.id}
+                  backHref={`/sites/${site.id}/revisao/${contentId}?passo=ajustes`}
+                  timeZone={timeZone}
+                  defaultValues={latest.data}
+                  options={options}
+                  action={amendAction.bind(null, site.id, contentId, latest.version)}
+                  previewUrl={preview}
+                />
+              )
+            }
             blocked={hasError(items)}
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
             confirmed={confirmations.value.map((confirmation) => confirmation.key)}

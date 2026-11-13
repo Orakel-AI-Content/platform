@@ -73,6 +73,8 @@ import type { ContentEdit } from '@/domain/content/contents.ts';
 // para buscadores mostram quantos caracteres têm.
 // Fora da correção (#780), "Salvar e enviar para revisão" grava e envia numa transação só e leva
 // ao detalhe do conteúdo; vale também sem alteração, que envia o rascunho mais recente.
+// A correção (`amend`, #751) vive no passo Ajustes da revisão (#767), na coluna do painel: uma
+// coluna só e os botões num cartão ao fim do formulário, no lugar da barra fixa.
 
 const META_HINTS: Record<string, string> = {
   slug: 'Minúsculas, números e hífens.',
@@ -192,7 +194,8 @@ export function ContentEditor({
   /**
    * `amend` (#751): a correção do revisor durante a revisão. Funciona como `edit` (sem o tipo,
    * sem salvar o que não mudou), mas salvar volta à revisão (`backHref`) em vez de continuar
-   * no editor.
+   * no editor. Fica embutido no passo Ajustes (#767): uma coluna e os botões no rodapé do
+   * formulário, sem a barra fixa e sem "Voltar".
    */
   mode: 'create' | 'edit' | 'amend';
   siteId: string;
@@ -208,7 +211,8 @@ export function ContentEditor({
   submitAction?: (input: ContentEdit) => Promise<ContentFormResult>;
   /**
    * Destino de "Voltar" (edição: link, com o aviso de saída) e de "Descartar" (criação:
-   * confirmado num diálogo): o nível anterior da trilha.
+   * confirmado num diálogo): o nível anterior da trilha. Na correção, para onde salvar leva
+   * (a revisão, no passo Ajustes).
    */
   backHref: string;
   /** Largura da coluna de cartões e da barra (`form-width`); quem decide é a página. */
@@ -460,6 +464,72 @@ export function ContentEditor({
   const unchanged = mode !== 'create' && !form.formState.isDirty;
   // Fora da correção, e só se a página passa a action (#780).
   const canSend = mode !== 'amend' && submitAction !== undefined;
+  // A correção só existe no passo Ajustes da revisão (#767): o editor cabe na coluna do painel.
+  const embedded = mode === 'amend';
+
+  const submit = (
+    <Button
+      type="submit"
+      variant="solid"
+      disabled={busy}
+      // aria-disabled (não disabled): fica no Tab e a nota chega com o foco (#525).
+      aria-disabled={unchanged || undefined}
+      aria-describedby={unchanged ? `${id}-save-note` : undefined}
+      className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+    >
+      {SUBMIT_LABEL[mode][busy && !sending ? 'pending' : 'idle']}
+    </Button>
+  );
+  const extra = (
+    <>
+      {previewUrl ? (
+        <Button
+          asElement="a"
+          href={previewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-describedby={`${id}-preview-note`}
+        >
+          Ver prévia<span className="sr-only"> (abre em nova aba)</span>
+        </Button>
+      ) : (
+        <Button type="button" disabled aria-describedby={`${id}-preview-note`}>
+          Ver prévia
+        </Button>
+      )}
+      {canSend && (
+        // Fora do `onSubmit`: o Enter num campo segue sendo "Salvar", e sem alteração
+        // este botão ainda envia o rascunho mais recente.
+        <Button
+          type="button"
+          disabled={busy}
+          onClick={(event) => {
+            // Antes da validação: o `isSubmitting` já põe a espera neste botão.
+            setSending(true);
+            void form.handleSubmit(onValid(true), onInvalid)(event);
+          }}
+        >
+          {SEND_LABEL[busy && sending ? 'pending' : 'idle']}
+        </Button>
+      )}
+    </>
+  );
+  const notes = (
+    <>
+      {/* aria-live sem role: o `status` é o do toast, que confirma o salvamento. */}
+      <p id={`${id}-preview-note`} aria-live="polite" className="mt-2 text-sm empty:hidden">
+        {previewNote}
+      </p>
+      {/* Sem aria-live: mudaria a cada tecla; é a descrição do "Salvar", lida no foco. */}
+      {unchanged && (
+        <p id={`${id}-save-note`} className="mt-2 text-sm">
+          Nenhuma alteração para salvar.
+        </p>
+      )}
+      <ErrorSummary lines={summary} className="not-empty:mt-3" />
+    </>
+  );
+
   return (
     <FormProvider {...form}>
       <form
@@ -477,9 +547,20 @@ export function ContentEditor({
       >
         {/* Duas colunas a partir de `xl` (#591), como o `ProductForm` do Ecme: os dados vêm
             primeiro no DOM (primeiros no empilhado e no Tab) e o `flex-row-reverse` os põe à
-            direita. */}
-        <div className={classNames('flex flex-col gap-4 xl:flex-row-reverse', contentClassName)}>
-          <div className="flex flex-col gap-4 xl:w-[440px] xl:shrink-0 2xl:w-[500px]">
+            direita. Embutido no painel da revisão (`amend`, #767), uma coluna só. */}
+        <div
+          className={classNames(
+            'flex flex-col gap-4',
+            !embedded && 'xl:flex-row-reverse',
+            contentClassName,
+          )}
+        >
+          <div
+            className={classNames(
+              'flex flex-col gap-4',
+              !embedded && 'xl:w-[440px] xl:shrink-0 2xl:w-[500px]',
+            )}
+          >
             <section aria-labelledby={`${id}-meta`}>
               <Card>
                 {/* Como o título de seção do `SchemaForm`: o `h4 mb-6` do Ecme, `h2` na estrutura. */}
@@ -626,72 +707,28 @@ export function ContentEditor({
             {insertMenu(blocks.fields.length)}
           </FieldGroup>
         </div>
-        ;
-        <FormActionBar
-          kind={mode === 'create' ? 'create' : 'edit'}
-          href={backHref}
-          contentClassName={contentClassName}
-          pending={busy}
-          submit={
-            <Button
-              type="submit"
-              variant="solid"
-              disabled={busy}
-              // aria-disabled (não disabled): fica no Tab e a nota chega com o foco (#525).
-              aria-disabled={unchanged || undefined}
-              aria-describedby={unchanged ? `${id}-save-note` : undefined}
-              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-            >
-              {SUBMIT_LABEL[mode][busy && !sending ? 'pending' : 'idle']}
-            </Button>
-          }
-          extra={
-            <>
-              {previewUrl ? (
-                <Button
-                  asElement="a"
-                  href={previewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-describedby={`${id}-preview-note`}
-                >
-                  Ver prévia<span className="sr-only"> (abre em nova aba)</span>
-                </Button>
-              ) : (
-                <Button type="button" disabled aria-describedby={`${id}-preview-note`}>
-                  Ver prévia
-                </Button>
-              )}
-              {canSend && (
-                // Fora do `onSubmit`: o Enter num campo segue sendo "Salvar", e sem alteração
-                // este botão ainda envia o rascunho mais recente.
-                <Button
-                  type="button"
-                  disabled={busy}
-                  onClick={(event) => {
-                    // Antes da validação: o `isSubmitting` já põe a espera neste botão.
-                    setSending(true);
-                    void form.handleSubmit(onValid(true), onInvalid)(event);
-                  }}
-                >
-                  {SEND_LABEL[busy && sending ? 'pending' : 'idle']}
-                </Button>
-              )}
-            </>
-          }
-        >
-          {/* aria-live sem role: o `status` é o do toast, que confirma o salvamento. */}
-          <p id={`${id}-preview-note`} aria-live="polite" className="mt-2 text-sm empty:hidden">
-            {previewNote}
-          </p>
-          {/* Sem aria-live: mudaria a cada tecla; é a descrição do "Salvar", lida no foco. */}
-          {unchanged && (
-            <p id={`${id}-save-note`} className="mt-2 text-sm">
-              Nenhuma alteração para salvar.
-            </p>
-          )}
-          <ErrorSummary lines={summary} className="not-empty:mt-3" />
-        </FormActionBar>
+        {embedded ? (
+          // Dentro do painel (#767): os botões no rodapé do formulário, como no `card` do
+          // `SchemaForm` (#333), sem a barra fixa da página e sem "Voltar".
+          <Card className="mt-4">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {extra}
+              {submit}
+            </div>
+            {notes}
+          </Card>
+        ) : (
+          <FormActionBar
+            kind={mode === 'create' ? 'create' : 'edit'}
+            href={backHref}
+            contentClassName={contentClassName}
+            pending={busy}
+            submit={submit}
+            extra={extra}
+          >
+            {notes}
+          </FormActionBar>
+        )}
       </form>
     </FormProvider>
   );
