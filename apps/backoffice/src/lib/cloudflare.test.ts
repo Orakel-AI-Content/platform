@@ -3,18 +3,27 @@ import { describe, expect, it } from 'vitest';
 import {
   cloudflareZoneChecker,
   edgeLocalZoneChecker,
+  cloudflareWorkerRemover,
+  edgeLocalWorkerRemover,
+  workerRemoverFrom,
   zoneCheckerFrom,
+  type ProviderFailure,
+  type WorkerRemoval,
   type ZoneStatus,
 } from './cloudflare.ts';
 
-type Call = { url: URL; headers: Record<string, string> };
+type Call = { url: URL; method: string; headers: Record<string, string> };
 
 /** fetch falso: devolve as respostas na ordem e guarda as chamadas. */
 function fakeFetch(...responses: (Response | Error)[]) {
   const calls: Call[] = [];
   const fn = ((input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
-    calls.push({ url, headers: (init?.headers ?? {}) as Record<string, string> });
+    calls.push({
+      url,
+      method: init?.method ?? 'GET',
+      headers: (init?.headers ?? {}) as Record<string, string>,
+    });
     const response = responses.shift();
     if (response === undefined) return Promise.reject(new Error('chamada inesperada'));
     return response instanceof Error ? Promise.reject(response) : Promise.resolve(response);
@@ -41,10 +50,14 @@ function checker(...responses: (Response | Error)[]) {
 }
 
 /** Confere a falha e devolve a mensagem, que nunca traz o token. */
-function expectFailure(status: ZoneStatus, transient: boolean): string {
+function expectFailure(
+  status: ZoneStatus | WorkerRemoval,
+  transient: boolean,
+  secret = token,
+): string {
   expect(status).toMatchObject({ kind: 'falha', transient });
-  const message = status.kind === 'falha' ? status.message : '';
-  expect(message).not.toContain(token);
+  const message = (status as ProviderFailure).message;
+  expect(message).not.toContain(secret);
   return message;
 }
 
@@ -188,6 +201,142 @@ describe('zoneCheckerFrom', () => {
     expect(() => zoneCheckerFrom({ DEPLOY_TARGET: 'local' })).toThrow(/EDGE_LOCAL_URL/);
     expect(() => zoneCheckerFrom({ DEPLOY_TARGET: 'cloudflare' })).toThrow(
       /CLOUDFLARE_ZONE_READ_TOKEN/,
+    );
+  });
+});
+
+const deployToken = 'cf-deploy-'.padEnd(40, 'd');
+
+function remover(...responses: (Response | Error)[]) {
+  const fake = fakeFetch(...responses);
+  return {
+    ...fake,
+    worker: cloudflareWorkerRemover({ token: deployToken, accountId, fetch: fake.fn }),
+  };
+}
+
+describe('cloudflareWorkerRemover', () => {
+  it('apaga o script workerName(site) da conta, com o token só no cabeçalho', async () => {
+    const { worker, calls } = remover(json({ success: true, errors: [], result: null }));
+
+    expect(await worker.remove('receitas')).toEqual({ kind: 'removido' });
+    expect(calls[0]?.method).toBe('DELETE');
+    expect(calls[0]?.url.href).toBe(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/orakel-receitas`,
+    );
+    expect(calls[0]?.url.searchParams.has('force')).toBe(false);
+    expect(calls[0]?.headers.authorization).toBe(`Bearer ${deployToken}`);
+  });
+
+  it('404 é Worker inexistente, que conta como sucesso', async () => {
+    const { worker } = remover(apiError(404, 'workers.api.error.script_not_found'));
+    expect(await worker.remove('receitas')).toEqual({ kind: 'inexistente' });
+  });
+
+  it('rede, falta de resposta, 429 e 5xx são falha transitória', async () => {
+    const timeout = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    const { worker } = remover(
+      new TypeError('fetch failed'),
+      timeout,
+      apiError(429, 'rate limited'),
+      apiError(500, 'internal'),
+      new Response('bad gateway', { status: 502 }),
+    );
+    for (let i = 0; i < 5; i += 1)
+      expectFailure(await worker.remove('receitas'), true, deployToken);
+  });
+
+  it('401 e 403 são falha definitiva que nomeia o token de deploy', async () => {
+    const { worker } = remover(
+      apiError(401, 'Invalid API Token'),
+      apiError(403, 'Authentication error'),
+    );
+    expect(expectFailure(await worker.remove('receitas'), false, deployToken)).toMatch(
+      /CLOUDFLARE_API_TOKEN.*inválido/,
+    );
+    expect(expectFailure(await worker.remove('receitas'), false, deployToken)).toMatch(
+      /Workers Scripts: Edit/,
+    );
+  });
+
+  it('outro 4xx é falha definitiva com a mensagem da API', async () => {
+    const { worker } = remover(apiError(400, 'script is bound by another worker'));
+    expect(expectFailure(await worker.remove('receitas'), false, deployToken)).toMatch(
+      /400.*bound by another worker/,
+    );
+  });
+
+  it('nenhuma mensagem repete o token, mesmo quando o erro o traz', async () => {
+    const { worker } = remover(
+      new Error(`falhou com Bearer ${deployToken}`),
+      apiError(400, `token ${deployToken} recusado`),
+      new Response(`eco ${deployToken}`, { status: 500 }),
+    );
+    for (let i = 0; i < 3; i += 1) {
+      expect(expectFailure(await worker.remove('receitas'), i !== 1, deployToken)).toContain('***');
+    }
+  });
+});
+
+describe('edgeLocalWorkerRemover', () => {
+  const edgeLocalUrl = 'http://edge-local:8081/';
+
+  it('DELETE /sites/<site>: 204 é removido', async () => {
+    const { fn, calls } = fakeFetch(new Response(null, { status: 204 }));
+    const worker = edgeLocalWorkerRemover({ edgeLocalUrl, fetch: fn });
+
+    expect(await worker.remove('receitas')).toEqual({ kind: 'removido' });
+    expect(calls[0]?.method).toBe('DELETE');
+    expect(calls[0]?.url.href).toBe('http://edge-local:8081/sites/receitas');
+  });
+
+  it('rede, 409 e 5xx são transitórios; 400 é definitivo', async () => {
+    const { fn } = fakeFetch(
+      new TypeError('fetch failed'),
+      json({ error: 'Outra operação em andamento para receitas' }, 409),
+      json({ error: 'Erro no edge-local' }, 500),
+      json({ error: 'Site inválido: Receitas' }, 400),
+    );
+    const worker = edgeLocalWorkerRemover({ edgeLocalUrl, fetch: fn });
+
+    expectFailure(await worker.remove('receitas'), true);
+    expectFailure(await worker.remove('receitas'), true);
+    expectFailure(await worker.remove('receitas'), true);
+    expect(expectFailure(await worker.remove('Receitas'), false)).toMatch(/400/);
+  });
+});
+
+describe('workerRemoverFrom', () => {
+  it('escolhe o edge-local com DEPLOY_TARGET=local', async () => {
+    const { fn, calls } = fakeFetch(new Response(null, { status: 204 }));
+    const worker = workerRemoverFrom(
+      { DEPLOY_TARGET: 'local', EDGE_LOCAL_URL: 'http://edge-local:8081' },
+      { fetch: fn },
+    );
+
+    expect(await worker.remove('receitas')).toEqual({ kind: 'removido' });
+    expect(calls[0]?.url.hostname).toBe('edge-local');
+  });
+
+  it('escolhe a API da Cloudflare com DEPLOY_TARGET=cloudflare', async () => {
+    const { fn, calls } = fakeFetch(apiError(404, 'not found'));
+    const worker = workerRemoverFrom(
+      {
+        DEPLOY_TARGET: 'cloudflare',
+        CLOUDFLARE_API_TOKEN: deployToken,
+        CLOUDFLARE_ACCOUNT_ID: accountId,
+      },
+      { fetch: fn },
+    );
+
+    expect(await worker.remove('receitas')).toEqual({ kind: 'inexistente' });
+    expect(calls[0]?.url.hostname).toBe('api.cloudflare.com');
+  });
+
+  it('lança sem as variáveis do modo (o env já as exige)', () => {
+    expect(() => workerRemoverFrom({ DEPLOY_TARGET: 'local' })).toThrow(/EDGE_LOCAL_URL/);
+    expect(() => workerRemoverFrom({ DEPLOY_TARGET: 'cloudflare' })).toThrow(
+      /CLOUDFLARE_API_TOKEN/,
     );
   });
 });
