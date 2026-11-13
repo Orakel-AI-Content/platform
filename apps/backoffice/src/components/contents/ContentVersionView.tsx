@@ -37,7 +37,7 @@ export function referenceNames(ids: readonly number[], labels: ReadonlyMap<numbe
  * Miniatura de uma mídia com as dimensões, como o campo de mídia do editor (`PickerFields`):
  * `alt=""` (o texto alternativo fica ao lado); a mídia removida, no espaço tracejado.
  */
-function MediaPreview({ id, item }: { id: number; item: MediaItem | undefined }) {
+export function MediaPreview({ id, item }: { id: number; item: MediaItem | undefined }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <div className="w-24 shrink-0">
@@ -110,7 +110,7 @@ function RichTextView({ nodes }: { nodes: RichText }) {
   });
 }
 
-function BlockBody({ block, media }: { block: Block; media: VersionReferences['media'] }) {
+export function BlockBody({ block, media }: { block: Block; media: VersionReferences['media'] }) {
   switch (block.type) {
     case 'text':
       return <RichTextView nodes={block.content} />;
