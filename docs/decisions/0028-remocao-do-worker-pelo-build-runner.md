@@ -50,7 +50,14 @@ mais recente.
 - O token de deploy precisa da permissão **Workers Scripts: Edit** na conta, que o `wrangler
 deploy` já exige; nada muda no token.
 - O `build-runner` já tem saída para a internet pela rede `internal`. No local, ele ainda não
-  alcança a API de administração do edge-local (só na rede `publish`): quem encadear a remoção
-  (Task da cadeia de workspace#97) liga o `build-runner` à `publish` no
-  `infra/local/compose.override.yaml`.
+  alcança a API de administração do edge-local (só na rede `publish`): a cadeia da remoção
+  (platform#840) liga o `build-runner` à `publish` no `infra/local/compose.override.yaml`, e o
+  `local:check` confere `build-runner → edge-local`.
+- A remoção do Worker é o primeiro elo da cadeia da remoção, na fila `infra:<site>`: a task
+  `infra-remove-worker` do `build-runner` grava a etapa `paginas`, apaga o Worker e enfileira o
+  esvaziamento de `media-<site>` no `backoffice-worker` (`empty-site-media`), que enfileira o
+  `infra-apply` do plano de destruição. Cada elo enfileira o próximo na mesma transação em que
+  grava a etapa, numa tentativa só; a falha fecha a execução com a etapa do elo. Na partida, cada
+  processo só recupera os jobs das próprias tasks e só solta as travas dos donos desses jobs, para
+  não derrubar o elo que o outro está rodando.
 - Só a nuvem valida a remoção de verdade com o token restrito ao IP da VPS.

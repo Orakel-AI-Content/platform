@@ -97,6 +97,7 @@ const site: SiteSummary = {
   effectiveDailyPublishLimit: 10,
   publishedToday: 0,
   timeZone: 'America/Sao_Paulo',
+  infraDrift: { status: null, summary: null, checkedAt: null, error: null },
 };
 
 /** Região viva do toast (a contagem do DataTable também é `role="status"`). */

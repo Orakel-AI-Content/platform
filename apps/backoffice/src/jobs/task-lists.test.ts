@@ -1,5 +1,9 @@
 import { localDriver } from '../domain/infra/drivers.ts';
-import { INFRA_APPLY_TASK, INFRA_PLAN_TASK } from '../domain/infra/schedule.ts';
+import {
+  INFRA_APPLY_TASK,
+  INFRA_PLAN_TASK,
+  INFRA_REMOVE_WORKER_TASK,
+} from '../domain/infra/schedule.ts';
 import { parseCrontab } from 'graphile-worker';
 import { describe, expect, it } from 'vitest';
 
@@ -9,13 +13,14 @@ import type { ContainerRuntime } from '../domain/builds/runtime.ts';
 import { CHECK_SITE_INFRA_TASK } from '../domain/builds/site-state.ts';
 import { resolveModel } from '../domain/generation/generate.ts';
 import { CORRECT_ARTICLE_TASK, GENERATE_ARTICLE_TASK } from '../domain/generation/runs.ts';
+import { RESTORE_MEDIA_TASK } from '../domain/media/schedule.ts';
 import type { ObjectStore } from '../domain/media/store.ts';
 import { EMPTY_SITE_MEDIA_TASK } from '../domain/media/variants.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
 import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
 import { REVIEW_OPINION_TASK } from '../domain/reviews/opinions.ts';
-import type { ZoneChecker } from '../lib/cloudflare.ts';
+import type { WorkerRemover, ZoneChecker } from '../lib/cloudflare.ts';
 import { buildRunnerTasks, WORKER_CRONTAB, workerTasks } from './task-lists.ts';
 
 describe('backoffice-worker', () => {
@@ -94,10 +99,23 @@ describe('backoffice-worker', () => {
     expect(EMPTY_SITE_MEDIA_TASK).toBe('empty-site-media');
     expect(tasks[EMPTY_SITE_MEDIA_TASK]).toBeTypeOf('function');
   });
+
+  it('registra a regravação das variantes do site no worker, o único com as credenciais S3', () => {
+    const tasks = workerTasks({
+      db: {} as Db,
+      store: {} as ObjectStore,
+      generation: { model: resolveModel('fixture'), pricing: {} },
+      api: { url: 'http://backoffice-web:3000', token: 'g'.repeat(32) },
+      zones: {} as ZoneChecker,
+    });
+
+    expect(RESTORE_MEDIA_TASK).toBe('restore-site-media');
+    expect(tasks[RESTORE_MEDIA_TASK]).toBeTypeOf('function');
+  });
 });
 
 describe('build-runner', () => {
-  it('só o build-runner registra a conferência da imagem, a troca da prévia, o run das releases e a infra do site (Docker, GitHub e segredos de infra)', () => {
+  it('só o build-runner registra a conferência da imagem, a troca da prévia, o run das releases, a infra do site e a remoção do Worker (Docker, GitHub, segredos de infra e token de deploy)', () => {
     const runner = buildRunnerTasks({
       db: {} as Db,
       runtime: {} as ContainerRuntime,
@@ -105,6 +123,7 @@ describe('build-runner', () => {
       driver: { kind: 'local' },
       preview: { internalNetwork: 'orakel-internal', exportPreviewToken: 'p'.repeat(32) },
       infra: localDriver(),
+      workers: {} as WorkerRemover,
     });
     const worker = workerTasks({
       db: {} as Db,
@@ -123,14 +142,17 @@ describe('build-runner', () => {
         'rollback',
         INFRA_PLAN_TASK,
         INFRA_APPLY_TASK,
+        INFRA_REMOVE_WORKER_TASK,
       ].sort(),
     );
     expect(Object.keys(worker)).not.toContain(INFRA_PLAN_TASK);
     expect(Object.keys(worker)).not.toContain(INFRA_APPLY_TASK);
+    expect(Object.keys(worker)).not.toContain(INFRA_REMOVE_WORKER_TASK);
     expect(Object.keys(worker)).not.toContain(CHECK_RELEASE_IMAGE_TASK);
     expect(Object.keys(worker)).not.toContain(RELEASE_RUN_TASK);
     expect(Object.keys(worker)).not.toContain(RECONCILE_PREVIEW_TASK);
     expect(Object.keys(runner)).not.toContain(LINK_CHECK_TASK);
     expect(Object.keys(runner)).not.toContain(EMPTY_SITE_MEDIA_TASK);
+    expect(Object.keys(runner)).not.toContain(RESTORE_MEDIA_TASK);
   });
 });

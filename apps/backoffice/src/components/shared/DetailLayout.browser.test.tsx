@@ -48,6 +48,7 @@ const SITE: SiteSummary = {
   effectiveDailyPublishLimit: 10,
   publishedToday: 0,
   timeZone: 'America/Sao_Paulo',
+  infraDrift: { status: null, summary: null, checkedAt: null, error: null },
 };
 
 const INSTANCE: SiteInstance = {

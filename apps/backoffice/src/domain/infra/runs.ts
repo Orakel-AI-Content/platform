@@ -21,6 +21,7 @@ import {
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { resolveActor } from '../access/users.ts';
 import { advanceLifecycle, resetSiteInfra } from '../builds/site-state.ts';
+import { enqueueRestoreMedia } from '../media/schedule.ts';
 
 type OpenInfraRunStatus = (typeof OPEN_INFRA_RUN_STATUSES)[number];
 type ClosedInfraRunStatus = Exclude<InfraRunStatus, OpenInfraRunStatus>;
@@ -286,8 +287,9 @@ const CLOSING_FROM = {
 /**
  * Fecha a execução. No `ok`, pelo `tipo` gravado e em nome de quem confirmou: a criação grava os
  * nameservers e leva o site a `infra_aplicada` (`advanceLifecycle`); a remoção devolve o site a
- * `cadastrado` (`resetSiteInfra`). A linha é travada antes, e a recusa do site devolve a issue
- * sem gravar nada. No `falhou`, grava a etapa e o motivo; o lifecycle não muda.
+ * `cadastrado` (`resetSiteInfra`). A criação também enfileira a regravação das variantes
+ * registradas no bucket recriado (`enqueueRestoreMedia`). A linha é travada antes, e a recusa do
+ * site devolve a issue sem gravar nem enfileirar nada. No `falhou`, grava a etapa e o motivo; o lifecycle não muda.
  */
 export async function finishInfraRun(
   tx: Executor,
@@ -333,6 +335,7 @@ export async function finishInfraRun(
     .update(infraRuns)
     .set({ status: 'ok', currentStep: null, nameservers, finishedAt })
     .where(eq(infraRuns.id, runId));
+  if (run.tipo === 'criar') await enqueueRestoreMedia(tx, run.siteId);
   return done;
 }
 
@@ -423,14 +426,18 @@ export async function infraActivity(
   return { open, history };
 }
 
-/** O que as tasks do build-runner leem da execução: o site, o estado e o resumo do plano. */
+/** O que as tasks do build-runner leem da execução: o site, o tipo, o estado e o resumo do plano. */
 export async function loadInfraRun(
   db: Executor,
   runId: number,
-): Promise<{ siteId: string; status: InfraRunStatus; planSummary: string | null } | undefined> {
+): Promise<
+  | { siteId: string; kind: InfraRunKind; status: InfraRunStatus; planSummary: string | null }
+  | undefined
+> {
   const [run] = await db
     .select({
       siteId: infraRuns.siteId,
+      kind: infraRuns.tipo,
       status: infraRuns.status,
       planSummary: infraRuns.planSummary,
     })
