@@ -1,9 +1,10 @@
-// Drivers da criação da infraestrutura do site (INFRA_DRIVER, ADR 0027 da raiz). `tofu` roda o
-// plano e o apply no container do infra-runner, pelo ContainerRuntime: um volume próprio da
+// Drivers da criação e da remoção da infraestrutura do site (INFRA_DRIVER, ADR 0027 da raiz),
+// pelo tipo da execução (workspace#97). `tofu` roda o plano (na remoção, `INFRA_MODE=destroy`) e o
+// apply no container do infra-runner, pelo ContainerRuntime: um volume próprio da
 // execução guarda o plano salvo do `plan` ao `apply` e é apagado no fim do apply (ou na falha do
 // plano); o container, sempre. O andamento vem do `-json` do tofu no log do container, lido em
 // fatias durante a espera. `local` percorre as mesmas etapas sem rede nem segredos, com memória
-// do que já "criou" e uma falha forçável, para o compose local e o E2E.
+// do que já "criou" (e esquece o que "removeu") e uma falha forçável, para o compose local e o E2E.
 import {
   EXIT_CODES,
   INFRA_DIR,
@@ -12,10 +13,15 @@ import {
   InfraChangeSchema,
   InfraPlanResultSchema,
   type InfraChange,
+  type InfraMode,
 } from '@orakel/build-contract';
 import * as z from 'zod';
 
-import { INFRA_RESOURCE_STEPS, type InfraResourceStep } from '../../db/schema/index.ts';
+import {
+  INFRA_RESOURCE_STEPS,
+  type InfraResourceStep,
+  type InfraRunKind,
+} from '../../db/schema/index.ts';
 import {
   ImageUnavailableError,
   readLogTail,
@@ -23,8 +29,21 @@ import {
   type WaitResult,
 } from '../builds/runtime.ts';
 
-/** O site e a execução de infra a que o plano e o apply pertencem. */
-export type InfraTarget = { runId: number; siteId: string; domain: string };
+/** O site e a execução de infra a que o plano e o apply pertencem; `kind`, o tipo dela. */
+export type InfraTarget = { runId: number; siteId: string; domain: string; kind: InfraRunKind };
+
+/**
+ * Ordem das etapas no apply: a da criação, ou a inversa na remoção (o tofu destrói a zona por
+ * último, depois do que depende dela).
+ */
+export function stepOrder(kind: InfraRunKind): readonly InfraResourceStep[] {
+  return kind === 'criar' ? INFRA_RESOURCE_STEPS : [...INFRA_RESOURCE_STEPS].reverse();
+}
+
+const MODE_OF = { criar: 'create', remover: 'destroy' } as const satisfies Record<
+  InfraRunKind,
+  InfraMode
+>;
 
 /** Falha do plano ou do apply; não há repetição automática ("Tentar de novo" é outra execução). */
 export type InfraFailure = { kind: 'permanent' | 'transient'; message: string };
@@ -44,6 +63,7 @@ export type InfraPlanOutcome =
   { status: 'ok'; summary: InfraPlanSummary } | { status: 'failed'; failure: InfraFailure };
 
 export type InfraApplyOutcome =
+  /** `nameservers` da zona criada; vazio na remoção. */
   | { status: 'ok'; nameservers: string[] }
   /** `step`: a etapa em que o apply parou; nula quando nenhum recurso chegou a começar. */
   | { status: 'failed'; step: InfraResourceStep | null; failure: InfraFailure };
@@ -51,7 +71,7 @@ export type InfraApplyOutcome =
 export interface InfraDriver {
   readonly kind: 'tofu' | 'local';
   plan(target: InfraTarget): Promise<InfraPlanOutcome>;
-  /** `onStep` a cada etapa nova, na ordem de `INFRA_RESOURCE_STEPS` (nunca volta). */
+  /** `onStep` a cada etapa nova, na ordem de `stepOrder(target.kind)` (nunca volta). */
   apply(
     target: InfraTarget,
     onStep: (step: InfraResourceStep) => Promise<void>,
@@ -80,8 +100,6 @@ export function summarizePlan(changes: readonly InfraChange[]): InfraPlanSummary
   return { formatVersion: 1, steps };
 }
 
-const stepIndex = (step: InfraResourceStep) => INFRA_RESOURCE_STEPS.indexOf(step);
-
 /** O que o log `-json` do apply diz até agora: a etapa mais adiantada e a do recurso que falhou. */
 export type ApplyProgress = {
   current: InfraResourceStep | null;
@@ -89,11 +107,13 @@ export type ApplyProgress = {
 };
 
 /**
- * Lê as linhas `-json` do tofu: `apply_start` avança a etapa corrente (só para a frente: o tofu
- * cria recursos de etapas diferentes em paralelo) e `apply_errored` aponta a etapa da falha.
- * Linhas que não são JSON (avisos do entrypoint no stderr) são ignoradas.
+ * Lê as linhas `-json` do tofu: `apply_start` avança a etapa corrente (só para a frente, na ordem
+ * do tipo: o tofu cria ou destrói recursos de etapas diferentes em paralelo) e `apply_errored`
+ * aponta a etapa da falha. Linhas que não são JSON (avisos do entrypoint no stderr) são ignoradas.
  */
-export function readApplyProgress(log: string): ApplyProgress {
+export function readApplyProgress(log: string, kind: InfraRunKind): ApplyProgress {
+  const order = stepOrder(kind);
+  const stepIndex = (step: InfraResourceStep) => order.indexOf(step);
   let current: InfraResourceStep | null = null;
   let errored: InfraResourceStep | null = null;
   for (const line of log.split('\n')) {
@@ -195,7 +215,13 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
         name: `orakel-infra-${command}-${target.runId}`,
         image: options.image,
         command: [command],
-        env: { ...options.env, SITE_ID: target.siteId, DOMAIN: target.domain },
+        env: {
+          ...options.env,
+          SITE_ID: target.siteId,
+          DOMAIN: target.domain,
+          // Só no plan: o apply lê o modo do plano salvo.
+          ...(command === 'plan' && target.kind === 'remover' && { INFRA_MODE: 'destroy' }),
+        },
         network: options.network,
         volume: { name: volumeOf(target), target: INFRA_DIR },
         labels: { ...labels(target), 'orakel.stage': `infra-${command}` },
@@ -302,6 +328,15 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
           };
         }
         if (result.status === 'failed') return { status: 'failed', failure: result.failure };
+        if (result.mode !== MODE_OF[target.kind]) {
+          return {
+            status: 'failed',
+            failure: {
+              kind: 'transient',
+              message: `${INFRA_PATHS.planResult} é de ${result.mode}, a execução é de ${target.kind}`,
+            },
+          };
+        }
         ok = true;
         return { status: 'ok', summary: summarizePlan(result.changes) };
       } catch (error) {
@@ -316,9 +351,11 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
     },
 
     async apply(target, onStep) {
+      const order = stepOrder(target.kind);
+      const stepIndex = (step: InfraResourceStep) => order.indexOf(step);
       let reported: InfraResourceStep | null = null;
       const advance = async (log: string) => {
-        const { current } = readApplyProgress(log);
+        const { current } = readApplyProgress(log, target.kind);
         if (current === null || (reported !== null && stepIndex(current) <= stepIndex(reported))) {
           return;
         }
@@ -333,7 +370,7 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
         if (missing !== undefined) return { status: 'failed', step: null, failure: missing };
         const run = await runCommand(target, 'apply', advance);
         await advance(run.log);
-        const { errored } = readApplyProgress(run.log);
+        const { errored } = readApplyProgress(run.log, target.kind);
         const step = errored ?? reported;
         if (!run.ok) return { status: 'failed', step, failure: run.failure };
         const result = parse(InfraApplyResultSchema, run.text);
@@ -348,16 +385,20 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
           };
         }
         if (result.status === 'failed') return { status: 'failed', step, failure: result.failure };
-        if (result.status === 'destroyed') {
+        if ((result.status === 'destroyed') !== (target.kind === 'remover')) {
           return {
             status: 'failed',
             step,
             failure: {
               kind: 'transient',
-              message: `${INFRA_PATHS.applyResult} relata destruição num apply`,
+              message:
+                result.status === 'destroyed'
+                  ? `${INFRA_PATHS.applyResult} relata destruição num apply de criação`
+                  : `${INFRA_PATHS.applyResult} relata criação num apply de remoção`,
             },
           };
         }
+        if (result.status === 'destroyed') return { status: 'ok', nameservers: [] };
         if (result.crawlerHints === 'falhou') {
           options.log?.(
             `Crawler Hints de ${target.siteId} não ligado pela API; ligue no painel (ADR 0027, passo 6)`,
@@ -374,7 +415,10 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
 // --- local -------------------------------------------------------------------------------
 
 export type LocalDriverOptions = {
-  /** A primeira execução de cada site falha nesta etapa (INFRA_LOCAL_FAIL_STEP). */
+  /**
+   * A primeira execução de cada site e de cada tipo (criação, remoção) falha nesta etapa
+   * (INFRA_LOCAL_FAIL_STEP).
+   */
   failStep?: InfraResourceStep;
 };
 
@@ -406,40 +450,50 @@ export const LOCAL_NAMESERVERS = ['ada.ns.orakel.localhost', 'bob.ns.orakel.loca
 
 /**
  * Simulação sem rede: o "estado" de cada site é a memória do processo (as etapas já criadas),
- * então uma nova execução só cria o que faltou, como o OpenTofu faria. Reiniciar o build-runner
- * zera a memória; sem efeito fora do local e do E2E.
+ * então uma nova execução só cria (ou remove) o que faltou, como o OpenTofu faria. A remoção
+ * percorre as etapas na ordem inversa e as esquece; um site sem memória (build-runner reiniciado)
+ * conta como todo criado. Reiniciar o build-runner zera a memória; sem efeito fora do local e do E2E.
  */
 export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
   const created = new Map<string, Set<InfraResourceStep>>();
   const failedOnce = new Set<string>();
-  const createdOf = (siteId: string) => {
-    const steps = created.get(siteId) ?? new Set<InfraResourceStep>();
+  const createdOf = ({ siteId, kind }: InfraTarget) => {
+    const steps =
+      created.get(siteId) ??
+      new Set<InfraResourceStep>(kind === 'remover' ? INFRA_RESOURCE_STEPS : []);
     created.set(siteId, steps);
     return steps;
+  };
+  /** As etapas que a execução ainda tem a percorrer, na ordem do tipo. */
+  const pending = (target: InfraTarget) => {
+    const done = createdOf(target);
+    return stepOrder(target.kind).filter((step) =>
+      target.kind === 'criar' ? !done.has(step) : done.has(step),
+    );
   };
 
   return {
     kind: 'local',
 
     plan(target) {
-      const done = createdOf(target.siteId);
-      const changes = INFRA_RESOURCE_STEPS.filter((step) => !done.has(step)).flatMap((step) =>
+      const action = target.kind === 'criar' ? ('create' as const) : ('delete' as const);
+      const changes = pending(target).flatMap((step) =>
         LOCAL_RESOURCES[step].map(({ name, type }) => ({
           address: `module.site.${type}.${name}`,
           type,
-          action: 'create' as const,
+          action,
         })),
       );
       return Promise.resolve({ status: 'ok', summary: summarizePlan(changes) });
     },
 
     async apply(target, onStep) {
-      const done = createdOf(target.siteId);
-      for (const step of INFRA_RESOURCE_STEPS) {
-        if (done.has(step)) continue;
+      const done = createdOf(target);
+      const once = `${target.siteId}:${target.kind}`;
+      for (const step of pending(target)) {
         await onStep(step);
-        if (options.failStep === step && !failedOnce.has(target.siteId)) {
-          failedOnce.add(target.siteId);
+        if (options.failStep === step && !failedOnce.has(once)) {
+          failedOnce.add(once);
           return {
             status: 'failed',
             step,
@@ -449,9 +503,13 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
             },
           };
         }
-        done.add(step);
+        if (target.kind === 'criar') done.add(step);
+        else done.delete(step);
       }
-      return { status: 'ok', nameservers: [...LOCAL_NAMESERVERS] };
+      return {
+        status: 'ok',
+        nameservers: target.kind === 'criar' ? [...LOCAL_NAMESERVERS] : [],
+      };
     },
   };
 }

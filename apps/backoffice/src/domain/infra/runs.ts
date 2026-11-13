@@ -423,14 +423,18 @@ export async function infraActivity(
   return { open, history };
 }
 
-/** O que as tasks do build-runner leem da execução: o site, o estado e o resumo do plano. */
+/** O que as tasks do build-runner leem da execução: o site, o tipo, o estado e o resumo do plano. */
 export async function loadInfraRun(
   db: Executor,
   runId: number,
-): Promise<{ siteId: string; status: InfraRunStatus; planSummary: string | null } | undefined> {
+): Promise<
+  | { siteId: string; kind: InfraRunKind; status: InfraRunStatus; planSummary: string | null }
+  | undefined
+> {
   const [run] = await db
     .select({
       siteId: infraRuns.siteId,
+      kind: infraRuns.tipo,
       status: infraRuns.status,
       planSummary: infraRuns.planSummary,
     })
