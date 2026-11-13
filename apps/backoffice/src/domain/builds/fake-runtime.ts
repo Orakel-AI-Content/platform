@@ -31,7 +31,10 @@ export function fakeRuntime(options: {
   render?: FakeStage;
   publish?: FakeStage;
   rollback?: FakeStage;
-  /** Containers `orakel-infra-plan-*` e `orakel-infra-apply-*` (ADR 0027 da raiz). */
+  /**
+   * Containers `orakel-infra-plan-*` e `orakel-infra-apply-*` (ADR 0027 da raiz); o da
+   * conferência (`orakel-infra-check-*`) roda o mesmo `plan` e usa `infraPlan`.
+   */
   infraPlan?: FakeStage;
   infraApply?: FakeStage;
   /**
@@ -57,7 +60,7 @@ export function fakeRuntime(options: {
       ? options.render
       : id.startsWith('orakel-rollback')
         ? options.rollback
-        : id.startsWith('orakel-infra-plan')
+        : id.startsWith('orakel-infra-plan') || id.startsWith('orakel-infra-check')
           ? options.infraPlan
           : id.startsWith('orakel-infra-apply')
             ? options.infraApply

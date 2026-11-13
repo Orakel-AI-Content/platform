@@ -3,7 +3,9 @@
 // execução guarda o plano salvo do `plan` ao `apply` e é apagado no fim do apply (ou na falha do
 // plano); o container, sempre. O andamento vem do `-json` do tofu no log do container, lido em
 // fatias durante a espera. `local` percorre as mesmas etapas sem rede nem segredos, com memória
-// do que já "criou" e uma falha forçável, para o compose local e o E2E.
+// do que já "criou" e uma falha forçável, para o compose local e o E2E. A conferência
+// (`check`, workspace#98) roda o mesmo `plan` num volume e container só dela, apagados sempre:
+// o plano salvo é descartado e nada é aplicado.
 import {
   EXIT_CODES,
   INFRA_DIR,
@@ -26,6 +28,9 @@ import {
 /** O site e a execução de infra a que o plano e o apply pertencem. */
 export type InfraTarget = { runId: number; siteId: string; domain: string };
 
+/** O site cuja infra é conferida contra a descrição atual; não há execução em `infra_runs`. */
+export type InfraCheckTarget = { siteId: string; domain: string };
+
 /** Falha do plano ou do apply; não há repetição automática ("Tentar de novo" é outra execução). */
 export type InfraFailure = { kind: 'permanent' | 'transient'; message: string };
 
@@ -39,6 +44,11 @@ export const InfraPlanSummarySchema = z.object({
   ),
 });
 export type InfraPlanSummary = z.infer<typeof InfraPlanSummarySchema>;
+
+/** O plano muda algum recurso? Sem mudança, a infra está em dia com a descrição. */
+export function planHasChanges(summary: InfraPlanSummary): boolean {
+  return Object.values(summary.steps).some((changes) => changes.length > 0);
+}
 
 export type InfraPlanOutcome =
   { status: 'ok'; summary: InfraPlanSummary } | { status: 'failed'; failure: InfraFailure };
@@ -56,6 +66,8 @@ export interface InfraDriver {
     target: InfraTarget,
     onStep: (step: InfraResourceStep) => Promise<void>,
   ): Promise<InfraApplyOutcome>;
+  /** Plano descartável contra a descrição atual: não guarda o plano nem toca a infra. */
+  check(target: InfraCheckTarget): Promise<InfraPlanOutcome>;
 }
 
 /**
@@ -147,10 +159,27 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
   const { runtime } = options;
   const timeouts = options.timeouts ?? DEFAULT_TIMEOUTS;
   const now = options.now ?? Date.now;
-  const volumeOf = (target: InfraTarget) => `orakel-infra-${target.runId}`;
-  const labels = (target: InfraTarget) => ({
-    'orakel.infra': String(target.runId),
-    'orakel.site': target.siteId,
+  /** Volume, nome do container e labels: da execução (`plan`/`apply`) ou da conferência. */
+  type Slot = {
+    siteId: string;
+    domain: string;
+    volume: string;
+    container: (command: 'plan' | 'apply') => string;
+    labels: Record<string, string>;
+  };
+  const runSlot = (target: InfraTarget): Slot => ({
+    siteId: target.siteId,
+    domain: target.domain,
+    volume: `orakel-infra-${target.runId}`,
+    container: (command) => `orakel-infra-${command}-${target.runId}`,
+    labels: { 'orakel.infra': String(target.runId), 'orakel.site': target.siteId },
+  });
+  const checkSlot = (target: InfraCheckTarget): Slot => ({
+    siteId: target.siteId,
+    domain: target.domain,
+    volume: `orakel-infra-check-${target.siteId}`,
+    container: () => `orakel-infra-check-${target.siteId}`,
+    labels: { 'orakel.infra-check': target.siteId, 'orakel.site': target.siteId },
   });
 
   async function ensureImage(): Promise<InfraFailure | undefined> {
@@ -172,7 +201,7 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
    * em fatias de `pollMs`, chamando `onProgress` com o log a cada uma. O container sai sempre.
    */
   async function runCommand(
-    target: InfraTarget,
+    slot: Slot,
     command: 'plan' | 'apply',
     onProgress?: (log: string) => Promise<void>,
   ): Promise<
@@ -192,13 +221,13 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
     };
     try {
       id = await runtime.start({
-        name: `orakel-infra-${command}-${target.runId}`,
+        name: slot.container(command),
         image: options.image,
         command: [command],
-        env: { ...options.env, SITE_ID: target.siteId, DOMAIN: target.domain },
+        env: { ...options.env, SITE_ID: slot.siteId, DOMAIN: slot.domain },
         network: options.network,
-        volume: { name: volumeOf(target), target: INFRA_DIR },
-        labels: { ...labels(target), 'orakel.stage': `infra-${command}` },
+        volume: { name: slot.volume, target: INFRA_DIR },
+        labels: { ...slot.labels, 'orakel.stage': `infra-${command}` },
       });
       const deadline = now() + timeoutMs;
       let waited: WaitResult;
@@ -258,8 +287,8 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
     }
   }
 
-  async function removeVolume(target: InfraTarget): Promise<void> {
-    const volume = volumeOf(target);
+  async function removeVolume(slot: Slot): Promise<void> {
+    const { volume } = slot;
     await runtime.removeVolume(volume).catch((error: unknown) => {
       options.log?.(`Volume ${volume} não removido: ${String(error)}`);
     });
@@ -274,45 +303,58 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
     }
   }
 
-  const noDomain = (target: InfraTarget): InfraFailure => ({
+  const noDomain = (target: { siteId: string }): InfraFailure => ({
     kind: 'permanent',
     message: `O site ${target.siteId} não tem domínio na configuração`,
   });
 
+  /**
+   * Roda o `plan` no volume do slot e devolve o resumo. `keep`: o volume (com o plano salvo)
+   * fica para o apply quando o plano sai bem; senão, é sempre apagado.
+   */
+  async function runPlan(slot: Slot, keep: boolean): Promise<InfraPlanOutcome> {
+    if (slot.domain === '') return { status: 'failed', failure: noDomain(slot) };
+    const missing = await ensureImage();
+    if (missing !== undefined) return { status: 'failed', failure: missing };
+    let ok = false;
+    try {
+      await runtime.createVolume(slot.volume, slot.labels);
+      const run = await runCommand(slot, 'plan');
+      if (!run.ok) return { status: 'failed', failure: run.failure };
+      const result = parse(InfraPlanResultSchema, run.text);
+      if (result === undefined || result.site !== slot.siteId) {
+        return {
+          status: 'failed',
+          failure: {
+            kind: 'transient',
+            message: `${INFRA_PATHS.planResult} inválido ou de outro site`,
+          },
+        };
+      }
+      if (result.status === 'failed') return { status: 'failed', failure: result.failure };
+      ok = true;
+      return { status: 'ok', summary: summarizePlan(result.changes) };
+    } catch (error) {
+      return {
+        status: 'failed',
+        failure: { kind: 'transient', message: `plan: ${message(error)}` },
+      };
+    } finally {
+      if (!(keep && ok)) await removeVolume(slot);
+    }
+  }
+
   return {
     kind: 'tofu',
 
-    async plan(target) {
-      if (target.domain === '') return { status: 'failed', failure: noDomain(target) };
-      const missing = await ensureImage();
-      if (missing !== undefined) return { status: 'failed', failure: missing };
-      let ok = false;
-      try {
-        await runtime.createVolume(volumeOf(target), labels(target));
-        const run = await runCommand(target, 'plan');
-        if (!run.ok) return { status: 'failed', failure: run.failure };
-        const result = parse(InfraPlanResultSchema, run.text);
-        if (result === undefined || result.site !== target.siteId) {
-          return {
-            status: 'failed',
-            failure: {
-              kind: 'transient',
-              message: `${INFRA_PATHS.planResult} inválido ou de outro site`,
-            },
-          };
-        }
-        if (result.status === 'failed') return { status: 'failed', failure: result.failure };
-        ok = true;
-        return { status: 'ok', summary: summarizePlan(result.changes) };
-      } catch (error) {
-        return {
-          status: 'failed',
-          failure: { kind: 'transient', message: `plan: ${message(error)}` },
-        };
-      } finally {
-        // O plano salvo fica no volume até o apply; sem plano, o volume não serve para nada.
-        if (!ok) await removeVolume(target);
-      }
+    plan(target) {
+      // O plano salvo fica no volume até o apply; sem plano, o volume não serve para nada.
+      return runPlan(runSlot(target), true);
+    },
+
+    check(target) {
+      // Conferência: o plano salvo não serve para nada, o volume sai sempre.
+      return runPlan(checkSlot(target), false);
     },
 
     async apply(target, onStep) {
@@ -331,7 +373,7 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
           return { status: 'failed', step: null, failure: noDomain(target) };
         const missing = await ensureImage();
         if (missing !== undefined) return { status: 'failed', step: null, failure: missing };
-        const run = await runCommand(target, 'apply', advance);
+        const run = await runCommand(runSlot(target), 'apply', advance);
         await advance(run.log);
         const { errored } = readApplyProgress(run.log);
         const step = errored ?? reported;
@@ -365,7 +407,7 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
         }
         return { status: 'ok', nameservers: result.nameServers };
       } finally {
-        await removeVolume(target);
+        await removeVolume(runSlot(target));
       }
     },
   };
@@ -376,6 +418,8 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
 export type LocalDriverOptions = {
   /** A primeira execução de cada site falha nesta etapa (INFRA_LOCAL_FAIL_STEP). */
   failStep?: InfraResourceStep;
+  /** A conferência destes sites sai desatualizada (INFRA_LOCAL_DRIFT_SITES); a dos outros, em dia. */
+  driftSites?: readonly string[];
 };
 
 /** Recursos fictícios de cada etapa, nos tipos do módulo `site`. */
@@ -404,10 +448,18 @@ const LOCAL_RESOURCES: Record<InfraResourceStep, { name: string; type: string }[
 
 export const LOCAL_NAMESERVERS = ['ada.ns.orakel.localhost', 'bob.ns.orakel.localhost'];
 
+/** Mudança que a conferência local devolve para um site configurado como desatualizado. */
+export const LOCAL_DRIFT_CHANGE: InfraChange = {
+  address: 'module.site.cloudflare_ruleset.waf',
+  type: 'cloudflare_ruleset',
+  action: 'update',
+};
+
 /**
  * Simulação sem rede: o "estado" de cada site é a memória do processo (as etapas já criadas),
  * então uma nova execução só cria o que faltou, como o OpenTofu faria. Reiniciar o build-runner
- * zera a memória; sem efeito fora do local e do E2E.
+ * zera a memória; sem efeito fora do local e do E2E. A conferência não usa essa memória (ela
+ * zeraria na partida e todo site sairia desatualizado): só `driftSites` sai desatualizado.
  */
 export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
   const created = new Map<string, Set<InfraResourceStep>>();
@@ -431,6 +483,14 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
         })),
       );
       return Promise.resolve({ status: 'ok', summary: summarizePlan(changes) });
+    },
+
+    check(target) {
+      const drifted = options.driftSites?.includes(target.siteId) ?? false;
+      return Promise.resolve({
+        status: 'ok',
+        summary: summarizePlan(drifted ? [LOCAL_DRIFT_CHANGE] : []),
+      });
     },
 
     async apply(target, onStep) {
