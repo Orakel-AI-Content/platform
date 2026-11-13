@@ -239,6 +239,13 @@
       "when": 1794577515746,
       "tag": "0033_correcao_automatica",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794579580295,
+      "tag": "0034_parecer_da_revisao",
+      "breakpoints": true
     }
   ]
 }
