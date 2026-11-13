@@ -42,6 +42,7 @@ import {
   type SiteCheckContext,
 } from './checks.ts';
 import { linkCheckFor, type LinkCheckState } from './link-checks.ts';
+import { opinionFor, opinionOutlook, type OpinionOutlook } from './opinions.ts';
 import { compareVersions, type VersionChanges } from './changes.ts';
 
 export {
@@ -183,6 +184,11 @@ export type ReviewQueueEntry = ReviewQueueItem & {
   returned: boolean;
   /** A versão da fila foi criada pela correção automática (`correctionRuns`). */
   autoCorrected: boolean;
+  /**
+   * Resultado do parecer automático da versão (#774), reduzido do mesmo `opinionFor` da tela de
+   * revisão. Só informa: não entra em `pending`.
+   */
+  opinion: OpinionOutlook;
 };
 
 /**
@@ -208,7 +214,7 @@ function pendingCount(checks: readonly ReviewCheck[], links: LinkCheckState): nu
 }
 
 /**
- * Fila de revisão (`listReviewQueue`) com pendências, links e devolução de cada item,
+ * Fila de revisão (`listReviewQueue`) com pendências, links, devolução e parecer de cada item,
  * calculados na leitura e nunca gravados. O contexto do site e os recursos da release são lidos
  * uma vez para a fila inteira; cada item deriva o seu com `checkContextFor`. Exige `site.read`.
  */
@@ -271,12 +277,13 @@ export async function reviewQueue(
       throw new Error(`versão ${String(item.version)} de ${String(item.id)} sumiu`);
     const issues = await validationIssues(db, siteId, item.id, data, resources);
     const checks = computeReviewChecks(data, issues, checkContextFor(site, item.id));
-    const links = await linkCheckFor(db, actor, {
-      siteId,
-      contentId: item.id,
-      version: item.version,
-    });
+    const target = { siteId, contentId: item.id, version: item.version };
+    const [links, opinion] = await Promise.all([
+      linkCheckFor(db, actor, target),
+      opinionFor(db, actor, target),
+    ]);
     if (!links.ok) return links;
+    if (!opinion.ok) return opinion;
     const last = lastReviewOf.get(item.id);
     entries.push({
       ...item,
@@ -284,6 +291,7 @@ export async function reviewQueue(
       links: links.value,
       returned: last?.decision === 'devolvido' && last.version <= item.version,
       autoCorrected: corrected.has(correctionKey(item.id, item.version)),
+      opinion: opinionOutlook(opinion.value),
     });
   }
   return { ok: true, value: entries };

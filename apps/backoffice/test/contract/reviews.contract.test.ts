@@ -8,6 +8,7 @@ import {
   generationRuns,
   publications,
   reviewConfirmations,
+  reviewOpinions,
   reviews,
   sites,
 } from '../../src/db/schema/index.ts';
@@ -46,6 +47,14 @@ import {
   linkCheckFor,
   recordLinkCheck,
 } from '../../src/domain/reviews/link-checks.ts';
+import type { Opinion, OpinionPoint } from '../../src/domain/reviews/opinion.ts';
+import {
+  enqueueOpinion,
+  opinionFor,
+  opinionOutlook,
+  recordOpinion,
+  type OpinionTarget,
+} from '../../src/domain/reviews/opinions.ts';
 import { reviewCheckItems } from '../../src/components/review/reviewCheckItems.ts';
 import type * as Sites from '../../src/domain/sites/sites.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
@@ -56,7 +65,7 @@ import { resetDatabase, setupDatabase } from './helpers.ts';
 // que exige as três gravadas.
 // Devolução ao editor (#598): comentário obrigatório, volta a rascunho e a devolução pendente.
 // Aprovar e publicar ou agendar numa decisão só, com transbordo para a próxima vaga (#759).
-// Fila de revisão com pendências, links e devolvido de cada item (#772).
+// Fila de revisão com pendências, links e devolvido de cada item (#772) e o parecer (#774).
 // O que mudou desde a última revisão (#768): a base é a versão da revisão mais recente.
 // Correção automática na fila e no que mudou (#804): derivada da execução `correcao` `ok`.
 
@@ -1271,6 +1280,75 @@ describe('fila de revisão com pendências e devolvidos (#772)', () => {
     await draft(1);
 
     expect(await entryOf(1)).toMatchObject({ returned: false });
+  });
+
+  it('o parecer de cada item é o da tela de revisão, nos cinco resultados, sem mudar as pendências (#774)', async () => {
+    const point = (verdict: 'atende' | 'nao_atende'): OpinionPoint => ({
+      verdict,
+      justification: 'Justificativa.',
+      excerpts: ['Trecho.'],
+    });
+    const opinion = (verdict: 'atende' | 'nao_atende'): Opinion => ({
+      valor_original: point('atende'),
+      politicas_anuncios_afiliados: point(verdict),
+      linha_editorial: { verdict: 'nao_avaliado' },
+    });
+    const targets = new Map<number, OpinionTarget>();
+    for (const contentId of [1, 2, 3]) {
+      targets.set(contentId, { siteId: SITE, contentId, version: await draft(contentId) });
+    }
+    const pendingBefore = new Map((await queueOf()).map((item) => [item.id, item.pending]));
+    /** Desfecho do job do parecer, gravado como o job grava. */
+    const finish = async (contentId: number, outcome: { opinion: Opinion } | { issues: [] }) => {
+      const recorded = await recordOpinion(
+        db,
+        targets.get(contentId)!,
+        {
+          result: {
+            prompt: { system: 's', user: 'u' },
+            provider: 'anthropic',
+            model: 'teste',
+            usage: { inputTokens: 1, outputTokens: 1 },
+            costUsd: null,
+            durationMs: 1,
+            ...('opinion' in outcome ? { ok: true, ...outcome } : { ok: false, ...outcome }),
+          },
+          editorialContextVersion: null,
+        },
+        new Date(),
+      );
+      expect(recorded).toBe(true);
+    };
+    /** Resultado de cada item da fila, conferido contra o `opinionFor` da tela de revisão. */
+    const outlooks = async () => {
+      const queue = await queueOf();
+      for (const item of queue) {
+        const shown = await opinionFor(db, role('revisor'), targets.get(item.id)!);
+        if (!shown.ok) throw new Error('leitura recusada');
+        expect(item.opinion).toBe(opinionOutlook(shown.value));
+        expect(item.pending).toBe(pendingBefore.get(item.id));
+      }
+      return Object.fromEntries(queue.map((item) => [item.id, item.opinion]));
+    };
+
+    // 3 continua pendente: o job não rodou.
+    await finish(1, { opinion: opinion('atende') });
+    await finish(2, { opinion: opinion('nao_atende') });
+    expect(await outlooks()).toEqual({ 1: 'favoravel', 2: 'com_ressalvas', 3: 'pendente' });
+
+    // 1 refeito e falho; 2 sem parecer, como uma versão enviada antes de ele existir.
+    await db.transaction((tx) => enqueueOpinion(tx, targets.get(1)!));
+    await finish(1, { issues: [] });
+    await db
+      .delete(reviewOpinions)
+      .where(
+        and(
+          eq(reviewOpinions.siteId, SITE),
+          eq(reviewOpinions.contentId, 2),
+          eq(reviewOpinions.version, targets.get(2)!.version),
+        ),
+      );
+    expect(await outlooks()).toEqual({ 1: 'falha', 2: 'ausente', 3: 'pendente' });
   });
 
   it('sem conteúdo em revisão, fila vazia; sem papel, forbidden', async () => {

@@ -31,6 +31,25 @@ export type OpinionState =
   | { state: 'falha'; issues: Issue[] }
   | { state: 'pronto'; opinion: Opinion };
 
+/**
+ * Resultado do parecer em uma palavra, para a fila de revisão (#774) e a elegibilidade do lote
+ * (#775): `favoravel`, `com_ressalvas`, `pendente`, `falha` ou `ausente` (sem parecer).
+ */
+export type OpinionOutlook = 'favoravel' | 'com_ressalvas' | 'pendente' | 'falha' | 'ausente';
+
+/**
+ * Reduz o estado do parecer ao resultado da fila. Pronto é favorável quando todo ponto avaliado
+ * pelo modelo atende; `nao_avaliado` (o site sem contexto editorial) não pesa, e qualquer
+ * `nao_atende` ou `inconclusivo` deixa o parecer com ressalvas.
+ */
+export function opinionOutlook(state: OpinionState): OpinionOutlook {
+  if (state.state !== 'pronto') return state.state;
+  const reserved = Object.values(state.opinion).some(
+    (point) => point.verdict === 'nao_atende' || point.verdict === 'inconclusivo',
+  );
+  return reserved ? 'com_ressalvas' : 'favoravel';
+}
+
 /** Colunas do desfecho, todas nulas no parecer `pendente`. */
 const EMPTY_OUTCOME = {
   status: 'pendente',

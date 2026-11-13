@@ -33,6 +33,7 @@ const item = (id: number): ReviewQueueEntry => ({
   links: { state: 'verificando' },
   returned: false,
   autoCorrected: false,
+  opinion: 'favoravel',
 });
 
 /** Primeiro elemento do tipo pedido na árvore devolvida pela página. */
