@@ -14,7 +14,8 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // sumários: inserir um bloco no meio só pelo teclado, pelo Dropdown do Ecme (#134, #274), com o
 // Esc devolvendo o foco ao gatilho e o foco no campo do bloco novo; recolher e expandir blocos
 // só pelo teclado (#135), com o bloco recolhido numa linha e o título no `title`. Na edição sem
-// alteração (#525), "Salvar" fica indisponível e focável, com a nota que diz por quê.
+// alteração (#525), "Salvar" fica indisponível e focável, com a nota que diz por quê. "Salvar e
+// enviar para revisão" (#780) pelo teclado, sem tomar o Enter dos campos.
 
 const options: ContentEditorOptions = {
   blockTypes: ['text', 'toc', 'quote', 'image', 'faq'],
@@ -317,6 +318,64 @@ describe('correção na revisão (#751)', () => {
     await userEvent.click(save());
     await expect.element(page.getByText('A versão 2 não está em revisão')).toBeVisible();
     expect(navigation.get()).toBe(`${REVIEW}/corrigir`);
+  });
+});
+
+describe('salvar e enviar para revisão (#780)', () => {
+  const send = () => page.getByRole('button', { name: 'Salvar e enviar para revisão' });
+  const save = () => page.getByRole('button', { name: 'Salvar', exact: true });
+  const title = () => page.getByRole('textbox', { name: 'Título', exact: true });
+
+  async function renderWithSend() {
+    navigation.set(EDIT_PATH);
+    const action = vi.fn<(input: ContentEdit) => Promise<ContentFormResult>>(() =>
+      Promise.resolve({ ok: true, message: 'Versão 2 salva.', id: 7 }),
+    );
+    const submitAction = vi.fn<(input: ContentEdit) => Promise<ContentFormResult>>(() =>
+      Promise.resolve({
+        ok: true,
+        message: 'Versão 2 salva e enviada para revisão.',
+        id: 7,
+      }),
+    );
+    await renderInApp(
+      <ContentEditor
+        mode="edit"
+        siteId="exemplo-a"
+        timeZone="America/Sao_Paulo"
+        defaultValues={defaultValues}
+        options={options}
+        action={action}
+        submitAction={submitAction}
+        backHref="/sites/exemplo-a/conteudos/7"
+      />,
+    );
+    return { action, submitAction };
+  }
+
+  it('alcançado pelo Tab ao lado de "Salvar" e acionado pelo Enter, envia e vai ao detalhe', async () => {
+    const { action, submitAction } = await renderWithSend();
+    await userEvent.type(title(), '!');
+
+    (save().element() as HTMLElement).focus();
+    await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+    await expect.element(send()).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+
+    await expect.poll(() => submitAction.mock.calls.length).toBe(1);
+    expect(submitAction.mock.calls[0]?.[0].title).toBe('Artigo longo!');
+    expect(action).not.toHaveBeenCalled();
+    await expect.poll(() => navigation.get()).toBe('/sites/exemplo-a/conteudos/7');
+  });
+
+  it('o Enter num campo continua sendo "Salvar", não o envio', async () => {
+    const { action, submitAction } = await renderWithSend();
+    await userEvent.type(title(), '!');
+    await userEvent.keyboard('{Enter}');
+
+    await expect.poll(() => action.mock.calls.length).toBe(1);
+    expect(submitAction).not.toHaveBeenCalled();
+    expect(navigation.get()).toBe(EDIT_PATH);
   });
 });
 
