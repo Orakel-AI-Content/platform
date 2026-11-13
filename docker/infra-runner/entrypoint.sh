@@ -15,6 +15,8 @@
 # stderr. Saída: 0 ok, 10 falha permanente, 20 transitória; o arquivo de resultado concorda.
 # Nenhuma mensagem repete um segredo: as falhas citam só o nome da variável.
 set -eu
+# O ash do BusyBox (Alpine) tem pipefail: sem ele, o tee esconderia a falha do tofu.
+# shellcheck disable=SC3040
 set -o pipefail
 
 INFRA_DIR=/infra
