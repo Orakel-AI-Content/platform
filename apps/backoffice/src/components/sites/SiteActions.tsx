@@ -13,6 +13,7 @@ import type { InfraPlanView } from '@/domain/infra/plan.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { CreateInfraDialog, useCreateInfra } from './CreateInfraDialog.tsx';
+import { INFRA_REAPPLY_ALREADY_CONFIRMED, ReapplyInfraDialog } from './ReapplyInfraDialog.tsx';
 import { INFRA_REMOVAL_ALREADY_CONFIRMED, RemoveInfraDialog } from './RemoveInfraDialog.tsx';
 
 import { useInfraCheckContext } from './LifecycleSteps.tsx';
@@ -70,6 +71,20 @@ export type RemoveInfraActions = {
   confirm: (runId: number, typedDomain: string) => Promise<ActionResult>;
 };
 
+/**
+ * "Reaplicar infraestrutura" (workspace#98), só para quem tem `site.configure`: a execução aberta
+ * (com o tipo e se é de um lote, para reabrir só a reaplicação pedida no site) e as actions
+ * ligadas ao site. `retry`: a última reaplicação falhou, e o botão vira "Tentar de novo". A
+ * leitura do plano é a mesma da criação.
+ */
+export type ReapplyInfraActions = {
+  open: Pick<OpenInfraRun, 'id' | 'status' | 'kind' | 'inBatch'> | null;
+  retry?: boolean;
+  request: () => Promise<{ ok: true; runId: number } | { ok: false; message: string }>;
+  read: (runId: number) => Promise<InfraPlanView | null>;
+  confirm: (runId: number) => Promise<ActionResult>;
+};
+
 const LifecycleActionContext = createContext<ReturnType<typeof useActionResult> | null>(null);
 
 /**
@@ -100,7 +115,11 @@ export function LifecycleActionScope({ children }: { children: ReactNode }) {
  * (`InfraCheckContext`); fora dela, da `lifecycle` da página. Com `remove` (só `site.destroy`),
  * "Remover infraestrutura" (workspace#97) de `infra_aplicada` em diante, sem outra execução
  * aberta: desabilitada, com o aviso de pausar, enquanto o site está ativo; "Revisar e confirmar a
- * remoção" reabre a remoção aberta no estado salvo. Sem nenhuma ação não renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de qualquer uma vai ao mesmo
+ * remoção" reabre a remoção aberta no estado salvo. Com `reapply` (só `site.configure`),
+ * "Reaplicar infraestrutura" (workspace#98) de `infra_aplicada` em diante, sem execução aberta
+ * ("Tentar de novo" depois de uma reaplicação que falhou); "Revisar e confirmar a reaplicação"
+ * reabre a reaplicação aberta no estado salvo, menos a de um lote, que se confirma no lote. Sem
+ * nenhuma ação não renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de qualquer uma vai ao mesmo
  * Alert.
  */
 export function LifecycleAction({
@@ -109,17 +128,21 @@ export function LifecycleAction({
   undo,
   infra,
   remove,
+  reapply,
 }: {
   lifecycle: SiteSummary['lifecycle'];
   check: () => Promise<ActionResult>;
   undo: (step: Step) => Promise<ActionResult>;
   infra?: CreateInfraActions;
   remove?: RemoveInfraActions;
+  reapply?: ReapplyInfraActions;
 }) {
   const scope = use(LifecycleActionContext);
   const view = useInfraCheckContext();
   const [confirming, setConfirming] = useState(false);
-  const [running, setRunning] = useState<'check' | 'undo' | 'infra' | 'remove' | null>(null);
+  const [running, setRunning] = useState<'check' | 'undo' | 'infra' | 'remove' | 'reapply' | null>(
+    null,
+  );
   const creating = useCreateInfra({
     request: infra?.request ?? noRequest,
     read: infra?.read ?? noRead,
@@ -129,7 +152,13 @@ export function LifecycleAction({
     read: remove?.read ?? noRead,
     alreadyConfirmed: INFRA_REMOVAL_ALREADY_CONFIRMED,
   });
+  const reapplying = useCreateInfra({
+    request: reapply?.request ?? noRequest,
+    read: reapply?.read ?? noRead,
+    alreadyConfirmed: INFRA_REAPPLY_ALREADY_CONFIRMED,
+  });
   const infraTrigger = useRef<HTMLButtonElement>(null);
+  const reapplyTrigger = useRef<HTMLButtonElement>(null);
   const removeTrigger = useRef<HTMLButtonElement>(null);
   const pauseHintId = useId();
   if (scope === null) throw new Error('LifecycleAction fora de um LifecycleActionScope.');
@@ -146,8 +175,17 @@ export function LifecycleAction({
     removalRun !== null && removalRun.kind === 'remover' && removalRun.status !== 'aplicando';
   const removable =
     remove !== undefined && lifecycle !== 'cadastrado' && (removalRun === null || reviewRemoval);
-  if (!checkable && current === null && !creatable && !removable) return null;
-  const pending = (kind: 'check' | 'undo' | 'infra' | 'remove') =>
+  // A reaplicação aberta pedida no site reabre o diálogo; a de um lote e outra execução a escondem.
+  const reapplyRun = reapply?.open ?? null;
+  const reviewReapply =
+    reapplyRun !== null &&
+    reapplyRun.kind === 'reaplicar' &&
+    !reapplyRun.inBatch &&
+    reapplyRun.status !== 'aplicando';
+  const reapplyable =
+    reapply !== undefined && lifecycle !== 'cadastrado' && (reapplyRun === null || reviewReapply);
+  if (!checkable && current === null && !creatable && !removable && !reapplyable) return null;
+  const pending = (kind: 'check' | 'undo' | 'infra' | 'remove' | 'reapply') =>
     scope.pending && running === kind;
 
   return (
@@ -231,6 +269,43 @@ export function LifecycleAction({
             </p>
           </ConfirmDialog>
         </>
+      )}
+      {reapplyable && (
+        <Button
+          ref={reapplyTrigger}
+          type="button"
+          size="sm"
+          disabled={scope.pending}
+          onClick={() =>
+            reapplyRun === null ? reapplying.start() : reapplying.reopen(reapplyRun.id)
+          }
+        >
+          {pending('reapply')
+            ? 'Confirmando…'
+            : reviewReapply
+              ? 'Revisar e confirmar a reaplicação'
+              : reapply.retry
+                ? 'Tentar de novo'
+                : 'Reaplicar infraestrutura'}
+          {!reviewReapply && reapply.retry && !pending('reapply') && (
+            <span className="sr-only"> a reaplicação da infraestrutura</span>
+          )}
+        </Button>
+      )}
+      {reapply !== undefined && (
+        <ReapplyInfraDialog
+          isOpen={reapplying.isOpen}
+          state={reapplying.state}
+          onCancel={reapplying.close}
+          onConfirm={() => {
+            const runId = reapplying.runId;
+            reapplying.close();
+            if (runId === null) return;
+            setRunning('reapply');
+            scope.run(() => reapply.confirm(runId));
+          }}
+          onAfterClose={() => reapplyTrigger.current?.focus()}
+        />
       )}
       {removable && (
         <>
