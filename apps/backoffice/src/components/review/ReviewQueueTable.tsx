@@ -11,37 +11,50 @@ import { CONTENT_KIND_LABEL, formatDateTime } from '@/components/shared/siteLabe
 import { NoWrap } from '@/components/shared/NoWrap';
 import { Truncated } from '@/components/shared/Truncated';
 import { useListTable } from '@/components/shared/useListTable';
+import { StateTag } from '@/components/sites/SiteStatus';
+import classNames from '@/components/ui/utils/classNames';
 import type { ListConfig } from '@/components/shared/useListState.ts';
-import type { ReviewQueueItem } from '@/domain/content/contents.ts';
+import type { ReviewQueueEntry } from '@/domain/reviews/reviews.ts';
 
-const KINDS = Object.keys(CONTENT_KIND_LABEL) as ReviewQueueItem['kind'][];
+const KINDS = Object.keys(CONTENT_KIND_LABEL) as ReviewQueueEntry['kind'][];
 
 /** Busca por título, filtro por tipo, a mais antiga primeiro (a ordem do domínio, #74) (#365). */
 const LIST: ListConfig = {
   filters: [{ column: 'kind', param: 'tipo', values: KINDS }],
-  sortable: ['title', 'kind', 'version', 'submittedAt'],
+  sortable: ['title', 'kind', 'version', 'pending', 'submittedAt'],
   defaultSort: { id: 'submittedAt', desc: false },
   pageSizes: [10, 25, 50, 100],
 };
 
 /** Ordena pelo texto exibido em pt-BR (rótulo do tipo, título), não pelo valor. */
-function byText(text: (item: ReviewQueueItem) => string) {
-  return (a: Row<ReviewQueueItem>, b: Row<ReviewQueueItem>) =>
+function byText(text: (item: ReviewQueueEntry) => string) {
+  return (a: Row<ReviewQueueEntry>, b: Row<ReviewQueueEntry>) =>
     text(a.original).localeCompare(text(b.original), 'pt-BR');
 }
 
-function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueItem>[] {
+function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueEntry>[] {
   return [
     {
       header: 'Título',
       accessorKey: 'title',
       meta: { fluid: true },
       sortFn: byText((item) => item.title),
+      // A marca "Devolvido" fica fora do link: o nome acessível continua o título (#772).
       cell: ({ row }) => (
-        <Link href={`/sites/${siteId}/revisao/${row.original.id}`} className={ROW_LINK_CLASS}>
-          <Truncated text={row.original.title} />
-          <span className="sr-only"> (revisar)</span>
-        </Link>
+        <span className="flex min-w-0 items-center gap-2">
+          <Link
+            href={`/sites/${siteId}/revisao/${row.original.id}`}
+            className={classNames(ROW_LINK_CLASS, 'min-w-0')}
+          >
+            <Truncated text={row.original.title} />
+            <span className="sr-only"> (revisar)</span>
+          </Link>
+          {row.original.returned && (
+            <StateTag color="bg-warning" className="shrink-0">
+              Devolvido
+            </StateTag>
+          )}
+        </span>
       ),
     },
     {
@@ -60,6 +73,14 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueItem
       enableGlobalFilter: false,
       sortFn: 'basic',
     },
+    // Itens da revisão que não estão ok, contados como na tela de revisão (#772).
+    {
+      header: 'Pendências',
+      accessorKey: 'pending',
+      enableGlobalFilter: false,
+      sortFn: 'basic',
+      cell: ({ row }) => (row.original.pending === 0 ? 'Nenhuma' : row.original.pending),
+    },
     // Instante do envio para revisão (#771); a data da versão nas anteriores à coluna.
     {
       header: 'Enviado em',
@@ -73,7 +94,8 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueItem
 
 /**
  * Fila de revisão do site (#74): conteúdos cuja versão mais recente está em revisão, da mais
- * antiga para a mais recente. Cada título leva à tela de revisão. No DataTable do template
+ * antiga para a mais recente. Cada título leva à tela de revisão, com a marca "Devolvido" ao
+ * lado quando volta de uma devolução, e "Pendências" conta o que não está ok (#772). No DataTable do template
  * (#365): busca por título, filtro por tipo, ordem e paginação no cliente com o estado na URL;
  * toolbar e tabela vão no cartão da página, abaixo do `ListHeader`.
  */
@@ -86,7 +108,7 @@ export function ReviewQueueTable({
   siteId: string;
   /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
   timeZone: string;
-  rows: ReviewQueueItem[];
+  rows: ReviewQueueEntry[];
   /** Id do título da lista, que dá nome à tabela. */
   labelledBy?: string;
 }) {
