@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useRef, useState, type Ref } from 'react';
+import { TbChecks } from 'react-icons/tb';
 
 import DataTable, { type ColumnDef, type Row } from '@/components/shared/DataTable';
 import { EmptyState, NoResults } from '@/components/shared/EmptyState';
@@ -14,12 +15,21 @@ import {
 } from '@/components/shared/siteLabels.ts';
 import { NoWrap } from '@/components/shared/NoWrap';
 import { Truncated } from '@/components/shared/Truncated';
+import StickyFooter from '@/components/shared/StickyFooter';
 import { useListTable } from '@/components/shared/useListTable';
 import { StateTag } from '@/components/sites/SiteStatus';
+import { Button } from '@/components/ui/Button';
 import classNames from '@/components/ui/utils/classNames';
 import type { ListConfig } from '@/components/shared/useListState.ts';
 import type { OpinionOutlook } from '@/domain/reviews/opinions.ts';
 import type { ReviewQueueEntry } from '@/domain/reviews/reviews.ts';
+
+import {
+  ApproveBatchDialog,
+  contentCount,
+  type ApproveBatch,
+  type BatchSelection,
+} from './ApproveBatchDialog.tsx';
 
 const KINDS = Object.keys(CONTENT_KIND_LABEL) as ReviewQueueEntry['kind'][];
 
@@ -129,28 +139,101 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueEntr
 }
 
 /**
+ * Barra dos selecionados, como a `ProductListSelected` do Ecme e a `ContentsSelected` da lista de
+ * conteúdos (#495): aparece com a seleção, no `StickyFooter`, com a quantidade e a ação do lote.
+ */
+function ReviewSelected({
+  total,
+  trigger,
+  onApprove,
+}: {
+  total: number;
+  trigger: Ref<HTMLButtonElement>;
+  onApprove: () => void;
+}) {
+  return (
+    <StickyFooter
+      className="flex items-center justify-between py-4 bg-white dark:bg-gray-800"
+      stickyClass="bottom-0 border-t border-gray-200 dark:border-gray-700 px-4"
+      defaultClass="rounded-xl border border-gray-200 dark:border-gray-600 px-4"
+    >
+      <div className="flex w-full flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          <span className="text-lg text-primary" aria-hidden>
+            <TbChecks />
+          </span>
+          <span className="font-semibold heading-text">
+            {total === 1 ? '1 conteúdo selecionado' : `${contentCount(total)} selecionados`}
+          </span>
+        </span>
+        <Button
+          ref={trigger}
+          type="button"
+          size="sm"
+          variant="solid"
+          aria-haspopup="dialog"
+          onClick={onApprove}
+        >
+          Aprovar e publicar selecionados
+        </Button>
+      </div>
+    </StickyFooter>
+  );
+}
+
+/**
  * Fila de revisão do site (#74): conteúdos cuja versão mais recente está em revisão, da mais
  * antiga para a mais recente. Cada título leva à tela de revisão, com a marca "Devolvido" ao
  * lado quando volta de uma devolução, "Pendências" conta o que não está ok (#772) e "Parecer" mostra o
  * resultado do parecer automático (#774). No DataTable do template
  * (#365): busca por título, filtro por tipo, ordem e paginação no cliente com o estado na URL;
- * toolbar e tabela vão no cartão da página, abaixo do `ListHeader`.
+ * toolbar e tabela vão no cartão da página, abaixo do `ListHeader`. Com `canPublish`
+ * (content.publish, decidido no servidor) e a ação, os itens elegíveis para o lote ganham caixa de
+ * seleção, e a barra dos selecionados abre o resumo do lote (#776). Os outros têm a caixa
+ * desabilitada, com os motivos do domínio (`batchBlockers`). A seleção vale para a página visível
+ * e zera quando ela muda e depois do envio, como na lista de conteúdos.
  */
 export function ReviewQueueTable({
   siteId,
   timeZone,
   rows,
+  canPublish = false,
+  approveBatchAction,
   labelledBy,
 }: {
   siteId: string;
   /** Fuso do site (`SiteSummary.timeZone`): as datas aparecem nele. */
   timeZone: string;
   rows: ReviewQueueEntry[];
+  /** content.publish, decidido no servidor: seleção e lote de aprovar e publicar. */
+  canPublish?: boolean;
+  approveBatchAction?: ApproveBatch;
   /** Id do título da lista, que dá nome à tabela. */
   labelledBy?: string;
 }) {
   const columns = useMemo(() => columnsFor(siteId, timeZone), [siteId, timeZone]);
   const { list, tableProps } = useListTable({ config: LIST, columns, data: rows });
+  const [selection, setSelection] = useState<{ page: string; ids: number[] }>({
+    page: '',
+    ids: [],
+  });
+  const [summary, setSummary] = useState<{ open: boolean; items: BatchSelection[] }>({
+    open: false,
+    items: [],
+  });
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  const selectable = canPublish && approveBatchAction !== undefined;
+  const eligible = tableProps.data.filter((item) => item.batchBlockers.length === 0);
+  // A seleção é da página visível: outra página, busca ou filtro mudam o conjunto e a zeram.
+  const page = eligible
+    .map((item) => item.id)
+    .sort((a, b) => a - b)
+    .join(',');
+  const selected =
+    selection.page === page ? eligible.filter((item) => selection.ids.includes(item.id)) : [];
+  const select = (ids: number[]) => setSelection({ page, ids });
+
   if (rows.length === 0) {
     return <EmptyState>Nenhum conteúdo aguardando revisão.</EmptyState>;
   }
@@ -178,7 +261,62 @@ export function ReviewQueueTable({
         columns={columns}
         customNoDataIcon={<NoResults>Nenhum conteúdo encontrado.</NoResults>}
         {...tableProps}
+        {...(selectable
+          ? {
+              selectable: true,
+              rowSelectable: (item: ReviewQueueEntry) => item.batchBlockers.length === 0,
+              rowUnselectableReason: (item: ReviewQueueEntry) =>
+                `Fora do lote: ${item.batchBlockers.join('; ')}.`,
+              checkboxLabel: (item: ReviewQueueEntry) => `Selecionar ${item.title}`,
+              checkboxChecked: (item: ReviewQueueEntry) =>
+                selected.some((chosen) => chosen.id === item.id),
+              indeterminateCheckboxChecked: () =>
+                eligible.length > 0 && selected.length === eligible.length,
+              onCheckBoxChange: (checked: boolean, item: ReviewQueueEntry) =>
+                select(
+                  checked
+                    ? [...selected.map((chosen) => chosen.id), item.id]
+                    : selected.map((chosen) => chosen.id).filter((id) => id !== item.id),
+                ),
+              onIndeterminateCheckBoxChange: (checked: boolean) =>
+                select(checked ? eligible.map((item) => item.id) : []),
+            }
+          : {})}
       />
+      {selectable && (
+        <>
+          {selected.length > 0 && (
+            <ReviewSelected
+              total={selected.length}
+              trigger={trigger}
+              onApprove={() =>
+                setSummary({
+                  open: true,
+                  items: selected.map(({ id, version, title }) => ({ id, version, title })),
+                })
+              }
+            />
+          )}
+          <ApproveBatchDialog
+            siteId={siteId}
+            isOpen={summary.open}
+            items={summary.items}
+            action={approveBatchAction}
+            onClose={(sent) => {
+              setSummary((current) => ({ ...current, open: false }));
+              if (sent) select([]);
+            }}
+            // Depois do envio, a barra some com a seleção: o foco vai ao título da lista.
+            onAfterClose={() => {
+              if (trigger.current?.isConnected) return;
+              const heading = labelledBy ? document.getElementById(labelledBy) : null;
+              if (heading === null) return;
+              heading.tabIndex = -1;
+              heading.focus();
+            }}
+          />
+        </>
+      )}
     </>
   );
 }

@@ -5,6 +5,10 @@ import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
 import type { ContentFormResult } from '@/components/contents/contentEditorValues.ts';
+import type {
+  ApproveBatchResult,
+  BatchItemResult,
+} from '@/components/review/ApproveBatchDialog.tsx';
 import type { SchemaFormIssue } from '@/components/forms/SchemaForm';
 import type { FormActionResult } from '@/components/shared/actionResult.ts';
 import { formatDateTime } from '@/components/shared/siteLabels.ts';
@@ -222,20 +226,6 @@ function decisionMessage(
 
 const OVERFLOW_WARNING =
   'O dia pedido já tinha atingido o limite diário de publicações do site; a publicação foi para o próximo dia com vaga, no mesmo horário.';
-
-/**
- * Desfecho de um artigo do lote, pronto para o resultado do diálogo: no ar, agendado em `at`
- * (data e hora de São Paulo, o dia do limite diário) com o aviso do transbordo, ou falhou, com o
- * motivo.
- */
-export type BatchItemResult =
-  | { contentId: number; outcome: 'published' }
-  | { contentId: number; outcome: 'scheduled'; at: string; warning?: string }
-  | { contentId: number; outcome: 'failed'; message: string };
-
-/** Lote enviado (um desfecho por artigo, na ordem enviada) ou recusado inteiro. */
-export type ApproveBatchResult =
-  { ok: true; items: BatchItemResult[] } | { ok: false; message: string };
 
 /**
  * Aprova e publica em lote os artigos que o revisor confirmou ter lido no resumo (#776). O
