@@ -21,10 +21,12 @@ import {
   CHECK_SITE_INFRA_TASK,
   pauseSite,
   pauseSiteManually,
+  recordInfraDrift,
   resumeSite,
   scheduleSiteInfraCheck,
   setBuildWindow,
   setDailyPublishLimit,
+  sitesForInfraDrift,
 } from '../../src/domain/builds/site-state.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { configureDailyPublishLimit } from '../../src/domain/publications/publish.ts';
@@ -294,6 +296,7 @@ describe('estado da instância (#516)', () => {
         'effectiveDailyPublishLimit',
         'id',
         'indexavel',
+        'infraDrift',
         'lastBuild',
         'lifecycle',
         'name',
@@ -1111,5 +1114,133 @@ describe('"Conferir agora" e leitura da conferência (#716)', () => {
       ok: false,
       issues: [{ code: 'site.not_found' }],
     });
+  });
+});
+
+describe('conferência da infra contra a descrição (#846)', () => {
+  const T1 = new Date('2026-11-13T09:00:00Z');
+  const T2 = new Date('2026-11-14T09:00:00Z');
+  const resumo = '~ cloudflare_ruleset.redirects (1 alteração)';
+  const nunca = { status: null, summary: null, checkedAt: null, error: null };
+
+  async function drift(siteId: string) {
+    const listed = await listSites(db, SYSTEM_ACTOR);
+    if (!listed.ok) throw new Error('listSites recusou');
+    return listed.value.find((site) => site.id === siteId)?.infraDrift;
+  }
+
+  it('sem conferência, a leitura traz tudo nulo', async () => {
+    expect(await drift('exemplo-a')).toEqual(nunca);
+  });
+
+  it('desatualizado e em dia gravam o resultado e a data; em dia limpa o resumo', async () => {
+    await db.transaction((tx) =>
+      recordInfraDrift(tx, 'exemplo-a', { kind: 'desatualizado', summary: resumo }, T1),
+    );
+    expect(await drift('exemplo-a')).toEqual({
+      status: 'desatualizado',
+      summary: resumo,
+      checkedAt: T1,
+      error: null,
+    });
+    expect(await drift('exemplo-b')).toEqual(nunca);
+
+    await db.transaction((tx) => recordInfraDrift(tx, 'exemplo-a', { kind: 'em_dia' }, T2));
+    expect(await drift('exemplo-a')).toEqual({
+      status: 'em_dia',
+      summary: null,
+      checkedAt: T2,
+      error: null,
+    });
+  });
+
+  it('falhou grava a data e o motivo e mantém o último resultado; o sucesso seguinte limpa o motivo', async () => {
+    await db.transaction((tx) =>
+      recordInfraDrift(tx, 'exemplo-a', { kind: 'desatualizado', summary: resumo }, T1),
+    );
+    await db.transaction((tx) =>
+      recordInfraDrift(tx, 'exemplo-a', { kind: 'falhou', message: 'tofu plan saiu com 1' }, T2),
+    );
+    expect(await drift('exemplo-a')).toEqual({
+      status: 'desatualizado',
+      summary: resumo,
+      checkedAt: T2,
+      error: 'tofu plan saiu com 1',
+    });
+
+    await db.transaction((tx) => recordInfraDrift(tx, 'exemplo-b', { kind: 'em_dia' }, T1));
+    await db.transaction((tx) =>
+      recordInfraDrift(tx, 'exemplo-b', { kind: 'falhou', message: 'sem rede' }, T2),
+    );
+    expect(await drift('exemplo-b')).toEqual({
+      status: 'em_dia',
+      summary: null,
+      checkedAt: T2,
+      error: 'sem rede',
+    });
+
+    await db.transaction((tx) => recordInfraDrift(tx, 'exemplo-b', { kind: 'em_dia' }, T2));
+    expect((await drift('exemplo-b'))?.error).toBeNull();
+  });
+
+  it('falhou sem conferência anterior não marca o site como desatualizado', async () => {
+    await db.transaction((tx) =>
+      recordInfraDrift(tx, 'exemplo-a', { kind: 'falhou', message: 'sem rede' }, T1),
+    );
+    expect(await drift('exemplo-a')).toEqual({
+      status: null,
+      summary: null,
+      checkedAt: T1,
+      error: 'sem rede',
+    });
+  });
+
+  it('a página do site lê o mesmo estado da conferência', async () => {
+    await db.transaction((tx) =>
+      recordInfraDrift(tx, 'exemplo-b', { kind: 'desatualizado', summary: resumo }, T1),
+    );
+    const listed = await listSites(db, { email: 'editor@orakel.local', roles: ['editor'] });
+    expect(listed.ok && listed.value.find((site) => site.id === 'exemplo-b')?.infraDrift).toEqual({
+      status: 'desatualizado',
+      summary: resumo,
+      checkedAt: T1,
+      error: null,
+    });
+  });
+
+  it('elegíveis: de infra_aplicada em diante, pausados incluídos', async () => {
+    expect(await sitesForInfraDrift(db)).toEqual([]);
+
+    await db.update(sites).set({ lifecycle: 'infra_aplicada' }).where(eq(sites.id, 'exemplo-a'));
+    await db
+      .update(sites)
+      .set({ lifecycle: 'publicado', state: 'pausado', pausedReason: 'manual' })
+      .where(eq(sites.id, 'exemplo-b'));
+    expect(await sitesForInfraDrift(db)).toEqual(['exemplo-a', 'exemplo-b']);
+
+    await db.update(sites).set({ lifecycle: 'zona_ativa' }).where(eq(sites.id, 'exemplo-a'));
+    await db.update(sites).set({ lifecycle: 'cadastrado' }).where(eq(sites.id, 'exemplo-b'));
+    expect(await sitesForInfraDrift(db)).toEqual(['exemplo-a']);
+  });
+
+  it('a conferência não mexe na conferência da zona nem gera mudança pendente', async () => {
+    const before = await db.select({ n: count() }).from(pendingChanges);
+    await db.transaction((tx) =>
+      recordInfraDrift(tx, 'exemplo-a', { kind: 'desatualizado', summary: resumo }, T1),
+    );
+    await db.transaction((tx) =>
+      recordInfraDrift(tx, 'exemplo-b', { kind: 'falhou', message: 'x' }, T1),
+    );
+
+    expect(await db.select({ n: count() }).from(pendingChanges)).toEqual(before);
+    expect(
+      await db
+        .select({ at: sites.infraCheckedAt, error: sites.infraCheckError })
+        .from(sites)
+        .orderBy(sites.id),
+    ).toEqual([
+      { at: null, error: null },
+      { at: null, error: null },
+    ]);
   });
 });
