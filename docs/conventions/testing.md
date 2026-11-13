@@ -8,7 +8,7 @@ Consulte ao escrever ou rodar testes. Cada unidade complementa em
 | Tipo                               | Ferramenta                 | Onde                                | Tarefa                                              |
 | ---------------------------------- | -------------------------- | ----------------------------------- | --------------------------------------------------- |
 | Unitário                           | Vitest                     | `src/**/*.test.ts`, junto do código | `test`                                              |
-| Contrato da API de exportação      | Vitest + Postgres          | backoffice                          | `test:contract`                                     |
+| Contrato da API de exportação      | Vitest + Postgres + S3     | backoffice                          | `test:contract`                                     |
 | Sites de exemplo (orçamento de JS) | build do blog com fixtures | blog                                | `build:examples`                                    |
 | Acessibilidade                     | Playwright + axe           | blog                                | `test:a11y`                                         |
 | Paridade estático × SSR            | Playwright                 | blog                                | `test:parity`                                       |
