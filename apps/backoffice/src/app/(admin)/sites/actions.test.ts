@@ -4,13 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   cancelBuildAction,
   checkSiteInfraAction,
+  confirmInfraBatchAction,
   confirmInfraPlanAction,
   confirmInfraReapplyAction,
   confirmInfraRemovalAction,
   createSiteAction,
+  infraBatchAction,
   infraPlanAction,
   pauseSiteAction,
   rebuildOnReleaseAction,
+  refreshSitesAction,
+  requestInfraBatchAction,
   requestInfraPlanAction,
   requestInfraReapplyAction,
   requestInfraRemovalAction,
@@ -56,6 +60,9 @@ const mocks = vi.hoisted(() => ({
   confirmInfraRemovalPlan: vi.fn(),
   requestInfraReapplyPlan: vi.fn(),
   confirmInfraReapplyPlan: vi.fn(),
+  requestInfraBatchPlans: vi.fn(),
+  confirmInfraBatchPlan: vi.fn(),
+  latestInfraBatch: vi.fn(),
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
@@ -87,7 +94,10 @@ vi.mock('@/domain/infra/plan.ts', () => ({
   confirmInfraRemovalPlan: mocks.confirmInfraRemovalPlan,
   requestInfraReapplyPlan: mocks.requestInfraReapplyPlan,
   confirmInfraReapplyPlan: mocks.confirmInfraReapplyPlan,
+  requestInfraBatchPlans: mocks.requestInfraBatchPlans,
+  confirmInfraBatchPlan: mocks.confirmInfraBatchPlan,
 }));
+vi.mock('@/domain/infra/runs.ts', () => ({ latestInfraBatch: mocks.latestInfraBatch }));
 vi.mock('@/domain/sites/policy-triggers.ts', () => ({
   registerPolicyTrigger: mocks.registerPolicyTrigger,
 }));
@@ -806,5 +816,102 @@ describe('reaplicar infraestrutura (workspace#98)', () => {
     expect(await confirmInfraReapplyAction('exemplo-a', 12)).toMatchObject({ ok: false });
     expect(mocks.requestInfraReapplyPlan).not.toHaveBeenCalled();
     expect(mocks.confirmInfraReapplyPlan).not.toHaveBeenCalled();
+  });
+});
+
+describe('reaplicar nos desatualizados (workspace#98)', () => {
+  const SUMMARY = {
+    formatVersion: 1,
+    steps: { endereco: [], dns: [], email: [], regras: [], imagens: [] },
+  };
+  const batch = (sites: unknown[]) => ({
+    ok: true,
+    value: {
+      id: 3,
+      state: 'aguardando_confirmacao',
+      requestedBy: 'operacao@orakel.local',
+      startedAt: new Date('2026-11-13T12:00:00Z'),
+      finishedAt: null,
+      sites,
+    },
+  });
+  const site = (siteId: string, planSummary: string | null) => ({
+    siteId,
+    runId: 10,
+    position: 0,
+    status: 'aguardando_confirmacao',
+    currentStep: null,
+    planSummary,
+    failure: null,
+  });
+
+  it('pedir devolve o lote e revalida a lista', async () => {
+    mocks.requestInfraBatchPlans.mockResolvedValue({ ok: true, value: { batchId: 3, runs: [] } });
+
+    expect(await requestInfraBatchAction()).toEqual({ ok: true, batchId: 3 });
+    expect(mocks.requestInfraBatchPlans).toHaveBeenCalledWith({}, operacao);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
+  });
+
+  it('a recusa do pedido vira a mensagem, sem revalidar', async () => {
+    const message = 'Nenhum site está com a infraestrutura desatualizada';
+    mocks.requestInfraBatchPlans.mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'infra.batch_empty', message, path: [] }],
+    });
+
+    expect(await requestInfraBatchAction()).toEqual({ ok: false, message });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('ler devolve o lote com o resumo validado, nulo fora do formato', async () => {
+    mocks.latestInfraBatch.mockResolvedValue(
+      batch([site('exemplo-a', JSON.stringify(SUMMARY)), site('exemplo-b', '{"x":1}')]),
+    );
+
+    const view = await infraBatchAction();
+    expect(view?.sites).toEqual([
+      expect.objectContaining({ siteId: 'exemplo-a', summary: SUMMARY }),
+      expect.objectContaining({ siteId: 'exemplo-b', summary: null }),
+    ]);
+    expect(view).not.toHaveProperty('sites.0.planSummary');
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('ler devolve null sem lote ou na recusa', async () => {
+    mocks.latestInfraBatch.mockResolvedValueOnce({ ok: true, value: null });
+    expect(await infraBatchAction()).toBeNull();
+    mocks.latestInfraBatch.mockResolvedValueOnce({
+      ok: false,
+      issues: [{ code: 'forbidden', message: 'x', path: [] }],
+    });
+    expect(await infraBatchAction()).toBeNull();
+  });
+
+  it('confirmar passa o lote ao domínio e revalida a lista', async () => {
+    mocks.confirmInfraBatchPlan.mockResolvedValue({ ok: true, value: { siteId: 'a', runId: 1 } });
+
+    expect(await confirmInfraBatchAction(3)).toEqual({
+      ok: true,
+      message: 'Reaplicação nos desatualizados confirmada.',
+    });
+    expect(mocks.confirmInfraBatchPlan).toHaveBeenCalledWith({}, operacao, 3);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
+  });
+
+  it('relê a lista quando o lote fecha', async () => {
+    await refreshSitesAction();
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites');
+  });
+
+  it('sem sessão, nada chega ao domínio', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await requestInfraBatchAction()).toMatchObject({ ok: false });
+    expect(await confirmInfraBatchAction(3)).toMatchObject({ ok: false });
+    expect(await infraBatchAction()).toBeNull();
+    expect(mocks.requestInfraBatchPlans).not.toHaveBeenCalled();
+    expect(mocks.confirmInfraBatchPlan).not.toHaveBeenCalled();
+    expect(mocks.latestInfraBatch).not.toHaveBeenCalled();
   });
 });

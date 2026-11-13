@@ -3,13 +3,18 @@
 import Link from 'next/link';
 import { useMemo, useRef, useState, useTransition, type ReactNode } from 'react';
 
-import { LIFECYCLE_LABEL, SITE_STATE_LABEL } from '@/components/shared/siteLabels.ts';
+import {
+  INFRA_OUTDATED_LABEL,
+  LIFECYCLE_LABEL,
+  SITE_STATE_LABEL,
+} from '@/components/shared/siteLabels.ts';
 import {
   LastBuildSummary,
   PendingCount,
   PUBLISH_NOW_LABEL,
   PublishNowDialog,
   SiteStateIndicator,
+  StateTag,
   type PublishNow,
 } from '@/components/sites/SiteStatus';
 import { ActionAlert, pushSuccess, useActionResult } from '@/components/shared/ActionFeedback.tsx';
@@ -193,10 +198,15 @@ function columnsFor(
       enableGlobalFilter: false,
       enableSorting: false,
       cell: ({ row }) => {
-        const { lifecycle, release } = row.original;
+        const { lifecycle, release, infraDrift } = row.original;
         return (
           <TwoLines secondary={release ? `Release ${release}` : 'Sem release'}>
-            {LIFECYCLE_LABEL[lifecycle]}
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {LIFECYCLE_LABEL[lifecycle]}
+              {infraDrift.status === 'desatualizado' && (
+                <StateTag color="bg-warning">{INFRA_OUTDATED_LABEL}</StateTag>
+              )}
+            </span>
           </TwoLines>
         );
       },

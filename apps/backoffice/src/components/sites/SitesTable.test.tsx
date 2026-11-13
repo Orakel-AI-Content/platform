@@ -173,6 +173,25 @@ describe('tabela de sites', () => {
     expect(screen.getByText('cota').getAttribute('title')).toBe('cota');
   });
 
+  it('marca "Infra desatualizada" no ciclo de vida só dos sites desatualizados (workspace#98)', () => {
+    render(
+      <SitesTable
+        rows={[
+          { ...site, infraDrift: { ...site.infraDrift, status: 'desatualizado' } },
+          { ...site, id: 'exemplo-b', infraDrift: { ...site.infraDrift, status: 'em_dia' } },
+          { ...site, id: 'exemplo-c' },
+        ]}
+      />,
+    );
+
+    const [outdated, ...others] = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    expect(tagColor(within(outdated!).getByText('Infra desatualizada'))).toContain('bg-warning');
+    expect(others).toHaveLength(2);
+    for (const row of others) {
+      expect(within(row).queryByText('Infra desatualizada')).toBeNull();
+    }
+  });
+
   it('dá a cada resultado de build a tag da sua cor (#86)', () => {
     const finishedAt = new Date('2026-10-01T12:00:00Z');
     render(
