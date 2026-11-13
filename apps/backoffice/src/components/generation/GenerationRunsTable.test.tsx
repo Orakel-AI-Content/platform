@@ -14,7 +14,8 @@ import {
 
 // Execuções da geração: a ordem do domínio, cada uma com status, provedor, modelo, tokens,
 // custo, duração e o link para a revisão do conteúdo quando `ok`; o que falta aparece como "—".
-// Com execução pendente, relê a lista pela Server Action até ela terminar (#779).
+// Com execução pendente, relê a lista pela Server Action até ela terminar (#779). A correção
+// aparece como "Correção de <título>", com link para a revisão, e o mesmo custo (#805).
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/sites/exemplo-a/geracao',
@@ -25,6 +26,7 @@ vi.mock('next/navigation', () => ({
 afterEach(cleanup);
 
 const base = {
+  kind: 'geracao',
   provider: null,
   model: null,
   inputTokens: null,
@@ -43,6 +45,7 @@ const ROWS: GenerationRunSummary[] = [
     status: 'pendente',
   },
   {
+    kind: 'geracao',
     id: 2,
     createdAt: new Date('2026-11-02T12:00Z'),
     topic: 'Chá verde',
@@ -127,14 +130,61 @@ describe('lista das execuções', () => {
   });
 });
 
+describe('execução de correção', () => {
+  const CORRECTION: GenerationRunSummary = {
+    id: 4,
+    createdAt: new Date('2026-11-04T12:00Z'),
+    kind: 'correcao',
+    contentTitle: 'Guia do café coado',
+    status: 'ok',
+    provider: 'anthropic',
+    model: 'claude-sonnet-5-5',
+    inputTokens: 23456,
+    outputTokens: 789,
+    costUsd: 0.0123,
+    durationMs: 4_200,
+    contentId: 7,
+  };
+
+  it('mostra "Correção de <título>" no tema, com link para a revisão do conteúdo', () => {
+    renderTable([CORRECTION, ...ROWS]);
+    const row = within(rowOf('Correção de Guia do café coado'));
+    const cells = row.getAllByRole('cell');
+    const topic = within(cells[1]!).getByRole('link', { name: 'Correção de Guia do café coado' });
+    expect(topic.getAttribute('href')).toBe('/sites/exemplo-a/revisao/7');
+    expect(cells[1]?.textContent).not.toBe('');
+  });
+
+  it('tokens, custo e duração com a formatação da geração', () => {
+    renderTable([CORRECTION]);
+    const row = within(rowOf('Correção de Guia do café coado'));
+    for (const text of [
+      'Concluída',
+      'anthropic',
+      'claude-sonnet-5-5',
+      formatTokens(23456),
+      formatTokens(789),
+      formatCost(0.0123),
+      formatRunDuration(4_200),
+    ]) {
+      expect(row.getAllByText(text).length).toBeGreaterThan(0);
+    }
+    expect(row.getByRole('link', { name: 'Conteúdo #7 (abrir)' })).toBeTruthy();
+  });
+
+  it('pendente, o tema já mostra o conteúdo e o resto fica "—"', () => {
+    renderTable([{ ...CORRECTION, ...base, kind: 'correcao', status: 'pendente', contentId: 7 }]);
+    const row = within(rowOf('Correção de Guia do café coado'));
+    expect(row.getByRole('link', { name: 'Correção de Guia do café coado' })).toBeTruthy();
+    expect(row.getAllByText('—')).toHaveLength(5);
+  });
+});
+
 describe('lista ao vivo', () => {
   const POLL_MS = 100;
   const status = vi.fn<GenerationRunsStatus>();
-  const [pending, done, failed] = ROWS as [
-    GenerationRunSummary,
-    GenerationRunSummary,
-    GenerationRunSummary,
-  ];
+  type Generation = Extract<GenerationRunSummary, { kind: 'geracao' }>;
+  const [pending, done, failed] = ROWS as [Generation, Generation, Generation];
   const tick = () => act(() => vi.advanceTimersByTimeAsync(POLL_MS));
 
   function renderLive(rows: GenerationRunSummary[]) {

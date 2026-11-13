@@ -264,6 +264,7 @@ describe('lista das execuções do site', () => {
     expect(listed.value[0]).toEqual({
       id: newest,
       createdAt: new Date('2026-11-03T10:00Z'),
+      kind: 'geracao',
       topic: 'Terceiro',
       status: 'pendente',
       provider: null,
@@ -434,7 +435,12 @@ describe('execuções de correção (#798)', () => {
     return { ...base, reviewId: review.id };
   }
 
-  async function correction(): Promise<{ runId: number; contentId: number; reviewId: number }> {
+  async function correction(): Promise<{
+    runId: number;
+    contentId: number;
+    version: number;
+    reviewId: number;
+  }> {
     const { contentId, version, reviewId } = await returned();
     const { runId } = await db.transaction((tx) =>
       enqueueCorrection(tx, {
@@ -445,7 +451,7 @@ describe('execuções de correção (#798)', () => {
         createdBy: revisor.email,
       }),
     );
-    return { runId, contentId, reviewId };
+    return { runId, contentId, version, reviewId };
   }
 
   /** Nome da restrição que o banco violou ao gravar. */
@@ -494,11 +500,45 @@ describe('execuções de correção (#798)', () => {
     expect(await db.select().from(generationRuns)).toEqual([]);
   });
 
-  it('pendingRun e a lista do site ignoram a correcao', async () => {
+  it('pendingRun ignora a correcao', async () => {
     const { runId } = await correction();
 
     expect(await pendingRun(db, runId)).toBeUndefined();
-    expect(await listGenerationRuns(db, editor, SITE)).toEqual({ ok: true, value: [] });
+  });
+
+  it('a lista do site traz a correcao com o título da versão devolvida (#805)', async () => {
+    const { runId, contentId, version } = await correction();
+    const [base] = await db
+      .select({ title: sql<string>`${contentVersions.data}->>'title'` })
+      .from(contentVersions)
+      .where(
+        and(
+          eq(contentVersions.siteId, SITE),
+          eq(contentVersions.contentId, contentId),
+          eq(contentVersions.version, version),
+        ),
+      );
+
+    expect(await listGenerationRuns(db, revisor, SITE)).toEqual({
+      ok: true,
+      value: [
+        {
+          id: runId,
+          createdAt: expect.any(Date) as Date,
+          kind: 'correcao',
+          contentTitle: base?.title,
+          status: 'pendente',
+          provider: null,
+          model: null,
+          inputTokens: null,
+          outputTokens: null,
+          costUsd: null,
+          durationMs: null,
+          contentId,
+        },
+      ],
+    });
+    expect(base?.title).toEqual(expect.any(String));
   });
 
   it('finishRun com falha mantém o conteúdo da correcao', async () => {

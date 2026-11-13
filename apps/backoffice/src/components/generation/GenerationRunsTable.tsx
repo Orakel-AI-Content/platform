@@ -61,6 +61,9 @@ export function formatRunDuration(ms: number | null): string {
   return ms < 1000 ? `${ms} ms` : `${seconds.format(ms / 1000)} s`;
 }
 
+const reviewHref = (siteId: string, contentId: number) =>
+  `/sites/${encodeURIComponent(siteId)}/revisao/${contentId}`;
+
 function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSummary>[] {
   return [
     {
@@ -70,10 +73,19 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
       cell: ({ row }) => formatDateTime(row.original.createdAt, timeZone),
     },
     {
+      // A correção não tem tema: aparece pelo conteúdo que corrige, com link para a revisão.
       header: 'Tema',
-      accessorKey: 'topic',
+      id: 'topic',
       enableSorting: false,
-      cell: ({ row }) => <Truncated text={row.original.topic} className="max-w-32" />,
+      cell: ({ row }) => {
+        const run = row.original;
+        if (run.kind === 'geracao') return <Truncated text={run.topic} className="max-w-32" />;
+        return (
+          <Link href={reviewHref(siteId, run.contentId)} className={ROW_LINK_CLASS}>
+            <Truncated text={`Correção de ${run.contentTitle}`} className="max-w-32" />
+          </Link>
+        );
+      },
     },
     {
       header: 'Status',
@@ -143,10 +155,7 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<GenerationRunSu
         const { contentId, status } = row.original;
         if (status !== 'ok' || contentId === null) return MISSING;
         return (
-          <Link
-            href={`/sites/${encodeURIComponent(siteId)}/revisao/${contentId}`}
-            className={ROW_LINK_CLASS}
-          >
+          <Link href={reviewHref(siteId, contentId)} className={ROW_LINK_CLASS}>
             <span className="sr-only">Conteúdo </span>#{contentId}
             <span className="sr-only"> (abrir)</span>
           </Link>
@@ -183,7 +192,8 @@ function useGenerationRuns(
 }
 
 /**
- * Execuções da geração do site (R5), só leitura: quando, tema, status, provedor e modelo, tokens,
+ * Execuções da geração do site (R5), só leitura: quando, tema (na correção, "Correção de
+ * <título>" com link para a revisão, #805), status, provedor e modelo, tokens,
  * custo, duração e o link para a revisão do conteúdo gerado (#779). Com `status`, relê a lista a
  * cada `pollMs` enquanto há execução pendente; sem pendente, não consulta. No DataTable do template, como a lista de
  * pendências (#365), sem toolbar (busca e filtro ficam fora, #541); o que a execução ainda não
