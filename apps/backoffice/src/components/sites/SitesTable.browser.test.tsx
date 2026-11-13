@@ -49,6 +49,7 @@ const SITES: SiteSummary[] = ids.map((id, index) => ({
   effectiveDailyPublishLimit: 10,
   publishedToday: 0,
   timeZone: index % 2 === 0 ? 'America/Sao_Paulo' : 'Europe/Lisbon',
+  infraDrift: { status: null, summary: null, checkedAt: null, error: null },
 }));
 
 const publishNow = () => Promise.resolve({ ok: true as const, message: 'ok' });

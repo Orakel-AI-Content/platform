@@ -66,6 +66,22 @@ export type SiteSummary = {
   publishedToday: number;
   /** Fuso IANA da configuração corrente: as telas mostram as datas do site nele. */
   timeZone: string;
+  /** Última conferência da infra contra a descrição atual (workspace#98). */
+  infraDrift: InfraDrift;
+};
+
+/**
+ * Conferência da infra contra a descrição atual: o último resultado conhecido (nulo se
+ * nenhuma conferência terminou bem) e a última conferência, com o motivo se ela falhou.
+ */
+export type InfraDrift = {
+  status: (typeof sites.$inferSelect)['infraDriftStatus'];
+  /** Resumo das mudanças do plano, quando `desatualizado`. */
+  summary: string | null;
+  /** Quando a última conferência terminou, com ou sem sucesso; nulo se nunca houve. */
+  checkedAt: Date | null;
+  /** Motivo da última conferência, se ela falhou; nulo no sucesso. */
+  error: string | null;
 };
 
 /** Schema e validação semântica da configuração v1, contra os recursos da release. */
@@ -369,6 +385,12 @@ export async function listSites(db: Executor, actor: Actor): Promise<Result<Site
         effectiveDailyPublishLimit: effectiveDailyPublishLimit(site.dailyPublishLimit),
         publishedToday: publishedToday.get(site.id) ?? 0,
         timeZone: config?.timeZone ?? DEFAULT_TIME_ZONE,
+        infraDrift: {
+          status: site.infraDriftStatus,
+          summary: site.infraDriftSummary,
+          checkedAt: site.infraDriftCheckedAt,
+          error: site.infraDriftError,
+        },
       };
     }),
   );

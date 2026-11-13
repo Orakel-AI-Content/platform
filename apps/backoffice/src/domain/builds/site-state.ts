@@ -712,3 +712,61 @@ export async function scheduleSiteInfraCheck(tx: Executor, siteId: string): Prom
       job_key_mode => 'replace'
     )`);
 }
+
+/**
+ * Etapas em que a infra do site já foi aplicada e pode divergir da descrição atual
+ * (`infra/site` + `infra/modules/site`, workspace#98): de `infra_aplicada` em diante.
+ */
+const INFRA_DRIFT_STEPS = ['infra_aplicada', 'zona_ativa', 'publicado'] as const satisfies Readonly<
+  (typeof sites.$inferSelect)['lifecycle'][]
+>;
+
+/**
+ * Resultado da conferência da infra contra a descrição atual (o plano real do site):
+ * `em_dia` quando o plano não tem mudanças, `desatualizado` com o resumo delas e `falhou`
+ * quando o plano não rodou.
+ */
+export type InfraDriftOutcome =
+  | { kind: 'em_dia' }
+  | { kind: 'desatualizado'; summary: string }
+  | { kind: 'falhou'; message: string };
+
+/**
+ * Sites a conferir contra a descrição: os de `infra_aplicada` em diante, pausados incluídos,
+ * em ordem de id. Não olha `infra_runs`: quem confere pula o site com execução aberta.
+ */
+export async function sitesForInfraDrift(db: Executor): Promise<string[]> {
+  const rows = await db
+    .select({ id: sites.id })
+    .from(sites)
+    .where(inArray(sites.lifecycle, INFRA_DRIFT_STEPS))
+    .orderBy(sites.id);
+  return rows.map((row) => row.id);
+}
+
+/**
+ * Grava a conferência da infra contra a descrição, em nome do sistema (task de conferência
+ * e reaplicação concluída). `em_dia` e `desatualizado` substituem o resultado e limpam o
+ * motivo da falha anterior; `falhou` grava só a data e o motivo e mantém o último resultado
+ * conhecido, para uma falha do plano não marcar o site como desatualizado.
+ */
+export async function recordInfraDrift(
+  tx: Executor,
+  siteId: string,
+  outcome: InfraDriftOutcome,
+  checkedAt: Date,
+): Promise<void> {
+  await tx
+    .update(sites)
+    .set(
+      outcome.kind === 'falhou'
+        ? { infraDriftCheckedAt: checkedAt, infraDriftError: outcome.message }
+        : {
+            infraDriftStatus: outcome.kind,
+            infraDriftSummary: outcome.kind === 'desatualizado' ? outcome.summary : null,
+            infraDriftCheckedAt: checkedAt,
+            infraDriftError: null,
+          },
+    )
+    .where(eq(sites.id, siteId));
+}
