@@ -4,7 +4,6 @@ import {
   BUILD_KINDS,
   BUILD_STAGES,
   INFRA_RESOURCE_STEPS,
-  INFRA_STEPS,
   SITE_EVENT_KINDS,
 } from '@/db/schema/operations.ts';
 import type {
@@ -21,7 +20,6 @@ import {
   BUILD_STATUS_VARIANT,
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_TAG,
-  INFRA_RESOURCE_STEP_ORDER,
   INFRA_STEP_LABEL,
   INFRA_STEP_ORDER,
   INFRA_STEP_TEXT,
@@ -301,13 +299,9 @@ describe('conferência da infra na etapa Infra e zona (#716)', () => {
 });
 
 describe('resumo do plano da infra (#825)', () => {
-  it('as etapas seguem a ordem de INFRA_STEPS, todas com rótulo', () => {
-    expect(INFRA_STEP_ORDER).toEqual([...INFRA_STEPS]);
-    for (const step of INFRA_STEPS) expect(INFRA_STEP_LABEL[step]).not.toBe('');
-  });
-
-  it('o resumo do plano lista só as etapas dos recursos, sem a das páginas', () => {
-    expect(INFRA_RESOURCE_STEP_ORDER).toEqual([...INFRA_RESOURCE_STEPS]);
+  it('as etapas seguem a ordem de INFRA_RESOURCE_STEPS, todas com rótulo', () => {
+    expect(INFRA_STEP_ORDER).toEqual([...INFRA_RESOURCE_STEPS]);
+    for (const step of INFRA_RESOURCE_STEPS) expect(INFRA_STEP_LABEL[step]).not.toBe('');
   });
 
   const change = (action: 'create' | 'update' | 'delete' | 'replace') => ({

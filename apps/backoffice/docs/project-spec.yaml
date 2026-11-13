@@ -131,7 +131,7 @@ decisions:
 
   quality.tests:
     {
-      value: 'test (Vitest, sem banco), test:contract (Vitest + Postgres), test:e2e (Playwright + axe contra o ambiente local); sem meta de cobertura',
+      value: 'test (Vitest, sem banco), test:contract (Vitest + Postgres e o S3 do SeaweedFS, para o ObjectStore), test:e2e (Playwright + axe contra o ambiente local); sem meta de cobertura',
       source: input,
       input_ref: 'Testes',
     }

@@ -152,10 +152,30 @@ jobs:
       POSTGRES_PASSWORD: orakel-ci
       POSTGRES_DB: orakel
       DATABASE_URL: postgres://orakel:orakel-ci@localhost:5432/orakel
+      # SeaweedFS do passo abaixo: contrato do ObjectStore (object-store.contract.test.ts).
+      S3_ENDPOINT: http://localhost:8333
+      S3_ACCESS_KEY_ID: orakel-ci
+      S3_SECRET_ACCESS_KEY: orakel-ci-secret
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      # A mesma imagem do infra/local/compose.override.yaml. Passo, não `services:`: o serviço
+      # do Actions não aceita o comando que liga o S3 nem monta o arquivo das identidades.
+      - name: SeaweedFS (S3)
+        run: |
+          cat > "$RUNNER_TEMP/s3.json" <<JSON
+          {"identities": [{"name": "orakel",
+            "credentials": [{"accessKey": "$S3_ACCESS_KEY_ID", "secretKey": "$S3_SECRET_ACCESS_KEY"}],
+            "actions": ["Admin", "Read", "List", "Tagging", "Write"]}]}
+          JSON
+          docker run -d --name s3 -p 127.0.0.1:8333:8333 \
+            -v "$RUNNER_TEMP/s3.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d \
+            server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+          for _ in $(seq 60); do curl -fs "$S3_ENDPOINT/healthz" >/dev/null && exit 0; sleep 1; done
+          docker logs s3
+          exit 1
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:

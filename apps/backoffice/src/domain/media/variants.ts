@@ -35,6 +35,9 @@ export type VariantsPayload = {
 /** Bucket de mídia do site (um por site, como no R2). */
 export const mediaBucket = (siteId: string) => `media-${siteId}`;
 
+/** Esvazia o bucket de mídia do site antes do destroy da infra (workspace#97). */
+export const EMPTY_SITE_MEDIA_TASK = 'empty-site-media';
+
 export type VariantSpec = { width: number; format: string };
 
 /** Variantes que o perfil exige de um original com esta largura (regra do content-model). */
