@@ -2,6 +2,7 @@ import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ContentEditor } from '@/components/contents/ContentEditor';
+import { ReviewOpinion } from '@/components/review/ReviewOpinion';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import type { Role } from '@/db/schema/index.ts';
@@ -9,7 +10,8 @@ import type { Role } from '@/db/schema/index.ts';
 // Tela de revisão (#767): com `content.amend` e a versão em revisão, o passo Ajustes recebe o
 // editor no modo `amend`, ligado à versão vista e voltando à revisão em `?passo=ajustes`; a
 // prévia continua ao lado. Sem a permissão, ou fora de revisão, nada de editor (nem as opções
-// dele são lidas), e o "Corrigir" da rota provisória (#751) não existe mais.
+// dele são lidas), e o "Corrigir" da rota provisória (#751) não existe mais. O parecer automático
+// da versão vista (workspace#94) vai ao painel com os rótulos dos três pontos.
 
 const state = vi.hoisted(() => ({
   roles: ['revisor'] as Role[],
@@ -19,6 +21,10 @@ const options = vi.hoisted(() => ({
   read: vi.fn(() =>
     Promise.resolve({ blockTypes: ['text'], media: {}, authors: [], taxonomies: [] }),
   ),
+}));
+
+const opinion = vi.hoisted(() => ({
+  read: vi.fn(() => Promise.resolve({ ok: true, value: { state: 'pendente' } })),
 }));
 
 const data = { kind: 'article', slug: 'guia', title: 'Guia', blocks: [] };
@@ -55,6 +61,9 @@ vi.mock('@/domain/reviews/reviews.ts', () => ({
 }));
 vi.mock('@/domain/reviews/link-checks.ts', () => ({
   linkCheckFor: () => Promise.resolve({ ok: true, value: undefined }),
+}));
+vi.mock('@/domain/reviews/opinions.ts', () => ({
+  opinionFor: opinion.read,
 }));
 vi.mock('@/domain/reviews/confirmations.ts', () => ({
   reviewConfirmations: () => Promise.resolve({ ok: true, value: [] }),
@@ -136,5 +145,26 @@ describe('tela de revisão, passo Ajustes (#767)', () => {
   it('o "Corrigir" da rota provisória não existe mais', async () => {
     const page = await render();
     expect(findAll(page, ButtonLink)).toHaveLength(0);
+  });
+});
+
+describe('tela de revisão, parecer automático (workspace#94)', () => {
+  it('lê o parecer da versão vista e o passa ao painel, com os rótulos dos pontos', async () => {
+    const page = await render();
+    expect(opinion.read).toHaveBeenCalledWith({}, expect.anything(), {
+      siteId: 'exemplo-a',
+      contentId: 7,
+      version: 2,
+    });
+    const panel = findAll(page, ReviewPanel)[0]!;
+    const section = findAll(panel.props.opinion as ReactNode, ReviewOpinion)[0]!;
+    expect(section.props.state).toEqual({ state: 'pendente' });
+    expect((section.props.points as { key: string }[]).map((point) => point.key)).toEqual([
+      'valor_original',
+      'politicas_anuncios_afiliados',
+      'linha_editorial',
+    ]);
+    // Só informa: não entra no bloqueio das aprovações.
+    expect(panel.props.blocked).toBe(false);
   });
 });
