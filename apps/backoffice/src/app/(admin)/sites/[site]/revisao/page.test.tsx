@@ -32,6 +32,7 @@ const item = (id: number): ReviewQueueEntry => ({
   pending: 0,
   links: { state: 'verificando' },
   returned: false,
+  opinion: 'favoravel',
 });
 
 /** Primeiro elemento do tipo pedido na árvore devolvida pela página. */

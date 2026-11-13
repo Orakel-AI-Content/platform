@@ -8,7 +8,7 @@ import type { ReviewQueueEntry } from '@/domain/reviews/reviews.ts';
 import { ReviewQueueTable } from './ReviewQueueTable.tsx';
 
 // Fila de revisão (#74): título, tipo, versão e data; links para a revisão e teclado.
-// Pendências e a marca "Devolvido" de cada item (#772).
+// Pendências e a marca "Devolvido" de cada item (#772). O resultado do parecer automático (#774).
 // Busca, filtro por tipo, ordem e paginação com o estado na URL (#365): router.replace simulado.
 
 const navigation = vi.hoisted(() => {
@@ -41,8 +41,13 @@ afterEach(() => {
   navigation.set('');
 });
 
-/** Sem pendência, links verificando e enviado pela primeira vez. */
-const fresh = { pending: 0, links: { state: 'verificando' }, returned: false } as const;
+/** Sem pendência, links verificando, enviado pela primeira vez e parecer favorável. */
+const fresh = {
+  pending: 0,
+  links: { state: 'verificando' },
+  returned: false,
+  opinion: 'favoravel',
+} as const;
 
 const rows: ReviewQueueEntry[] = [
   {
@@ -84,6 +89,7 @@ describe('fila de revisão', () => {
       'Tipo',
       'Versão',
       'Pendências',
+      'Parecer',
       'Enviado em',
     ]);
     const [, first, second] = screen.getAllByRole('row');
@@ -127,6 +133,33 @@ describe('fila de revisão', () => {
     expect(within(titleCell).getByText('Devolvido')).toBeTruthy();
     // A marca fica fora do link: o nome acessível continua o do título.
     expect(screen.getByRole('link', { name: 'Guia de uso (revisar)' })).toBeTruthy();
+  });
+
+  it('mostra o resultado do parecer de cada item (#774)', () => {
+    const outlooks = ['favoravel', 'com_ressalvas', 'pendente', 'falha', 'ausente'] as const;
+    renderTable(
+      outlooks.map((opinion, index) => ({
+        ...fresh,
+        id: index + 1,
+        kind: 'article',
+        title: `Artigo ${String(index + 1)}`,
+        version: 1,
+        submittedAt: new Date(Date.UTC(2026, 9, 1 + index)),
+        opinion,
+      })),
+    );
+
+    const opinionCells = screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getAllByRole('cell')[4]?.textContent);
+    expect(opinionCells).toEqual([
+      'Favorável',
+      'Com ressalvas',
+      'Pendente',
+      'Falhou',
+      'Sem parecer',
+    ]);
   });
 
   it('mostra o instante do envio no fuso do site (#771)', () => {

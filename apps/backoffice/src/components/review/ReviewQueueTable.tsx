@@ -7,13 +7,18 @@ import DataTable, { type ColumnDef, type Row } from '@/components/shared/DataTab
 import { EmptyState, NoResults } from '@/components/shared/EmptyState';
 import { ListToolbar } from '@/components/shared/ListControls.tsx';
 import { ROW_LINK_CLASS } from '@/components/shared/rowLink';
-import { CONTENT_KIND_LABEL, formatDateTime } from '@/components/shared/siteLabels.ts';
+import {
+  CONTENT_KIND_LABEL,
+  formatDateTime,
+  type StateTagColor,
+} from '@/components/shared/siteLabels.ts';
 import { NoWrap } from '@/components/shared/NoWrap';
 import { Truncated } from '@/components/shared/Truncated';
 import { useListTable } from '@/components/shared/useListTable';
 import { StateTag } from '@/components/sites/SiteStatus';
 import classNames from '@/components/ui/utils/classNames';
 import type { ListConfig } from '@/components/shared/useListState.ts';
+import type { OpinionOutlook } from '@/domain/reviews/opinions.ts';
 import type { ReviewQueueEntry } from '@/domain/reviews/reviews.ts';
 
 const KINDS = Object.keys(CONTENT_KIND_LABEL) as ReviewQueueEntry['kind'][];
@@ -24,6 +29,15 @@ const LIST: ListConfig = {
   sortable: ['title', 'kind', 'version', 'pending', 'submittedAt'],
   defaultSort: { id: 'submittedAt', desc: false },
   pageSizes: [10, 25, 50, 100],
+};
+
+/** Resultado do parecer automático (#774), nas cores dos vereditos do `ReviewOpinion`. */
+const OPINION: Record<OpinionOutlook, { text: string; color: StateTagColor }> = {
+  favoravel: { text: 'Favorável', color: 'bg-success' },
+  com_ressalvas: { text: 'Com ressalvas', color: 'bg-warning' },
+  pendente: { text: 'Pendente', color: 'bg-info' },
+  falha: { text: 'Falhou', color: 'bg-error' },
+  ausente: { text: 'Sem parecer', color: 'bg-gray-400' },
 };
 
 /** Ordena pelo texto exibido em pt-BR (rótulo do tipo, título), não pelo valor. */
@@ -81,6 +95,21 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueEntr
       sortFn: 'basic',
       cell: ({ row }) => (row.original.pending === 0 ? 'Nenhuma' : row.original.pending),
     },
+    // Parecer automático da versão em revisão (#774): só informa, como na tela de revisão.
+    {
+      header: 'Parecer',
+      accessorKey: 'opinion',
+      enableGlobalFilter: false,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const { text, color } = OPINION[row.original.opinion];
+        return (
+          <StateTag color={color} className="whitespace-nowrap">
+            {text}
+          </StateTag>
+        );
+      },
+    },
     // Instante do envio para revisão (#771); a data da versão nas anteriores à coluna.
     {
       header: 'Enviado em',
@@ -95,7 +124,8 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueEntr
 /**
  * Fila de revisão do site (#74): conteúdos cuja versão mais recente está em revisão, da mais
  * antiga para a mais recente. Cada título leva à tela de revisão, com a marca "Devolvido" ao
- * lado quando volta de uma devolução, e "Pendências" conta o que não está ok (#772). No DataTable do template
+ * lado quando volta de uma devolução, "Pendências" conta o que não está ok (#772) e "Parecer" mostra o
+ * resultado do parecer automático (#774). No DataTable do template
  * (#365): busca por título, filtro por tipo, ordem e paginação no cliente com o estado na URL;
  * toolbar e tabela vão no cartão da página, abaixo do `ListHeader`.
  */
