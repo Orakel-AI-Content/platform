@@ -124,6 +124,9 @@ services:
       # Sem INFRA_DRIVER, vale tofu, e o build-runner não sobe sem os quatro segredos.
       INFRA_RUNNER_IMAGE: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/infra-runner
       INFRA_DRIVER: ${INFRA_DRIVER:-}
+      # Mesmo commit do backoffice: o grupo images constrói as duas imagens juntas.
+      INFRA_RUNNER_TAG: ${BACKOFFICE_TAG:-}
+      INFRA_EMAIL_FORWARD_TO: ${INFRA_EMAIL_FORWARD_TO:-}
       CLOUDFLARE_INFRA_TOKEN: ${CLOUDFLARE_INFRA_TOKEN:-}
       TOFU_STATE_ACCESS_KEY_ID: ${TOFU_STATE_ACCESS_KEY_ID:-}
       TOFU_STATE_SECRET_ACCESS_KEY: ${TOFU_STATE_SECRET_ACCESS_KEY:-}

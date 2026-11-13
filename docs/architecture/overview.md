@@ -57,7 +57,10 @@ flowchart LR
   `build-runner` mantém na versão do motor corrente (ADR 0024). Cada build ou rollback de
   um site é uma execução (tabela `builds`), registrada desde o enfileiramento e visível no
   histórico do site; a atualização de sites leva a versão do motor mais recente a todos os
-  sites, um por vez, começando pelo canário.
+  sites, um por vez, começando pelo canário. A infraestrutura de cada site é criada pelo
+  `build-runner` em duas tasks, na fila `infra:<site>`: `infra-plan` grava o resumo e espera a
+  confirmação; `infra-apply` aplica o plano salvo, etapa por etapa (tabela `infra_runs`, ADR
+  0027). O driver `tofu` roda a imagem `infra-runner`; o `local` simula as etapas.
 - **Eventos:** o Worker de borda grava eventos anônimos no Analytics Engine e na fila;
   o agregador consolida no Postgres.
 

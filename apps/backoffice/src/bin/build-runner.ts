@@ -3,6 +3,9 @@ import { run } from 'graphile-worker';
 import { getDb } from '../db/client.ts';
 import type { BuildSettings } from '../domain/builds/plan.ts';
 import { recoverInterruptedBuilds } from '../domain/builds/recover.ts';
+import type { ContainerRuntime } from '../domain/builds/runtime.ts';
+import { localDriver, tofuDriver, type InfraDriver } from '../domain/infra/drivers.ts';
+import { recoverInterruptedInfraRuns } from '../domain/infra/schedule.ts';
 import { schedulePreviewReconcile } from '../domain/preview/preview.ts';
 import { getBuildRunnerEnv, getEnv, type BuildRunnerEnv, type Env } from '../env.ts';
 import { BUILD_RUNNER_CONCURRENCY, buildRunnerTasks } from '../jobs/task-lists.ts';
@@ -51,6 +54,36 @@ function releaseDriverFrom(runner: BuildRunnerEnv): ReleaseDriver {
   };
 }
 
+/**
+ * Driver da infra do site (ADR 0027 da raiz); o env já recusa `tofu` sem a tag, a conta, a caixa
+ * central ou os segredos. Só o container do infra-runner recebe essa entrada.
+ */
+function infraDriverFrom(runner: BuildRunnerEnv, runtime: ContainerRuntime): InfraDriver {
+  if (runner.INFRA_DRIVER === 'local') {
+    return localDriver(
+      runner.INFRA_LOCAL_FAIL_STEP === undefined ? {} : { failStep: runner.INFRA_LOCAL_FAIL_STEP },
+    );
+  }
+  const required = (name: keyof BuildRunnerEnv): string => {
+    const value = runner[name];
+    if (typeof value !== 'string') throw new Error(`INFRA_DRIVER=tofu sem ${name}`);
+    return value;
+  };
+  return tofuDriver({
+    runtime,
+    image: `${runner.INFRA_RUNNER_IMAGE}:${required('INFRA_RUNNER_TAG')}`,
+    network: runner.BUILD_PUBLISH_NETWORK,
+    env: {
+      CLOUDFLARE_ACCOUNT_ID: required('CLOUDFLARE_ACCOUNT_ID'),
+      EMAIL_FORWARD_TO: required('INFRA_EMAIL_FORWARD_TO'),
+      CLOUDFLARE_INFRA_TOKEN: required('CLOUDFLARE_INFRA_TOKEN'),
+      TOFU_STATE_ACCESS_KEY_ID: required('TOFU_STATE_ACCESS_KEY_ID'),
+      TOFU_STATE_SECRET_ACCESS_KEY: required('TOFU_STATE_SECRET_ACCESS_KEY'),
+      TOFU_STATE_PASSPHRASE: required('TOFU_STATE_PASSPHRASE'),
+    },
+  });
+}
+
 // build-runner (12.0, L3): builds, releases e a prévia, no máximo dois jobs simultâneos; a fila
 // nomeada build:<site> garante um por vez por site. Cria os containers do site-builder pela
 // API do Docker, sempre pelo docker-socket-proxy.
@@ -62,25 +95,31 @@ await runProcess('build-runner', async (logger) => {
   for (const build of await recoverInterruptedBuilds(db, runner.SITE_BUILDER_TAG)) {
     logger.warn(build, `${build.kind} de ${build.siteId} interrompido; fila liberada`);
   }
+  // Plano ou apply da infra largado no meio: a execução fecha `falhou` e a fila infra:<site> solta.
+  for (const run of await recoverInterruptedInfraRuns(db)) {
+    logger.warn(run, `infra de ${run.siteId} interrompida; execução ${run.runId} fechada`);
+  }
   // O container da prévia sobrevive ao build-runner (restart unless-stopped): a cada partida, a
   // reconciliação confere que ele está na versão corrente (ADR 0024 da raiz).
   await schedulePreviewReconcile(db);
   const env = getEnv();
+  const runtime = dockerRuntime({
+    host: runner.DOCKER_HOST,
+    siteBuilderImage: runner.SITE_BUILDER_IMAGE,
+    infraRunnerImage: runner.INFRA_RUNNER_IMAGE,
+  });
   const worker = await run({
     pgPool: pool,
     taskList: buildRunnerTasks({
       db,
-      runtime: dockerRuntime({
-        host: runner.DOCKER_HOST,
-        siteBuilderImage: runner.SITE_BUILDER_IMAGE,
-        infraRunnerImage: runner.INFRA_RUNNER_IMAGE,
-      }),
+      runtime,
       settings: settingsFrom(env, runner),
       driver: releaseDriverFrom(runner),
       preview: {
         internalNetwork: runner.BUILD_INTERNAL_NETWORK,
         exportPreviewToken: env.EXPORT_PREVIEW_TOKEN,
       },
+      infra: infraDriverFrom(runner, runtime),
     }),
     concurrency: BUILD_RUNNER_CONCURRENCY,
   });
@@ -92,6 +131,7 @@ await runProcess('build-runner', async (logger) => {
         runner.RELEASE_DRIVER === 'local'
           ? 'local'
           : `github (${runner.GITHUB_RELEASE_REPOSITORY})`,
+      infra: runner.INFRA_DRIVER,
     },
     'build-runner no ar',
   );

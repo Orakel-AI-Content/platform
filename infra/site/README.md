@@ -50,6 +50,11 @@ também para rodar à mão, a partir de uma máquina com o IP liberado no token.
    da zona, por isso não fica no módulo: com um estado por site, ele seria criado de novo a
    cada site.
 
+No ambiente da VPS, o build-runner recebe o token do passo 2 em `CLOUDFLARE_INFRA_TOKEN`, as
+credenciais do passo 1 em `TOFU_STATE_ACCESS_KEY_ID` e `TOFU_STATE_SECRET_ACCESS_KEY`, a senha
+do passo 3 em `TOFU_STATE_PASSPHRASE` e a caixa do passo 4 em `INFRA_EMAIL_FORWARD_TO`, além do
+`CLOUDFLARE_ACCOUNT_ID`. A tag da imagem é a do `BACKOFFICE_TAG` (`.env.example`).
+
 ## Passos manuais (por site)
 
 1. **Nameservers.** Depois do `apply`, troque no registrador os nameservers do domínio pelos
