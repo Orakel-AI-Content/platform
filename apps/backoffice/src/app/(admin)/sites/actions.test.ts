@@ -4,9 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   cancelBuildAction,
   checkSiteInfraAction,
+  confirmInfraPlanAction,
   createSiteAction,
+  infraPlanAction,
   pauseSiteAction,
   rebuildOnReleaseAction,
+  requestInfraPlanAction,
   registerG1Action,
   rollbackSiteAction,
   resumeSiteAction,
@@ -42,6 +45,9 @@ const mocks = vi.hoisted(() => ({
   setBuildWindow: vi.fn(),
   setDailyPublishLimit: vi.fn(),
   registerPolicyTrigger: vi.fn(),
+  requestInfraPlan: vi.fn(),
+  confirmInfraPlan: vi.fn(),
+  readInfraPlan: vi.fn(),
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
@@ -64,6 +70,11 @@ vi.mock('@/domain/builds/site-state.ts', () => ({
   revertRelease: mocks.revertRelease,
   setBuildWindow: mocks.setBuildWindow,
   setDailyPublishLimit: mocks.setDailyPublishLimit,
+}));
+vi.mock('@/domain/infra/plan.ts', () => ({
+  requestInfraPlan: mocks.requestInfraPlan,
+  confirmInfraPlan: mocks.confirmInfraPlan,
+  readInfraPlan: mocks.readInfraPlan,
 }));
 vi.mock('@/domain/sites/policy-triggers.ts', () => ({
   registerPolicyTrigger: mocks.registerPolicyTrigger,
@@ -615,5 +626,67 @@ describe('siteInfraCheckAction (#716)', () => {
 
     mocks.readSiteInfraCheck.mockResolvedValue({ ok: false, issues: [{ code: 'forbidden' }] });
     expect(await siteInfraCheckAction('exemplo-a')).toBeNull();
+  });
+});
+
+describe('criar infraestrutura (#825)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.currentActor.mockResolvedValue({ ok: true, value: operacao });
+  });
+
+  it('pedir devolve a execução e revalida a página do site', async () => {
+    mocks.requestInfraPlan.mockResolvedValue({ ok: true, value: { runId: 7 } });
+
+    expect(await requestInfraPlanAction('exemplo-a')).toEqual({ ok: true, runId: 7 });
+    expect(mocks.requestInfraPlan).toHaveBeenCalledWith({}, operacao, 'exemplo-a');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('a recusa do pedido vira a mensagem, sem revalidar', async () => {
+    const message = 'O site exemplo-a já tem uma criação de infraestrutura aberta';
+    mocks.requestInfraPlan.mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'infra.run_open', message, path: [] }],
+    });
+
+    expect(await requestInfraPlanAction('exemplo-a')).toEqual({ ok: false, message });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('confirmar chama o domínio com a execução e revalida', async () => {
+    mocks.confirmInfraPlan.mockResolvedValue({ ok: true, value: undefined });
+
+    expect(await confirmInfraPlanAction('exemplo-a', 7)).toEqual({
+      ok: true,
+      message: 'Criação da infraestrutura confirmada.',
+    });
+    expect(mocks.confirmInfraPlan).toHaveBeenCalledWith({}, operacao, 'exemplo-a', 7);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('ler o plano devolve a visão do domínio, ou null na recusa', async () => {
+    mocks.readInfraPlan.mockResolvedValueOnce({ ok: true, value: { status: 'planejando' } });
+    expect(await infraPlanAction('exemplo-a', 7)).toEqual({ status: 'planejando' });
+
+    mocks.readInfraPlan.mockResolvedValueOnce({
+      ok: false,
+      issues: [{ code: 'forbidden', message: 'x', path: [] }],
+    });
+    expect(await infraPlanAction('exemplo-a', 7)).toBeNull();
+  });
+
+  it('sem sessão, nada chega ao domínio', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await requestInfraPlanAction('exemplo-a')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(await confirmInfraPlanAction('exemplo-a', 7)).toMatchObject({ ok: false });
+    expect(await infraPlanAction('exemplo-a', 7)).toBeNull();
+    expect(mocks.requestInfraPlan).not.toHaveBeenCalled();
+    expect(mocks.confirmInfraPlan).not.toHaveBeenCalled();
+    expect(mocks.readInfraPlan).not.toHaveBeenCalled();
   });
 });

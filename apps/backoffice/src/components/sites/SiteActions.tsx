@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, use, useState, type ReactNode } from 'react';
+import { createContext, use, useRef, useState, type ReactNode } from 'react';
 
 import { SchemaForm } from '@/components/forms/SchemaForm';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
@@ -8,7 +8,11 @@ import type { ActionResult } from '@/components/shared/actionResult.ts';
 import ConfirmDialog from '@/components/shared/ConfirmDialog.tsx';
 import { INFRA_STEP_TEXT } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
+import type { OpenInfraRun } from '@/domain/infra/runs.ts';
+import type { InfraPlanView } from '@/domain/infra/plan.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
+
+import { CreateInfraDialog, useCreateInfra } from './CreateInfraDialog.tsx';
 
 import { useInfraCheckContext } from './LifecycleSteps.tsx';
 
@@ -36,6 +40,17 @@ const UNDO_STEP = {
   zona_ativa: { label: 'zona ativa', back: 'infra_aplicada' },
 } as const satisfies Record<Step, unknown>;
 
+/**
+ * "Criar infraestrutura" (#825): a execução aberta do site (só o id e o estado) e as actions
+ * de pedir o plano, lê-lo e confirmá-lo, ligadas ao site.
+ */
+export type CreateInfraActions = {
+  open: Pick<OpenInfraRun, 'id' | 'status'> | null;
+  request: () => Promise<{ ok: true; runId: number } | { ok: false; message: string }>;
+  read: (runId: number) => Promise<InfraPlanView | null>;
+  confirm: (runId: number) => Promise<ActionResult>;
+};
+
 const LifecycleActionContext = createContext<ReturnType<typeof useActionResult> | null>(null);
 
 /**
@@ -54,7 +69,10 @@ export function LifecycleActionScope({ children }: { children: ReactNode }) {
 }
 
 /**
- * As ações da etapa "Infra e zona": "Conferir agora" (workspace#85), que enfileira a conferência
+ * As ações da etapa "Infra e zona": "Criar infraestrutura" (#825) num site `cadastrado` sem
+ * execução aberta, ou "Revisar e confirmar" com a execução `planejando` ou
+ * `aguardando_confirmacao` (reabre o diálogo no estado salvo; nenhuma das duas com `aplicando`),
+ * quando a página passa `infra`; "Conferir agora" (workspace#85), que enfileira a conferência
  * da infra só deste site, enquanto a conferência ainda tem o que avançar (`cadastrado`,
  * `infra_aplicada`), e o caminho de volta da etapa atual ("Desmarcar", com confirmação; #714);
  * `publicado` vem do build e não se desmarca. Com conferência pedida ou na fila, "Conferir agora"
@@ -68,25 +86,69 @@ export function LifecycleAction({
   lifecycle: pageLifecycle,
   check,
   undo,
+  infra,
 }: {
   lifecycle: SiteSummary['lifecycle'];
   check: () => Promise<ActionResult>;
   undo: (step: Step) => Promise<ActionResult>;
+  infra?: CreateInfraActions;
 }) {
   const scope = use(LifecycleActionContext);
   const view = useInfraCheckContext();
   const [confirming, setConfirming] = useState(false);
-  const [running, setRunning] = useState<'check' | 'undo' | null>(null);
+  const [running, setRunning] = useState<'check' | 'undo' | 'infra' | null>(null);
+  const creating = useCreateInfra({
+    request: infra?.request ?? noRequest,
+    read: infra?.read ?? noRead,
+  });
+  const infraTrigger = useRef<HTMLButtonElement>(null);
   if (scope === null) throw new Error('LifecycleAction fora de um LifecycleActionScope.');
   const lifecycle = view?.check.lifecycle ?? pageLifecycle;
   const queued = view?.check.queued ?? false;
   const checkable = lifecycle === 'cadastrado' || lifecycle === 'infra_aplicada';
   const current = lifecycle === 'infra_aplicada' || lifecycle === 'zona_ativa' ? lifecycle : null;
-  if (!checkable && current === null) return null;
-  const pending = (kind: 'check' | 'undo') => scope.pending && running === kind;
+  const openRun = infra?.open ?? null;
+  const creatable =
+    infra !== undefined && lifecycle === 'cadastrado' && openRun?.status !== 'aplicando';
+  if (!checkable && current === null && !creatable) return null;
+  const pending = (kind: 'check' | 'undo' | 'infra') => scope.pending && running === kind;
 
   return (
     <span className="flex flex-wrap gap-2">
+      {creatable && (
+        <Button
+          ref={infraTrigger}
+          type="button"
+          size="sm"
+          variant="solid"
+          disabled={scope.pending}
+          onClick={() => (openRun === null ? creating.start() : creating.reopen(openRun.id))}
+        >
+          {pending('infra')
+            ? 'Confirmando…'
+            : openRun === null
+              ? 'Criar infraestrutura'
+              : 'Revisar e confirmar'}
+          {openRun !== null && !pending('infra') && (
+            <span className="sr-only"> a criação da infraestrutura</span>
+          )}
+        </Button>
+      )}
+      {infra !== undefined && (
+        <CreateInfraDialog
+          isOpen={creating.isOpen}
+          state={creating.state}
+          onCancel={creating.close}
+          onConfirm={() => {
+            const runId = creating.runId;
+            creating.close();
+            if (runId === null) return;
+            setRunning('infra');
+            scope.run(() => infra.confirm(runId));
+          }}
+          onAfterClose={() => infraTrigger.current?.focus()}
+        />
+      )}
       {checkable && (
         <Button
           type="button"
@@ -134,6 +196,9 @@ export function LifecycleAction({
     </span>
   );
 }
+
+const noRequest = () => Promise.resolve({ ok: false as const, message: '' });
+const noRead = () => Promise.resolve(null);
 
 /** Recusa do formulário: as issues com `path` vão ao campo; sem nenhuma, a mensagem vai ao resumo. */
 function outcome(result: SiteFormResult) {

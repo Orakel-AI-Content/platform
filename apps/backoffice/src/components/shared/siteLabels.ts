@@ -1,6 +1,7 @@
+import type { InfraChange } from '@orakel/build-contract';
 import type { Block } from '@orakel/content-model/v1';
 
-import type { BuildKind, BuildStatus, SiteEventKind } from '@/db/schema/operations.ts';
+import type { BuildKind, BuildStatus, InfraStep, SiteEventKind } from '@/db/schema/operations.ts';
 import type {
   ExecutionHistoryItem,
   OpenExecution,
@@ -142,6 +143,39 @@ export const HISTORY_KIND_LABEL: Record<BuildKind | SiteEventKind, string> = {
 
 /** Item do histórico de uma criação da infraestrutura (`infra_runs`); o detalhe é da #826. */
 export const INFRA_RUN_LABEL = 'Criação da infraestrutura';
+
+/**
+ * Etapas da criação da infraestrutura (`INFRA_STEPS`), na mesma ordem, nos termos de quem opera
+ * (#825): o resumo do plano e o andamento listam nesta ordem.
+ */
+export const INFRA_STEP_LABEL = {
+  endereco: 'Endereço',
+  dns: 'Registros de DNS',
+  email: 'E-mail',
+  regras: 'Regras',
+  imagens: 'Armazenamento de imagens',
+} as const satisfies Record<InfraStep, string>;
+
+/** As etapas na ordem do `INFRA_STEP_LABEL` (sem importar o schema do banco no navegador). */
+export const INFRA_STEP_ORDER = Object.keys(INFRA_STEP_LABEL) as InfraStep[];
+
+/** O que o plano faz com um recurso, no resumo de uma etapa. */
+const INFRA_ACTION_TEXT: Record<InfraChange['action'], string> = {
+  create: 'a criar',
+  update: 'a alterar',
+  replace: 'a recriar',
+  delete: 'a remover',
+};
+
+/** Resumo de uma etapa do plano: "2 a criar · 1 a alterar", ou "Nada muda" sem recursos. */
+export function infraStepChangesText(changes: readonly InfraChange[]): string {
+  if (changes.length === 0) return 'Nada muda';
+  return (Object.keys(INFRA_ACTION_TEXT) as InfraChange['action'][])
+    .map((action) => [action, changes.filter((change) => change.action === action).length] as const)
+    .filter(([, count]) => count > 0)
+    .map(([action, count]) => `${count} ${INFRA_ACTION_TEXT[action]}`)
+    .join(' · ');
+}
 
 /** Etapa de uma execução de build, no detalhe de uma falha (#637). */
 export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {

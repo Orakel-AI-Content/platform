@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { BUILD_KINDS, BUILD_STAGES, SITE_EVENT_KINDS } from '@/db/schema/operations.ts';
+import {
+  BUILD_KINDS,
+  BUILD_STAGES,
+  INFRA_STEPS,
+  SITE_EVENT_KINDS,
+} from '@/db/schema/operations.ts';
 import type {
   EventHistoryItem,
   ExecutionHistoryItem,
@@ -15,6 +20,8 @@ import {
   BUILD_STATUS_VARIANT,
   CONTENT_STATUS_LABEL,
   CONTENT_STATUS_TAG,
+  INFRA_STEP_LABEL,
+  INFRA_STEP_ORDER,
   INFRA_STEP_TEXT,
   LIFECYCLE_LABEL,
   LIFECYCLE_ORDER,
@@ -26,6 +33,7 @@ import {
   formatDateTime,
   formatDuration,
   infraCheckText,
+  infraStepChangesText,
   liveResultText,
   liveStatusText,
   liveVersionText,
@@ -287,5 +295,34 @@ describe('conferência da infra na etapa Infra e zona (#716)', () => {
     ).toBe(
       'Não foi possível consultar o provedor (conferido há 5 minutos): Cloudflare respondeu 503',
     );
+  });
+});
+
+describe('resumo do plano da infra (#825)', () => {
+  it('as etapas seguem a ordem de INFRA_STEPS, todas com rótulo', () => {
+    expect(INFRA_STEP_ORDER).toEqual([...INFRA_STEPS]);
+    for (const step of INFRA_STEPS) expect(INFRA_STEP_LABEL[step]).not.toBe('');
+  });
+
+  const change = (action: 'create' | 'update' | 'delete' | 'replace') => ({
+    address: `module.site.x.${action}`,
+    type: 'cloudflare_dns_record',
+    action,
+  });
+
+  it('sem recursos, nada muda', () => {
+    expect(infraStepChangesText([])).toBe('Nada muda');
+  });
+
+  it('conta os recursos por ação, na ordem criar, alterar, recriar, remover', () => {
+    expect(
+      infraStepChangesText([
+        change('delete'),
+        change('create'),
+        change('update'),
+        change('create'),
+        change('replace'),
+      ]),
+    ).toBe('2 a criar · 1 a alterar · 1 a recriar · 1 a remover');
   });
 });
