@@ -115,9 +115,11 @@ describe('parseBuildRunnerEnv', () => {
   const runner = {
     DOCKER_HOST: 'tcp://docker-socket-proxy:2375',
     SITE_BUILDER_IMAGE: 'ghcr.io/orakel-ai-content/site-builder',
+    INFRA_RUNNER_IMAGE: 'ghcr.io/orakel-ai-content/infra-runner',
     EDGE_LOCAL_URL: 'http://edge-local:8081',
     RELEASE_DRIVER: 'local',
     SITE_BUILDER_TAG: 'local',
+    INFRA_DRIVER: 'local',
   };
   const token = `github_pat_${'a'.repeat(40)}`;
 
@@ -208,6 +210,71 @@ describe('parseBuildRunnerEnv', () => {
     const run = () => parseBuildRunnerEnv({ ...runner, GITHUB_RELEASE_TOKEN: 'ghp_segredo123' });
     expect(run).toThrow(/GITHUB_RELEASE_TOKEN/);
     expect(run).not.toThrow(/segredo/);
+  });
+
+  it('exige a imagem do infra-runner', () => {
+    expect(() => parseBuildRunnerEnv({ ...runner, INFRA_RUNNER_IMAGE: undefined })).toThrow(
+      /INFRA_RUNNER_IMAGE/,
+    );
+  });
+
+  describe('driver da infra (ADR 0027)', () => {
+    const secrets = {
+      CLOUDFLARE_INFRA_TOKEN: 'segredo-infra-'.padEnd(40, 'x'),
+      TOFU_STATE_ACCESS_KEY_ID: 'segredo-chave',
+      TOFU_STATE_SECRET_ACCESS_KEY: 'segredo-acesso',
+      TOFU_STATE_PASSPHRASE: 'segredo-senha-do-estado',
+    };
+    const tofu = { ...runner, ...secrets, INFRA_DRIVER: 'tofu' };
+
+    it('tofu com todos os segredos sobe', () => {
+      expect(parseBuildRunnerEnv(tofu)).toMatchObject({ INFRA_DRIVER: 'tofu', ...secrets });
+    });
+
+    it.each(Object.keys(secrets))(
+      'tofu sem %s não sobe, diz qual falta e não repete os outros segredos',
+      (name) => {
+        for (const value of [undefined, '']) {
+          const run = () => parseBuildRunnerEnv({ ...tofu, [name]: value });
+          expect(run).toThrow(new RegExp(`- ${name}: Defina ${name}`));
+          expect(run).not.toThrow(/segredo/);
+        }
+      },
+    );
+
+    it('é tofu por padrão, também com a variável vazia', () => {
+      for (const value of [undefined, '']) {
+        expect(() => parseBuildRunnerEnv({ ...runner, INFRA_DRIVER: value })).toThrow(
+          /TOFU_STATE_PASSPHRASE/,
+        );
+        expect(parseBuildRunnerEnv({ ...tofu, INFRA_DRIVER: value }).INFRA_DRIVER).toBe('tofu');
+      }
+    });
+
+    it('local sobe sem os segredos', () => {
+      const env = parseBuildRunnerEnv(runner);
+      expect(env.INFRA_DRIVER).toBe('local');
+      expect(env.CLOUDFLARE_INFRA_TOKEN).toBeUndefined();
+      expect(env.TOFU_STATE_PASSPHRASE).toBeUndefined();
+    });
+
+    it('recusa driver desconhecido e senha curta sem repetir o valor', () => {
+      expect(() => parseBuildRunnerEnv({ ...runner, INFRA_DRIVER: 'terraform' })).toThrow(
+        /INFRA_DRIVER/,
+      );
+      const run = () => parseBuildRunnerEnv({ ...tofu, TOFU_STATE_PASSPHRASE: 'segredo' });
+      expect(run).toThrow(/TOFU_STATE_PASSPHRASE/);
+      expect(run).not.toThrow(/segredo/);
+    });
+
+    it('o ambiente do web, do worker e da zona não conhece os segredos', () => {
+      const app = parseEnv({ ...valid, ...secrets });
+      const zone = parseZoneCheckEnv({ EDGE_LOCAL_URL: 'http://edge-local:8081', ...secrets });
+      for (const name of Object.keys(secrets)) {
+        expect(app).not.toHaveProperty(name);
+        expect(zone).not.toHaveProperty(name);
+      }
+    });
   });
 
   it('o Docker é sempre por TCP (o proxy), nunca pelo socket', () => {
