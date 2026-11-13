@@ -7,6 +7,8 @@ import { check, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'dri
 export const SITE_LIFECYCLE = ['cadastrado', 'infra_aplicada', 'zona_ativa', 'publicado'] as const;
 /** Estado operacional; `pausado` sempre tem motivo. */
 export const SITE_STATES = ['ativo', 'promovendo', 'pausado'] as const;
+/** Resultado conhecido da conferência da infra contra a descrição atual (workspace#98). */
+export const INFRA_DRIFT_STATUSES = ['em_dia', 'desatualizado'] as const;
 
 export const sites = pgTable(
   'sites',
@@ -57,6 +59,17 @@ export const sites = pgTable(
      */
     infraCheckedAt: timestamp({ withTimezone: true }),
     infraCheckError: text(),
+    /**
+     * Última conferência da infra contra a descrição atual (plano real, workspace#98): o
+     * resultado conhecido (`em_dia` ou `desatualizado`, com o resumo das mudanças do plano) e
+     * quando a conferência terminou. A que falha grava só a data e o motivo e preserva o
+     * resultado anterior; a bem-sucedida limpa o motivo. Nulas até a primeira conferência.
+     * Operacional: fora do snapshot.
+     */
+    infraDriftStatus: text({ enum: INFRA_DRIFT_STATUSES }),
+    infraDriftSummary: text(),
+    infraDriftCheckedAt: timestamp({ withTimezone: true }),
+    infraDriftError: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
