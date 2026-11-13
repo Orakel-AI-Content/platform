@@ -346,6 +346,16 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
           };
         }
         if (result.status === 'failed') return { status: 'failed', step, failure: result.failure };
+        if (result.status === 'destroyed') {
+          return {
+            status: 'failed',
+            step,
+            failure: {
+              kind: 'transient',
+              message: `${INFRA_PATHS.applyResult} relata destruição num apply`,
+            },
+          };
+        }
         if (result.crawlerHints === 'falhou') {
           options.log?.(
             `Crawler Hints de ${target.siteId} não ligado pela API; ligue no painel (ADR 0027, passo 6)`,
