@@ -25,8 +25,11 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 
 // Painel da tela de revisão (#75), ao lado da visualização a partir de `xl` e abaixo dela antes
 // (#373). É um wizard de quatro passos (#766) sobre o `Steps` do Ecme, no exemplo "Controlled":
-// Checagens (`checks`, workspace#87), Ajustes (vazio por ora; a correção entra na #767), Leitura
-// (o checklist) e Decisão (as aprovações e a devolução), com "Anterior" e "Próximo" no rodapé.
+// Checagens (`checks`, workspace#87), Ajustes (a correção, #767), Leitura (o checklist) e Decisão
+// (as aprovações e a devolução), com "Anterior" e "Próximo" no rodapé. Em Ajustes fica o editor
+// no modo `amend` (#751), montado pela página com a Server Action dele: a prévia continua ao
+// lado, e salvar volta à revisão neste passo, já na versão nova. Sem `content.amend`, ou com a
+// versão fora de revisão, o passo diz por que não há correção.
 // Os quatro passos ficam montados e os inativos levam `hidden`: voltar a um passo encontra as
 // caixas e o comentário digitado como estavam. O passo atual fica em `?passo=` (`router.replace`,
 // como o período da audiência), e a página o devolve na prop `step`: a troca de versão remonta o
@@ -158,6 +161,8 @@ export function ReviewPanel({
   status,
   step,
   checks,
+  amend,
+  canAmend,
   blocked,
   checklist,
   confirmed: initialConfirmed,
@@ -175,6 +180,13 @@ export function ReviewPanel({
   step?: string;
   /** Seção de checagens automáticas (`ReviewChecks`), no passo Checagens. */
   checks?: ReactNode;
+  /**
+   * O editor da correção (`ContentEditor` no modo `amend`), no passo Ajustes; a página só o
+   * monta com `content.amend` e a versão em revisão.
+   */
+  amend?: ReactNode;
+  /** `content.amend` (corrigir durante a revisão), decidido no servidor. */
+  canAmend: boolean;
   /** Alguma checagem com `erro` (a validação da release): as aprovações ficam desabilitadas. */
   blocked: boolean;
   checklist: readonly ChecklistItem[];
@@ -213,6 +225,15 @@ export function ReviewPanel({
   const { confirmed, error, saving, write } = useConfirmations(initialConfirmed);
   const complete = checklist.every((item) => confirmed.includes(item.key));
   const approveDisabled = blocked || !complete || saving;
+  // Decidida a versão nesta tela, também não há mais o que corrigir.
+  const amendOpen = canAmend && inReview && !decided && amend !== undefined;
+  const amendHint = amendOpen
+    ? `Corrija aqui o que precisar; salvar grava a versão ${version + 1}, ainda em revisão. Nada a ajustar? Siga para a leitura.`
+    : decided
+      ? 'A revisão desta versão já foi decidida: não há correção disponível.'
+      : !inReview
+        ? `Esta versão está ${CONTENT_STATUS_LABEL[status].toLowerCase()}: só uma versão em revisão pode ser corrigida.`
+        : 'Só quem pode corrigir conteúdo em revisão ajusta esta versão: não há correção disponível.';
   const approveDescribedBy =
     [blocked && `${id}-blocked`, !complete && `${id}-incomplete`].filter(Boolean).join(' ') ||
     undefined;
@@ -252,10 +273,13 @@ export function ReviewPanel({
   const panels: Record<(typeof STEPS)[number]['key'], ReactNode> = {
     checagens: checks,
     ajustes: (
-      <Card bodyClass="space-y-3">
-        <h2 className={SECTION_TITLE_CLASS}>Ajustes</h2>
-        <p className={SECTION_HINT_CLASS}>Nada a ajustar nesta versão? Siga para a leitura.</p>
-      </Card>
+      <div className="flex flex-col gap-4">
+        <Card bodyClass="space-y-3">
+          <h2 className={SECTION_TITLE_CLASS}>Ajustes</h2>
+          <p className={SECTION_HINT_CLASS}>{amendHint}</p>
+        </Card>
+        {amendOpen && amend}
+      </div>
     ),
     leitura: (
       <Card bodyClass="space-y-3">

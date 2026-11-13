@@ -19,6 +19,7 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 // "Devolver ao editor" (#598) tem cartão próprio, com o comentário obrigatório. Em passos (#766):
 // Checagens, Ajustes, Leitura (o checklist) e Decisão (as aprovações e a devolução), todos
 // montados e os inativos com `hidden`; o passo vem da prop `step` e a troca vai a `?passo=`.
+// Ajustes (#767) mostra o editor da correção que a página monta, ou por que não há correção.
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
 const search = vi.hoisted(() => ({ value: '' }));
@@ -117,6 +118,7 @@ const renderPanel = (props: Partial<Props> = {}) =>
       blocked={false}
       checklist={checklist}
       canApprove
+      canAmend={false}
       approve={vi.fn()}
       approvePublish={vi.fn()}
       approveSchedule={vi.fn()}
@@ -232,7 +234,13 @@ describe('painel de revisão', () => {
   });
 
   it('numa versão nova (outro key), continua no passo da URL', () => {
-    const props = { status: 'em_revisao' as const, blocked: false, checklist, canApprove: true };
+    const props = {
+      status: 'em_revisao' as const,
+      blocked: false,
+      checklist,
+      canApprove: true,
+      canAmend: false,
+    };
     const actions = {
       approve: vi.fn(),
       approvePublish: vi.fn(),
@@ -645,5 +653,73 @@ describe('painel de revisão', () => {
 
     const field = screen.getByRole('textbox', { name: /O que corrigir/ });
     await waitFor(() => expect(field.getAttribute('aria-invalid')).toBe('true'));
+  });
+});
+
+describe('passo Ajustes (#767)', () => {
+  /** O editor da correção como a página o passa; aqui, um campo basta. */
+  const editor = (
+    <form aria-label="Correção">
+      <label>
+        Título
+        <input defaultValue="Guia" />
+      </label>
+    </form>
+  );
+  const ajustes = () => document.querySelector<HTMLElement>('[data-step="ajustes"]')!;
+  const title = () => screen.getByRole<HTMLInputElement>('textbox', { name: 'Título' });
+
+  it('com content.amend e a versão em revisão, mostra o editor e diz qual versão salvar grava', () => {
+    renderPanel({ step: 'ajustes', canAmend: true, amend: editor });
+
+    expect(ajustes().hidden).toBe(false);
+    expect(ajustes().contains(screen.getByRole('form', { name: 'Correção' }))).toBe(true);
+    expect(ajustes().textContent).toContain('salvar grava a versão 3, ainda em revisão');
+  });
+
+  it('uma edição não salva continua no editor depois de ir a outro passo e voltar', async () => {
+    renderPanel({ step: 'ajustes', canAmend: true, amend: editor });
+
+    await userEvent.clear(title());
+    await userEvent.type(title(), 'Guia revisado');
+    await next();
+    expect(currentStep()).toBe('Leitura');
+    expect(ajustes().hidden).toBe(true);
+    await previous();
+
+    expect(currentStep()).toBe('Ajustes');
+    expect(title().value).toBe('Guia revisado');
+  });
+
+  it('sem content.amend, explica que não há correção e não mostra o editor', () => {
+    renderPanel({ step: 'ajustes', canAmend: false, amend: editor });
+
+    expect(screen.queryByRole('form', { name: 'Correção' })).toBeNull();
+    expect(ajustes().textContent).toContain(
+      'Só quem pode corrigir conteúdo em revisão ajusta esta versão: não há correção disponível.',
+    );
+  });
+
+  it('com a versão fora de revisão, explica que só a versão em revisão pode ser corrigida', () => {
+    renderPanel({ step: 'ajustes', status: 'aprovado', canAmend: true, amend: editor });
+
+    expect(screen.queryByRole('form', { name: 'Correção' })).toBeNull();
+    expect(ajustes().textContent).toContain(
+      'Esta versão está aprovado: só uma versão em revisão pode ser corrigida.',
+    );
+  });
+
+  it('decidida a versão nesta tela, o editor sai', async () => {
+    renderPanel({
+      step: 'decisao',
+      canAmend: true,
+      amend: editor,
+      giveBack: vi.fn(() => Promise.resolve({ ok: true as const, message: 'Devolvido.' })),
+    });
+
+    await userEvent.type(screen.getByRole('textbox', { name: /O que corrigir/ }), 'Fonte.');
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver ao editor' }));
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Correção' })).toBeNull());
+    expect(ajustes().textContent).toContain('A revisão desta versão já foi decidida');
   });
 });
