@@ -25,6 +25,7 @@ import Card from '@/components/ui/Card';
 import { itemTitle } from '../../item-title.ts';
 import { previewUrl } from '../../conteudos/content-urls.ts';
 import { readContentVersions } from '../../conteudos/content-versions.ts';
+import { editorOptions } from '../../conteudos/editor-options.ts';
 import { readVersionReferences } from '../../conteudos/version-references.ts';
 import { positiveInt } from '../../conteudos/params.ts';
 import { sitePageContext } from '../../editorial-page.tsx';
@@ -156,6 +157,21 @@ export default async function ReviewPage({ params, searchParams }: Params & Sear
             status={latest.status}
             step={typeof passo === 'string' ? passo : undefined}
             checks={<ReviewChecks items={items} />}
+            canAmend={canAmend}
+            amend={
+              options && (
+                <ContentEditor
+                  mode="amend"
+                  siteId={site.id}
+                  backHref={`/sites/${site.id}/revisao/${contentId}?passo=ajustes`}
+                  timeZone={timeZone}
+                  defaultValues={latest.data}
+                  options={options}
+                  action={amendAction.bind(null, site.id, contentId, latest.version)}
+                  previewUrl={preview}
+                />
+              )
+            }
             changes={
               diff !== null &&
               references !== undefined && (

@@ -26,8 +26,11 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 // Painel da tela de revisão (#75), ao lado da visualização a partir de `xl` e abaixo dela antes
 // (#373). É um wizard de quatro passos (#766) sobre o `Steps` do Ecme, no exemplo "Controlled":
 // Checagens (`checks`, workspace#87, e `changes`, o que mudou desde a última revisão, #768),
-// Ajustes (vazio por ora; a correção entra na #767), Leitura (o checklist) e Decisão (as
-// aprovações e a devolução), com "Anterior" e "Próximo" no rodapé.
+// Ajustes (a correção, #767), Leitura (o checklist) e Decisão (as aprovações e a devolução),
+// com "Anterior" e "Próximo" no rodapé. Em Ajustes fica o editor no modo `amend` (#751),
+// montado pela página com a Server Action dele: a prévia continua ao lado, e salvar volta à
+// revisão neste passo, já na versão nova. Sem `content.amend`, ou com a versão fora de
+// revisão, o passo diz por que não há correção.
 // Os quatro passos ficam montados e os inativos levam `hidden`: voltar a um passo encontra as
 // caixas e o comentário digitado como estavam. O passo atual fica em `?passo=` (`router.replace`,
 // como o período da audiência), e a página o devolve na prop `step`: a troca de versão remonta o
@@ -162,6 +165,8 @@ export function ReviewPanel({
   status,
   step,
   checks,
+  amend,
+  canAmend,
   changes,
   blocked,
   checklist,
@@ -180,6 +185,13 @@ export function ReviewPanel({
   step?: string;
   /** Seção de checagens automáticas (`ReviewChecks`), no passo Checagens. */
   checks?: ReactNode;
+  /**
+   * O editor da correção (`ContentEditor` no modo `amend`), no passo Ajustes; a página só o
+   * monta com `content.amend` e a versão em revisão.
+   */
+  amend?: ReactNode;
+  /** `content.amend` (corrigir durante a revisão), decidido no servidor. */
+  canAmend: boolean;
   /** Seção "O que mudou" (`ReviewChanges`), abaixo das checagens; ausente na primeira revisão. */
   changes?: ReactNode;
   /** Alguma checagem com `erro` (a validação da release): as aprovações ficam desabilitadas. */

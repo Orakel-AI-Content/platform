@@ -50,6 +50,8 @@ vi.mock('../../conteudos/editor-options.ts', () => ({ editorOptions: options.rea
 vi.mock('@/domain/reviews/reviews.ts', () => ({
   REVIEW_CHECKLIST: [],
   reviewChecks: () => Promise.resolve({ ok: true, value: { checks: [] } }),
+  // Primeira revisão: sem "O que mudou" (#768), nenhuma leitura de referências a mais.
+  reviewChanges: () => Promise.resolve({ ok: true, value: null }),
 }));
 vi.mock('@/domain/reviews/link-checks.ts', () => ({
   linkCheckFor: () => Promise.resolve({ ok: true, value: undefined }),
