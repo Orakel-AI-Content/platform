@@ -1,14 +1,12 @@
 import { currentActor } from '@/auth/request-actor.ts';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { SitesTable } from '@/components/sites/SitesTable';
-import { Button } from '@/components/ui/Button';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { can } from '@/domain/access/rbac.ts';
-import { TFVARS_FILENAME } from '@/domain/sites/sites.ts';
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { ListHeader } from '@/components/shared/PageHeader';
 
-import { TbCloudDownload, TbPlus } from 'react-icons/tb';
+import { TbPlus } from 'react-icons/tb';
 
 import { publishNow } from './actions.ts';
 import { readVisibleSites } from '../visible-sites.ts';
@@ -46,26 +44,7 @@ export default async function SitesPage({ searchParams }: SearchParams) {
     <section aria-labelledby="sites-title" className="list-width space-y-4">
       <AdaptiveCard>
         <div className="flex flex-col gap-4">
-          <ListHeader
-            id="sites-title"
-            title="Sites"
-            action={
-              canConfigure ? (
-                <>
-                  {/* Rota de download (ADR 0011), não navegação: <a> com download, não <Link>. */}
-                  <Button
-                    asElement="a"
-                    href="/sites/tfvars"
-                    download={TFVARS_FILENAME}
-                    icon={<TbCloudDownload className="text-xl" aria-hidden />}
-                  >
-                    Baixar {TFVARS_FILENAME}
-                  </Button>
-                  {register}
-                </>
-              ) : undefined
-            }
-          />
+          <ListHeader id="sites-title" title="Sites" action={register} />
           <SitesTable
             rows={sites.value}
             publishNow={can(actor.value, 'operations.run') ? publishNow : undefined}

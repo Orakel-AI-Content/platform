@@ -31,10 +31,9 @@ test(
     await expect(table.getByRole('link', { name: 'Exemplo A — Guias' })).toBeVisible();
     await expect(table.getByRole('link', { name: 'Exemplo B — Receitas' })).toBeVisible();
 
-    // Operação baixa a lista de sites do OpenTofu (ADR 0011).
-    const download = page.waitForEvent('download');
-    await page.getByRole('link', { name: 'Baixar sites.auto.tfvars.json' }).click();
-    expect((await download).suggestedFilename()).toBe('sites.auto.tfvars.json');
+    // A lista de sites do OpenTofu saiu (ADR 0027 da raiz): sem botão e sem rota.
+    await expect(page.getByRole('link', { name: /sites\.auto\.tfvars\.json/ })).toHaveCount(0);
+    expect((await page.request.get('/sites/tfvars')).status()).toBe(404);
   },
 );
 
@@ -194,8 +193,6 @@ test(
 test('editor não cadastra nem edita a configuração', async ({ page }) => {
   await asRole(page, 'editor');
   await expect(page.getByRole('link', { name: 'Criar site' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /sites\.auto\.tfvars\.json/ })).toHaveCount(0);
-  expect((await page.request.get('/sites/tfvars')).status()).toBe(403);
 
   for (const path of ['/sites/novo', '/sites/exemplo-a/configuracao']) {
     await page.goto(path);
