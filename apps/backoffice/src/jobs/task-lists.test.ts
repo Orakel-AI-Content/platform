@@ -6,6 +6,7 @@ import type { BuildSettings } from '../domain/builds/plan.ts';
 import type { ContainerRuntime } from '../domain/builds/runtime.ts';
 import { CHECK_SITE_INFRA_TASK } from '../domain/builds/site-state.ts';
 import { resolveModel } from '../domain/generation/generate.ts';
+import { CORRECT_ARTICLE_TASK, GENERATE_ARTICLE_TASK } from '../domain/generation/runs.ts';
 import type { ObjectStore } from '../domain/media/store.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
@@ -62,7 +63,7 @@ describe('backoffice-worker', () => {
     expect(tasks[LINK_CHECK_TASK]).toBeTypeOf('function');
   });
 
-  it('registra o parecer automático da revisão no worker, que tem o modelo da geração', () => {
+  it('registra a geração, a correção e o parecer automáticos no worker, com o modelo e a rota interna', () => {
     const tasks = workerTasks({
       db: {} as Db,
       store: {} as ObjectStore,
@@ -73,6 +74,9 @@ describe('backoffice-worker', () => {
 
     expect(REVIEW_OPINION_TASK).toBe('review-opinion');
     expect(tasks[REVIEW_OPINION_TASK]).toBeTypeOf('function');
+    expect(CORRECT_ARTICLE_TASK).toBe('correct-article');
+    expect(tasks[GENERATE_ARTICLE_TASK]).toBeTypeOf('function');
+    expect(tasks[CORRECT_ARTICLE_TASK]).toBeTypeOf('function');
   });
 });
 
