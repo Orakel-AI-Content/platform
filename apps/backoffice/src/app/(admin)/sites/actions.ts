@@ -19,6 +19,12 @@ import {
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
 import {
+  confirmInfraPlan,
+  readInfraPlan,
+  requestInfraPlan,
+  type InfraPlanView,
+} from '@/domain/infra/plan.ts';
+import {
   cancelBuild,
   requestBuildNow,
   requestRollback,
@@ -158,6 +164,51 @@ export async function siteInfraCheckAction(siteId: string): Promise<SiteInfraChe
   if (!actor.ok) return null;
   const result = await readSiteInfraCheck(getDb().db, actor.value, siteId);
   return result.ok ? result.value : null;
+}
+
+/** Pedido do plano de "Criar infraestrutura": a execução aberta, ou a recusa em mensagem. */
+export type InfraPlanRequest = { ok: true; runId: number } | { ok: false; message: string };
+
+/**
+ * "Criar infraestrutura" (#825): grava a execução e enfileira o plano; papel, etapa e execução
+ * aberta são do domínio. Sem toast: o diálogo mostra o andamento e lê o plano por
+ * `infraPlanAction`. Revalida a página, para a etapa passar a "Revisar e confirmar".
+ */
+export async function requestInfraPlanAction(siteId: string): Promise<InfraPlanRequest> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
+  const result = await getDb().db.transaction((tx) => requestInfraPlan(tx, actor.value, siteId));
+  if (!result.ok) {
+    return {
+      ok: false,
+      message: result.issues[0]?.message ?? 'Não foi possível pedir o plano.',
+    };
+  }
+  revalidatePath(`/sites/${siteId}`);
+  return { ok: true, runId: result.value.runId };
+}
+
+/**
+ * Plano da execução, para o diálogo consultar enquanto ele é preparado. Só leitura
+ * (`site.configure` no domínio); `null` sem sessão, permissão ou execução do site.
+ */
+export async function infraPlanAction(
+  siteId: string,
+  runId: number,
+): Promise<InfraPlanView | null> {
+  const actor = await currentActor();
+  if (!actor.ok) return null;
+  const result = await readInfraPlan(getDb().db, actor.value, siteId, runId);
+  return result.ok ? result.value : null;
+}
+
+/** "Confirmar" o plano: a execução passa a aplicando e o apply entra na fila (domínio). */
+export async function confirmInfraPlanAction(siteId: string, runId: number): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => confirmInfraPlan(tx, actor, siteId, runId),
+    'Criação da infraestrutura confirmada.',
+  );
 }
 
 /** "Desmarcar" a etapa manual atual: volta só à anterior (a ordem e a corrida são do domínio). */
