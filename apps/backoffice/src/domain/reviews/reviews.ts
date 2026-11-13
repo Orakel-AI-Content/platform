@@ -182,6 +182,8 @@ export type ReviewQueueEntry = ReviewQueueItem & {
   links: LinkCheckState;
   /** A revisão mais recente do conteúdo devolveu uma versão até a da fila: voltou da devolução. */
   returned: boolean;
+  /** A versão da fila foi criada pela correção automática (`correctionRuns`). */
+  autoCorrected: boolean;
   /**
    * Resultado do parecer automático da versão (#774), reduzido do mesmo `opinionFor` da tela de
    * revisão. Só informa: não entra em `pending`.
@@ -288,6 +290,7 @@ export async function reviewQueue(
       pending: pendingCount(checks, links.value),
       links: links.value,
       returned: last?.decision === 'devolvido' && last.version <= item.version,
+      autoCorrected: corrected.has(correctionKey(item.id, item.version)),
       opinion: opinionOutlook(opinion.value),
     });
   }

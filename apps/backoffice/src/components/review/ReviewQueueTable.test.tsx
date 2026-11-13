@@ -8,7 +8,8 @@ import type { ReviewQueueEntry } from '@/domain/reviews/reviews.ts';
 import { ReviewQueueTable } from './ReviewQueueTable.tsx';
 
 // Fila de revisão (#74): título, tipo, versão e data; links para a revisão e teclado.
-// Pendências e a marca "Devolvido" de cada item (#772). O resultado do parecer automático (#774).
+// Pendências e a marca "Devolvido" de cada item (#772); "Correção automática" no lugar dela (#804).
+// O resultado do parecer automático (#774).
 // Busca, filtro por tipo, ordem e paginação com o estado na URL (#365): router.replace simulado.
 
 const navigation = vi.hoisted(() => {
@@ -46,6 +47,7 @@ const fresh = {
   pending: 0,
   links: { state: 'verificando' },
   returned: false,
+  autoCorrected: false,
   opinion: 'favoravel',
 } as const;
 
@@ -133,6 +135,31 @@ describe('fila de revisão', () => {
     expect(within(titleCell).getByText('Devolvido')).toBeTruthy();
     // A marca fica fora do link: o nome acessível continua o do título.
     expect(screen.getByRole('link', { name: 'Guia de uso (revisar)' })).toBeTruthy();
+  });
+
+  it('mostra "Correção automática" no lugar de "Devolvido" só na versão corrigida (#804)', () => {
+    renderTable([
+      ...rows,
+      {
+        ...fresh,
+        id: 5,
+        kind: 'article',
+        title: 'Receita corrigida',
+        version: 3,
+        submittedAt: new Date('2026-10-03T12:00:00Z'),
+        returned: true,
+        autoCorrected: true,
+      },
+    ]);
+
+    const [, first, second, third] = screen.getAllByRole('row');
+    expect(within(first!).queryByText('Correção automática')).toBeNull();
+    expect(within(second!).queryByText('Correção automática')).toBeNull();
+    expect(within(second!).getByText('Devolvido')).toBeTruthy();
+    const titleCell = within(third!).getAllByRole('cell')[0]!;
+    expect(within(titleCell).getByText('Correção automática')).toBeTruthy();
+    expect(within(titleCell).queryByText('Devolvido')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Receita corrigida (revisar)' })).toBeTruthy();
   });
 
   it('mostra o resultado do parecer de cada item (#774)', () => {
