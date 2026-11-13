@@ -5,12 +5,16 @@ import type { BuildSettings } from '../domain/builds/plan.ts';
 import { recoverInterruptedBuilds } from '../domain/builds/recover.ts';
 import type { ContainerRuntime } from '../domain/builds/runtime.ts';
 import { localDriver, tofuDriver, type InfraDriver } from '../domain/infra/drivers.ts';
-import { recoverInterruptedInfraRuns } from '../domain/infra/schedule.ts';
+import {
+  BUILD_RUNNER_INFRA_RECOVERY,
+  recoverInterruptedInfraRuns,
+} from '../domain/infra/schedule.ts';
 import { schedulePreviewReconcile } from '../domain/preview/preview.ts';
 import { getBuildRunnerEnv, getEnv, type BuildRunnerEnv, type Env } from '../env.ts';
 import { BUILD_RUNNER_CONCURRENCY, buildRunnerTasks } from '../jobs/task-lists.ts';
 import type { ReleaseDriver } from '../jobs/tasks/release-run.ts';
 import { dockerRuntime } from '../lib/docker.ts';
+import { workerRemoverFrom } from '../lib/cloudflare.ts';
 import { githubClient } from '../lib/github.ts';
 import { runProcess } from './run-process.ts';
 
@@ -95,8 +99,9 @@ await runProcess('build-runner', async (logger) => {
   for (const build of await recoverInterruptedBuilds(db, runner.SITE_BUILDER_TAG)) {
     logger.warn(build, `${build.kind} de ${build.siteId} interrompido; fila liberada`);
   }
-  // Plano ou apply da infra largado no meio: a execução fecha `falhou` e a fila infra:<site> solta.
-  for (const run of await recoverInterruptedInfraRuns(db)) {
+  // Plano, apply ou remoção do Worker largado no meio: a execução fecha `falhou` e a fila
+  // infra:<site> solta. O esvaziamento da mídia, do backoffice-worker, não é tocado.
+  for (const run of await recoverInterruptedInfraRuns(db, BUILD_RUNNER_INFRA_RECOVERY)) {
     logger.warn(run, `infra de ${run.siteId} interrompida; execução ${run.runId} fechada`);
   }
   // O container da prévia sobrevive ao build-runner (restart unless-stopped): a cada partida, a
@@ -120,6 +125,8 @@ await runProcess('build-runner', async (logger) => {
         exportPreviewToken: env.EXPORT_PREVIEW_TOKEN,
       },
       infra: infraDriverFrom(runner, runtime),
+      // Só o token de deploy; nunca vai ao container do infra-runner (ADR 0028 da raiz).
+      workers: workerRemoverFrom(runner),
     }),
     concurrency: BUILD_RUNNER_CONCURRENCY,
   });

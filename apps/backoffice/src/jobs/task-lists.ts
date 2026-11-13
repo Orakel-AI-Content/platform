@@ -13,7 +13,11 @@ import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
 import { REVIEW_OPINION_TASK } from '../domain/reviews/opinions.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
-import { INFRA_APPLY_TASK, INFRA_PLAN_TASK } from '../domain/infra/schedule.ts';
+import {
+  INFRA_APPLY_TASK,
+  INFRA_PLAN_TASK,
+  INFRA_REMOVE_WORKER_TASK,
+} from '../domain/infra/schedule.ts';
 import {
   createAggregateAudienceTask,
   type AggregateAudienceTaskDeps,
@@ -31,6 +35,10 @@ import { createEmptySiteMediaTask } from './tasks/empty-site-media.ts';
 import { heartbeat } from './tasks/heartbeat.ts';
 import { createInfraApplyTask } from './tasks/infra-apply.ts';
 import { createInfraPlanTask } from './tasks/infra-plan.ts';
+import {
+  createInfraRemoveWorkerTask,
+  type InfraRemoveWorkerTaskDeps,
+} from './tasks/infra-remove-worker.ts';
 import type { InfraTaskDeps } from './tasks/infra-run.ts';
 import { createIngestMediaTask } from './tasks/ingest-media.ts';
 import { createMediaReprocessTask } from './tasks/media-reprocess.ts';
@@ -85,13 +93,15 @@ export const WORKER_CRONTAB = [
  * das releases e a troca do container da prévia (fila `preview`, ADR 0024 da raiz), os únicos
  * jobs que falam com o Docker, e o run do release.yml, o único que usa a credencial do GitHub
  * (ADR 0022 da raiz), e o plano e o apply da infra do site (fila `infra:<site>`, ADR 0027 da
- * raiz), os únicos que recebem os segredos de infra; concorrência 2.
+ * raiz), os únicos que recebem os segredos de infra, e a remoção do Worker do site, o primeiro elo
+ * da remoção da infra, com o token de deploy (ADR 0028 da raiz); concorrência 2.
  */
 export function buildRunnerTasks(
   deps: BuildTaskDeps &
     Pick<ReleaseRunTaskDeps, 'driver'> &
     Pick<ReconcilePreviewTaskDeps, 'preview'> &
-    Pick<InfraTaskDeps, 'infra'>,
+    Pick<InfraTaskDeps, 'infra'> &
+    Pick<InfraRemoveWorkerTaskDeps, 'workers'>,
 ): TaskList {
   return {
     build: createBuildTask(deps),
@@ -101,6 +111,7 @@ export function buildRunnerTasks(
     [RECONCILE_PREVIEW_TASK]: createReconcilePreviewTask(deps),
     [INFRA_PLAN_TASK]: createInfraPlanTask(deps),
     [INFRA_APPLY_TASK]: createInfraApplyTask(deps),
+    [INFRA_REMOVE_WORKER_TASK]: createInfraRemoveWorkerTask(deps),
   };
 }
 export const BUILD_RUNNER_CONCURRENCY = 2;
