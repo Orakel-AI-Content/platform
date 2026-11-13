@@ -844,3 +844,12 @@ export async function latestInfraBatch(
   }));
   return { ok: true, value: { ...batch, sites: batchSites } };
 }
+
+/** O site tem execução de infra aberta (criação, remoção ou reaplicação em andamento)? */
+export async function hasOpenInfraRun(db: Executor, siteId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: infraRuns.id })
+    .from(infraRuns)
+    .where(and(eq(infraRuns.siteId, siteId), inArray(infraRuns.status, OPEN_INFRA_RUN_STATUSES)));
+  return row !== undefined;
+}

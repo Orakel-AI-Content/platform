@@ -12,8 +12,10 @@ import {
 } from '../builds/fake-runtime.ts';
 import {
   InfraPlanSummarySchema,
+  LOCAL_DRIFT_CHANGE,
   LOCAL_NAMESERVERS,
   localDriver,
+  planHasChanges,
   readApplyProgress,
   stepOfResourceType,
   stepOrder,
@@ -143,6 +145,13 @@ describe('summarizePlan', () => {
   });
 });
 
+describe('planHasChanges', () => {
+  it('só há mudança quando alguma etapa tem recurso', () => {
+    expect(planHasChanges(summarizePlan([]))).toBe(false);
+    expect(planHasChanges(summarizePlan([LOCAL_DRIFT_CHANGE]))).toBe(true);
+  });
+});
+
 describe('readApplyProgress', () => {
   it('a etapa corrente só avança e ignora linhas que não são JSON', () => {
     expect(readApplyProgress(FULL_APPLY_LOG, 'criar')).toEqual({
@@ -262,6 +271,57 @@ describe('tofuDriver', () => {
       failure: { kind: 'permanent' },
     });
     expect(denied.started).toEqual([]);
+  });
+
+  const check = { siteId: 'exemplo-a', domain: 'exemplo-a.com.br' };
+
+  it('check: roda o plan num volume e container só da conferência e apaga os dois', async () => {
+    const t = tofu({ infraPlan: { file: infraPlanOk(changes) } });
+    const outcome = await t.driver.check(check);
+
+    expect(outcome).toMatchObject({ status: 'ok' });
+    if (outcome.status !== 'ok') return;
+    expect(planHasChanges(outcome.summary)).toBe(true);
+    expect(t.started[0]).toMatchObject({
+      name: 'orakel-infra-check-exemplo-a',
+      command: ['plan'],
+      env: { ...ENV, SITE_ID: 'exemplo-a', DOMAIN: 'exemplo-a.com.br' },
+      volume: { name: 'orakel-infra-check-exemplo-a', target: '/infra' },
+      labels: { 'orakel.infra-check': 'exemplo-a', 'orakel.site': 'exemplo-a' },
+    });
+    expect(t.volumes).toEqual({
+      created: ['orakel-infra-check-exemplo-a'],
+      removed: ['orakel-infra-check-exemplo-a'],
+    });
+    expect(t.removed).toEqual(['orakel-infra-check-exemplo-a']);
+  });
+
+  it('check sem mudanças sai em dia', async () => {
+    const t = tofu({ infraPlan: { file: infraPlanOk([]) } });
+    const outcome = await t.driver.check(check);
+    expect(outcome.status === 'ok' && planHasChanges(outcome.summary)).toBe(false);
+  });
+
+  it('check com falha também apaga o volume e o container', async () => {
+    const t = tofu({
+      infraPlan: { exitCode: 10, file: infraFailed('permanent', 'token inválido') },
+    });
+    expect(await t.driver.check(check)).toEqual({
+      status: 'failed',
+      failure: { kind: 'permanent', message: 'token inválido' },
+    });
+    expect(t.volumes.removed).toEqual(['orakel-infra-check-exemplo-a']);
+    expect(t.removed).toEqual(['orakel-infra-check-exemplo-a']);
+  });
+
+  it('check com erro do runtime vira falha, e o volume sai mesmo assim', async () => {
+    const fake = fakeRuntime({ failOn: 'start' });
+    const driver = tofuDriver({ runtime: fake.runtime, image: IMAGE, network: 'n', env: ENV });
+    expect(await driver.check(check)).toMatchObject({
+      status: 'failed',
+      failure: { kind: 'transient', message: 'plan: proxy recusou' },
+    });
+    expect(fake.volumes.removed).toEqual(['orakel-infra-check-exemplo-a']);
   });
 
   it('apply: grava a etapa de cada recurso na ordem do -json e fecha com os nameservers', async () => {
@@ -465,6 +525,7 @@ describe('tofuDriver na remoção', () => {
 });
 
 describe('localDriver', () => {
+  const check = { siteId: 'exemplo-a', domain: 'exemplo-a.com.br' };
   const collect = () => {
     const steps: InfraStep[] = [];
     return { steps, onStep: (step: InfraStep) => (steps.push(step), Promise.resolve()) };
@@ -505,6 +566,15 @@ describe('localDriver', () => {
     const retry = collect();
     expect(await driver.apply(target, retry.onStep)).toMatchObject({ status: 'ok' });
     expect(retry.steps).toEqual(['email', 'regras', 'imagens']);
+  });
+
+  it('check: só os sites configurados saem desatualizados, sem usar a memória', async () => {
+    const driver = localDriver({ driftSites: ['exemplo-b'] });
+    const fresh = await driver.check(check);
+    expect(fresh.status === 'ok' && planHasChanges(fresh.summary)).toBe(false);
+
+    const drifted = await driver.check({ ...check, siteId: 'exemplo-b' });
+    expect(drifted).toEqual({ status: 'ok', summary: summarizePlan([LOCAL_DRIFT_CHANGE]) });
   });
 
   it('a memória é por site', async () => {

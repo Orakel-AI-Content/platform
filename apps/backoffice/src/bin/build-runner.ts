@@ -8,10 +8,15 @@ import { localDriver, tofuDriver, type InfraDriver } from '../domain/infra/drive
 import {
   BUILD_RUNNER_INFRA_RECOVERY,
   recoverInterruptedInfraRuns,
+  scheduleInfraCheckAll,
 } from '../domain/infra/schedule.ts';
 import { schedulePreviewReconcile } from '../domain/preview/preview.ts';
 import { getBuildRunnerEnv, getEnv, type BuildRunnerEnv, type Env } from '../env.ts';
-import { BUILD_RUNNER_CONCURRENCY, buildRunnerTasks } from '../jobs/task-lists.ts';
+import {
+  BUILD_RUNNER_CONCURRENCY,
+  BUILD_RUNNER_CRONTAB,
+  buildRunnerTasks,
+} from '../jobs/task-lists.ts';
 import type { ReleaseDriver } from '../jobs/tasks/release-run.ts';
 import { dockerRuntime } from '../lib/docker.ts';
 import { workerRemoverFrom } from '../lib/cloudflare.ts';
@@ -64,9 +69,12 @@ function releaseDriverFrom(runner: BuildRunnerEnv): ReleaseDriver {
  */
 function infraDriverFrom(runner: BuildRunnerEnv, runtime: ContainerRuntime): InfraDriver {
   if (runner.INFRA_DRIVER === 'local') {
-    return localDriver(
-      runner.INFRA_LOCAL_FAIL_STEP === undefined ? {} : { failStep: runner.INFRA_LOCAL_FAIL_STEP },
-    );
+    return localDriver({
+      ...(runner.INFRA_LOCAL_FAIL_STEP !== undefined && { failStep: runner.INFRA_LOCAL_FAIL_STEP }),
+      ...(runner.INFRA_LOCAL_DRIFT_SITES !== undefined && {
+        driftSites: runner.INFRA_LOCAL_DRIFT_SITES,
+      }),
+    });
   }
   const required = (name: keyof BuildRunnerEnv): string => {
     const value = runner[name];
@@ -107,6 +115,9 @@ await runProcess('build-runner', async (logger) => {
   // O container da prévia sobrevive ao build-runner (restart unless-stopped): a cada partida, a
   // reconciliação confere que ele está na versão corrente (ADR 0024 da raiz).
   await schedulePreviewReconcile(db);
+  // Um deploy pode ter trazido uma descrição nova da infra: a partida confere todos os sites, e
+  // o cron diário (BUILD_RUNNER_CRONTAB) pega o que mudou à mão na Cloudflare (workspace#98).
+  await scheduleInfraCheckAll(db);
   const env = getEnv();
   const runtime = dockerRuntime({
     host: runner.DOCKER_HOST,
@@ -129,6 +140,7 @@ await runProcess('build-runner', async (logger) => {
       workers: workerRemoverFrom(runner),
     }),
     concurrency: BUILD_RUNNER_CONCURRENCY,
+    crontab: BUILD_RUNNER_CRONTAB,
   });
   logger.info(
     {
