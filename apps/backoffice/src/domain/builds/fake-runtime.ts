@@ -1,5 +1,5 @@
-// Runtime de containers falso para os testes do build: cada etapa (render, publish, rollback) tem o
-// código de saída, os arquivos que deixa no volume, o log que escreve, se estoura o tempo e se
+// Runtime de containers falso para os testes do build e da infra: cada etapa (render, publish,
+// rollback, infra-plan, infra-apply) tem o código de saída, os arquivos que deixa no volume, o log que escreve, se estoura o tempo e se
 // fica rodando até ser morto. Containers de serviço (a prévia) têm a saúde lida de uma fila.
 import {
   ImageUnavailableError,
@@ -16,6 +16,8 @@ export type FakeStage = {
   log?: string;
   /** Fica rodando (cada `wait` estoura o tempo) até o `kill`; morto, sai com 137. */
   running?: boolean;
+  /** Quantas esperas estouram o tempo antes de o container sair (andamento acompanhado). */
+  pendingWaits?: number;
 };
 
 export function fakeRuntime(options: {
@@ -29,6 +31,9 @@ export function fakeRuntime(options: {
   render?: FakeStage;
   publish?: FakeStage;
   rollback?: FakeStage;
+  /** Containers `orakel-infra-plan-*` e `orakel-infra-apply-*` (ADR 0027 da raiz). */
+  infraPlan?: FakeStage;
+  infraApply?: FakeStage;
   /**
    * Saúde lida pelo `health` de um container de serviço, uma por chamada; o último valor se
    * repete. Padrão: `healthy`. Container de serviço removido, ou nunca criado, é `absent`.
@@ -46,12 +51,17 @@ export function fakeRuntime(options: {
   const live = new Set<string>();
   const healthQueue = [...(options.health ?? ['healthy'])];
   let present = options.image ?? true;
+  const waits = new Map<string, number>();
   const stageOf = (id: string) =>
     id.startsWith('orakel-render')
       ? options.render
       : id.startsWith('orakel-rollback')
         ? options.rollback
-        : options.publish;
+        : id.startsWith('orakel-infra-plan')
+          ? options.infraPlan
+          : id.startsWith('orakel-infra-apply')
+            ? options.infraApply
+            : options.publish;
 
   const runtime: ContainerRuntime = {
     imageExists: () => Promise.resolve(present),
@@ -100,6 +110,9 @@ export function fakeRuntime(options: {
           killed.includes(id) ? { exitCode: 137 } : { timedOut: true as const },
         );
       }
+      const count = (waits.get(id) ?? 0) + 1;
+      waits.set(id, count);
+      if (count <= (stage?.pendingWaits ?? 0)) return Promise.resolve({ timedOut: true as const });
       return Promise.resolve(
         stage?.timedOut ? { timedOut: true as const } : { exitCode: stage?.exitCode ?? 0 },
       );
@@ -175,4 +188,37 @@ export const failedFile = (
   release: 'local',
   durationMs: 10,
   failure: { kind, message, ...(culprit && { culprit }) },
+});
+
+/** `infra-plan.json` de sucesso, com os recursos que mudam. */
+export const infraPlanOk = (
+  changes: { address: string; type: string; action: string }[],
+  site = 'exemplo-a',
+) => ({ formatVersion: 1, status: 'ok', site, changes, durationMs: 900 });
+
+/** `infra-apply.json` de sucesso, com os nameservers da zona. */
+export const infraApplyOk = (
+  site = 'exemplo-a',
+  nameServers = ['ada.ns.cloudflare.com', 'bob.ns.cloudflare.com'],
+) => ({
+  formatVersion: 1,
+  status: 'ok',
+  site,
+  nameServers,
+  zoneId: 'z'.repeat(32),
+  crawlerHints: 'ligado',
+  durationMs: 4000,
+});
+
+/** Resultado de falha do plano ou do apply. */
+export const infraFailed = (
+  kind: 'permanent' | 'transient',
+  message: string,
+  site = 'exemplo-a',
+) => ({
+  formatVersion: 1,
+  status: 'failed',
+  site,
+  failure: { kind, message },
+  durationMs: 10,
 });
