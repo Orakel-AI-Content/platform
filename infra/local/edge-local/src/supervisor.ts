@@ -75,6 +75,20 @@ export class Supervisor {
     });
   }
 
+  /**
+   * Remoção do Worker do site (workspace#97): desliga a instância, tira o site do proxy (que
+   * passa a responder 404) e apaga as versões. Site que não existe também conta como removido.
+   */
+  async removeSite(site: string): Promise<void> {
+    return this.#exclusive(site, async () => {
+      const active = this.#active.get(site);
+      this.#active.delete(site);
+      if (active) await active.instance.dispose().catch(() => undefined);
+      await this.store.removeSite(site);
+      this.#log({ msg: 'site removido', site, id: active?.id });
+    });
+  }
+
   async stop(): Promise<void> {
     const instances = [...this.#active.values()].map((active) => active.instance);
     if (this.#aeSim) instances.push(this.#aeSim);

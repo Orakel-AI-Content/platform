@@ -1,4 +1,5 @@
 import { mkdtemp, readFile } from 'node:fs/promises';
+import { createServer, request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -6,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { adminHandler } from './admin.ts';
 import { ndjsonSink } from './ae-sink.ts';
-import { siteOfHost } from './proxy.ts';
+import { proxyHandler, siteOfHost } from './proxy.ts';
 import type { Runtime } from './runtime.ts';
 import { Store } from './store.ts';
 import { Supervisor } from './supervisor.ts';
@@ -147,6 +148,54 @@ describe('proxy e administração', () => {
       ok: true,
       sites: ['exemplo-a'],
     });
+  });
+
+  it('DELETE /sites/{site}: o proxy responde 404 e um publish novo volta a servir', async () => {
+    const { sup, dir, disposed } = await supervisor();
+    const admin = createServer(
+      (req, res) => void adminHandler(sup, ndjsonSink(dir), () => undefined)(req, res),
+    ).listen(0);
+    const proxy = createServer(proxyHandler(sup)).listen(0);
+    await Promise.all([admin, proxy].map((s) => new Promise((r) => s.once('listening', r))));
+    const portOf = (s: typeof admin) => (s.address() as { port: number }).port;
+    const adminUrl = `http://127.0.0.1:${portOf(admin)}`;
+    const visit = () =>
+      new Promise<number>((resolve, reject) => {
+        request(
+          { port: portOf(proxy), path: '/', headers: { host: 'exemplo-a.localhost' } },
+          (response) => {
+            response.resume();
+            resolve(response.statusCode ?? 0);
+          },
+        )
+          .on('error', reject)
+          .end();
+      });
+    try {
+      const archive = await makeArchive('exemplo-a', 'A');
+      const id = await sup.publish('exemplo-a', archive);
+
+      const removed = await fetch(`${adminUrl}/sites/exemplo-a`, { method: 'DELETE' });
+      expect(removed.status).toBe(204);
+      expect(disposed).toEqual([expect.stringContaining(id)]);
+      expect(sup.target('exemplo-a')).toBeUndefined();
+      expect(await sup.store.sites()).toEqual([]);
+      expect(await visit()).toBe(404);
+
+      // Idempotente: site que já não existe também responde 204.
+      expect((await fetch(`${adminUrl}/sites/exemplo-a`, { method: 'DELETE' })).status).toBe(204);
+      expect((await fetch(`${adminUrl}/sites/Exemplo_A`, { method: 'DELETE' })).status).toBe(400);
+
+      const put = await fetch(`${adminUrl}/sites/exemplo-a/versions`, {
+        method: 'PUT',
+        body: archive,
+      });
+      expect(put.status).toBe(201);
+      expect(sup.target('exemplo-a')).toBeDefined();
+    } finally {
+      admin.close();
+      proxy.close();
+    }
   });
 
   it('/healthz responde 503 até o proxy estar no ar', async () => {

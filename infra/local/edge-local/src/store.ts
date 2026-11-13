@@ -169,6 +169,14 @@ export class Store {
     await rm(dir, { recursive: true, force: true });
   }
 
+  /** Apaga o site inteiro (versões e a ativa); site sem pasta não é erro. */
+  async removeSite(site: string): Promise<void> {
+    assertSite(site);
+    const dir = this.siteDir(site);
+    await run('chmod', ['-R', 'u+w', dir]).catch(() => undefined);
+    await rm(dir, { recursive: true, force: true });
+  }
+
   /** Mantém as `keep` mais novas e a ativa; devolve as apagadas. */
   async prune(site: string, keep: number): Promise<string[]> {
     const active = await this.active(site);

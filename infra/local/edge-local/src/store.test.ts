@@ -87,4 +87,15 @@ describe('Store', () => {
     expect(await s.prune('exemplo-a', 2)).toEqual([ids[1]]);
     expect(await s.ids('exemplo-a')).toEqual([ids[3], ids[2], ids[0]]);
   });
+
+  it('remove o site inteiro; site sem pasta não é erro', async () => {
+    const s = await store();
+    const id = await s.add('exemplo-a', await makeArchive('exemplo-a', 'A'), at(0));
+    await s.setActive('exemplo-a', id);
+    await s.removeSite('exemplo-a');
+    expect(await s.sites()).toEqual([]);
+    expect(await s.active('exemplo-a')).toBeUndefined();
+    await expect(s.removeSite('exemplo-a')).resolves.toBeUndefined();
+    await expect(s.removeSite('Exemplo_A')).rejects.toMatchObject({ status: 400 });
+  });
 });
