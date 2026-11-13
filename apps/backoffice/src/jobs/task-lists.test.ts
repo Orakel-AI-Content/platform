@@ -9,6 +9,7 @@ import type { ContainerRuntime } from '../domain/builds/runtime.ts';
 import { CHECK_SITE_INFRA_TASK } from '../domain/builds/site-state.ts';
 import { resolveModel } from '../domain/generation/generate.ts';
 import { CORRECT_ARTICLE_TASK, GENERATE_ARTICLE_TASK } from '../domain/generation/runs.ts';
+import { RESTORE_MEDIA_TASK } from '../domain/media/reprocess.ts';
 import type { ObjectStore } from '../domain/media/store.ts';
 import { EMPTY_SITE_MEDIA_TASK } from '../domain/media/variants.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
@@ -94,6 +95,19 @@ describe('backoffice-worker', () => {
     expect(EMPTY_SITE_MEDIA_TASK).toBe('empty-site-media');
     expect(tasks[EMPTY_SITE_MEDIA_TASK]).toBeTypeOf('function');
   });
+
+  it('registra a regravação das variantes do site no worker, o único com as credenciais S3', () => {
+    const tasks = workerTasks({
+      db: {} as Db,
+      store: {} as ObjectStore,
+      generation: { model: resolveModel('fixture'), pricing: {} },
+      api: { url: 'http://backoffice-web:3000', token: 'g'.repeat(32) },
+      zones: {} as ZoneChecker,
+    });
+
+    expect(RESTORE_MEDIA_TASK).toBe('restore-site-media');
+    expect(tasks[RESTORE_MEDIA_TASK]).toBeTypeOf('function');
+  });
 });
 
 describe('build-runner', () => {
@@ -132,5 +146,6 @@ describe('build-runner', () => {
     expect(Object.keys(worker)).not.toContain(RECONCILE_PREVIEW_TASK);
     expect(Object.keys(runner)).not.toContain(LINK_CHECK_TASK);
     expect(Object.keys(runner)).not.toContain(EMPTY_SITE_MEDIA_TASK);
+    expect(Object.keys(runner)).not.toContain(RESTORE_MEDIA_TASK);
   });
 });
