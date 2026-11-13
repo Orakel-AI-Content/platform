@@ -121,3 +121,58 @@ export const generationRuns = pgTable(
     ),
   ],
 );
+
+/**
+ * Parecer automático de uma versão em revisão (workspace#94): nasce `pendente` na transação
+ * que leva a versão a `em_revisao` e termina `ok` (com os pontos) ou `falha` (com os
+ * problemas), sem nova tentativa. As colunas de execução seguem `generation_runs`. A correção
+ * que não muda o texto copia o parecer da versão anterior e marca `copiedFromVersion`: a cópia
+ * não é uma chamada nova ao modelo, então não conta no custo. Operacional: fora do snapshot.
+ * Só informa: nunca aprova, devolve nem impede a aprovação (RN-GEN-02).
+ */
+export const reviewOpinions = pgTable(
+  'review_opinions',
+  {
+    siteId: text()
+      .notNull()
+      .references(() => sites.id),
+    contentId: integer().notNull(),
+    version: integer().notNull(),
+    status: text({ enum: GENERATION_STATUSES }).notNull().default('pendente'),
+    /** Os pontos do parecer `ok` (`Opinion`, de `domain/reviews/opinion.ts`). */
+    opinion: jsonb().$type<Record<string, unknown>>(),
+    /** Problemas do parecer `falha`. */
+    error: jsonb().$type<Issue[]>(),
+    /** Versão do contexto editorial usada; nula quando o site não tinha contexto. */
+    editorialContextVersion: integer(),
+    /** Versão de onde o parecer foi copiado, na correção que não muda o texto. */
+    copiedFromVersion: integer(),
+    prompt: jsonb().$type<{ system: string; user: string }>(),
+    provider: text(),
+    model: text(),
+    inputTokens: integer(),
+    outputTokens: integer(),
+    /** Em dólares; nulo quando o modelo não está em `LLM_PRICING`. */
+    costUsd: numeric({ precision: 12, scale: 6, mode: 'number' }),
+    durationMs: integer(),
+    requestedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.siteId, t.contentId, t.version] }),
+    foreignKey({
+      name: 'review_opinions_version_fk',
+      columns: [t.siteId, t.contentId, t.version],
+      foreignColumns: [contentVersions.siteId, contentVersions.contentId, contentVersions.version],
+    }),
+    foreignKey({
+      name: 'review_opinions_editorial_context_fk',
+      columns: [t.siteId, t.editorialContextVersion],
+      foreignColumns: [editorialContexts.siteId, editorialContexts.version],
+    }),
+    check(
+      'review_opinions_finished_check',
+      sql`(${t.status} = 'pendente') = (${t.finishedAt} is null)`,
+    ),
+  ],
+);

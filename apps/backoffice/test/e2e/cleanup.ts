@@ -17,6 +17,7 @@ export const SITE_TABLES = [
   'site_events',
   'content_link_results',
   'content_link_checks',
+  'review_opinions',
   'review_confirmations',
   'reviews',
   'publications',

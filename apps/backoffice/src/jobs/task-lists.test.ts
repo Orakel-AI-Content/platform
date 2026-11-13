@@ -10,6 +10,7 @@ import type { ObjectStore } from '../domain/media/store.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
 import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
+import { REVIEW_OPINION_TASK } from '../domain/reviews/opinions.ts';
 import type { ZoneChecker } from '../lib/cloudflare.ts';
 import { buildRunnerTasks, WORKER_CRONTAB, workerTasks } from './task-lists.ts';
 
@@ -59,6 +60,19 @@ describe('backoffice-worker', () => {
 
     expect(LINK_CHECK_TASK).toBe('check-content-links');
     expect(tasks[LINK_CHECK_TASK]).toBeTypeOf('function');
+  });
+
+  it('registra o parecer automático da revisão no worker, que tem o modelo da geração', () => {
+    const tasks = workerTasks({
+      db: {} as Db,
+      store: {} as ObjectStore,
+      generation: { model: resolveModel('fixture'), pricing: {} },
+      api: { url: 'http://backoffice-web:3000', token: 'g'.repeat(32) },
+      zones: {} as ZoneChecker,
+    });
+
+    expect(REVIEW_OPINION_TASK).toBe('review-opinion');
+    expect(tasks[REVIEW_OPINION_TASK]).toBeTypeOf('function');
   });
 });
 
