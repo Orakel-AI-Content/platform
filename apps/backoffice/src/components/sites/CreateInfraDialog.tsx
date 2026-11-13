@@ -5,8 +5,8 @@ import { useCallback, useState } from 'react';
 import { ActionAlert } from '@/components/shared/ActionFeedback.tsx';
 import ConfirmDialog from '@/components/shared/ConfirmDialog.tsx';
 import {
+  INFRA_RESOURCE_STEP_ORDER,
   INFRA_STEP_LABEL,
-  INFRA_STEP_ORDER,
   infraStepChangesText,
 } from '@/components/shared/siteLabels.ts';
 import { usePolling } from '@/components/shared/usePolling.ts';
@@ -91,7 +91,7 @@ export function CreateInfraDialog({
             Confira o que muda em cada etapa. Nada é aplicado antes de &quot;Confirmar&quot;.
           </p>
           <ul aria-label="Resumo por etapa" className="flex flex-col gap-1">
-            {INFRA_STEP_ORDER.map((step) => (
+            {INFRA_RESOURCE_STEP_ORDER.map((step) => (
               <li key={step} className="flex justify-between gap-4">
                 <span className="heading-text font-semibold">{INFRA_STEP_LABEL[step]}</span>
                 <span>{infraStepChangesText(state.summary.steps[step])}</span>

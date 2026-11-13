@@ -1,7 +1,13 @@
 import type { InfraChange } from '@orakel/build-contract';
 import type { Block } from '@orakel/content-model/v1';
 
-import type { BuildKind, BuildStatus, InfraStep, SiteEventKind } from '@/db/schema/operations.ts';
+import type {
+  BuildKind,
+  BuildStatus,
+  InfraResourceStep,
+  InfraStep,
+  SiteEventKind,
+} from '@/db/schema/operations.ts';
 import type {
   ExecutionHistoryItem,
   OpenExecution,
@@ -145,10 +151,11 @@ export const HISTORY_KIND_LABEL: Record<BuildKind | SiteEventKind, string> = {
 export const INFRA_RUN_LABEL = 'Criação da infraestrutura';
 
 /**
- * Etapas da criação da infraestrutura (`INFRA_STEPS`), na mesma ordem, nos termos de quem opera
- * (#825): o resumo do plano e o andamento listam nesta ordem.
+ * Etapas de uma execução de infra (`INFRA_STEPS`), na mesma ordem, nos termos de quem opera
+ * (#825): o andamento lista nesta ordem. `paginas` (apagar o Worker) só existe na remoção.
  */
 export const INFRA_STEP_LABEL = {
+  paginas: 'Páginas',
   endereco: 'Endereço',
   dns: 'Registros de DNS',
   email: 'E-mail',
@@ -158,6 +165,11 @@ export const INFRA_STEP_LABEL = {
 
 /** As etapas na ordem do `INFRA_STEP_LABEL` (sem importar o schema do banco no navegador). */
 export const INFRA_STEP_ORDER = Object.keys(INFRA_STEP_LABEL) as InfraStep[];
+
+/** As etapas dos recursos do OpenTofu (`INFRA_RESOURCE_STEPS`): as do resumo do plano. */
+export const INFRA_RESOURCE_STEP_ORDER = INFRA_STEP_ORDER.filter(
+  (step): step is InfraResourceStep => step !== 'paginas',
+);
 
 /** O que o plano faz com um recurso, no resumo de uma etapa. */
 const INFRA_ACTION_TEXT: Record<InfraChange['action'], string> = {
