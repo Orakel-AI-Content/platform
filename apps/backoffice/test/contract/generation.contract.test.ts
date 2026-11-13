@@ -8,7 +8,13 @@ import type * as ClientModule from '../../src/db/client.ts';
 import { POST } from '../../src/app/api/internal/v1/contents/route.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import type { Db } from '../../src/db/client.ts';
-import { authors, contentVersions, generationRuns, reviews } from '../../src/db/schema/index.ts';
+import {
+  authors,
+  contentVersions,
+  generationRuns,
+  reviews,
+  taxonomies,
+} from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { createEditorialContext } from '../../src/domain/generation/editorial-contexts.ts';
 import { FIXTURE_INVALID_TOPIC } from '../../src/domain/generation/fixture.ts';
@@ -25,6 +31,8 @@ import {
   type GenerationRequest,
 } from '../../src/domain/generation/runs.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
+import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX } from '../../src/domain/reviews/checks.ts';
+import { reviewChecks } from '../../src/domain/reviews/reviews.ts';
 import { createGenerateArticleTask } from '../../src/jobs/tasks/generate-article.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
@@ -133,6 +141,25 @@ async function runTask(runId: number) {
   })({ runId }, helpers);
   const model = settings.model.languageModel as MockLanguageModelV4;
   return { fetch, modelCalls: model.doGenerateCalls.length };
+}
+
+/** Gera um artigo pela task e devolve a versão 1 dele e o nível de cada checagem da revisão. */
+async function generateAndCheck() {
+  await withContext();
+  const enqueued = await enqueue();
+  if (!enqueued.ok) throw new Error(JSON.stringify(enqueued.issues));
+  await runTask(enqueued.value.runId);
+  const run = await runRow(enqueued.value.runId);
+  expect(run).toMatchObject({ status: 'ok', error: null });
+  const [version] = await db
+    .select()
+    .from(contentVersions)
+    .where(and(eq(contentVersions.siteId, SITE), eq(contentVersions.contentId, run.contentId!)));
+  if (version === undefined) throw new Error('artigo gerado sem versão');
+  const checks = await reviewChecks(db, revisor, SITE, run.contentId!);
+  if (!checks.ok) throw new Error(JSON.stringify(checks.issues));
+  const levels = Object.fromEntries(checks.value.checks.map((check) => [check.key, check.level]));
+  return { version, levels };
 }
 
 describe('disparo da geração', () => {
@@ -304,6 +331,42 @@ describe('task generate-article (fixture)', () => {
       title: 'Artigo de teste: Café coado em casa',
       authorIds: [authorId],
     });
+  });
+
+  it('artigo gerado chega com categoria do site e SEO; só a capa fica pendente (#792)', async () => {
+    const categoryIds = (
+      await db
+        .select({ id: taxonomies.id })
+        .from(taxonomies)
+        .where(and(eq(taxonomies.siteId, SITE), eq(taxonomies.kind, 'category')))
+    ).map((row) => row.id);
+    expect(categoryIds.length).toBeGreaterThan(0);
+
+    const { version, levels } = await generateAndCheck();
+
+    expect(version.status).toBe('em_revisao');
+    expect(version.data.taxonomyIds.length).toBeGreaterThan(0);
+    expect(version.data.taxonomyIds.every((id) => categoryIds.includes(id))).toBe(true);
+    expect(version.data.seo?.title?.length).toBeLessThanOrEqual(SEO_TITLE_MAX);
+    expect(version.data.seo?.description?.length).toBeLessThanOrEqual(SEO_DESCRIPTION_MAX);
+    expect(levels).toMatchObject({
+      categoria: 'ok',
+      seo_titulo: 'ok',
+      seo_descricao: 'ok',
+      capa: 'aviso',
+    });
+  });
+
+  it('site sem categorias: a execução conclui e a falta de categoria fica pendente', async () => {
+    await db
+      .delete(taxonomies)
+      .where(and(eq(taxonomies.siteId, SITE), eq(taxonomies.kind, 'category')));
+
+    const { version, levels } = await generateAndCheck();
+
+    expect(version.status).toBe('em_revisao');
+    expect(version.data.taxonomyIds).toEqual([]);
+    expect(levels).toMatchObject({ categoria: 'aviso', capa: 'aviso' });
   });
 
   it('saída inválida: execução falha com o erro, sem nova chamada nem artigo', async () => {

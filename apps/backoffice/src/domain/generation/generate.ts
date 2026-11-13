@@ -14,6 +14,7 @@ import {
 import { APICallError, NoObjectGeneratedError, generateObject, type LanguageModel } from 'ai';
 import * as z from 'zod';
 
+import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX } from '../reviews/checks.ts';
 import { fixtureModel } from './fixture.ts';
 import { costUsd, type PricingTable, type TokenUsage } from './pricing.ts';
 
@@ -62,22 +63,38 @@ export function generatedBlockTypes(resources: Resources): GeneratedBlockType[] 
   );
 }
 
-/** Schema enviado ao modelo: o artigo sem ID, autor nem datas, só com os blocos permitidos. */
-export function articleSchema(types: readonly [GeneratedBlockType, ...GeneratedBlockType[]]) {
+/**
+ * Schema enviado ao modelo: o artigo sem ID, autor nem datas, só com os blocos permitidos, o
+ * SEO e as categorias como enum fechado dos slugs do site (o campo some sem categorias). Os
+ * limites do SEO ficam só no prompt: um estouro vira aviso na revisão, não falha da geração.
+ */
+export function articleSchema(
+  types: readonly [GeneratedBlockType, ...GeneratedBlockType[]],
+  categorySlugs: readonly string[] = [],
+) {
   const [first, ...rest] = types.map((type) => GENERATED_BLOCKS[type]);
-  return z.object({
+  const article = z.object({
     title: z.string().min(1),
     slug: SlugSchema,
     description: z.string().min(1),
+    seo: z.object({ title: z.string().min(1), description: z.string().min(1) }),
     blocks: z.array(z.discriminatedUnion('type', [first!, ...rest])).min(1),
   });
+  const [firstSlug, ...otherSlugs] = categorySlugs;
+  if (firstSlug === undefined) return article;
+  return article.extend({ categories: z.array(z.enum([firstSlug, ...otherSlugs])).min(1) });
 }
+
+/** Categoria do site que o modelo pode escolher (taxonomia `kind: 'category'`). */
+export type GenerationCategory = { id: number; slug: string; name: string };
 
 export type GenerationInput = {
   topic: string;
   /** Texto do contexto editorial vigente do site. */
   editorialContext: string;
   author: { id: number; name: string };
+  /** Categorias do site; vazio quando o site não tem nenhuma. */
+  categories: readonly GenerationCategory[];
   /** Recursos da release do site (`resourcesFor`). */
   resources: Resources;
   /** Data de publicação proposta do artigo (o fluxo de revisão a ajusta). */
@@ -112,10 +129,21 @@ export function buildPrompt(
     'Siga o contexto editorial do site e responda só com o objeto do schema.',
     `Use apenas estes tipos de bloco no corpo: ${types.join(', ')}.`,
     'O slug é kebab-case ASCII, derivado do título.',
+    `O seo.title tem no máximo ${SEO_TITLE_MAX} caracteres e o seo.description no máximo ${SEO_DESCRIPTION_MAX}.`,
+    ...(input.categories.length > 0
+      ? ['Escolha uma ou mais categorias da lista do site, pelo slug.']
+      : []),
   ].join('\n');
   const user = [
     `Tema: ${input.topic}`,
     `Autor: ${input.author.name}`,
+    ...(input.categories.length > 0
+      ? [
+          '',
+          'Categorias do site (slug: nome):',
+          ...input.categories.map((category) => `- ${category.slug}: ${category.name}`),
+        ]
+      : []),
     '',
     'Contexto editorial:',
     input.editorialContext,
@@ -185,7 +213,10 @@ export async function generate(
   try {
     generated = await generateObject({
       model: model.languageModel,
-      schema: articleSchema([first, ...rest]),
+      schema: articleSchema(
+        [first, ...rest],
+        input.categories.map((category) => category.slug),
+      ),
       schemaName: 'artigo',
       system: prompt.system,
       prompt: prompt.user,
@@ -208,13 +239,22 @@ export async function generate(
   }
 
   const execution = finish(tokens(generated.usage));
-  const { blocks, ...article } = generated.object;
+  const { title, slug, description, seo, blocks } = generated.object;
+  // `categories` só existe no schema (e na saída validada por ele) quando o site tem categorias.
+  const { categories = [] } = generated.object as { categories?: readonly string[] };
+  const chosen = new Set(categories);
+  const taxonomyIds = input.categories
+    .filter((category) => chosen.has(category.slug))
+    .map((category) => category.id);
   const parsed = ContentSchema.safeParse({
-    ...article,
+    title,
+    slug,
+    description,
+    seo,
     id: 1, // provisório, como em validateContentData: o definitivo é alocado na gravação
     kind: 'article',
     authorIds: [input.author.id],
-    taxonomyIds: [],
+    taxonomyIds,
     publishedAt: input.publishedAt.toISOString(),
     blocks: blocks.map((block, index) => ({ ...block, n: index + 1 })),
   });
@@ -228,7 +268,7 @@ export async function generate(
   }
   const context = {
     authorIds: new Set([input.author.id]),
-    taxonomyIds: new Set<number>(),
+    taxonomyIds: new Set(input.categories.map((category) => category.id)),
     mediaIds: new Set<number>(),
   };
   const semantic = validateContent(parsed.data, context, input.resources);

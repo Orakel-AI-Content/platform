@@ -1,11 +1,12 @@
 import type { Issue, Result } from '@orakel/content-model';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import {
   authors,
   editorialContexts,
   generationRuns,
+  taxonomies,
   type GenerationStatus,
 } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
@@ -213,7 +214,7 @@ export type PendingRun = { runId: number; siteId: string; input: GenerationInput
 
 /**
  * Insumos da chamada ao modelo para a execução ainda `pendente`: o tema, a versão do contexto
- * gravada no disparo, o autor e os recursos da release do site. `undefined` se a execução não
+ * gravada no disparo, o autor, as categorias e os recursos da release do site. `undefined` se a execução não
  * existe, já terminou ou não é `geracao`. Sem ator: leitura interna da task; a permissão ficou no disparo.
  */
 export async function pendingRun(
@@ -249,6 +250,11 @@ export async function pendingRun(
       ),
     );
   if (row === undefined || row.topic === null || row.authorId === null) return undefined;
+  const categories = await db
+    .select({ id: taxonomies.id, slug: taxonomies.slug, name: taxonomies.name })
+    .from(taxonomies)
+    .where(and(eq(taxonomies.siteId, row.siteId), eq(taxonomies.kind, 'category')))
+    .orderBy(asc(taxonomies.id));
   return {
     runId,
     siteId: row.siteId,
@@ -256,6 +262,7 @@ export async function pendingRun(
       topic: row.topic,
       editorialContext: row.editorialContext,
       author: { id: row.authorId, name: row.authorName },
+      categories,
       resources: await resourcesFor(db, row.siteId),
       publishedAt: options.now ?? new Date(),
     },
