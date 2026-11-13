@@ -1,0 +1,276 @@
+// Execuções da criação da infraestrutura do site (`infra_runs`, ADR 0027): o pedido e a
+// confirmação, feitos por quem opera, e as gravações do infra-runner (resumo do plano, etapa
+// corrente e o fechamento). Cada transição é um update condicional no estado de origem: fora de
+// ordem, devolve issue de domínio sem gravar. No `ok`, o site avança a `infra_aplicada` na mesma
+// transação, em nome de quem confirmou. O histórico do site lê daqui (`infraActivity`).
+import type { Issue, Result } from '@orakel/content-model';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+
+import type { Executor } from '../../db/client.ts';
+import {
+  infraRuns,
+  OPEN_INFRA_RUN_STATUSES,
+  sites,
+  type InfraRunStatus,
+  type InfraStep,
+} from '../../db/schema/index.ts';
+import { requireRole, type Actor } from '../access/rbac.ts';
+import { resolveActor } from '../access/users.ts';
+import { advanceLifecycle } from '../builds/site-state.ts';
+
+type OpenInfraRunStatus = (typeof OPEN_INFRA_RUN_STATUSES)[number];
+type ClosedInfraRunStatus = Exclude<InfraRunStatus, OpenInfraRunStatus>;
+
+const refused = (code: string, message: string, path: Issue['path'] = []) => ({
+  ok: false as const,
+  issues: [{ code, message, path }],
+});
+
+const done = { ok: true as const, value: undefined };
+
+/**
+ * Pede a criação da infraestrutura: grava a linha `planejando` com quem pediu. Só num site
+ * `cadastrado` e sem execução aberta; o índice único parcial decide a corrida entre dois pedidos.
+ */
+export async function requestInfraRun(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<{ id: number }>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  const [site] = await tx
+    .select({ lifecycle: sites.lifecycle })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) return refused('site.not_found', `Site ${siteId} não encontrado`);
+  if (site.lifecycle !== 'cadastrado') {
+    return refused(
+      'infra.lifecycle',
+      `A infraestrutura só é criada num site cadastrado; o site está em ${site.lifecycle}`,
+      ['lifecycle'],
+    );
+  }
+
+  const [row] = await tx
+    .insert(infraRuns)
+    .values({ siteId, status: 'planejando', requestedBy: actor.email })
+    .onConflictDoNothing()
+    .returning({ id: infraRuns.id });
+  if (row === undefined) {
+    return refused(
+      'infra.run_open',
+      `O site ${siteId} já tem uma criação de infraestrutura aberta`,
+    );
+  }
+  return { ok: true, value: row };
+}
+
+/** Recusa da transição: a execução não existe ou não está no estado de origem. */
+async function wrongState(
+  tx: Executor,
+  runId: number,
+  from: readonly InfraRunStatus[],
+): Promise<{ ok: false; issues: Issue[] }> {
+  const [run] = await tx
+    .select({ status: infraRuns.status })
+    .from(infraRuns)
+    .where(eq(infraRuns.id, runId));
+  if (run === undefined) {
+    return refused('infra.run_not_found', `Execução de infraestrutura ${runId} não encontrada`);
+  }
+  return refused(
+    'infra.run_state',
+    `A execução ${runId} está em ${run.status}; a transição exige ${from.join(' ou ')}`,
+    ['status'],
+  );
+}
+
+/** Grava o resumo do plano: `planejando → aguardando_confirmacao`. */
+export async function recordInfraPlan(
+  tx: Executor,
+  runId: number,
+  planSummary: string,
+): Promise<Result<void>> {
+  const updated = await tx
+    .update(infraRuns)
+    .set({ status: 'aguardando_confirmacao', planSummary })
+    .where(and(eq(infraRuns.id, runId), eq(infraRuns.status, 'planejando')))
+    .returning({ id: infraRuns.id });
+  return updated.length > 0 ? done : wrongState(tx, runId, ['planejando']);
+}
+
+/** Confirma o plano: `aguardando_confirmacao → aplicando`, com quem confirmou e quando. */
+export async function confirmInfraRun(
+  tx: Executor,
+  actor: Actor,
+  runId: number,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+
+  const updated = await tx
+    .update(infraRuns)
+    .set({ status: 'aplicando', confirmedBy: actor.email, confirmedAt: new Date() })
+    .where(and(eq(infraRuns.id, runId), eq(infraRuns.status, 'aguardando_confirmacao')))
+    .returning({ id: infraRuns.id });
+  return updated.length > 0 ? done : wrongState(tx, runId, ['aguardando_confirmacao']);
+}
+
+/** Grava a etapa em andamento, enquanto `aplicando`. */
+export async function recordInfraStep(
+  tx: Executor,
+  runId: number,
+  step: InfraStep,
+): Promise<Result<void>> {
+  const updated = await tx
+    .update(infraRuns)
+    .set({ currentStep: step })
+    .where(and(eq(infraRuns.id, runId), eq(infraRuns.status, 'aplicando')))
+    .returning({ id: infraRuns.id });
+  return updated.length > 0 ? done : wrongState(tx, runId, ['aplicando']);
+}
+
+/** Desfecho do apply ou do plano. */
+export type InfraRunClosing =
+  | { status: 'ok'; nameservers: readonly string[] }
+  /** `step` nulo quando a falha foi no plano. */
+  | { status: 'falhou'; step: InfraStep | null; message: string };
+
+/** Estados de que cada desfecho parte: o `ok` só do apply; a falha, do plano ou do apply. */
+const CLOSING_FROM = {
+  ok: ['aplicando'],
+  falhou: ['planejando', 'aplicando'],
+} as const satisfies Record<ClosedInfraRunStatus, readonly OpenInfraRunStatus[]>;
+
+/**
+ * Fecha a execução. No `ok`, grava os nameservers e leva o site a `infra_aplicada` pelo
+ * `advanceLifecycle`, em nome de quem confirmou: a linha é travada antes, e a recusa do avanço
+ * devolve a issue sem gravar nada. No `falhou`, grava a etapa e o motivo; o lifecycle não muda.
+ */
+export async function finishInfraRun(
+  tx: Executor,
+  runId: number,
+  closing: InfraRunClosing,
+): Promise<Result<void>> {
+  const from = CLOSING_FROM[closing.status];
+  const [run] = await tx
+    .select({ siteId: infraRuns.siteId, confirmedBy: infraRuns.confirmedBy })
+    .from(infraRuns)
+    .where(and(eq(infraRuns.id, runId), inArray(infraRuns.status, from)))
+    .for('update');
+  if (run === undefined) return wrongState(tx, runId, from);
+
+  const finishedAt = new Date();
+  if (closing.status === 'falhou') {
+    await tx
+      .update(infraRuns)
+      .set({
+        status: 'falhou',
+        currentStep: null,
+        failedStep: closing.step,
+        failureMessage: closing.message,
+        finishedAt,
+      })
+      .where(eq(infraRuns.id, runId));
+    return done;
+  }
+
+  if (run.confirmedBy === null) {
+    return refused('infra.run_unconfirmed', `A execução ${runId} não tem quem a confirmou`);
+  }
+  const confirmer = await resolveActor(tx, run.confirmedBy);
+  if (!confirmer.ok) return confirmer;
+  const advanced = await advanceLifecycle(tx, confirmer.value, run.siteId, 'infra_aplicada');
+  if (!advanced.ok) return advanced;
+
+  await tx
+    .update(infraRuns)
+    .set({ status: 'ok', currentStep: null, nameservers: [...closing.nameservers], finishedAt })
+    .where(eq(infraRuns.id, runId));
+  return done;
+}
+
+/** Criação da infraestrutura em andamento, para o status ao vivo. */
+export type OpenInfraRun = {
+  id: number;
+  status: OpenInfraRunStatus;
+  /** Etapa em andamento, enquanto `aplicando`. */
+  currentStep: InfraStep | null;
+  /** Resumo do plano, a partir de `aguardando_confirmacao`. */
+  planSummary: string | null;
+  requestedBy: string;
+  requestedAt: Date;
+  confirmedBy: string | null;
+};
+
+/** Item do histórico do site: uma criação da infraestrutura que terminou. */
+export type InfraHistoryItem = {
+  type: 'infra';
+  id: number;
+  status: ClosedInfraRunStatus;
+  requestedBy: string;
+  requestedAt: Date;
+  confirmedBy: string | null;
+  /** Fim da execução. */
+  at: Date;
+  /** Só no `ok`. */
+  nameservers: string[] | null;
+  /** Só no `falhou`. */
+  failure: { step: InfraStep | null; message: string | null } | null;
+};
+
+function isOpen(status: InfraRunStatus): status is OpenInfraRunStatus {
+  return (OPEN_INFRA_RUN_STATUSES as readonly InfraRunStatus[]).includes(status);
+}
+
+/** A execução aberta do site e as fechadas, da mais recente para a mais antiga, até `limit`. */
+export async function infraActivity(
+  db: Executor,
+  siteId: string,
+  limit: number,
+): Promise<{ open: OpenInfraRun | null; history: InfraHistoryItem[] }> {
+  const [openRow] = await db
+    .select()
+    .from(infraRuns)
+    .where(and(eq(infraRuns.siteId, siteId), inArray(infraRuns.status, OPEN_INFRA_RUN_STATUSES)));
+  const open =
+    openRow !== undefined && isOpen(openRow.status)
+      ? {
+          id: openRow.id,
+          status: openRow.status,
+          currentStep: openRow.currentStep,
+          planSummary: openRow.planSummary,
+          requestedBy: openRow.requestedBy,
+          requestedAt: openRow.requestedAt,
+          confirmedBy: openRow.confirmedBy,
+        }
+      : null;
+
+  const closed = await db
+    .select()
+    .from(infraRuns)
+    .where(and(eq(infraRuns.siteId, siteId), isNotNull(infraRuns.finishedAt)))
+    .orderBy(desc(infraRuns.finishedAt), desc(infraRuns.id))
+    .limit(limit);
+  const history = closed.flatMap(({ status, finishedAt, ...row }): InfraHistoryItem[] =>
+    finishedAt === null || isOpen(status)
+      ? []
+      : [
+          {
+            type: 'infra',
+            id: row.id,
+            status,
+            requestedBy: row.requestedBy,
+            requestedAt: row.requestedAt,
+            confirmedBy: row.confirmedBy,
+            at: finishedAt,
+            nameservers: status === 'ok' ? row.nameservers : null,
+            failure:
+              status === 'falhou' ? { step: row.failedStep, message: row.failureMessage } : null,
+          },
+        ],
+  );
+  return { open, history };
+}
