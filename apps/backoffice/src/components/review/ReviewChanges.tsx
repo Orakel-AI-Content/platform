@@ -16,12 +16,14 @@ import type {
   FieldValue,
   VersionChanges,
 } from '@/domain/reviews/changes.ts';
+import type { ReviewCorrection } from '@/domain/reviews/reviews.ts';
 
 // "O que mudou" da revisão (#768), no passo Checagens: os metadados e os blocos que mudaram desde
 // a versão da última revisão, com o antes e o depois. O cálculo é do domínio (`changes.ts`);
 // aqui só a apresentação. Os blocos usam a mesma leitura da página da versão (`BlockBody`), e
 // nomes e mídias vêm resolvidos pela página. Sem `'use client'`, como o `ReviewChecks`: a página
 // a desenha no servidor e a passa ao painel. Sem base (primeira revisão), a página não a mostra.
+// Versão da correção automática (#804): o comentário da devolução que a pediu vem junto.
 
 /** Os rótulos da leitura da versão (`ContentVersionView`). */
 const FIELD_LABEL: Record<ChangeField, string> = {
@@ -41,7 +43,12 @@ const KIND_LABEL: Record<BlockChange['kind'], string> = {
   alterado: 'Alterado',
 };
 
-export type ReviewChangesData = VersionChanges & { baseVersion: number; version: number };
+export type ReviewChangesData = VersionChanges & {
+  baseVersion: number;
+  version: number;
+  /** A devolução que pediu a correção automática da versão; `null` fora dela. */
+  correction: ReviewCorrection | null;
+};
 
 function fieldValue(
   field: ChangeField,
@@ -93,7 +100,7 @@ export function ReviewChanges({
   timeZone: string;
 }) {
   const id = useId();
-  const { fields, blocks, baseVersion, version } = changes;
+  const { fields, blocks, baseVersion, version, correction } = changes;
   return (
     <Card>
       <section aria-labelledby={`${id}-title`} className="space-y-3">
@@ -103,6 +110,20 @@ export function ReviewChanges({
         <p className={SECTION_HINT_CLASS}>
           Da versão {baseVersion}, a da última revisão, para a versão {version}.
         </p>
+        {correction !== null && (
+          <section aria-labelledby={`${id}-correction`} className="space-y-1 text-sm">
+            <h3 id={`${id}-correction`} className={SIDE_LABEL_CLASS}>
+              Correção automática
+            </h3>
+            <p className={SECTION_HINT_CLASS}>
+              A versão {version} foi criada pela correção automática, a partir do comentário de{' '}
+              {correction.reviewer} na devolução:
+            </p>
+            <blockquote className="border-s-4 border-gray-200 ps-3 whitespace-pre-line dark:border-gray-700">
+              {correction.comment}
+            </blockquote>
+          </section>
+        )}
         {fields.length === 0 && blocks.length === 0 && (
           <p className={SECTION_HINT_CLASS}>Nenhum campo nem bloco mudou.</p>
         )}

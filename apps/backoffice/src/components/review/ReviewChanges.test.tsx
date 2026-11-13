@@ -8,6 +8,7 @@ import type { VersionReferences } from '@/components/contents/ContentVersionView
 import { ReviewChanges, type ReviewChangesData } from './ReviewChanges.tsx';
 
 // "O que mudou" da revisão (#768): campos e blocos alterados, com o antes e o depois.
+// Versão da correção automática (#804): o comentário da devolução que a pediu.
 
 afterEach(cleanup);
 
@@ -44,6 +45,7 @@ const changes: ReviewChangesData = {
     { n: 3, kind: 'removido', before: text(3, 'Fim antigo') },
     { n: 4, kind: 'adicionado', after: { n: 4, type: 'toc', title: 'Neste guia' } },
   ],
+  correction: null,
 };
 
 const renderChanges = (data: ReviewChangesData = changes) =>
@@ -100,6 +102,28 @@ describe('o que mudou desde a última revisão', () => {
     expect(items[1]!.textContent).not.toContain('Depois');
     expect(items[2]!.textContent).toContain('Neste guia');
     expect(items[2]!.textContent).not.toContain('Antes');
+  });
+
+  it('fora da correção automática, não mostra comentário de devolução', () => {
+    renderChanges();
+
+    expect(within(section()).queryByRole('region', { name: 'Correção automática' })).toBeNull();
+  });
+
+  it('da correção automática, mostra o comentário do revisor que a pediu (#804)', () => {
+    renderChanges({
+      ...changes,
+      correction: { reviewer: 'revisor@orakel.local', comment: 'Falta a fonte.\nRevise o título.' },
+    });
+
+    const correction = within(section()).getByRole('region', { name: 'Correção automática' });
+    expect(correction.textContent).toContain(
+      'A versão 4 foi criada pela correção automática, a partir do comentário de revisor@orakel.local na devolução:',
+    );
+    expect(correction.querySelector('blockquote')?.textContent).toBe(
+      'Falta a fonte.\nRevise o título.',
+    );
+    expect(section().textContent).toContain('Da versão 2, a da última revisão, para a versão 4.');
   });
 
   it('sem nada alterado, diz que nada mudou e não mostra as listas', () => {

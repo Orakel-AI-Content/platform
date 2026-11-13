@@ -314,6 +314,7 @@ describe('painel de revisão', () => {
           version: 2,
           fields: [{ field: 'title', before: 'Antigo', after: 'Novo' }],
           blocks: [],
+          correction: null,
         }}
         references={{ authors: new Map(), taxonomies: new Map(), media: new Map() }}
         timeZone="America/Sao_Paulo"
