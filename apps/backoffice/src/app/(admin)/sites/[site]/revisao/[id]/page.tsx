@@ -6,6 +6,7 @@ import { noRead } from '@/components/shared/ForbiddenScreen';
 import type { VersionReferences } from '@/components/contents/ContentVersionView';
 import { ReviewChanges } from '@/components/review/ReviewChanges';
 import { ReviewChecks } from '@/components/review/ReviewChecks';
+import { ReviewOpinion } from '@/components/review/ReviewOpinion';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
 import { hasError, reviewCheckItems } from '@/components/review/reviewCheckItems.ts';
 import { CONTENT_STATUS_LABEL, CONTENT_STATUS_TAG } from '@/components/shared/siteLabels.ts';
@@ -13,6 +14,8 @@ import { StateTag } from '@/components/sites/SiteStatus';
 import { can } from '@/domain/access/rbac.ts';
 import { reviewConfirmations } from '@/domain/reviews/confirmations.ts';
 import { linkCheckFor } from '@/domain/reviews/link-checks.ts';
+import { OPINION_POINTS } from '@/domain/reviews/opinion.ts';
+import { opinionFor } from '@/domain/reviews/opinions.ts';
 import { REVIEW_CHECKLIST, reviewChanges, reviewChecks } from '@/domain/reviews/reviews.ts';
 import { DETAIL_SUMMARY_CLASS } from '@/components/shared/detailSummary.ts';
 import { DetailLayout } from '@/components/shared/DetailLayout';
@@ -64,6 +67,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * Tela de revisão (#75): a versão mais recente na visualização do site (iframe) e, ao lado, as
  * checagens automáticas (workspace#87: as calculadas na leitura e a dos links externos, gravada
  * pelo job), o que mudou desde a última revisão (#768, só quando há uma de versão mais antiga),
+ * o parecer automático da versão (workspace#94, só informa),
  * o checklist com as confirmações gravadas na versão (#752), as decisões (só aprovar,
  * aprovar e publicar agora ou agendar, workspace#89) e a devolução ao editor (#598). Ler exige site.read; aprovar só
  * aparece com content.publish, e o domínio confere tudo de novo. Tela de detalhe do guia (#373),
@@ -92,13 +96,15 @@ export default async function ReviewPage({ params, searchParams }: Params & Sear
     return noRead;
   }
   const latest = versions.value.at(-1)!;
-  const [checks, links, confirmations, changes] = await Promise.all([
+  const target = { siteId, contentId, version: latest.version };
+  const [checks, links, opinion, confirmations, changes] = await Promise.all([
     reviewChecks(db, actor, siteId, contentId),
-    linkCheckFor(db, actor, { siteId, contentId, version: latest.version }),
+    linkCheckFor(db, actor, target),
+    opinionFor(db, actor, target),
     reviewConfirmations(db, actor, siteId, contentId, latest.version),
     reviewChanges(db, actor, siteId, contentId),
   ]);
-  if (!checks.ok || !links.ok || !confirmations.ok || !changes.ok) return noRead;
+  if (!checks.ok || !links.ok || !opinion.ok || !confirmations.ok || !changes.ok) return noRead;
   // "O que mudou" só com base (#768): na primeira revisão, nenhuma leitura a mais.
   const diff = changes.value;
   const references =
@@ -168,6 +174,13 @@ export default async function ReviewPage({ params, searchParams }: Params & Sear
               )
             }
             canAmend={canAmend}
+            opinion={
+              // Só informa (workspace#94): fica fora de `blocked`, que só olha as checagens.
+              <ReviewOpinion
+                state={opinion.value}
+                points={OPINION_POINTS.map(({ key, label }) => ({ key, label }))}
+              />
+            }
             amend={
               options && (
                 <ContentEditor
