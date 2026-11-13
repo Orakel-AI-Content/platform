@@ -34,12 +34,14 @@ import {
   cancelBuildAction,
   checkSiteInfraAction,
   confirmInfraPlanAction,
+  confirmInfraRemovalAction,
   infraPlanAction,
   pauseSiteAction,
   publishNow,
   rebuildOnReleaseAction,
   registerG1Action,
   requestInfraPlanAction,
+  requestInfraRemovalAction,
   resumeSiteAction,
   retreatLifecycleAction,
   revertReleaseAction,
@@ -91,6 +93,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
   if (!infraCheck.ok) return noRead;
   const canConfigure = can(actor, 'site.configure');
   const canOperate = can(actor, 'operations.run');
+  const canDestroy = can(actor, 'site.destroy');
   // As releases do "Escolher outra versão do motor" (#515): listá-las exige release.promote, que a
   // operação e o admin têm junto de operations.run; recusada a lista, a ação não aparece. Só as
   // `disponivel` entram no diálogo (#691); o domínio recusa as outras.
@@ -205,6 +208,23 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
               read: infraPlanAction.bind(null, site.id),
               confirm: confirmInfraPlanAction.bind(null, site.id),
             }}
+            remove={
+              canDestroy
+                ? {
+                    domain: site.domain,
+                    activePages: instance.value.activePages,
+                    active: site.state !== 'pausado',
+                    open: activity.value.openInfra && {
+                      id: activity.value.openInfra.id,
+                      status: activity.value.openInfra.status,
+                      kind: activity.value.openInfra.kind,
+                    },
+                    request: requestInfraRemovalAction.bind(null, site.id),
+                    read: infraPlanAction.bind(null, site.id),
+                    confirm: confirmInfraRemovalAction.bind(null, site.id),
+                  }
+                : undefined
+            }
           />
         ) : undefined
       }

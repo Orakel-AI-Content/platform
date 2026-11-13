@@ -6,6 +6,7 @@ import { LifecycleAction } from '@/components/sites/SiteActions';
 
 // Página do site (#825): "Criar infraestrutura" vem no `LifecycleAction` da etapa Infra e zona,
 // que a página só passa com site.configure (admin e operação), com a execução aberta do site.
+// "Remover infraestrutura" (workspace#97) vai no mesmo `LifecycleAction`, só com site.destroy.
 
 const state = vi.hoisted(() => ({
   roles: ['operacao'] as string[],
@@ -24,6 +25,7 @@ vi.mock('./editorial-page.tsx', () => ({
       site: {
         id: 'exemplo-a',
         name: 'Exemplo A',
+        domain: 'exemplo-a.com.br',
         timeZone: 'UTC',
         lifecycle: 'cadastrado',
         release: '1.0.0',
@@ -42,12 +44,14 @@ vi.mock('../actions.ts', () => ({
   cancelBuildAction: vi.fn(),
   checkSiteInfraAction: vi.fn(),
   confirmInfraPlanAction: vi.fn(),
+  confirmInfraRemovalAction: vi.fn(),
   infraPlanAction: vi.fn(),
   pauseSiteAction: vi.fn(),
   publishNow: vi.fn(),
   rebuildOnReleaseAction: vi.fn(),
   registerG1Action: vi.fn(),
   requestInfraPlanAction: vi.fn(),
+  requestInfraRemovalAction: vi.fn(),
   resumeSiteAction: vi.fn(),
   retreatLifecycleAction: vi.fn(),
   revertReleaseAction: vi.fn(),
@@ -150,5 +154,40 @@ describe('página do site: Criar infraestrutura', () => {
 
     state.history = [creation(4, 'ok'), creation(3, 'falhou')];
     expect(((await lifecycleAction())?.props.infra as { retry: boolean }).retry).toBe(false);
+  });
+});
+
+describe('página do site: Remover infraestrutura', () => {
+  beforeEach(() => {
+    state.openInfra = null;
+    state.history = [];
+  });
+
+  it('admin recebe a remoção com o domínio, as páginas no ar e o site ativo', async () => {
+    state.roles = ['admin'];
+    const remove = (await lifecycleAction())?.props.remove as Record<string, unknown> | undefined;
+    expect(remove).toMatchObject({
+      domain: 'exemplo-a.com.br',
+      activePages: 0,
+      active: true,
+      open: null,
+    });
+    for (const key of ['request', 'read', 'confirm']) {
+      expect(typeof remove?.[key]).toBe('function');
+    }
+  });
+
+  it('operação recebe a criação, mas não a remoção', async () => {
+    state.roles = ['operacao'];
+    const action = await lifecycleAction();
+    expect(action?.props.infra).toBeDefined();
+    expect(action?.props.remove).toBeUndefined();
+  });
+
+  it('a execução aberta vai com o tipo, para reabrir só a remoção', async () => {
+    state.roles = ['admin'];
+    state.openInfra = { id: 5, kind: 'remover', status: 'aguardando_confirmacao' };
+    const remove = (await lifecycleAction())?.props.remove as { open: unknown };
+    expect(remove.open).toEqual({ id: 5, kind: 'remover', status: 'aguardando_confirmacao' });
   });
 });

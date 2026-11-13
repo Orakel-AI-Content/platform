@@ -76,6 +76,13 @@ describe('estado do diálogo a partir do plano', () => {
   ])('%j → %j', (view, state) => {
     expect(infraPlanState(view)).toEqual(state);
   });
+
+  it('já confirmada, usa a mensagem do chamador (a da remoção)', () => {
+    expect(infraPlanState({ status: 'ok' }, 'remoção já confirmada')).toEqual({
+      kind: 'erro',
+      message: 'remoção já confirmada',
+    });
+  });
 });
 
 function dialog(state: CreateInfraState, onConfirm = vi.fn(), onCancel = vi.fn()) {
