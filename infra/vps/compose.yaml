@@ -119,6 +119,15 @@ services:
       # PAT do GitHub só aqui (ADR 0022 da raiz): dispara e acompanha o release.yml.
       GITHUB_RELEASE_TOKEN: ${GITHUB_RELEASE_TOKEN:-}
       GITHUB_RELEASE_REPOSITORY: ${GITHUB_RELEASE_REPOSITORY:-}
+      # Infra do site (ADR 0027 da raiz): o plano e o apply rodam no infra-runner, o único que
+      # recebe esses segredos. Nunca na âncora backoffice-env: o web e o worker não os conhecem.
+      # Sem INFRA_DRIVER, vale tofu, e o build-runner não sobe sem os quatro segredos.
+      INFRA_RUNNER_IMAGE: ${IMAGE_REGISTRY:-ghcr.io/orakel-ai-content}/infra-runner
+      INFRA_DRIVER: ${INFRA_DRIVER:-}
+      CLOUDFLARE_INFRA_TOKEN: ${CLOUDFLARE_INFRA_TOKEN:-}
+      TOFU_STATE_ACCESS_KEY_ID: ${TOFU_STATE_ACCESS_KEY_ID:-}
+      TOFU_STATE_SECRET_ACCESS_KEY: ${TOFU_STATE_SECRET_ACCESS_KEY:-}
+      TOFU_STATE_PASSPHRASE: ${TOFU_STATE_PASSPHRASE:-}
     networks: [internal, docker]
     depends_on:
       backoffice-migrate:
