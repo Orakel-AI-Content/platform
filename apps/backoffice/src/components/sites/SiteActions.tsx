@@ -58,13 +58,15 @@ export type CreateInfraActions = {
  * "Remover infraestrutura" (workspace#97), só para quem tem `site.destroy`: o domínio a digitar,
  * as páginas no ar, se o site está ativo (a ação fica desabilitada, com o aviso de pausar), a
  * execução aberta (com o tipo, para reabrir só a de remoção) e as actions ligadas ao site. A
- * leitura do plano é a mesma da criação.
+ * leitura do plano é a mesma da criação. `retry`: a última remoção falhou, e o botão vira "Tentar
+ * de novo", uma nova execução com novo plano e o domínio digitado de novo.
  */
 export type RemoveInfraActions = {
   domain: string;
   activePages: number | null;
   active: boolean;
   open: Pick<OpenInfraRun, 'id' | 'status' | 'kind'> | null;
+  retry?: boolean;
   request: () => Promise<{ ok: true; runId: number } | { ok: false; message: string }>;
   read: (runId: number) => Promise<InfraPlanView | null>;
   confirm: (runId: number, typedDomain: string) => Promise<ActionResult>;
@@ -100,7 +102,8 @@ export function LifecycleActionScope({ children }: { children: ReactNode }) {
  * (`InfraCheckContext`); fora dela, da `lifecycle` da página. Com `remove` (só `site.destroy`),
  * "Remover infraestrutura" (workspace#97) de `infra_aplicada` em diante, sem outra execução
  * aberta: desabilitada, com o aviso de pausar, enquanto o site está ativo; "Revisar e confirmar a
- * remoção" reabre a remoção aberta no estado salvo. Sem nenhuma ação não renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de qualquer uma vai ao mesmo
+ * remoção" reabre a remoção aberta no estado salvo; com a última remoção em falha, o botão vira
+ * "Tentar de novo". Sem nenhuma ação não renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de qualquer uma vai ao mesmo
  * Alert.
  */
 export function LifecycleAction({
@@ -249,7 +252,12 @@ export function LifecycleAction({
               ? 'Confirmando…'
               : reviewRemoval
                 ? 'Revisar e confirmar a remoção'
-                : 'Remover infraestrutura'}
+                : remove.retry
+                  ? 'Tentar de novo'
+                  : 'Remover infraestrutura'}
+            {!reviewRemoval && remove.retry && !pending('remove') && (
+              <span className="sr-only"> a remoção da infraestrutura</span>
+            )}
           </Button>
           {remove.active && (
             <span id={pauseHintId} className="basis-full text-sm">

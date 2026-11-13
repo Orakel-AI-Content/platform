@@ -10,6 +10,7 @@ import {
   formatDateTime,
   formatDuration,
   latestInfraCreation,
+  latestInfraRemoval,
 } from '@/components/shared/siteLabels.ts';
 import { SiteOperationButton, SiteOperationsScope } from '@/components/sites/SiteOperations';
 import { SitePublicationTab } from '@/components/sites/SitePublicationTab';
@@ -219,6 +220,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                       status: activity.value.openInfra.status,
                       kind: activity.value.openInfra.kind,
                     },
+                    retry: latestInfraRemoval(activity.value.history)?.status === 'falhou',
                     request: requestInfraRemovalAction.bind(null, site.id),
                     read: infraPlanAction.bind(null, site.id),
                     confirm: confirmInfraRemovalAction.bind(null, site.id),
