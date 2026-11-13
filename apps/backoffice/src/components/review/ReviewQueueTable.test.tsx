@@ -1,15 +1,18 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MotionGlobalConfig } from 'motion/react';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { ReviewQueueEntry } from '@/domain/reviews/reviews.ts';
+
+import type { ApproveBatch } from './ApproveBatchDialog.tsx';
 
 import { ReviewQueueTable } from './ReviewQueueTable.tsx';
 
 // Fila de revisão (#74): título, tipo, versão e data; links para a revisão e teclado.
 // Pendências e a marca "Devolvido" de cada item (#772); "Correção automática" no lugar dela (#804).
-// O resultado do parecer automático (#774).
+// O resultado do parecer automático (#774). A seleção do lote, o resumo e o resultado (#776).
 // Busca, filtro por tipo, ordem e paginação com o estado na URL (#365): router.replace simulado.
 
 const navigation = vi.hoisted(() => {
@@ -43,13 +46,14 @@ afterEach(() => {
 });
 
 /** Sem pendência, links verificando, enviado pela primeira vez e parecer favorável. */
-const fresh = {
+const fresh: Omit<ReviewQueueEntry, 'id' | 'kind' | 'title' | 'version' | 'submittedAt'> = {
   pending: 0,
   links: { state: 'verificando' },
   returned: false,
   autoCorrected: false,
   opinion: 'favoravel',
-} as const;
+  batchBlockers: ['a checagem de links externos não terminou'],
+};
 
 const rows: ReviewQueueEntry[] = [
   {
@@ -318,5 +322,191 @@ describe('busca, filtro, ordem e paginação (#365)', () => {
     const text = within(link).getByText(title);
     expect(text.getAttribute('title')).toBe(title);
     expect(text.className).toContain('truncate');
+  });
+});
+
+describe('lote de aprovar e publicar na fila (#776)', () => {
+  // O happy-dom rejeita a animação nativa que o motion cancela ao desmontar o Dialog.
+  beforeAll(() => {
+    MotionGlobalConfig.skipAnimations = true;
+  });
+  afterAll(() => {
+    MotionGlobalConfig.skipAnimations = false;
+  });
+
+  const clean = { ...fresh, links: { state: 'sem_links' }, batchBlockers: [] } as const;
+  const batchRows: ReviewQueueEntry[] = [
+    { ...rows[0]!, id: 1, title: 'Limpo A', version: 2, ...clean, batchBlockers: [] },
+    {
+      ...rows[0]!,
+      id: 2,
+      title: 'Com pendência',
+      ...clean,
+      pending: 2,
+      batchBlockers: ['tem 2 pendência(s)'],
+    },
+    { ...rows[1]!, id: 3, title: 'Limpo B', version: 5, ...clean, batchBlockers: [] },
+  ];
+  const overflow =
+    'O dia pedido já tinha atingido o limite diário de publicações do site; a publicação foi para o próximo dia com vaga, no mesmo horário.';
+  const done: ApproveBatch = () =>
+    Promise.resolve({
+      ok: true,
+      items: [
+        { contentId: 1, outcome: 'published' },
+        { contentId: 3, outcome: 'scheduled', at: '13/11/2026, 10:00 BRT', warning: overflow },
+      ],
+    });
+
+  function renderBatch(action = vi.fn(done), canPublish = true) {
+    render(
+      <ReviewQueueTable
+        siteId="exemplo-a"
+        timeZone="UTC"
+        rows={batchRows}
+        canPublish={canPublish}
+        approveBatchAction={action}
+      />,
+    );
+    return action;
+  }
+
+  async function openSummary(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar todas as linhas' }));
+    await user.click(screen.getByRole('button', { name: 'Aprovar e publicar selecionados' }));
+    return screen.findByRole('dialog', { name: 'Aprovar e publicar 2 conteúdos?' });
+  }
+
+  it('sem content.publish a fila fica sem caixas nem barra', () => {
+    renderBatch(vi.fn(done), false);
+
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Aprovar e publicar selecionados' })).toBeNull();
+  });
+
+  it('só os elegíveis têm a caixa habilitada; os outros dizem por que ficam fora do lote', () => {
+    renderBatch();
+
+    const boxes = screen.getAllByRole<HTMLInputElement>('checkbox');
+    expect(boxes.map((box) => [box.getAttribute('aria-label'), box.disabled])).toEqual([
+      ['Selecionar todas as linhas', false],
+      ['Selecionar Limpo A', false],
+      ['Selecionar Com pendência', true],
+      ['Selecionar Limpo B', false],
+    ]);
+    const reason = document.getElementById(boxes[2]?.getAttribute('aria-describedby') ?? '');
+    expect(reason?.textContent).toBe('Fora do lote: tem 2 pendência(s).');
+    expect(screen.queryByRole('button', { name: 'Aprovar e publicar selecionados' })).toBeNull();
+  });
+
+  it('o resumo lista os títulos, e o envio só se habilita com a confirmação de leitura', async () => {
+    const user = userEvent.setup();
+    const action = renderBatch();
+
+    expect(screen.queryByText('2 conteúdos selecionados')).toBeNull();
+    const dialog = await openSummary(user);
+    expect(
+      within(dialog)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Limpo A', 'Limpo B']);
+    const send = within(dialog).getByRole<HTMLButtonElement>('button', {
+      name: 'Aprovar e publicar',
+    });
+    expect(send.disabled).toBe(true);
+
+    await user.click(
+      within(dialog).getByRole('checkbox', {
+        name: 'Li os conteúdos selecionados e confirmo o checklist de cada um',
+      }),
+    );
+    expect(send.disabled).toBe(false);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it('depois do envio, o resultado separa os que foram ao ar, os agendados e os que falharam', async () => {
+    const user = userEvent.setup();
+    const action = renderBatch(
+      vi.fn<ApproveBatch>(() =>
+        Promise.resolve({
+          ok: true,
+          items: [
+            { contentId: 1, outcome: 'published' },
+            {
+              contentId: 3,
+              outcome: 'failed',
+              message: 'O conteúdo 3 não pode ser aprovado em lote: tem 1 pendência(s)',
+            },
+          ],
+        }),
+      ),
+    );
+
+    const dialog = await openSummary(user);
+    await user.click(within(dialog).getByRole('checkbox'));
+    await user.click(within(dialog).getByRole('button', { name: 'Aprovar e publicar' }));
+
+    const result = await screen.findByRole('dialog', { name: 'Resultado do lote' });
+    expect(action).toHaveBeenCalledWith('exemplo-a', [
+      { contentId: 1, version: 2 },
+      { contentId: 3, version: 5 },
+    ]);
+    expect(within(result).getByRole('region', { name: 'Foram ao ar (1)' }).textContent).toContain(
+      'Limpo A',
+    );
+    expect(within(result).getByRole('region', { name: 'Falharam (1)' }).textContent).toContain(
+      'Limpo B: O conteúdo 3 não pode ser aprovado em lote: tem 1 pendência(s)',
+    );
+    expect(within(result).queryByRole('region', { name: /Agendados/ })).toBeNull();
+    // A seleção zera depois do envio.
+    await user.click(within(result).getByRole('button', { name: 'Concluir' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Aprovar e publicar selecionados' })).toBeNull();
+  });
+
+  it('o agendado mostra a data e a hora de São Paulo e o aviso do transbordo', async () => {
+    const user = userEvent.setup();
+    renderBatch();
+
+    const dialog = await openSummary(user);
+    await user.click(within(dialog).getByRole('checkbox'));
+    await user.click(within(dialog).getByRole('button', { name: 'Aprovar e publicar' }));
+
+    const result = await screen.findByRole('dialog', { name: 'Resultado do lote' });
+    const scheduled = within(result).getByRole('region', { name: 'Agendados (1)' });
+    expect(scheduled.textContent).toContain('Limpo B: agendado para 13/11/2026, 10:00 BRT.');
+    expect(scheduled.textContent).toContain(overflow);
+  });
+
+  it('a recusa do lote inteiro fica no resumo, com o motivo', async () => {
+    const user = userEvent.setup();
+    renderBatch(
+      vi.fn<ApproveBatch>(() =>
+        Promise.resolve({ ok: false, message: 'Sem permissão para content.publish' }),
+      ),
+    );
+
+    const dialog = await openSummary(user);
+    await user.click(within(dialog).getByRole('checkbox'));
+    await user.click(within(dialog).getByRole('button', { name: 'Aprovar e publicar' }));
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('alert').textContent).toBe(
+        'Sem permissão para content.publish',
+      ),
+    );
+    expect(screen.getByRole('dialog', { name: 'Aprovar e publicar 2 conteúdos?' })).toBeTruthy();
+  });
+
+  it('Cancelar não envia e a seleção fica', async () => {
+    const user = userEvent.setup();
+    const action = renderBatch();
+
+    const dialog = await openSummary(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(action).not.toHaveBeenCalled();
+    expect(screen.getByText('2 conteúdos selecionados')).toBeTruthy();
   });
 });

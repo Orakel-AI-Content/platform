@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   amendAction,
   approveAction,
+  approveBatchAction,
   approvePublishAction,
   approveScheduleAction,
   confirmAction,
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   currentActor: vi.fn(),
   approveVersion: vi.fn(),
   approveAndPublish: vi.fn(),
+  approveAndPublishBatch: vi.fn(),
   approveAndSchedule: vi.fn(),
   amendInReview: vi.fn(),
   nextInReviewQueue: vi.fn(),
@@ -41,6 +43,7 @@ vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }))
 vi.mock('@/domain/reviews/reviews.ts', () => ({
   approveVersion: mocks.approveVersion,
   approveAndPublish: mocks.approveAndPublish,
+  approveAndPublishBatch: mocks.approveAndPublishBatch,
   approveAndSchedule: mocks.approveAndSchedule,
   returnVersion: mocks.returnVersion,
 }));
@@ -215,6 +218,102 @@ describe('aprovar e publicar ou agendar na tela de revisão (workspace#89)', () 
       ],
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe('aprovar e publicar em lote na fila (#776)', () => {
+  const items = [
+    { contentId: 1, version: 2 },
+    { contentId: 3, version: 5 },
+    { contentId: 4, version: 1 },
+  ];
+  const approved = { reviewId: 9, publicationId: 4, overflowed: false };
+
+  it('sem sessão não chama o domínio nem revalida', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await approveBatchAction('exemplo-a', items)).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+    });
+    expect(mocks.approveAndPublishBatch).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('a recusa do lote inteiro volta como mensagem e não revalida', async () => {
+    mocks.approveAndPublishBatch.mockResolvedValue(forbidden);
+
+    expect(await approveBatchAction('exemplo-a', items)).toEqual({
+      ok: false,
+      message: 'Sem permissão para content.publish',
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('separa os que foram ao ar, os agendados (São Paulo, com o transbordo) e os que falharam', async () => {
+    mocks.approveAndPublishBatch.mockResolvedValue({
+      ok: true,
+      value: [
+        { ...items[0], ...approved, outcome: 'published', at: new Date() },
+        {
+          ...items[1],
+          ...approved,
+          outcome: 'scheduled',
+          at: new Date('2026-11-13T13:00:00Z'),
+          overflowed: true,
+        },
+        {
+          ...items[2],
+          outcome: 'failed',
+          issues: [
+            {
+              code: 'review.batch_ineligible',
+              message: 'O conteúdo 4 não pode ser aprovado em lote: tem 1 pendência(s)',
+              path: [],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(await approveBatchAction('exemplo-a', items)).toEqual({
+      ok: true,
+      items: [
+        { contentId: 1, outcome: 'published' },
+        {
+          contentId: 3,
+          outcome: 'scheduled',
+          at: '13/11/2026, 10:00 BRT',
+          warning:
+            'O dia pedido já tinha atingido o limite diário de publicações do site; a publicação foi para o próximo dia com vaga, no mesmo horário.',
+        },
+        {
+          contentId: 4,
+          outcome: 'failed',
+          message: 'O conteúdo 4 não pode ser aprovado em lote: tem 1 pendência(s)',
+        },
+      ],
+    });
+    expect(mocks.approveAndPublishBatch).toHaveBeenCalledWith({}, revisor, 'exemplo-a', items);
+    const paths = mocks.revalidatePath.mock.calls.map(([path]) => path as string);
+    expect(paths).toContain('/sites/exemplo-a/revisao');
+    expect(paths).toContain('/sites/exemplo-a/revisao/1');
+    expect(paths).toContain('/sites/exemplo-a/conteudos/3');
+    expect(paths.some((path) => path.endsWith('/4'))).toBe(false);
+  });
+
+  it('agendado sem transbordo não leva o aviso', async () => {
+    mocks.approveAndPublishBatch.mockResolvedValue({
+      ok: true,
+      value: [
+        { ...items[0], ...approved, outcome: 'scheduled', at: new Date('2026-11-13T13:00:00Z') },
+      ],
+    });
+
+    expect(await approveBatchAction('exemplo-a', [items[0]!])).toEqual({
+      ok: true,
+      items: [{ contentId: 1, outcome: 'scheduled', at: '13/11/2026, 10:00 BRT' }],
+    });
   });
 });
 
