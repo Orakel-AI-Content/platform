@@ -90,6 +90,13 @@ test('devolver ao editor com comentário; o editor vê o comentário e pode reen
     reviewer.getByRole('heading', { level: 1, name: `Revisão de “${title}”` }),
   ).toBeVisible();
 
+  // A revisão é em passos (#766): "Próximo" leva de Checagens a Decisão, com o passo na URL.
+  const proximo = reviewer.getByRole('button', { name: 'Próximo' });
+  for (const passo of ['ajustes', 'leitura', 'decisao']) {
+    await proximo.click();
+    await expect(reviewer).toHaveURL(new RegExp(`[?&]passo=${passo}$`));
+  }
+
   // Sem comentário, o erro fica no campo e nada é devolvido.
   const devolver = reviewer.getByRole('button', { name: 'Devolver ao editor' });
   await devolver.click();
