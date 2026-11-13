@@ -422,3 +422,19 @@ export async function infraActivity(
   );
   return { open, history };
 }
+
+/** O que as tasks do build-runner leem da execução: o site, o estado e o resumo do plano. */
+export async function loadInfraRun(
+  db: Executor,
+  runId: number,
+): Promise<{ siteId: string; status: InfraRunStatus; planSummary: string | null } | undefined> {
+  const [run] = await db
+    .select({
+      siteId: infraRuns.siteId,
+      status: infraRuns.status,
+      planSummary: infraRuns.planSummary,
+    })
+    .from(infraRuns)
+    .where(eq(infraRuns.id, runId));
+  return run;
+}

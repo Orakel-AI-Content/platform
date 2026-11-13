@@ -1,3 +1,5 @@
+import { localDriver } from '../domain/infra/drivers.ts';
+import { INFRA_APPLY_TASK, INFRA_PLAN_TASK } from '../domain/infra/schedule.ts';
 import { parseCrontab } from 'graphile-worker';
 import { describe, expect, it } from 'vitest';
 
@@ -81,13 +83,14 @@ describe('backoffice-worker', () => {
 });
 
 describe('build-runner', () => {
-  it('só o build-runner registra a conferência da imagem, a troca da prévia e o run das releases (Docker e GitHub)', () => {
+  it('só o build-runner registra a conferência da imagem, a troca da prévia, o run das releases e a infra do site (Docker, GitHub e segredos de infra)', () => {
     const runner = buildRunnerTasks({
       db: {} as Db,
       runtime: {} as ContainerRuntime,
       settings: {} as BuildSettings,
       driver: { kind: 'local' },
       preview: { internalNetwork: 'orakel-internal', exportPreviewToken: 'p'.repeat(32) },
+      infra: localDriver(),
     });
     const worker = workerTasks({
       db: {} as Db,
@@ -104,8 +107,12 @@ describe('build-runner', () => {
         RECONCILE_PREVIEW_TASK,
         RELEASE_RUN_TASK,
         'rollback',
+        INFRA_PLAN_TASK,
+        INFRA_APPLY_TASK,
       ].sort(),
     );
+    expect(Object.keys(worker)).not.toContain(INFRA_PLAN_TASK);
+    expect(Object.keys(worker)).not.toContain(INFRA_APPLY_TASK);
     expect(Object.keys(worker)).not.toContain(CHECK_RELEASE_IMAGE_TASK);
     expect(Object.keys(worker)).not.toContain(RELEASE_RUN_TASK);
     expect(Object.keys(worker)).not.toContain(RECONCILE_PREVIEW_TASK);
