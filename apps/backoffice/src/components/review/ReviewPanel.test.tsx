@@ -9,6 +9,7 @@ import { toast, ToastProvider } from '@/components/ui/toast';
 
 import { ReviewChanges } from './ReviewChanges.tsx';
 import { ReviewChecks } from './ReviewChecks.tsx';
+import { ReviewOpinion, type OpinionPointLabel } from './ReviewOpinion.tsx';
 import type { ReviewCheckItem } from './reviewCheckItems.ts';
 import { ReviewPanel } from './ReviewPanel.tsx';
 
@@ -21,7 +22,8 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 // Checagens, Ajustes, Leitura (o checklist) e Decisão (as aprovações e a devolução), todos
 // montados e os inativos com `hidden`; o passo vem da prop `step` e a troca vai a `?passo=`.
 // Ajustes (#767) mostra o editor da correção que a página monta, ou por que não há correção.
-// "O que mudou" (#768) fica em Checagens, abaixo das checagens, só quando a página o passa.
+// "O que mudou" (#768) fica em Checagens, abaixo das checagens, só quando a página o passa. O
+// parecer automático (workspace#94) fica em Leitura, acima do checklist, e não muda a decisão.
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 const search = vi.hoisted(() => ({ value: '' }));
@@ -85,6 +87,23 @@ function server(initial: readonly string[] = []) {
 
 const APPROVALS = ['Aprovar e publicar agora', 'Aprovar e agendar', 'Só aprovar'] as const;
 const approvals = () => APPROVALS.map((name) => screen.getByRole('button', { name }));
+
+const opinionPoints: OpinionPointLabel[] = [
+  { key: 'valor_original', label: 'Valor original' },
+  { key: 'politicas_anuncios_afiliados', label: 'Políticas de anúncios e afiliados' },
+  { key: 'linha_editorial', label: 'Linha editorial' },
+];
+
+// Parecer desfavorável em tudo: só informa (workspace#94), não mexe nas aprovações.
+const unfavorable = {
+  valor_original: { verdict: 'nao_atende', justification: 'Só parafraseia.', excerpts: ['x'] },
+  politicas_anuncios_afiliados: {
+    verdict: 'nao_atende',
+    justification: 'Promete ganho garantido.',
+    excerpts: ['lucro garantido'],
+  },
+  linha_editorial: { verdict: 'nao_atende', justification: 'Fora do tema.', excerpts: ['y'] },
+} as const;
 
 const STEP_TITLES = ['Checagens', 'Ajustes', 'Leitura', 'Decisão'];
 
@@ -315,6 +334,42 @@ describe('painel de revisão', () => {
     renderPanel({ checks: <ReviewChecks items={warnings} /> });
     expect(screen.queryByRole('region', { name: 'O que mudou' })).toBeNull();
     expect(screen.queryByText('O que mudou')).toBeNull();
+  });
+
+  it('o parecer automático fica no passo Leitura, acima do checklist, e não em outro passo', () => {
+    renderPanel({
+      checks: <ReviewChecks items={warnings} />,
+      opinion: <ReviewOpinion state={{ state: 'pendente' }} points={opinionPoints} />,
+    });
+
+    const section = screen.getByRole('region', { name: 'Parecer automático', hidden: true });
+    const steps = [...document.querySelectorAll<HTMLElement>('[data-step]')];
+    expect(steps.filter((step) => step.contains(section)).map((step) => step.dataset.step)).toEqual(
+      ['leitura'],
+    );
+    const reading = document.querySelector<HTMLElement>('[data-step="leitura"]')!;
+    expect([...reading.querySelectorAll('h2')].map((heading) => heading.textContent)).toEqual([
+      'Parecer automático',
+      'Checklist',
+    ]);
+  });
+
+  it('parecer desfavorável não muda a decisão: com o checklist completo, tudo fica habilitado', () => {
+    renderPanel({
+      step: 'decisao',
+      confirmed: allKeys,
+      opinion: (
+        <ReviewOpinion state={{ state: 'pronto', opinion: unfavorable }} points={opinionPoints} />
+      ),
+    });
+
+    expect(
+      screen.getByRole('region', { name: 'Parecer automático', hidden: true }).textContent,
+    ).toContain('Não atende');
+    for (const button of approvals()) expect(button.hasAttribute('disabled')).toBe(false);
+    expect(
+      screen.getByRole('button', { name: 'Devolver ao editor' }).hasAttribute('disabled'),
+    ).toBe(false);
   });
 
   it('títulos na escala do guia: as seções em h2, nenhum h3 no tamanho de h2, sem o link da prévia', () => {
