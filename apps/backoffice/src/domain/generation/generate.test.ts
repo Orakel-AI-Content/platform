@@ -2,6 +2,7 @@ import { RESOURCES, type Resources } from '@orakel/content-model/v1';
 import { MockLanguageModelV4 } from 'ai/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX } from '../reviews/checks.ts';
 import { FIXTURE_INVALID_TOPIC, FIXTURE_USAGE } from './fixture.ts';
 import {
   generate,
@@ -16,9 +17,15 @@ const input: GenerationInput = {
   topic: 'Café coado em casa',
   editorialContext: 'Tom leve, frases curtas, público iniciante.',
   author: { id: 7, name: 'Ana' },
+  categories: [],
   resources: RESOURCES,
   publishedAt: new Date('2026-11-03T12:00:00Z'),
 };
+
+const categories = [
+  { id: 3, slug: 'metodos', name: 'Métodos' },
+  { id: 4, slug: 'graos', name: 'Grãos' },
+];
 
 const pricing: PricingTable = { fixture: { input: 0.1, output: 0.5 } };
 
@@ -57,10 +64,28 @@ function schemaBlockTypes(call: GenerateCall): string[] {
   return options.map((option) => option.properties.type.const);
 }
 
+type JsonSchema = {
+  properties: Record<string, { items?: { enum?: unknown[] } } | undefined>;
+  required?: string[];
+};
+
+/** O JSON Schema enviado ao modelo. */
+function sentSchema(call: GenerateCall): JsonSchema {
+  const format = call.responseFormat;
+  if (format?.type !== 'json') throw new Error('Chamada sem saída estruturada');
+  return format.schema as JsonSchema;
+}
+
+const article = (extra: Record<string, unknown>) => {
+  const base = JSON.parse(valid) as Record<string, unknown>;
+  return JSON.stringify({ ...base, ...extra });
+};
+
 const valid = JSON.stringify({
   title: 'Café coado',
   slug: 'cafe-coado',
   description: 'Como coar café.',
+  seo: { title: 'Café coado em casa', description: 'O passo a passo do café coado.' },
   blocks: [
     { type: 'text', content: [{ type: 'paragraph', children: [{ type: 'text', text: 'Oi' }] }] },
     { type: 'faq', items: [{ question: 'Qual pó?', answer: [{ type: 'text', text: 'Médio' }] }] },
@@ -99,6 +124,7 @@ describe('generate', () => {
         slug: 'cafe-coado',
         authorIds: [7],
         taxonomyIds: [],
+        seo: { title: 'Café coado em casa', description: 'O passo a passo do café coado.' },
         publishedAt: '2026-11-03T12:00:00.000Z',
         blocks: [
           { n: 1, type: 'text' },
@@ -111,6 +137,49 @@ describe('generate', () => {
     expect(result.prompt.user).toContain('Tema: Café coado em casa');
     expect(result.prompt.user).toContain('Tom leve, frases curtas');
     expect(result.prompt.system).toContain('text, toc, quote, faq');
+    expect(result.prompt.system).toContain(`no máximo ${SEO_TITLE_MAX} caracteres`);
+    expect(result.prompt.system).toContain(`no máximo ${SEO_DESCRIPTION_MAX}`);
+  });
+
+  it('as categorias do site vão como enum fechado e os slugs escolhidos viram taxonomyIds', async () => {
+    const { resolved, mock } = mockModel(article({ categories: ['graos'] }));
+    const result = await generate({ ...input, categories }, { model: resolved, pricing });
+
+    const schema = sentSchema(mock.doGenerateCalls[0]!);
+    expect(schema.properties.categories?.items?.enum).toEqual(['metodos', 'graos']);
+    expect(schema.required).toContain('categories');
+    expect(result).toMatchObject({ ok: true, content: { taxonomyIds: [4] } });
+    expect(result.prompt.user).toContain('- metodos: Métodos');
+    expect(result.prompt.system).toContain('categorias da lista do site');
+  });
+
+  it('categoria fora da lista do site é falha da saída, sem nova chamada', async () => {
+    const { resolved, mock } = mockModel(article({ categories: ['inventada'] }));
+    const result = await generate({ ...input, categories }, { model: resolved, pricing });
+    expect(mock.doGenerateCalls).toHaveLength(1);
+    expect(result.ok).toBe(false);
+  });
+
+  it('sem categorias no site, o campo some do schema e o artigo sai sem taxonomia', async () => {
+    const { resolved, mock } = mockModel(valid);
+    const result = await generate(input, { model: resolved, pricing });
+
+    const schema = sentSchema(mock.doGenerateCalls[0]!);
+    expect(schema.properties.categories).toBeUndefined();
+    expect(schema.required).not.toContain('categories');
+    expect(schema.required).toContain('seo');
+    expect(result).toMatchObject({ ok: true, content: { taxonomyIds: [] } });
+    expect(result.prompt.user).not.toContain('Categorias do site');
+  });
+
+  it('SEO acima dos limites não faz a geração falhar (vira aviso na revisão)', async () => {
+    const seo = {
+      title: 't'.repeat(SEO_TITLE_MAX + 1),
+      description: 'd'.repeat(SEO_DESCRIPTION_MAX + 1),
+    };
+    const { resolved } = mockModel(article({ seo }));
+    const result = await generate(input, { model: resolved, pricing });
+    expect(result).toMatchObject({ ok: true, content: { seo } });
   });
 
   it('saída fora do content-model volta como falha, sem nova chamada ao modelo', async () => {
@@ -171,6 +240,19 @@ describe('modo fixture', () => {
     });
     // 1.000 × 0,10/1M + 500 × 0,50/1M
     expect(first.costUsd).toBeCloseTo(0.00035, 10);
+  });
+
+  it('escolhe a primeira categoria do site e devolve SEO dentro dos limites', async () => {
+    const result = await generate({ ...input, categories }, { model: fixture(), pricing });
+    expect(result).toMatchObject({ ok: true, content: { taxonomyIds: [3] } });
+    if (!result.ok) return;
+    expect(result.content.seo?.title?.length).toBeLessThanOrEqual(SEO_TITLE_MAX);
+    expect(result.content.seo?.description?.length).toBeLessThanOrEqual(SEO_DESCRIPTION_MAX);
+  });
+
+  it('sem categorias no site, conclui sem taxonomia', async () => {
+    const result = await generate(input, { model: fixture(), pricing });
+    expect(result).toMatchObject({ ok: true, content: { taxonomyIds: [] } });
   });
 
   it('o tema de saída inválida aciona o caminho de falha', async () => {

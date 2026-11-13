@@ -25,6 +25,7 @@ const run = (topic = 'Café coado em casa'): PendingRun => ({
     topic,
     editorialContext: 'Tom leve.',
     author: { id: 1, name: 'Ana' },
+    categories: [{ id: 1, slug: 'receitas', name: 'Receitas' }],
     resources: RESOURCES,
     publishedAt: new Date('2026-11-03T12:00:00Z'),
   },
@@ -68,9 +69,16 @@ describe('generate-article', () => {
     expect((url as URL).href).toBe('http://backoffice-web:3000/api/internal/v1/contents');
     expect(init?.method).toBe('POST');
     expect(new Headers(init?.headers).get('authorization')).toBe(`Bearer ${'g'.repeat(32)}`);
-    const body = JSON.parse(init?.body as string) as { siteId: string; content: { title: string } };
+    const body = JSON.parse(init?.body as string) as {
+      siteId: string;
+      content: { title: string; taxonomyIds: number[]; seo?: { title?: string } };
+    };
     expect(body.siteId).toBe('exemplo-a');
-    expect(body.content.title).toBe('Artigo de teste: Café coado em casa');
+    expect(body.content).toMatchObject({
+      title: 'Artigo de teste: Café coado em casa',
+      taxonomyIds: [1],
+    });
+    expect(body.content.seo?.title).toBe('Artigo de teste');
     expect(outcome()).toMatchObject({
       status: 'ok',
       contentId: 42,
