@@ -15,7 +15,7 @@ import {
 } from '@orakel/build-contract';
 import * as z from 'zod';
 
-import { INFRA_STEPS, type InfraStep } from '../../db/schema/index.ts';
+import { INFRA_RESOURCE_STEPS, type InfraResourceStep } from '../../db/schema/index.ts';
 import {
   ImageUnavailableError,
   readLogTail,
@@ -33,10 +33,9 @@ export type InfraFailure = { kind: 'permanent' | 'transient'; message: string };
 export const InfraPlanSummarySchema = z.object({
   formatVersion: z.literal(1),
   steps: z.object(
-    Object.fromEntries(INFRA_STEPS.map((step) => [step, z.array(InfraChangeSchema)])) as Record<
-      InfraStep,
-      z.ZodArray<typeof InfraChangeSchema>
-    >,
+    Object.fromEntries(
+      INFRA_RESOURCE_STEPS.map((step) => [step, z.array(InfraChangeSchema)]),
+    ) as Record<InfraResourceStep, z.ZodArray<typeof InfraChangeSchema>>,
   ),
 });
 export type InfraPlanSummary = z.infer<typeof InfraPlanSummarySchema>;
@@ -47,15 +46,15 @@ export type InfraPlanOutcome =
 export type InfraApplyOutcome =
   | { status: 'ok'; nameservers: string[] }
   /** `step`: a etapa em que o apply parou; nula quando nenhum recurso chegou a começar. */
-  | { status: 'failed'; step: InfraStep | null; failure: InfraFailure };
+  | { status: 'failed'; step: InfraResourceStep | null; failure: InfraFailure };
 
 export interface InfraDriver {
   readonly kind: 'tofu' | 'local';
   plan(target: InfraTarget): Promise<InfraPlanOutcome>;
-  /** `onStep` a cada etapa nova, na ordem de `INFRA_STEPS` (nunca volta). */
+  /** `onStep` a cada etapa nova, na ordem de `INFRA_RESOURCE_STEPS` (nunca volta). */
   apply(
     target: InfraTarget,
-    onStep: (step: InfraStep) => Promise<void>,
+    onStep: (step: InfraResourceStep) => Promise<void>,
   ): Promise<InfraApplyOutcome>;
 }
 
@@ -64,7 +63,7 @@ export interface InfraDriver {
  * não é zona, DNS, e-mail nem armazenamento é regra da zona (rulesets, zone settings, cache,
  * bot management).
  */
-export function stepOfResourceType(type: string): InfraStep {
+export function stepOfResourceType(type: string): InfraResourceStep {
   if (type === 'cloudflare_zone') return 'endereco';
   if (type === 'cloudflare_dns_record') return 'dns';
   if (type.startsWith('cloudflare_email_routing')) return 'email';
@@ -75,16 +74,19 @@ export function stepOfResourceType(type: string): InfraStep {
 /** Agrupa os recursos do plano por etapa; toda etapa aparece, vazia quando nada muda nela. */
 export function summarizePlan(changes: readonly InfraChange[]): InfraPlanSummary {
   const steps = Object.fromEntries(
-    INFRA_STEPS.map((step) => [step, [] as InfraChange[]]),
-  ) as Record<InfraStep, InfraChange[]>;
+    INFRA_RESOURCE_STEPS.map((step) => [step, [] as InfraChange[]]),
+  ) as Record<InfraResourceStep, InfraChange[]>;
   for (const change of changes) steps[stepOfResourceType(change.type)].push(change);
   return { formatVersion: 1, steps };
 }
 
-const stepIndex = (step: InfraStep) => INFRA_STEPS.indexOf(step);
+const stepIndex = (step: InfraResourceStep) => INFRA_RESOURCE_STEPS.indexOf(step);
 
 /** O que o log `-json` do apply diz até agora: a etapa mais adiantada e a do recurso que falhou. */
-export type ApplyProgress = { current: InfraStep | null; errored: InfraStep | null };
+export type ApplyProgress = {
+  current: InfraResourceStep | null;
+  errored: InfraResourceStep | null;
+};
 
 /**
  * Lê as linhas `-json` do tofu: `apply_start` avança a etapa corrente (só para a frente: o tofu
@@ -92,8 +94,8 @@ export type ApplyProgress = { current: InfraStep | null; errored: InfraStep | nu
  * Linhas que não são JSON (avisos do entrypoint no stderr) são ignoradas.
  */
 export function readApplyProgress(log: string): ApplyProgress {
-  let current: InfraStep | null = null;
-  let errored: InfraStep | null = null;
+  let current: InfraResourceStep | null = null;
+  let errored: InfraResourceStep | null = null;
   for (const line of log.split('\n')) {
     if (!line.startsWith('{')) continue;
     let entry: { type?: unknown; hook?: { resource?: { resource_type?: unknown } } };
@@ -314,7 +316,7 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
     },
 
     async apply(target, onStep) {
-      let reported: InfraStep | null = null;
+      let reported: InfraResourceStep | null = null;
       const advance = async (log: string) => {
         const { current } = readApplyProgress(log);
         if (current === null || (reported !== null && stepIndex(current) <= stepIndex(reported))) {
@@ -363,11 +365,11 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
 
 export type LocalDriverOptions = {
   /** A primeira execução de cada site falha nesta etapa (INFRA_LOCAL_FAIL_STEP). */
-  failStep?: InfraStep;
+  failStep?: InfraResourceStep;
 };
 
 /** Recursos fictícios de cada etapa, nos tipos do módulo `site`. */
-const LOCAL_RESOURCES: Record<InfraStep, { name: string; type: string }[]> = {
+const LOCAL_RESOURCES: Record<InfraResourceStep, { name: string; type: string }[]> = {
   endereco: [{ name: 'site', type: 'cloudflare_zone' }],
   dns: [
     { name: 'www', type: 'cloudflare_dns_record' },
@@ -398,10 +400,10 @@ export const LOCAL_NAMESERVERS = ['ada.ns.orakel.localhost', 'bob.ns.orakel.loca
  * zera a memória; sem efeito fora do local e do E2E.
  */
 export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
-  const created = new Map<string, Set<InfraStep>>();
+  const created = new Map<string, Set<InfraResourceStep>>();
   const failedOnce = new Set<string>();
   const createdOf = (siteId: string) => {
-    const steps = created.get(siteId) ?? new Set<InfraStep>();
+    const steps = created.get(siteId) ?? new Set<InfraResourceStep>();
     created.set(siteId, steps);
     return steps;
   };
@@ -411,7 +413,7 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
 
     plan(target) {
       const done = createdOf(target.siteId);
-      const changes = INFRA_STEPS.filter((step) => !done.has(step)).flatMap((step) =>
+      const changes = INFRA_RESOURCE_STEPS.filter((step) => !done.has(step)).flatMap((step) =>
         LOCAL_RESOURCES[step].map(({ name, type }) => ({
           address: `module.site.${type}.${name}`,
           type,
@@ -423,7 +425,7 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
 
     async apply(target, onStep) {
       const done = createdOf(target.siteId);
-      for (const step of INFRA_STEPS) {
+      for (const step of INFRA_RESOURCE_STEPS) {
         if (done.has(step)) continue;
         await onStep(step);
         if (options.failStep === step && !failedOnce.has(target.siteId)) {

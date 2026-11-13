@@ -162,10 +162,16 @@ export const OPEN_INFRA_RUN_STATUSES = [
   'aplicando',
 ] as const satisfies readonly InfraRunStatus[];
 /**
- * Etapas do apply, na ordem e nos termos de quem opera. `paginas` (apagar o Worker do site) só
- * existe na remoção, antes das demais.
+ * Etapas dos recursos do módulo OpenTofu `site`, na ordem e nos termos de quem opera: as do plano,
+ * do resumo e do apply (drivers).
  */
-export const INFRA_STEPS = ['paginas', 'endereco', 'dns', 'email', 'regras', 'imagens'] as const;
+export const INFRA_RESOURCE_STEPS = ['endereco', 'dns', 'email', 'regras', 'imagens'] as const;
+export type InfraResourceStep = (typeof INFRA_RESOURCE_STEPS)[number];
+/**
+ * Etapas de uma execução: as do módulo e, só na remoção e antes delas, `paginas` (apagar o
+ * Worker do site, fora do OpenTofu).
+ */
+export const INFRA_STEPS = ['paginas', ...INFRA_RESOURCE_STEPS] as const;
 export type InfraStep = (typeof INFRA_STEPS)[number];
 /** O que a execução faz com a infraestrutura do site (workspace#97). */
 export const INFRA_RUN_KINDS = ['criar', 'remover'] as const;
