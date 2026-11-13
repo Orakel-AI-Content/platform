@@ -1,8 +1,11 @@
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   NotFound,
+  NoSuchBucket,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -10,6 +13,9 @@ import {
 
 import type { ObjectStore } from '../domain/media/store.ts';
 import type { Env } from '../env.ts';
+
+/** Máximo de chaves por `DeleteObjects` (S3 e R2). */
+export const DELETE_BATCH = 1000;
 
 // Cliente S3 único para SeaweedFS (local) e R2 (produção): só o protocolo muda de endpoint.
 export function createS3Client(
@@ -56,6 +62,42 @@ export function s3ObjectStore(client: S3Client): ObjectStore {
       } catch (error) {
         if (error instanceof NotFound) return false;
         throw error;
+      }
+    },
+    async list(bucket, prefix) {
+      const keys: string[] = [];
+      let token: string | undefined;
+      try {
+        do {
+          const page = await client.send(
+            new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token }),
+          );
+          for (const object of page.Contents ?? []) if (object.Key) keys.push(object.Key);
+          token = page.IsTruncated ? page.NextContinuationToken : undefined;
+        } while (token);
+      } catch (error) {
+        if (error instanceof NoSuchBucket) return [];
+        throw error;
+      }
+      return keys;
+    },
+    async deleteMany(bucket, keys) {
+      for (let i = 0; i < keys.length; i += DELETE_BATCH) {
+        const batch = keys.slice(i, i + DELETE_BATCH);
+        const result = await client.send(
+          new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+          }),
+        );
+        const failed = result.Errors ?? [];
+        if (failed.length > 0) {
+          const first = failed[0];
+          throw new Error(
+            `${failed.length} objetos de ${bucket} não foram removidos ` +
+              `(${first?.Key}: ${first?.Code} ${first?.Message})`,
+          );
+        }
       }
     },
   };

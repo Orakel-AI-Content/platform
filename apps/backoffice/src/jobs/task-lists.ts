@@ -4,7 +4,7 @@ import { AGGREGATE_AUDIENCE_TASK, AUDIENCE_QUEUE } from '../domain/audience/sche
 import { CORRECT_ARTICLE_TASK, GENERATE_ARTICLE_TASK } from '../domain/generation/runs.ts';
 import { REPROCESS_TASK } from '../domain/media/reprocess.ts';
 import { INGEST_TASK } from '../domain/media/upload.ts';
-import { VARIANTS_TASK } from '../domain/media/variants.ts';
+import { EMPTY_SITE_MEDIA_TASK, VARIANTS_TASK } from '../domain/media/variants.ts';
 import { ROLLBACK_TASK } from '../domain/builds/schedule.ts';
 import { CHECK_SITE_INFRA_TASK } from '../domain/builds/site-state.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../domain/publications/schedule.ts';
@@ -26,6 +26,7 @@ import {
   createGenerateArticleTask,
   type GenerateArticleTaskDeps,
 } from './tasks/generate-article.ts';
+import { createEmptySiteMediaTask } from './tasks/empty-site-media.ts';
 import { heartbeat } from './tasks/heartbeat.ts';
 import { createInfraApplyTask } from './tasks/infra-apply.ts';
 import { createInfraPlanTask } from './tasks/infra-plan.ts';
@@ -54,6 +55,7 @@ export function workerTasks(deps: WorkerTaskDeps): TaskList {
     [INGEST_TASK]: createIngestMediaTask(deps),
     [VARIANTS_TASK]: createMediaVariantsTask(deps),
     [REPROCESS_TASK]: createMediaReprocessTask(deps),
+    [EMPTY_SITE_MEDIA_TASK]: createEmptySiteMediaTask(deps),
     [PUBLISH_SCHEDULED_TASK]: createPublishScheduledTask(deps),
     [GENERATE_ARTICLE_TASK]: createGenerateArticleTask(deps),
     [CORRECT_ARTICLE_TASK]: createCorrectArticleTask(deps),

@@ -1,7 +1,12 @@
 import type { InfraChange } from '@orakel/build-contract';
 import type { Block } from '@orakel/content-model/v1';
 
-import type { BuildKind, BuildStatus, InfraStep, SiteEventKind } from '@/db/schema/operations.ts';
+import type {
+  BuildKind,
+  BuildStatus,
+  InfraResourceStep,
+  SiteEventKind,
+} from '@/db/schema/operations.ts';
 import type {
   ExecutionHistoryItem,
   OpenExecution,
@@ -145,7 +150,7 @@ export const HISTORY_KIND_LABEL: Record<BuildKind | SiteEventKind, string> = {
 export const INFRA_RUN_LABEL = 'Criação da infraestrutura';
 
 /**
- * Etapas da criação da infraestrutura (`INFRA_STEPS`), na mesma ordem, nos termos de quem opera
+ * Etapas do módulo na criação da infraestrutura (`INFRA_RESOURCE_STEPS`), na mesma ordem, nos termos de quem opera
  * (#825): o resumo do plano e o andamento listam nesta ordem.
  */
 export const INFRA_STEP_LABEL = {
@@ -154,10 +159,10 @@ export const INFRA_STEP_LABEL = {
   email: 'E-mail',
   regras: 'Regras',
   imagens: 'Armazenamento de imagens',
-} as const satisfies Record<InfraStep, string>;
+} as const satisfies Record<InfraResourceStep, string>;
 
 /** As etapas na ordem do `INFRA_STEP_LABEL` (sem importar o schema do banco no navegador). */
-export const INFRA_STEP_ORDER = Object.keys(INFRA_STEP_LABEL) as InfraStep[];
+export const INFRA_STEP_ORDER = Object.keys(INFRA_STEP_LABEL) as InfraResourceStep[];
 
 /** O que o plano faz com um recurso, no resumo de uma etapa. */
 const INFRA_ACTION_TEXT: Record<InfraChange['action'], string> = {
