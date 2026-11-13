@@ -1,7 +1,7 @@
 import type { TaskList } from 'graphile-worker';
 
 import { AGGREGATE_AUDIENCE_TASK, AUDIENCE_QUEUE } from '../domain/audience/schedule.ts';
-import { GENERATE_ARTICLE_TASK } from '../domain/generation/runs.ts';
+import { CORRECT_ARTICLE_TASK, GENERATE_ARTICLE_TASK } from '../domain/generation/runs.ts';
 import { REPROCESS_TASK } from '../domain/media/reprocess.ts';
 import { INGEST_TASK } from '../domain/media/upload.ts';
 import { VARIANTS_TASK } from '../domain/media/variants.ts';
@@ -19,6 +19,7 @@ import { createBuildTask, type BuildTaskDeps } from './tasks/build.ts';
 import { createCheckContentLinksTask } from './tasks/check-content-links.ts';
 import { createCheckReleaseImageTask } from './tasks/check-release-image.ts';
 import { createCheckSiteInfraTask, type CheckSiteInfraTaskDeps } from './tasks/check-site-infra.ts';
+import { createCorrectArticleTask } from './tasks/correct-article.ts';
 import {
   createGenerateArticleTask,
   type GenerateArticleTaskDeps,
@@ -49,6 +50,7 @@ export function workerTasks(deps: WorkerTaskDeps): TaskList {
     [REPROCESS_TASK]: createMediaReprocessTask(deps),
     [PUBLISH_SCHEDULED_TASK]: createPublishScheduledTask(deps),
     [GENERATE_ARTICLE_TASK]: createGenerateArticleTask(deps),
+    [CORRECT_ARTICLE_TASK]: createCorrectArticleTask(deps),
     [AGGREGATE_AUDIENCE_TASK]: createAggregateAudienceTask(deps),
     [CHECK_SITE_INFRA_TASK]: createCheckSiteInfraTask(deps),
     [LINK_CHECK_TASK]: createCheckContentLinksTask(deps),
