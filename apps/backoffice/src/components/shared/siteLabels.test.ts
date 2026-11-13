@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BUILD_KINDS,
   BUILD_STAGES,
-  INFRA_STEPS,
+  INFRA_RESOURCE_STEPS,
   SITE_EVENT_KINDS,
 } from '@/db/schema/operations.ts';
 import type {
@@ -299,9 +299,9 @@ describe('conferência da infra na etapa Infra e zona (#716)', () => {
 });
 
 describe('resumo do plano da infra (#825)', () => {
-  it('as etapas seguem a ordem de INFRA_STEPS, todas com rótulo', () => {
-    expect(INFRA_STEP_ORDER).toEqual([...INFRA_STEPS]);
-    for (const step of INFRA_STEPS) expect(INFRA_STEP_LABEL[step]).not.toBe('');
+  it('as etapas seguem a ordem de INFRA_RESOURCE_STEPS, todas com rótulo', () => {
+    expect(INFRA_STEP_ORDER).toEqual([...INFRA_RESOURCE_STEPS]);
+    for (const step of INFRA_RESOURCE_STEPS) expect(INFRA_STEP_LABEL[step]).not.toBe('');
   });
 
   const change = (action: 'create' | 'update' | 'delete' | 'replace') => ({
