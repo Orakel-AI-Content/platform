@@ -18,16 +18,20 @@ import {
 } from '@/components/sites/siteOperationForms.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
+import type { InfraBatchView } from '@/components/sites/infraBatchView.ts';
 import {
+  confirmInfraBatchPlan,
   confirmInfraPlan,
   confirmInfraReapplyPlan,
   confirmInfraRemovalPlan,
   readInfraPlan,
+  requestInfraBatchPlans,
   requestInfraPlan,
   requestInfraReapplyPlan,
   requestInfraRemovalPlan,
   type InfraPlanView,
 } from '@/domain/infra/plan.ts';
+import { readInfraBatchView } from './infra-batch.ts';
 import {
   cancelBuild,
   requestBuildNow,
@@ -283,6 +287,61 @@ export async function confirmInfraReapplyAction(
     (tx, actor) => confirmInfraReapplyPlan(tx, actor, siteId, runId),
     'Reaplicação da infraestrutura confirmada.',
   );
+}
+
+/** Pedido do lote "Reaplicar nos desatualizados": o lote aberto, ou a recusa em mensagem. */
+export type InfraBatchRequest = { ok: true; batchId: number } | { ok: false; message: string };
+
+/**
+ * "Reaplicar nos desatualizados" (workspace#98): grava o lote e enfileira o plano de cada site;
+ * papel (`site.configure`), lote aberto e "nenhum desatualizado" são do domínio. Sem toast: o
+ * diálogo lê os planos por `infraBatchAction`.
+ */
+export async function requestInfraBatchAction(): Promise<InfraBatchRequest> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
+  const result = await getDb().db.transaction((tx) => requestInfraBatchPlans(tx, actor.value));
+  if (!result.ok) {
+    return {
+      ok: false,
+      message: result.issues[0]?.message ?? 'Não foi possível pedir o lote.',
+    };
+  }
+  revalidatePath('/sites');
+  return { ok: true, batchId: result.value.batchId };
+}
+
+/**
+ * O lote de reaplicação mais recente, para o diálogo e o cartão da lista consultarem. Só leitura
+ * (`site.configure` no domínio); `null` sem sessão, permissão ou lote.
+ */
+export async function infraBatchAction(): Promise<InfraBatchView | null> {
+  const actor = await currentActor();
+  if (!actor.ok) return null;
+  return readInfraBatchView(getDb().db, actor.value);
+}
+
+/** "Confirmar" o lote: o primeiro site passa a aplicando e o apply dele entra na fila (domínio). */
+export async function confirmInfraBatchAction(batchId: number): Promise<ActionResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
+  const result = await getDb().db.transaction((tx) =>
+    confirmInfraBatchPlan(tx, actor.value, batchId),
+  );
+  if (!result.ok) {
+    return { ok: false, message: result.issues[0]?.message ?? 'Não foi possível concluir.' };
+  }
+  revalidatePath('/sites');
+  return { ok: true, message: 'Reaplicação nos desatualizados confirmada.' };
+}
+
+/**
+ * Relê a lista de sites quando o lote fecha: os selos de "Infra desatualizada" e o botão do
+ * cabeçalho vêm do servidor, e o polling do cartão só lê o lote.
+ */
+export async function refreshSitesAction(): Promise<void> {
+  const actor = await currentActor();
+  if (actor.ok) revalidatePath('/sites');
 }
 
 /** "Desmarcar" a etapa manual atual: volta só à anterior (a ordem e a corrida são do domínio). */
