@@ -11,3 +11,8 @@
 .env
 .env.*
 !.env.example
+# Pasta de trabalho, estado e planos do OpenTofu de quem rodou à mão: nunca na imagem.
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
