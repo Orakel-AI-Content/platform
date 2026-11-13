@@ -95,13 +95,19 @@ test(
     await expect(
       reviewer.getByRole('heading', { level: 2, name: 'Checagens automáticas' }),
     ).toBeVisible();
+    // Em passos (#766): o checklist fica em Leitura e as aprovações em Decisão.
+    const proximo = reviewer.getByRole('button', { name: 'Próximo' });
+    await proximo.click();
+    await proximo.click();
     const items = reviewer.getByRole('checkbox');
     await expect(items).toHaveCount(3);
     for (let index = 0; index < 3; index += 1) {
       await items.nth(index).focus();
       await reviewer.keyboard.press('Space');
+      await expect(items.nth(index)).toBeChecked();
     }
-    await reviewer.getByRole('button', { name: 'Aprovar' }).click();
+    await proximo.click();
+    await reviewer.getByRole('button', { name: 'Só aprovar', exact: true }).click();
     await expect(
       reviewer.getByRole('status').filter({ hasText: 'Versão 1 aprovada.' }),
     ).toBeVisible();

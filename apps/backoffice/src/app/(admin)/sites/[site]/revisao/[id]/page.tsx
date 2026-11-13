@@ -37,6 +37,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ site: string; id: string }> };
+type SearchParams = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 /** "<título> · Revisão"; sem o conteúdo, só a área. */
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -54,10 +55,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * aprovar e publicar agora ou agendar, workspace#89) e a devolução ao editor (#598). Ler exige site.read; aprovar só
  * aparece com content.publish, e o domínio confere tudo de novo. Tela de detalhe do guia (#373),
  * na ordem invertida do `CustomerDetails`: a prévia é o conteúdo principal, com a largura do
- * `main`, e o painel fica abaixo dela até `xl` e ao lado a partir dele.
+ * `main`, e o painel fica abaixo dela até `xl` e ao lado a partir dele. O painel é um wizard de
+ * quatro passos (#766), com o atual em `?passo=`: a página o lê e o devolve ao painel, que assim
+ * volta ao mesmo passo quando remonta numa versão nova.
  */
-export default async function ReviewPage({ params }: Params) {
+export default async function ReviewPage({ params, searchParams }: Params & SearchParams) {
   const { site: siteId, id } = await params;
+  const { passo } = await searchParams;
   const contentId = positiveInt(id);
   if (contentId === undefined) notFound();
   const context = await sitePageContext(siteId);
@@ -134,6 +138,7 @@ export default async function ReviewPage({ params }: Params) {
             key={latest.version}
             version={latest.version}
             status={latest.status}
+            step={typeof passo === 'string' ? passo : undefined}
             checks={<ReviewChecks items={items} />}
             blocked={hasError(items)}
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
