@@ -24,6 +24,7 @@ const ROWS: GenerationRunSummary[] = [
   {
     id: 3,
     createdAt: new Date('2026-11-03T12:00Z'),
+    kind: 'geracao',
     topic: 'Como escolher um moedor de café para o dia a dia sem gastar muito',
     status: 'pendente',
     provider: null,
@@ -37,6 +38,7 @@ const ROWS: GenerationRunSummary[] = [
   {
     id: 2,
     createdAt: new Date('2026-11-02T12:00Z'),
+    kind: 'geracao',
     topic: 'Café coado',
     status: 'ok',
     provider: 'anthropic',
@@ -50,6 +52,7 @@ const ROWS: GenerationRunSummary[] = [
   {
     id: 1,
     createdAt: new Date('2026-11-01T12:00Z'),
+    kind: 'geracao',
     topic: 'Chá verde',
     status: 'falha',
     provider: 'openai',
