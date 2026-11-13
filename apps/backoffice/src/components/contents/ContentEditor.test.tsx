@@ -293,6 +293,19 @@ describe('barra de ações e continuar no editor (#109)', () => {
     expect(screen.queryByRole('button', { name: 'Descartar' })).toBeNull();
   });
 
+  it('na correção (#767), embutida na revisão: sem a barra fixa e sem Voltar, numa coluna só', () => {
+    renderEditor({ mode: 'amend' });
+
+    const submit = screen.getByRole('button', { name: 'Salvar correção' });
+    expect(document.querySelector('.sticky')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Voltar' })).toBeNull();
+    // Ver prévia e o resumo de erros no rodapé do formulário, junto do envio.
+    const footer = submit.closest('.card');
+    expect(footer?.contains(screen.getByRole('button', { name: 'Ver prévia' }))).toBe(true);
+    expect(footer?.querySelector('[role="alert"]')).toBeTruthy();
+    expect(document.querySelector('[class*="xl:flex-row-reverse"]')).toBeNull();
+  });
+
   it('metadados e cada bloco ficam num Card (#332)', () => {
     renderEditor();
 

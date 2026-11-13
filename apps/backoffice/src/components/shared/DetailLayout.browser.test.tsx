@@ -228,6 +228,7 @@ function ReviewDetail() {
             checklist={REVIEW_CHECKLIST.map(({ key, label }) => ({ key, label }))}
             confirmed={[]}
             canApprove
+            canAmend={false}
             confirm={() => Promise.resolve({ ok: true as const, confirmed: [] })}
             confirmAll={() => Promise.resolve({ ok: true as const, confirmed: [] })}
             approve={() => Promise.resolve({ ok: true as const, message: 'ok' })}

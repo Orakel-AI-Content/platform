@@ -120,6 +120,7 @@ const renderPanel = (props: Partial<Props> = {}) =>
       blocked={false}
       checklist={checklist}
       canApprove
+      canAmend={false}
       approve={vi.fn()}
       approvePublish={vi.fn()}
       approveSchedule={vi.fn()}
@@ -235,7 +236,13 @@ describe('painel de revisão', () => {
   });
 
   it('numa versão nova (outro key), continua no passo da URL', () => {
-    const props = { status: 'em_revisao' as const, blocked: false, checklist, canApprove: true };
+    const props = {
+      status: 'em_revisao' as const,
+      blocked: false,
+      checklist,
+      canApprove: true,
+      canAmend: false,
+    };
     const actions = {
       approve: vi.fn(),
       approvePublish: vi.fn(),
@@ -463,6 +470,7 @@ describe('painel de revisão', () => {
         blocked={false}
         checklist={checklist}
         canApprove
+        canAmend={false}
         approve={approve}
         approvePublish={vi.fn()}
         approveSchedule={vi.fn()}
@@ -682,88 +690,70 @@ describe('painel de revisão', () => {
   });
 });
 
-describe('próximo da fila depois da decisão (workspace#90)', () => {
-  const comment = () =>
-    userEvent.type(screen.getByRole('textbox', { name: /O que corrigir/ }), 'Falta a fonte.');
-  const decisions = [
-    {
-      name: 'Só aprovar',
-      prop: 'approve',
-      message: 'Versão 2 aprovada.',
-      before: () => Promise.resolve(),
-    },
-    {
-      name: 'Aprovar e publicar agora',
-      prop: 'approvePublish',
-      message: 'Versão 2 aprovada: o artigo foi ao ar.',
-      before: () => Promise.resolve(),
-    },
-    {
-      name: 'Devolver ao editor',
-      prop: 'giveBack',
-      message: 'Versão 2 devolvida ao editor.',
-      before: comment,
-    },
-  ] as const;
-
-  it.each(decisions)(
-    '$name: depois do toast, vai para revisao/<próximo>',
-    async ({ name, prop, message, before }) => {
-      const action = vi.fn().mockResolvedValue({ ok: true, message, next: 9 });
-      // O toast já está na tela quando a navegação acontece.
-      const toastAtPush: (string | null | undefined)[] = [];
-      router.push.mockImplementation(() => {
-        toastAtPush.push(screen.queryByRole('status')?.textContent);
-      });
-      renderPanel({ step: 'decisao', confirmed: allKeys, [prop]: action });
-      render(<ToastProvider />);
-
-      await before();
-      await userEvent.click(screen.getByRole('button', { name }));
-
-      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/revisao/9'));
-      expect(router.push).toHaveBeenCalledOnce();
-      expect(toastAtPush).toEqual([message]);
-      expect(screen.queryByText('A fila de revisão acabou.')).toBeNull();
-    },
+describe('passo Ajustes (#767)', () => {
+  /** O editor da correção como a página o passa; aqui, um campo basta. */
+  const editor = (
+    <form aria-label="Correção">
+      <label>
+        Título
+        <input defaultValue="Guia" />
+      </label>
+    </form>
   );
+  const ajustes = () => document.querySelector<HTMLElement>('[data-step="ajustes"]')!;
+  const title = () => screen.getByRole<HTMLInputElement>('textbox', { name: 'Título' });
 
-  it.each(decisions)(
-    '$name: com a fila vazia, diz que ela acabou, com o link para a fila, e não navega',
-    async ({ name, prop, message, before }) => {
-      const action = vi.fn().mockResolvedValue({ ok: true, message, next: null });
-      renderPanel({ step: 'decisao', confirmed: allKeys, [prop]: action });
+  it('com content.amend e a versão em revisão, mostra o editor e diz qual versão salvar grava', () => {
+    renderPanel({ step: 'ajustes', canAmend: true, amend: editor });
 
-      await before();
-      await userEvent.click(screen.getByRole('button', { name }));
+    expect(ajustes().hidden).toBe(false);
+    expect(ajustes().contains(screen.getByRole('form', { name: 'Correção' }))).toBe(true);
+    expect(ajustes().textContent).toContain('salvar grava a versão 3, ainda em revisão');
+  });
 
-      const panel = screen.getByRole('complementary');
-      expect(await within(panel).findByText('A fila de revisão acabou.')).toBeTruthy();
-      expect(
-        within(panel).getByRole('link', { name: 'Voltar à fila de revisão' }).getAttribute('href'),
-      ).toBe('/sites/exemplo-a/revisao');
-      expect(router.push).not.toHaveBeenCalled();
-    },
-  );
+  it('uma edição não salva continua no editor depois de ir a outro passo e voltar', async () => {
+    renderPanel({ step: 'ajustes', canAmend: true, amend: editor });
 
-  it.each(decisions)(
-    '$name: recusa do domínio não navega e fica no resumo de erros',
-    async ({ name, prop, before }) => {
-      const action = vi.fn().mockResolvedValue({
-        ok: false,
-        message: 'Não foi possível decidir.',
-        issues: [{ path: [], message: 'A versão 2 não está em revisão' }],
-      });
-      renderPanel({ step: 'decisao', confirmed: allKeys, [prop]: action });
+    await userEvent.clear(title());
+    await userEvent.type(title(), 'Guia revisado');
+    await next();
+    expect(currentStep()).toBe('Leitura');
+    expect(ajustes().hidden).toBe(true);
+    await previous();
 
-      await before();
-      await userEvent.click(screen.getByRole('button', { name }));
+    expect(currentStep()).toBe('Ajustes');
+    expect(title().value).toBe('Guia revisado');
+  });
 
-      const refusal = await screen.findByText('A versão 2 não está em revisão');
-      expect(refusal.closest('[role="alert"]')).not.toBeNull();
-      expect(router.push).not.toHaveBeenCalled();
-      expect(screen.queryByText('A fila de revisão acabou.')).toBeNull();
-      expect(screen.getByRole('button', { name })).toBeTruthy();
-    },
-  );
+  it('sem content.amend, explica que não há correção e não mostra o editor', () => {
+    renderPanel({ step: 'ajustes', canAmend: false, amend: editor });
+
+    expect(screen.queryByRole('form', { name: 'Correção' })).toBeNull();
+    expect(ajustes().textContent).toContain(
+      'Só quem pode corrigir conteúdo em revisão ajusta esta versão: não há correção disponível.',
+    );
+  });
+
+  it('com a versão fora de revisão, explica que só a versão em revisão pode ser corrigida', () => {
+    renderPanel({ step: 'ajustes', status: 'aprovado', canAmend: true, amend: editor });
+
+    expect(screen.queryByRole('form', { name: 'Correção' })).toBeNull();
+    expect(ajustes().textContent).toContain(
+      'Esta versão está aprovado: só uma versão em revisão pode ser corrigida.',
+    );
+  });
+
+  it('decidida a versão nesta tela, o editor sai', async () => {
+    renderPanel({
+      step: 'decisao',
+      canAmend: true,
+      amend: editor,
+      giveBack: vi.fn(() => Promise.resolve({ ok: true as const, message: 'Devolvido.' })),
+    });
+
+    await userEvent.type(screen.getByRole('textbox', { name: /O que corrigir/ }), 'Fonte.');
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver ao editor' }));
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Correção' })).toBeNull());
+    expect(ajustes().textContent).toContain('A revisão desta versão já foi decidida');
+  });
 });

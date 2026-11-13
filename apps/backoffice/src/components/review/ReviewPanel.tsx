@@ -223,6 +223,15 @@ export function ReviewPanel({
   const { confirmed, error, saving, write } = useConfirmations(initialConfirmed);
   const complete = checklist.every((item) => confirmed.includes(item.key));
   const approveDisabled = blocked || !complete || saving;
+  // Decidida a versão nesta tela, também não há mais o que corrigir.
+  const amendOpen = canAmend && inReview && !decided && amend !== undefined;
+  const amendHint = amendOpen
+    ? `Corrija aqui o que precisar; salvar grava a versão ${version + 1}, ainda em revisão. Nada a ajustar? Siga para a leitura.`
+    : decided
+      ? 'A revisão desta versão já foi decidida: não há correção disponível.'
+      : !inReview
+        ? `Esta versão está ${CONTENT_STATUS_LABEL[status].toLowerCase()}: só uma versão em revisão pode ser corrigida.`
+        : 'Só quem pode corrigir conteúdo em revisão ajusta esta versão: não há correção disponível.';
   const approveDescribedBy =
     [blocked && `${id}-blocked`, !complete && `${id}-incomplete`].filter(Boolean).join(' ') ||
     undefined;
@@ -278,10 +287,13 @@ export function ReviewPanel({
       </div>
     ),
     ajustes: (
-      <Card bodyClass="space-y-3">
-        <h2 className={SECTION_TITLE_CLASS}>Ajustes</h2>
-        <p className={SECTION_HINT_CLASS}>Nada a ajustar nesta versão? Siga para a leitura.</p>
-      </Card>
+      <div className="flex flex-col gap-4">
+        <Card bodyClass="space-y-3">
+          <h2 className={SECTION_TITLE_CLASS}>Ajustes</h2>
+          <p className={SECTION_HINT_CLASS}>{amendHint}</p>
+        </Card>
+        {amendOpen && amend}
+      </div>
     ),
     leitura: (
       <Card bodyClass="space-y-3">
