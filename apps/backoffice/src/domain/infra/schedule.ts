@@ -17,6 +17,13 @@ import { finishInfraRun } from './runs.ts';
 
 export const INFRA_PLAN_TASK = 'infra-plan';
 export const INFRA_APPLY_TASK = 'infra-apply';
+/**
+ * Conferência da infra contra a descrição atual (workspace#98): sem payload, distribui um job
+ * por site; com `{ siteId }`, roda o plano descartável do site na fila `infra:<site>`.
+ */
+export const INFRA_CHECK_TASK = 'infra-check';
+/** Chave do job de distribuição: partida e cron no mesmo dia não acumulam duplicados. */
+export const INFRA_CHECK_ALL_KEY = 'infra-check:todos';
 export const INFRA_REMOVE_WORKER_TASK = 'infra-remove-worker';
 
 export const INTERRUPTED_INFRA_MESSAGE =
@@ -143,4 +150,36 @@ export async function recoverInterruptedInfraRuns(
     }
     return recovered;
   });
+}
+
+/**
+ * Enfileira a conferência de todos os sites (o job de distribuição, fora das filas de site), na
+ * partida do build-runner: um deploy pode ter trazido uma descrição nova.
+ */
+export async function scheduleInfraCheckAll(tx: Executor): Promise<void> {
+  await tx.execute(sql`
+    select graphile_worker.add_job(
+      identifier => ${INFRA_CHECK_TASK},
+      payload => '{}'::json,
+      max_attempts => 1,
+      job_key => ${INFRA_CHECK_ALL_KEY},
+      job_key_mode => 'replace'
+    )`);
+}
+
+/**
+ * Enfileira a conferência de um site na fila `infra:<site>`, para nunca rodar junto com uma
+ * criação, remoção ou reaplicação. Uma tentativa só (a próxima é a partida ou o cron) e uma
+ * chave por site: uma conferência ainda na fila é substituída, não duplicada.
+ */
+export async function scheduleSiteInfraDriftCheck(tx: Executor, siteId: string): Promise<void> {
+  await tx.execute(sql`
+    select graphile_worker.add_job(
+      identifier => ${INFRA_CHECK_TASK},
+      payload => ${JSON.stringify({ siteId })}::json,
+      queue_name => ${`infra:${siteId}`},
+      max_attempts => 1,
+      job_key => ${`infra-check:${siteId}`},
+      job_key_mode => 'replace'
+    )`);
 }

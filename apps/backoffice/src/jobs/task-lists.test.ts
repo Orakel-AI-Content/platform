@@ -1,6 +1,8 @@
 import { localDriver } from '../domain/infra/drivers.ts';
 import {
   INFRA_APPLY_TASK,
+  INFRA_CHECK_ALL_KEY,
+  INFRA_CHECK_TASK,
   INFRA_PLAN_TASK,
   INFRA_REMOVE_WORKER_TASK,
 } from '../domain/infra/schedule.ts';
@@ -21,7 +23,12 @@ import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/r
 import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
 import { REVIEW_OPINION_TASK } from '../domain/reviews/opinions.ts';
 import type { WorkerRemover, ZoneChecker } from '../lib/cloudflare.ts';
-import { buildRunnerTasks, WORKER_CRONTAB, workerTasks } from './task-lists.ts';
+import {
+  BUILD_RUNNER_CRONTAB,
+  buildRunnerTasks,
+  WORKER_CRONTAB,
+  workerTasks,
+} from './task-lists.ts';
 
 describe('backoffice-worker', () => {
   it('o cron consolida a audiência a cada hora, na fila audience', () => {
@@ -142,9 +149,11 @@ describe('build-runner', () => {
         'rollback',
         INFRA_PLAN_TASK,
         INFRA_APPLY_TASK,
+        INFRA_CHECK_TASK,
         INFRA_REMOVE_WORKER_TASK,
       ].sort(),
     );
+    expect(Object.keys(worker)).not.toContain(INFRA_CHECK_TASK);
     expect(Object.keys(worker)).not.toContain(INFRA_PLAN_TASK);
     expect(Object.keys(worker)).not.toContain(INFRA_APPLY_TASK);
     expect(Object.keys(worker)).not.toContain(INFRA_REMOVE_WORKER_TASK);
@@ -154,5 +163,30 @@ describe('build-runner', () => {
     expect(Object.keys(runner)).not.toContain(LINK_CHECK_TASK);
     expect(Object.keys(runner)).not.toContain(EMPTY_SITE_MEDIA_TASK);
     expect(Object.keys(runner)).not.toContain(RESTORE_MEDIA_TASK);
+  });
+
+  it('o cron confere a infra contra a descrição uma vez por dia, com a chave da partida', () => {
+    const items = parseCrontab(BUILD_RUNNER_CRONTAB);
+    const item = items.find((i) => i.task === INFRA_CHECK_TASK);
+
+    expect(items).toHaveLength(1);
+    expect(item?.options).toMatchObject({
+      maxAttempts: 1,
+      jobKey: INFRA_CHECK_ALL_KEY,
+      jobKeyMode: 'replace',
+    });
+    // Um disparo por dia: às 06:00 sim, uma hora depois não.
+    const at = (iso: string) => {
+      const d = new Date(iso);
+      return {
+        min: d.getUTCMinutes(),
+        hour: d.getUTCHours(),
+        date: d.getUTCDate(),
+        month: d.getUTCMonth() + 1,
+        dow: d.getUTCDay(),
+      };
+    };
+    expect(item?.match(at('2026-11-13T06:00:00Z'))).toBe(true);
+    expect(item?.match(at('2026-11-13T07:00:00Z'))).toBe(false);
   });
 });

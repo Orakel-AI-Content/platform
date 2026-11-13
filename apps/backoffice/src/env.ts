@@ -175,6 +175,21 @@ export const BuildRunnerEnvSchema = z
      * exercitar "Tentar de novo". Vazio não força falha.
      */
     INFRA_LOCAL_FAIL_STEP: optional(z.enum(INFRA_RESOURCE_STEPS)),
+    /**
+     * Só com INFRA_DRIVER=local (E2E): ids de site, separados por vírgula, cuja conferência da
+     * infra contra a descrição sai desatualizada (workspace#98). Vazio: todos em dia.
+     */
+    INFRA_LOCAL_DRIFT_SITES: blankAsUndefined(
+      z
+        .string()
+        .transform((value) =>
+          value
+            .split(',')
+            .map((id) => id.trim())
+            .filter((id) => id !== ''),
+        )
+        .optional(),
+    ),
     /** Token de infra da Cloudflare, restrito ao IP da VPS; nem o de deploy nem o de leitura. */
     CLOUDFLARE_INFRA_TOKEN: optional(z.string().min(32)),
     /** Credenciais S3 (R2) do bucket `tofu-state`, onde fica o estado de cada site. */
@@ -211,6 +226,13 @@ export const BuildRunnerEnvSchema = z
         code: 'custom',
         message: 'INFRA_LOCAL_FAIL_STEP só vale com INFRA_DRIVER=local',
         path: ['INFRA_LOCAL_FAIL_STEP'],
+      });
+    }
+    if (env.INFRA_LOCAL_DRIFT_SITES !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'INFRA_LOCAL_DRIFT_SITES só vale com INFRA_DRIVER=local',
+        path: ['INFRA_LOCAL_DRIFT_SITES'],
       });
     }
     for (const name of INFRA_TOFU_REQUIRED) {
