@@ -22,7 +22,7 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 // montados e os inativos com `hidden`; o passo vem da prop `step` e a troca vai a `?passo=`.
 // "O que mudou" (#768) fica em Checagens, abaixo das checagens, só quando a página o passa.
 
-const router = vi.hoisted(() => ({ replace: vi.fn() }));
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 const search = vi.hoisted(() => ({ value: '' }));
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
@@ -38,6 +38,7 @@ afterAll(() => {
 });
 afterEach(async () => {
   router.replace.mockClear();
+  router.push.mockReset();
   search.value = '';
   act(() => toast.removeAll());
   await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
@@ -679,4 +680,90 @@ describe('painel de revisão', () => {
     const field = screen.getByRole('textbox', { name: /O que corrigir/ });
     await waitFor(() => expect(field.getAttribute('aria-invalid')).toBe('true'));
   });
+});
+
+describe('próximo da fila depois da decisão (workspace#90)', () => {
+  const comment = () =>
+    userEvent.type(screen.getByRole('textbox', { name: /O que corrigir/ }), 'Falta a fonte.');
+  const decisions = [
+    {
+      name: 'Só aprovar',
+      prop: 'approve',
+      message: 'Versão 2 aprovada.',
+      before: () => Promise.resolve(),
+    },
+    {
+      name: 'Aprovar e publicar agora',
+      prop: 'approvePublish',
+      message: 'Versão 2 aprovada: o artigo foi ao ar.',
+      before: () => Promise.resolve(),
+    },
+    {
+      name: 'Devolver ao editor',
+      prop: 'giveBack',
+      message: 'Versão 2 devolvida ao editor.',
+      before: comment,
+    },
+  ] as const;
+
+  it.each(decisions)(
+    '$name: depois do toast, vai para revisao/<próximo>',
+    async ({ name, prop, message, before }) => {
+      const action = vi.fn().mockResolvedValue({ ok: true, message, next: 9 });
+      // O toast já está na tela quando a navegação acontece.
+      const toastAtPush: (string | null | undefined)[] = [];
+      router.push.mockImplementation(() => {
+        toastAtPush.push(screen.queryByRole('status')?.textContent);
+      });
+      renderPanel({ step: 'decisao', confirmed: allKeys, [prop]: action });
+      render(<ToastProvider />);
+
+      await before();
+      await userEvent.click(screen.getByRole('button', { name }));
+
+      await waitFor(() => expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/revisao/9'));
+      expect(router.push).toHaveBeenCalledOnce();
+      expect(toastAtPush).toEqual([message]);
+      expect(screen.queryByText('A fila de revisão acabou.')).toBeNull();
+    },
+  );
+
+  it.each(decisions)(
+    '$name: com a fila vazia, diz que ela acabou, com o link para a fila, e não navega',
+    async ({ name, prop, message, before }) => {
+      const action = vi.fn().mockResolvedValue({ ok: true, message, next: null });
+      renderPanel({ step: 'decisao', confirmed: allKeys, [prop]: action });
+
+      await before();
+      await userEvent.click(screen.getByRole('button', { name }));
+
+      const panel = screen.getByRole('complementary');
+      expect(await within(panel).findByText('A fila de revisão acabou.')).toBeTruthy();
+      expect(
+        within(panel).getByRole('link', { name: 'Voltar à fila de revisão' }).getAttribute('href'),
+      ).toBe('/sites/exemplo-a/revisao');
+      expect(router.push).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(decisions)(
+    '$name: recusa do domínio não navega e fica no resumo de erros',
+    async ({ name, prop, before }) => {
+      const action = vi.fn().mockResolvedValue({
+        ok: false,
+        message: 'Não foi possível decidir.',
+        issues: [{ path: [], message: 'A versão 2 não está em revisão' }],
+      });
+      renderPanel({ step: 'decisao', confirmed: allKeys, [prop]: action });
+
+      await before();
+      await userEvent.click(screen.getByRole('button', { name }));
+
+      const refusal = await screen.findByText('A versão 2 não está em revisão');
+      expect(refusal.closest('[role="alert"]')).not.toBeNull();
+      expect(router.push).not.toHaveBeenCalled();
+      expect(screen.queryByText('A fila de revisão acabou.')).toBeNull();
+      expect(screen.getByRole('button', { name })).toBeTruthy();
+    },
+  );
 });

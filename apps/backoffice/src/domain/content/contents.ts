@@ -774,6 +774,22 @@ export async function listReviewQueue(
 }
 
 /**
+ * Próximo conteúdo da fila de revisão do site depois de decidir `currentId` (workspace#90): o
+ * mais antigo de `listReviewQueue` que não é o atual, ou `null` com a fila vazia. Mesma regra e
+ * mesma ordem da fila, para a tela de revisão abrir o que a fila mostraria primeiro.
+ */
+export async function nextInReviewQueue(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+  currentId: number,
+): Promise<Result<number | null>> {
+  const queue = await listReviewQueue(db, actor, siteId);
+  if (!queue.ok) return queue;
+  return { ok: true, value: queue.value.find((item) => item.id !== currentId)?.id ?? null };
+}
+
+/**
  * Tamanho da fila de revisão de cada site, para o selo do item Revisão da barra lateral
  * (#583): mesma regra de `listReviewQueue` (a versão mais recente do conteúdo está
  * `em_revisao`), numa consulta só para todos os sites, sem ler título nem blocos. Site sem

@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import * as z from 'zod';
 
 import { ScheduleDialog } from '@/components/contents/ScheduleDialog.tsx';
@@ -12,11 +12,11 @@ import {
   type SchemaFormIssue,
 } from '@/components/forms/SchemaForm';
 import { ActionAlert } from '@/components/shared/ActionFeedback.tsx';
-import type { FormActionResult } from '@/components/shared/actionResult.ts';
 import { CONTENT_STATUS_LABEL } from '@/components/shared/siteLabels.ts';
 import { SECTION_HINT_CLASS, SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import Alert from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import Checkbox from '@/components/ui/Checkbox';
 import Input from '@/components/ui/Input';
@@ -49,7 +49,9 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 // checklist, bloqueia as aprovações (`blocked`), com o aviso no `Alert` de erro do Ecme (#444),
 // sem `role="alert"`: chega no carregamento. "Devolver ao editor" (#598) tem cartão próprio, com
 // o comentário obrigatório, e não depende do checklist nem da validação. Decidida a versão, os
-// dois formulários saem.
+// dois formulários saem. Toda decisão devolve o próximo da fila (workspace#90): depois do toast,
+// a tela vai para `revisao/<próximo>`; com a fila vazia, o cartão da decisão diz que ela acabou,
+// com o link para a fila. Uma recusa não navega e fica no resumo de erros.
 
 export type ChecklistItem = { key: string; label: string };
 
@@ -71,11 +73,12 @@ const stepIndex = (step: string | undefined) =>
     STEPS.findIndex((item) => item.key === step),
   );
 
-type FormAction = () => Promise<FormActionResult<SchemaFormIssue>>;
-
-/** Desfecho de aprovar e publicar ou agendar: `warning` é o aviso do transbordo. */
+/**
+ * Desfecho de uma decisão: `warning` é o aviso do transbordo; `next`, o próximo da fila, ou
+ * `null` com a fila vazia (sem `next`, a tela fica no desfecho).
+ */
 export type DecisionOutcome =
-  | { ok: true; message: string; warning?: string }
+  | { ok: true; message: string; warning?: string; next?: number | null }
   | { ok: false; message: string; issues: SchemaFormIssue[] };
 
 type Decided = { message: string; warning?: string };
@@ -191,13 +194,13 @@ export function ReviewPanel({
   /** Grava ou apaga todas (`confirmAllAction`); "Marcar todos" passa `true`. */
   confirmAll: (confirmed: boolean) => Promise<ConfirmOutcome>;
   /** "Só aprovar": aprova com as confirmações gravadas (`approveVersion`). */
-  approve: FormAction;
+  approve: () => Promise<DecisionOutcome>;
   /** Aprova e publica na hora, ou na próxima vaga (`approveAndPublish`). */
   approvePublish: () => Promise<DecisionOutcome>;
   /** Aprova e agenda para o instante em ISO, ou para a próxima vaga (`approveAndSchedule`). */
   approveSchedule: (at: string) => Promise<DecisionOutcome>;
   /** Devolve ao editor com o comentário (`returnVersion`). */
-  giveBack: (comment: string) => Promise<FormActionResult<SchemaFormIssue>>;
+  giveBack: (comment: string) => Promise<DecisionOutcome>;
 }) {
   const id = useId();
   const router = useRouter();
@@ -208,6 +211,9 @@ export function ReviewPanel({
   const nextRef = useRef<HTMLButtonElement>(null);
   // Decidida nesta tela: os formulários saem e a confirmação vai para o toast (pelo SchemaForm).
   const [decided, setDecided] = useState(false);
+  // Próximo da fila devolvido pela decisão: `undefined` antes dela, `null` com a fila vazia.
+  const [next, setNext] = useState<number | null | undefined>(undefined);
+  const queueHref = pathname.slice(0, pathname.lastIndexOf('/'));
   // Desfecho de publicar ou agendar, que fica no cartão da decisão.
   const [outcome, setOutcome] = useState<Decided | null>(null);
   // Qual das ações próprias do rodapé está em curso, para o rótulo dela.
@@ -232,6 +238,17 @@ export function ReviewPanel({
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   };
 
+  // Navega depois do render da decisão: o toast (pushSuccess, no SchemaForm) já saiu.
+  useEffect(() => {
+    if (typeof next === 'number') router.push(`${queueHref}/${String(next)}`);
+  }, [next, queueHref, router]);
+
+  /** Fecha a decisão: os formulários saem e o próximo da fila fica guardado para navegar. */
+  const settle = (result: Extract<DecisionOutcome, { ok: true }>) => {
+    setDecided(true);
+    setNext(result.next);
+  };
+
   /** Roda publicar ou agendar pelo formulário: a recusa vai ao resumo e o sucesso fica no cartão. */
   const decide = (
     { run }: SchemaFormActionHelpers,
@@ -244,7 +261,7 @@ export function ReviewPanel({
         const result = await action();
         if (!result.ok) return result.issues;
         setOutcome({ message: result.message, warning: result.warning });
-        setDecided(true);
+        settle(result);
         return { success: [result.message, result.warning].filter(Boolean).join(' ') };
       } finally {
         setRunning(null);
@@ -367,7 +384,7 @@ export function ReviewPanel({
           onSubmit={async () => {
             const result = await approve();
             if (!result.ok) return result.issues;
-            setDecided(true);
+            settle(result);
             return { success: result.message };
           }}
         />
@@ -391,7 +408,7 @@ export function ReviewPanel({
           onSubmit={async ({ comment }) => {
             const result = await giveBack(comment);
             if (!result.ok) return result.issues;
-            setDecided(true);
+            settle(result);
             return { success: result.message };
           }}
         />
@@ -409,6 +426,12 @@ export function ReviewPanel({
                 <p className="text-sm">{outcome.warning}</p>
               </Alert>
             )}
+          </div>
+        )}
+        {next === null && (
+          <div className="space-y-3">
+            <p className="text-sm">A fila de revisão acabou.</p>
+            <ButtonLink href={queueHref}>Voltar à fila de revisão</ButtonLink>
           </div>
         )}
         {!inReview && !decided && (
