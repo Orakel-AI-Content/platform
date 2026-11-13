@@ -9,11 +9,13 @@ import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { upsertUser } from '../../src/domain/access/users.ts';
 import { siteActivity } from '../../src/domain/builds/builds.ts';
 import {
+  confirmInfraReapply,
   confirmInfraRemoval,
   confirmInfraRun,
   finishInfraRun,
   recordInfraPlan,
   recordInfraStep,
+  requestInfraReapply,
   requestInfraRemoval,
   requestInfraRun,
 } from '../../src/domain/infra/runs.ts';
@@ -22,7 +24,8 @@ import { resetDatabase, setupDatabase } from './helpers.ts';
 
 // Execuções da criação da infraestrutura (#821): o pedido, a confirmação e as gravações do
 // infra-runner em `infra_runs`, o avanço do site a `infra_aplicada` no `ok` e o histórico. E as da
-// remoção (#836): só admin, site pausado, domínio digitado e a volta do site a `cadastrado`.
+// remoção (#836): só admin, site pausado, domínio digitado e a volta do site a `cadastrado`. E as
+// da reaplicação (#848): quem opera, de `infra_aplicada` em diante, e o site em dia no `ok`.
 
 let db: Db;
 let close: () => Promise<void>;
@@ -547,6 +550,277 @@ describe('remoção', () => {
         status: 'ok',
         nameservers: null,
       }),
+    ]);
+  });
+});
+
+describe('reaplicação', () => {
+  async function site() {
+    const [row] = await db.select().from(sites).where(eq(sites.id, 'exemplo-a'));
+    return row;
+  }
+
+  /** Site publicado com a infra marcada como desatualizada pela conferência. */
+  async function outdated(): Promise<void> {
+    await db
+      .update(sites)
+      .set({
+        lifecycle: 'publicado',
+        infraDriftStatus: 'desatualizado',
+        infraDriftSummary: '1 a alterar',
+        infraDriftCheckedAt: new Date('2026-11-01T00:00:00Z'),
+        infraDriftError: 'plano anterior falhou',
+      })
+      .where(eq(sites.id, 'exemplo-a'));
+  }
+
+  async function requestReapply(actor: Actor = operacao): Promise<number> {
+    const result = await db.transaction((tx) => requestInfraReapply(tx, actor, 'exemplo-a'));
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value.id;
+  }
+
+  /** Reaplicação com o plano gravado, `aguardando_confirmacao`. */
+  async function waitingReapply(actor: Actor = operacao): Promise<number> {
+    const id = await requestReapply(actor);
+    expect((await recordInfraPlan(db, id, '1 a alterar')).ok).toBe(true);
+    return id;
+  }
+
+  /** Reaplicação confirmada, `aplicando`. */
+  async function applyingReapply(confirmer: Actor = operacao): Promise<number> {
+    const id = await waitingReapply();
+    expect((await confirmInfraReapply(db, confirmer, id)).ok).toBe(true);
+    return id;
+  }
+
+  beforeEach(outdated);
+
+  describe('pedir', () => {
+    it.each([operacao, admin])(
+      '$roles.0 grava a linha reaplicar em planejando com quem pediu',
+      async (actor) => {
+        await requestReapply(actor);
+        expect(await runs()).toEqual([
+          expect.objectContaining({
+            tipo: 'reaplicar',
+            status: 'planejando',
+            requestedBy: actor.email,
+            finishedAt: null,
+          }),
+        ]);
+      },
+    );
+
+    it.each([editor, revisor])('$roles.0 recebe forbidden sem gravar', async (actor) => {
+      const result = await db.transaction((tx) => requestInfraReapply(tx, actor, 'exemplo-a'));
+      expect(codes(result)).toEqual(['forbidden']);
+      expect(await runs()).toEqual([]);
+    });
+
+    it.each<SiteLifecycle>(['infra_aplicada', 'zona_ativa', 'publicado'])(
+      'em %s é aceito',
+      async (value) => {
+        await setLifecycle(value);
+        await requestReapply();
+        expect(await runs()).toHaveLength(1);
+      },
+    );
+
+    it('com o site pausado é aceito', async () => {
+      await db.update(sites).set({ state: 'pausado', pausedReason: 'manutenção' });
+      await requestReapply();
+      expect(await runs()).toHaveLength(1);
+    });
+
+    it('com o site em cadastrado, devolve issue sem gravar', async () => {
+      await setLifecycle('cadastrado');
+      const result = await db.transaction((tx) => requestInfraReapply(tx, admin, 'exemplo-a'));
+      expect(codes(result)).toEqual(['infra.lifecycle']);
+      expect(await runs()).toEqual([]);
+    });
+
+    it('site inexistente devolve issue', async () => {
+      const result = await db.transaction((tx) => requestInfraReapply(tx, admin, 'nenhum'));
+      expect(codes(result)).toEqual(['site.not_found']);
+    });
+
+    it('reaplicação, criação e remoção não ficam abertas juntas no mesmo site', async () => {
+      await requestReapply();
+      const reapply = await db.transaction((tx) => requestInfraReapply(tx, admin, 'exemplo-a'));
+      expect(codes(reapply)).toEqual(['infra.run_open']);
+
+      await db.update(sites).set({ state: 'pausado', pausedReason: 'remoção' });
+      const removal = await db.transaction((tx) => requestInfraRemoval(tx, admin, 'exemplo-a'));
+      expect(codes(removal)).toEqual(['infra.run_open']);
+
+      await setLifecycle('cadastrado');
+      const creation = await db.transaction((tx) => requestInfraRun(tx, admin, 'exemplo-a'));
+      expect(codes(creation)).toEqual(['infra.run_open']);
+      expect(await runs()).toHaveLength(1);
+    });
+
+    it('com uma criação aberta, a reaplicação devolve issue', async () => {
+      await setLifecycle('cadastrado');
+      await request(admin);
+      await setLifecycle('infra_aplicada');
+      const result = await db.transaction((tx) => requestInfraReapply(tx, admin, 'exemplo-a'));
+      expect(codes(result)).toEqual(['infra.run_open']);
+      expect(await runs()).toHaveLength(1);
+    });
+  });
+
+  describe('confirmar', () => {
+    it.each([operacao, admin])('$roles.0 passa a aplicando com quem confirmou', async (actor) => {
+      const id = await waitingReapply();
+      expect((await confirmInfraReapply(db, actor, id)).ok).toBe(true);
+      expect((await runs())[0]).toMatchObject({ status: 'aplicando', confirmedBy: actor.email });
+      expect((await runs())[0]?.confirmedAt).toBeInstanceOf(Date);
+    });
+
+    it.each([editor, revisor])('$roles.0 recebe forbidden sem gravar', async (actor) => {
+      const id = await waitingReapply();
+      const before = await runs();
+      expect(codes(await confirmInfraReapply(db, actor, id))).toEqual(['forbidden']);
+      expect(await runs()).toEqual(before);
+    });
+
+    it('fora de aguardando_confirmacao, recusa', async () => {
+      const id = await requestReapply();
+      expect(codes(await confirmInfraReapply(db, operacao, id))).toEqual(['infra.run_state']);
+    });
+
+    it('a confirmação da criação não confirma uma reaplicação', async () => {
+      const id = await waitingReapply();
+      const before = await runs();
+      expect(codes(await confirmInfraRun(db, operacao, id))).toEqual(['infra.run_kind']);
+      expect(await runs()).toEqual(before);
+    });
+
+    it('a confirmação da remoção não confirma uma reaplicação', async () => {
+      const id = await waitingReapply();
+      await db.update(sites).set({ state: 'pausado', pausedReason: 'remoção' });
+      const before = await runs();
+      expect(codes(await confirmInfraRemoval(db, admin, id, config.domains[0] ?? ''))).toEqual([
+        'infra.run_kind',
+      ]);
+      expect(await runs()).toEqual(before);
+    });
+
+    it('a confirmação da reaplicação não confirma uma criação', async () => {
+      await setLifecycle('cadastrado');
+      const creation = await request(admin);
+      await recordInfraPlan(db, creation, 'resumo');
+      const before = await runs();
+      expect(codes(await confirmInfraReapply(db, admin, creation))).toEqual(['infra.run_kind']);
+      expect(await runs()).toEqual(before);
+    });
+
+    it('a confirmação da reaplicação não confirma uma remoção', async () => {
+      await db.update(sites).set({ state: 'pausado', pausedReason: 'remoção' });
+      const removal = await db.transaction((tx) => requestInfraRemoval(tx, admin, 'exemplo-a'));
+      if (!removal.ok) throw new Error(JSON.stringify(removal.issues));
+      await recordInfraPlan(db, removal.value.id, '7 a destruir');
+      const before = await runs();
+      expect(codes(await confirmInfraReapply(db, admin, removal.value.id))).toEqual([
+        'infra.run_kind',
+      ]);
+      expect(await runs()).toEqual(before);
+    });
+  });
+
+  describe('fechar', () => {
+    it('com ok, mantém o lifecycle, não grava nameservers e deixa o site em dia', async () => {
+      const id = await applyingReapply();
+      expect((await recordInfraStep(db, id, 'dns')).ok).toBe(true);
+
+      expect((await finishInfraRun(db, id, { status: 'ok', nameservers: NAMESERVERS })).ok).toBe(
+        true,
+      );
+      const [run] = await runs();
+      expect(run).toMatchObject({ status: 'ok', currentStep: null, nameservers: null });
+      expect(await site()).toMatchObject({
+        lifecycle: 'publicado',
+        infraDriftStatus: 'em_dia',
+        infraDriftSummary: null,
+        infraDriftCheckedAt: run?.finishedAt,
+        infraDriftError: null,
+      });
+    });
+
+    it('com falhou, grava a etapa e o motivo e o site fica como estava', async () => {
+      const id = await applyingReapply();
+      await recordInfraStep(db, id, 'regras');
+      const before = await site();
+      await finishInfraRun(db, id, { status: 'falhou', step: 'regras', message: 'token' });
+      expect((await runs())[0]).toMatchObject({
+        status: 'falhou',
+        failedStep: 'regras',
+        failureMessage: 'token',
+      });
+      expect(await site()).toEqual(before);
+    });
+
+    it('a falha no plano fecha sem etapa e o site fica como estava', async () => {
+      const id = await requestReapply();
+      const before = await site();
+      await finishInfraRun(db, id, { status: 'falhou', step: null, message: 'plano' });
+      expect((await runs())[0]).toMatchObject({ status: 'falhou', failedStep: null });
+      expect(await site()).toEqual(before);
+    });
+
+    it('em nome de quem confirmou: sem site.configure, recusa sem gravar', async () => {
+      const id = await applyingReapply();
+      await upsertUser(db, { email: operacao.email, name: operacao.email, roles: ['editor'] });
+      const before = await site();
+      expect(codes(await finishInfraRun(db, id, { status: 'ok' }))).toEqual(['forbidden']);
+      expect((await runs())[0]?.status).toBe('aplicando');
+      expect(await site()).toEqual(before);
+    });
+  });
+
+  it('o histórico devolve o tipo reaplicar, com quem pediu, quando e o resultado', async () => {
+    const failed = await applyingReapply();
+    await finishInfraRun(db, failed, { status: 'falhou', step: 'dns', message: 'timeout' });
+    const succeeded = await waitingReapply(admin);
+    await confirmInfraReapply(db, operacao, succeeded);
+    await finishInfraRun(db, succeeded, { status: 'ok' });
+    const open = await requestReapply();
+
+    const result = await siteActivity(db, revisor, 'exemplo-a');
+    if (!result.ok) throw new Error('consulta recusada');
+    const rows = await runs();
+    const row = (id: number) => rows.find((r) => r.id === id);
+    expect(result.value.openInfra).toMatchObject({
+      id: open,
+      kind: 'reaplicar',
+      status: 'planejando',
+    });
+    expect(result.value.history).toEqual([
+      {
+        type: 'infra',
+        id: succeeded,
+        kind: 'reaplicar',
+        status: 'ok',
+        requestedBy: admin.email,
+        requestedAt: row(succeeded)?.requestedAt,
+        confirmedBy: operacao.email,
+        at: row(succeeded)?.finishedAt,
+        nameservers: null,
+        failure: null,
+      },
+      {
+        type: 'infra',
+        id: failed,
+        kind: 'reaplicar',
+        status: 'falhou',
+        requestedBy: operacao.email,
+        requestedAt: row(failed)?.requestedAt,
+        confirmedBy: operacao.email,
+        at: row(failed)?.finishedAt,
+        nameservers: null,
+        failure: { step: 'dns', message: 'timeout' },
+      },
     ]);
   });
 });

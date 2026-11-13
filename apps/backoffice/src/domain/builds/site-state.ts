@@ -748,9 +748,11 @@ export async function scheduleSiteInfraCheck(tx: Executor, siteId: string): Prom
  * Etapas em que a infra do site já foi aplicada e pode divergir da descrição atual
  * (`infra/site` + `infra/modules/site`, workspace#98): de `infra_aplicada` em diante.
  */
-const INFRA_DRIFT_STEPS = ['infra_aplicada', 'zona_ativa', 'publicado'] as const satisfies Readonly<
-  (typeof sites.$inferSelect)['lifecycle'][]
->;
+export const INFRA_DRIFT_STEPS = [
+  'infra_aplicada',
+  'zona_ativa',
+  'publicado',
+] as const satisfies Readonly<(typeof sites.$inferSelect)['lifecycle'][]>;
 
 /**
  * Resultado da conferência da infra contra a descrição atual (o plano real do site):
