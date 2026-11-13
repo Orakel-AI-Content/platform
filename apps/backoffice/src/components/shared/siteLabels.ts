@@ -4,8 +4,10 @@ import type { Block } from '@orakel/content-model/v1';
 import type {
   BuildKind,
   BuildStatus,
+  InfraBatchState,
   InfraResourceStep,
   InfraRunKind,
+  InfraRunStatus,
   InfraStep,
   SiteEventKind,
 } from '@/db/schema/operations.ts';
@@ -223,6 +225,38 @@ export const INFRA_REMOVAL_PAUSE_FIRST = 'Para remover a infraestrutura, pause o
 
 /** Selo da etapa Infra e zona quando a conferência achou a infra fora da descrição (workspace#98). */
 export const INFRA_OUTDATED_LABEL = 'Infra desatualizada';
+
+/** Ação do cabeçalho da lista de sites: o lote sobre todos os desatualizados (workspace#98). */
+export const REAPPLY_OUTDATED_LABEL = 'Reaplicar nos desatualizados';
+
+/** Estado do lote "Reaplicar nos desatualizados", no título do cartão da lista. */
+export const INFRA_BATCH_STATE_LABEL: Record<InfraBatchState, string> = {
+  planejando: 'preparando os resumos',
+  aguardando_confirmacao: 'aguardando confirmação',
+  aplicando: 'em andamento',
+  concluido: 'concluída',
+  interrompido: 'interrompida',
+};
+
+/** Estado de um site do lote, pela execução `reaplicar` dele. */
+export const INFRA_BATCH_SITE_LABEL: Record<InfraRunStatus, string> = {
+  planejando: 'Preparando o resumo',
+  aguardando_confirmacao: 'Aguardando',
+  aplicando: 'Aplicando',
+  ok: 'Em dia',
+  falhou: 'Falhou',
+  cancelado: 'Não aplicado',
+};
+
+/** Cor da tag de cada site do lote; o cancelado fica no cinza escuro, como o build cancelado. */
+export const INFRA_BATCH_SITE_COLOR: Record<InfraRunStatus, StateTagColor> = {
+  planejando: 'bg-gray-400',
+  aguardando_confirmacao: 'bg-gray-400',
+  aplicando: 'bg-info',
+  ok: 'bg-success',
+  falhou: 'bg-error',
+  cancelado: 'bg-gray-600',
+};
 
 /** Resultado de uma reaplicação concluída, no histórico do site (workspace#98). */
 export const INFRA_REAPPLY_OK_TEXT = 'Infraestrutura em dia com a descrição atual';
