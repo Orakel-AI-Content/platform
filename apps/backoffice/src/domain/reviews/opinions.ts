@@ -1,8 +1,13 @@
 import type { Issue, Result } from '@orakel/content-model';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { contentVersions, reviewOpinions, type ContentData } from '../../db/schema/index.ts';
+import {
+  contentVersions,
+  reviewOpinions,
+  type ContentData,
+  type GenerationStatus,
+} from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { currentEditorialContext } from '../generation/editorial-contexts.ts';
 import type { Opinion, OpinionResult } from './opinion.ts';
@@ -190,4 +195,68 @@ export async function opinionFor(
     case 'ok':
       return { ok: true, value: { state: 'pronto', opinion: row.opinion as Opinion } };
   }
+}
+
+/** Um parecer na lista do site: o que a operação acompanha (custo, tokens, duração). */
+export type ReviewOpinionSummary = {
+  contentId: number;
+  /** Título da versão do parecer. */
+  contentTitle: string;
+  version: number;
+  status: GenerationStatus;
+  /** Versão de origem do parecer copiado na correção sem mudança de texto; sem chamada nova. */
+  copiedFromVersion: number | null;
+  provider: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  /** Em dólares; nulo com o parecer `pendente` ou o modelo fora de `LLM_PRICING`. */
+  costUsd: number | null;
+  durationMs: number | null;
+  requestedAt: Date;
+};
+
+/**
+ * Pareceres do site, do mais recente para o primeiro, como `listGenerationRuns`. Ler exige
+ * site.read; o parecer, o erro e o prompt ficam de fora (o parecer aparece na revisão).
+ */
+export async function listReviewOpinions(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<ReviewOpinionSummary[]>> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+  const rows = await db
+    .select({
+      contentId: reviewOpinions.contentId,
+      contentTitle: sql<string>`${contentVersions.data}->>'title'`,
+      version: reviewOpinions.version,
+      status: reviewOpinions.status,
+      copiedFromVersion: reviewOpinions.copiedFromVersion,
+      provider: reviewOpinions.provider,
+      model: reviewOpinions.model,
+      inputTokens: reviewOpinions.inputTokens,
+      outputTokens: reviewOpinions.outputTokens,
+      costUsd: reviewOpinions.costUsd,
+      durationMs: reviewOpinions.durationMs,
+      requestedAt: reviewOpinions.requestedAt,
+    })
+    .from(reviewOpinions)
+    // A FK `review_opinions_version_fk` garante a versão (e o título, obrigatório no content-model).
+    .innerJoin(
+      contentVersions,
+      and(
+        eq(contentVersions.siteId, reviewOpinions.siteId),
+        eq(contentVersions.contentId, reviewOpinions.contentId),
+        eq(contentVersions.version, reviewOpinions.version),
+      ),
+    )
+    .where(eq(reviewOpinions.siteId, siteId))
+    .orderBy(
+      desc(reviewOpinions.requestedAt),
+      desc(reviewOpinions.contentId),
+      desc(reviewOpinions.version),
+    );
+  return { ok: true, value: rows };
 }
