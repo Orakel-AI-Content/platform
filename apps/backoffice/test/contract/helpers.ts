@@ -66,6 +66,7 @@ const TABLES = [
   'preview_state',
   'site_events',
   'infra_runs',
+  'infra_batches',
   'pending_changes',
   'content_link_results',
   'content_link_checks',
