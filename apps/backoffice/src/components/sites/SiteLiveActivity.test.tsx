@@ -8,6 +8,7 @@ import type {
   SiteActivity,
   SiteHistoryItem,
 } from '@/domain/builds/builds.ts';
+import type { InfraHistoryItem, OpenInfraRun } from '@/domain/infra/runs.ts';
 
 import { SiteLiveActivity, type SiteActivityStatus } from './SiteLiveActivity.tsx';
 
@@ -62,6 +63,8 @@ const finished: ExecutionHistoryItem = {
 };
 
 const status = vi.fn<SiteActivityStatus>();
+const refresh = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
 
 function renderLive(activity: SiteActivity) {
   return render(
@@ -75,6 +78,7 @@ const region = () => screen.getByRole('status');
 beforeEach(() => {
   vi.useFakeTimers();
   status.mockReset();
+  refresh.mockReset();
 });
 afterEach(() => {
   cleanup();
@@ -166,5 +170,125 @@ describe('SiteLiveActivity', () => {
     await tick();
     expect(status).toHaveBeenCalledTimes(1);
     expect(region().textContent).toContain('em andamento');
+  });
+});
+
+describe('SiteLiveActivity na criação da infraestrutura (#826)', () => {
+  const applying: OpenInfraRun = {
+    id: 4,
+    kind: 'criar',
+    status: 'aplicando',
+    currentStep: 'endereco',
+    planSummary: null,
+    requestedBy: 'operacao@orakel.local',
+    requestedAt: new Date('2026-10-11T16:58:00Z'),
+    confirmedBy: 'operacao@orakel.local',
+  };
+  const closed = (over: Partial<InfraHistoryItem>): InfraHistoryItem => ({
+    type: 'infra',
+    id: 4,
+    kind: 'criar',
+    status: 'ok',
+    requestedBy: 'operacao@orakel.local',
+    requestedAt: new Date('2026-10-11T16:58:00Z'),
+    confirmedBy: 'operacao@orakel.local',
+    at: new Date('2026-10-11T17:05:00Z'),
+    nameservers: ['ada.ns.example', 'bob.ns.example'],
+    failure: null,
+    ...over,
+  });
+  const idle = (over: Partial<SiteActivity>): SiteActivity => ({
+    open: null,
+    openInfra: null,
+    history: [PAUSE],
+    ...over,
+  });
+
+  it('acompanha as etapas aplicando até concluir e relê a página no fim', async () => {
+    status
+      .mockResolvedValueOnce(idle({ openInfra: { ...applying, currentStep: 'dns' } }))
+      .mockResolvedValueOnce(idle({ history: [closed({}), PAUSE] }));
+    renderLive(idle({ openInfra: applying }));
+
+    expect(region().textContent).toBe('Criação da infraestrutura em andamento, etapa: Endereço');
+    await tick();
+    expect(region().textContent).toBe(
+      'Criação da infraestrutura em andamento, etapa: Registros de DNS',
+    );
+    expect(refresh).not.toHaveBeenCalled();
+    await tick();
+    expect(region().textContent).toBe(
+      'Criação da infraestrutura concluída em 11/10/2026, 14:05 BRT',
+    );
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 10));
+    expect(status).toHaveBeenCalledTimes(2);
+  });
+
+  it('na falha, a faixa diz a etapa e o motivo', async () => {
+    status.mockResolvedValue(
+      idle({
+        history: [
+          closed({
+            status: 'falhou',
+            nameservers: null,
+            failure: { step: 'regras', message: 'Falha simulada' },
+          }),
+          PAUSE,
+        ],
+      }),
+    );
+    renderLive(idle({ openInfra: { ...applying, currentStep: 'regras' } }));
+
+    await tick();
+    expect(region().textContent).toBe(
+      'Criação da infraestrutura falhou na etapa Regras em 11/10/2026, 14:05 BRT: Falha simulada',
+    );
+  });
+
+  it('o plano preparando ou aguardando confirmação não liga o polling da aba', async () => {
+    renderLive(idle({ openInfra: { ...applying, status: 'aguardando_confirmacao' } }));
+
+    expect(region().textContent).toBe('');
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 10));
+    expect(status).not.toHaveBeenCalled();
+  });
+
+  it('a criação vista aguardando confirmação que a página entrega já fechada mostra o resultado', () => {
+    const { rerender } = renderLive(
+      idle({ openInfra: { ...applying, status: 'aguardando_confirmacao', currentStep: null } }),
+    );
+    rerender(
+      <SiteLiveActivity
+        activity={idle({ history: [closed({}), PAUSE] })}
+        status={status}
+        timeZone={TZ}
+        pollMs={POLL_MS}
+      />,
+    );
+
+    expect(region().textContent).toBe(
+      'Criação da infraestrutura concluída em 11/10/2026, 14:05 BRT',
+    );
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('com build e criação ao mesmo tempo, uma faixa para cada', async () => {
+    status.mockResolvedValue(idle({ history: [finished, closed({}), PAUSE] }));
+    renderLive(idle({ open: running, openInfra: applying }));
+
+    await tick();
+    const alerts = [...region().children];
+    expect(alerts.map((alert) => alert.textContent)).toEqual([
+      'Publicação falhou em 11/10/2026, 14:05 BRT',
+      'Criação da infraestrutura concluída em 11/10/2026, 14:05 BRT',
+    ]);
+  });
+
+  it('sem criação acompanhada, uma já terminada no histórico não mostra faixa nem relê', () => {
+    renderLive(idle({ history: [closed({}), PAUSE] }));
+
+    expect(region().textContent).toBe('');
+    expect(refresh).not.toHaveBeenCalled();
   });
 });

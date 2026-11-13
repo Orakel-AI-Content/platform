@@ -248,6 +248,18 @@ na produção. Para a rodada com o GitHub de
 verdade, defina `GITHUB_RELEASE_TOKEN` no `.env.local` e suba com
 `LOCAL_RELEASE_DRIVER=github pnpm local:up`.
 
+### Criar infraestrutura
+
+No local, "Criar infraestrutura" (aba Publicação do site) não usa a Cloudflare: o
+`build-runner` sobe com `INFRA_DRIVER=local`, que percorre as etapas do módulo `site`, mostra
+um resumo simulado e termina com os nameservers fictícios (ADR 0027 da raiz). Por padrão, a
+primeira criação de cada site falha uma vez na etapa Regras (`INFRA_LOCAL_FAIL_STEP=regras`),
+e "Tentar de novo" conclui só o que faltou: é o cenário do E2E (`pnpm local:e2e:area sites`).
+Para criar sem a falha, suba com `LOCAL_INFRA_FAIL_STEP= pnpm local:up`; outra etapa, com
+`LOCAL_INFRA_FAIL_STEP=dns`. O driver guarda o que "criou" na memória do processo: reiniciar
+o `build-runner` zera. Para a rodada com o OpenTofu de verdade, defina os segredos de infra
+no `.env.local` e suba com `LOCAL_INFRA_DRIVER=tofu LOCAL_INFRA_FAIL_STEP= pnpm local:up`.
+
 ## Geração
 
 A aba Geração de cada site (`/sites/<site>/geracao`) dispara um artigo por tema; o
