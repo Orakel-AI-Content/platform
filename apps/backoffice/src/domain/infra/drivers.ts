@@ -465,11 +465,14 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
 
 export type LocalDriverOptions = {
   /**
-   * A primeira execução de cada site e de cada tipo (criação, remoção) falha nesta etapa
-   * (INFRA_LOCAL_FAIL_STEP).
+   * A primeira execução de cada site e de cada tipo (criação, remoção, reaplicação) falha nesta
+   * etapa (INFRA_LOCAL_FAIL_STEP).
    */
   failStep?: InfraResourceStep;
-  /** A conferência destes sites sai desatualizada (INFRA_LOCAL_DRIFT_SITES); a dos outros, em dia. */
+  /**
+   * A conferência destes sites sai desatualizada (INFRA_LOCAL_DRIFT_SITES) até uma reaplicação
+   * `ok`; a dos outros, em dia.
+   */
   driftSites?: readonly string[];
 };
 
@@ -508,16 +511,21 @@ export const LOCAL_DRIFT_CHANGE: InfraChange = {
 
 /**
  * Simulação sem rede: o "estado" de cada site é a memória do processo (as etapas já criadas),
- * então uma nova execução só cria (ou remove) o que faltou, como o OpenTofu faria; a reaplicação
- * cria como a criação. A remoção percorre as etapas na ordem inversa e as esquece; um site sem
- * memória (build-runner reiniciado) conta como todo criado na remoção e na reaplicação. Reiniciar
- * o build-runner zera a memória; sem efeito fora do local e do E2E. A conferência não usa essa
- * memória (ela zeraria na partida e todo site sairia desatualizado): só `driftSites` sai
- * desatualizado.
+ * então uma nova execução só cria (ou remove) o que faltou, como o OpenTofu faria. A remoção
+ * percorre as etapas na ordem inversa e as esquece; um site sem memória (build-runner reiniciado)
+ * conta como todo criado na remoção. A conferência não usa essa memória (ela zeraria na partida e
+ * todo site sairia desatualizado): só `driftSites` sai desatualizado, até uma reaplicação `ok`. A
+ * reaplicação planeja a mudança simulada (`LOCAL_DRIFT_CHANGE`) enquanto o site está
+ * desatualizado, percorre todas as etapas no apply (a falha forçável vale em qualquer uma) e, no
+ * `ok`, guarda o site entre os reaplicados, que a conferência dá como em dia. Reiniciar o
+ * build-runner zera a memória; sem efeito fora do local e do E2E.
  */
 export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
   const created = new Map<string, Set<InfraResourceStep>>();
   const failedOnce = new Set<string>();
+  const reapplied = new Set<string>();
+  const drifted = (siteId: string) =>
+    (options.driftSites?.includes(siteId) ?? false) && !reapplied.has(siteId);
   const createdOf = ({ siteId, kind }: InfraTarget) => {
     const steps =
       created.get(siteId) ??
@@ -525,8 +533,9 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
     created.set(siteId, steps);
     return steps;
   };
-  /** As etapas que a execução ainda tem a percorrer, na ordem do tipo. */
+  /** As etapas que a execução ainda tem a percorrer, na ordem do tipo; a reaplicação, todas. */
   const pending = (target: InfraTarget) => {
+    if (target.kind === 'reaplicar') return stepOrder(target.kind);
     const done = createdOf(target);
     return stepOrder(target.kind).filter((step) =>
       target.kind === 'remover' ? done.has(step) : !done.has(step),
@@ -537,6 +546,12 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
     kind: 'local',
 
     plan(target) {
+      if (target.kind === 'reaplicar') {
+        return Promise.resolve({
+          status: 'ok',
+          summary: summarizePlan(drifted(target.siteId) ? [LOCAL_DRIFT_CHANGE] : []),
+        });
+      }
       const action = target.kind === 'remover' ? ('delete' as const) : ('create' as const);
       const changes = pending(target).flatMap((step) =>
         LOCAL_RESOURCES[step].map(({ name, type }) => ({
@@ -549,10 +564,9 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
     },
 
     check(target) {
-      const drifted = options.driftSites?.includes(target.siteId) ?? false;
       return Promise.resolve({
         status: 'ok',
-        summary: summarizePlan(drifted ? [LOCAL_DRIFT_CHANGE] : []),
+        summary: summarizePlan(drifted(target.siteId) ? [LOCAL_DRIFT_CHANGE] : []),
       });
     },
 
@@ -575,6 +589,7 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
         if (target.kind === 'remover') done.delete(step);
         else done.add(step);
       }
+      if (target.kind === 'reaplicar') reapplied.add(target.siteId);
       return {
         status: 'ok',
         nameservers: target.kind === 'remover' ? [] : [...LOCAL_NAMESERVERS],

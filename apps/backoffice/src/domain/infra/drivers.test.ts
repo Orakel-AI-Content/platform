@@ -637,4 +637,48 @@ describe('localDriver', () => {
     });
     expect(again.steps).toEqual(['endereco', 'dns', 'email', 'regras', 'imagens']);
   });
+  describe('reaplicação', () => {
+    const reapply = { ...target, runId: 9, kind: 'reaplicar' as const };
+
+    it('planeja a mudança simulada só enquanto o site está desatualizado', async () => {
+      const driver = localDriver({ driftSites: ['exemplo-a'] });
+      expect(await driver.plan(reapply)).toEqual({
+        status: 'ok',
+        summary: summarizePlan([LOCAL_DRIFT_CHANGE]),
+      });
+      const fresh = await driver.plan({ ...reapply, siteId: 'exemplo-b' });
+      expect(fresh.status === 'ok' && planHasChanges(fresh.summary)).toBe(false);
+    });
+
+    it('o ok percorre as cinco etapas e o site deixa de sair desatualizado', async () => {
+      const driver = localDriver({ driftSites: ['exemplo-a'] });
+      const { steps, onStep } = collect();
+      expect(await driver.apply(reapply, onStep)).toMatchObject({ status: 'ok' });
+      expect(steps).toEqual(['endereco', 'dns', 'email', 'regras', 'imagens']);
+
+      const after = await driver.check(check);
+      expect(after.status === 'ok' && planHasChanges(after.summary)).toBe(false);
+      const plan = await driver.plan({ ...reapply, runId: 10 });
+      expect(plan.status === 'ok' && planHasChanges(plan.summary)).toBe(false);
+    });
+
+    it('com failStep, a primeira reaplicação falha nessa etapa e o site continua desatualizado', async () => {
+      const driver = localDriver({ driftSites: ['exemplo-a'], failStep: 'regras' });
+      const first = collect();
+      expect(await driver.apply(reapply, first.onStep)).toEqual({
+        status: 'failed',
+        step: 'regras',
+        failure: { kind: 'permanent', message: 'Falha simulada na etapa regras (driver local)' },
+      });
+      expect(first.steps).toEqual(['endereco', 'dns', 'email', 'regras']);
+      const drifted = await driver.check(check);
+      expect(drifted.status === 'ok' && planHasChanges(drifted.summary)).toBe(true);
+
+      expect(await driver.apply({ ...reapply, runId: 10 }, () => Promise.resolve())).toMatchObject({
+        status: 'ok',
+      });
+      const after = await driver.check(check);
+      expect(after.status === 'ok' && planHasChanges(after.summary)).toBe(false);
+    });
+  });
 });
