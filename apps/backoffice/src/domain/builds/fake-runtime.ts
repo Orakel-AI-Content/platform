@@ -38,6 +38,11 @@ export function fakeRuntime(options: {
   infraPlan?: FakeStage;
   infraApply?: FakeStage;
   /**
+   * Desfecho do plano e do apply por site (label `orakel.site` do container), para o lote de
+   * reaplicação: vence `infraPlan`/`infraApply` no site que aparece aqui.
+   */
+  infraBySite?: Record<string, { infraPlan?: FakeStage; infraApply?: FakeStage }>;
+  /**
    * Saúde lida pelo `health` de um container de serviço, uma por chamada; o último valor se
    * repete. Padrão: `healthy`. Container de serviço removido, ou nunca criado, é `absent`.
    */
@@ -55,15 +60,21 @@ export function fakeRuntime(options: {
   const healthQueue = [...(options.health ?? ['healthy'])];
   let present = options.image ?? true;
   const waits = new Map<string, number>();
+  /** Site de cada container de infra iniciado, pelo label. */
+  const siteOf = new Map<string, string>();
+  const bySite = (id: string) => {
+    const site = siteOf.get(id);
+    return site === undefined ? undefined : options.infraBySite?.[site];
+  };
   const stageOf = (id: string) =>
     id.startsWith('orakel-render')
       ? options.render
       : id.startsWith('orakel-rollback')
         ? options.rollback
         : id.startsWith('orakel-infra-plan') || id.startsWith('orakel-infra-check')
-          ? options.infraPlan
+          ? (bySite(id)?.infraPlan ?? options.infraPlan)
           : id.startsWith('orakel-infra-apply')
-            ? options.infraApply
+            ? (bySite(id)?.infraApply ?? options.infraApply)
             : options.publish;
 
   const runtime: ContainerRuntime = {
@@ -90,6 +101,8 @@ export function fakeRuntime(options: {
     start(spec) {
       if (options.failOn === 'start') return Promise.reject(new Error('proxy recusou'));
       started.push(spec);
+      const site = spec.labels['orakel.site'];
+      if (site !== undefined) siteOf.set(spec.name, site);
       return Promise.resolve(spec.name);
     },
     startService(spec) {
