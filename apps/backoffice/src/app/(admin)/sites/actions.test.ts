@@ -5,12 +5,14 @@ import {
   cancelBuildAction,
   checkSiteInfraAction,
   confirmInfraPlanAction,
+  confirmInfraReapplyAction,
   confirmInfraRemovalAction,
   createSiteAction,
   infraPlanAction,
   pauseSiteAction,
   rebuildOnReleaseAction,
   requestInfraPlanAction,
+  requestInfraReapplyAction,
   requestInfraRemovalAction,
   registerG1Action,
   rollbackSiteAction,
@@ -52,6 +54,8 @@ const mocks = vi.hoisted(() => ({
   readInfraPlan: vi.fn(),
   requestInfraRemovalPlan: vi.fn(),
   confirmInfraRemovalPlan: vi.fn(),
+  requestInfraReapplyPlan: vi.fn(),
+  confirmInfraReapplyPlan: vi.fn(),
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
@@ -81,6 +85,8 @@ vi.mock('@/domain/infra/plan.ts', () => ({
   readInfraPlan: mocks.readInfraPlan,
   requestInfraRemovalPlan: mocks.requestInfraRemovalPlan,
   confirmInfraRemovalPlan: mocks.confirmInfraRemovalPlan,
+  requestInfraReapplyPlan: mocks.requestInfraReapplyPlan,
+  confirmInfraReapplyPlan: mocks.confirmInfraReapplyPlan,
 }));
 vi.mock('@/domain/sites/policy-triggers.ts', () => ({
   registerPolicyTrigger: mocks.registerPolicyTrigger,
@@ -760,5 +766,45 @@ describe('remover infraestrutura (workspace#97)', () => {
     expect(await confirmInfraRemovalAction('exemplo-a', 9, 'x')).toMatchObject({ ok: false });
     expect(mocks.requestInfraRemovalPlan).not.toHaveBeenCalled();
     expect(mocks.confirmInfraRemovalPlan).not.toHaveBeenCalled();
+  });
+});
+
+describe('reaplicar infraestrutura (workspace#98)', () => {
+  it('pedir devolve a execução e revalida a página do site', async () => {
+    mocks.requestInfraReapplyPlan.mockResolvedValue({ ok: true, value: { runId: 12 } });
+
+    expect(await requestInfraReapplyAction('exemplo-a')).toEqual({ ok: true, runId: 12 });
+    expect(mocks.requestInfraReapplyPlan).toHaveBeenCalledWith({}, operacao, 'exemplo-a');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('a recusa do pedido vira a mensagem, sem revalidar', async () => {
+    const message = 'O site exemplo-a já tem uma execução de infraestrutura aberta';
+    mocks.requestInfraReapplyPlan.mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'infra.run_open', message, path: [] }],
+    });
+
+    expect(await requestInfraReapplyAction('exemplo-a')).toEqual({ ok: false, message });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('confirmar passa a execução ao domínio e devolve a mensagem de sucesso', async () => {
+    mocks.confirmInfraReapplyPlan.mockResolvedValue({ ok: true, value: undefined });
+
+    expect(await confirmInfraReapplyAction('exemplo-a', 12)).toEqual({
+      ok: true,
+      message: 'Reaplicação da infraestrutura confirmada.',
+    });
+    expect(mocks.confirmInfraReapplyPlan).toHaveBeenCalledWith({}, operacao, 'exemplo-a', 12);
+  });
+
+  it('sem sessão, nada chega ao domínio', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await requestInfraReapplyAction('exemplo-a')).toMatchObject({ ok: false });
+    expect(await confirmInfraReapplyAction('exemplo-a', 12)).toMatchObject({ ok: false });
+    expect(mocks.requestInfraReapplyPlan).not.toHaveBeenCalled();
+    expect(mocks.confirmInfraReapplyPlan).not.toHaveBeenCalled();
   });
 });
