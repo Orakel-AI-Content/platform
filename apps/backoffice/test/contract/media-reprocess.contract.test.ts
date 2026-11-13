@@ -8,7 +8,11 @@ import type { Db } from '../../src/db/client.ts';
 import { media, mediaVariants } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
-import { reprocessSiteMedia, scheduleMediaReprocess } from '../../src/domain/media/reprocess.ts';
+import {
+  reprocessSiteMedia,
+  restoreSiteMedia,
+  scheduleMediaReprocess,
+} from '../../src/domain/media/reprocess.ts';
 import { memoryStore, ORIGINALS_BUCKET } from '../../src/domain/media/store.ts';
 import { registerMediaVariants } from '../../src/domain/media/variants.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
@@ -123,6 +127,64 @@ describe('reprocessamento das variantes', () => {
       written: 0,
     });
     expect(store.objects.size).toBe(files);
+  });
+});
+
+describe('regravação das variantes registradas (#843)', () => {
+  const BUCKET_PREFIX = 'media-exemplo-a/';
+
+  function siteFiles(): string[] {
+    return [...store.objects.keys()].filter((key) => key.startsWith(BUCKET_PREFIX)).sort();
+  }
+
+  function emptySiteBucket(): void {
+    for (const key of siteFiles()) store.objects.delete(key);
+  }
+
+  it('com o bucket vazio, regrava todas as variantes registradas, sem mexer no registro', async () => {
+    const files = siteFiles();
+    expect(files.length).toBeGreaterThan(0);
+    emptySiteBucket();
+    const rows = await variantCount();
+    const pending = await unresolvedPendingChangeIds(db, 'exemplo-a');
+    const warnings: string[] = [];
+
+    const report = await restoreSiteMedia(
+      { db, store, warn: (message) => warnings.push(message) },
+      'exemplo-a',
+    );
+
+    expect(report).toEqual({ restored: [mediaId], withoutOriginal: [1, 2], written: files.length });
+    expect(siteFiles()).toEqual(files);
+    expect(await variantCount()).toBe(rows);
+    expect(await unresolvedPendingChangeIds(db, 'exemplo-a')).toEqual(pending);
+    // As mídias da fixture não têm original: vão para o log, e a do original é regravada.
+    expect(warnings).toEqual([
+      expect.stringContaining('mídia 1 de exemplo-a sem original'),
+      expect.stringContaining('mídia 2 de exemplo-a sem original'),
+    ]);
+  });
+
+  it('com o bucket completo, não grava nada', async () => {
+    const files = new Map(store.objects);
+
+    const report = await restoreSiteMedia({ db, store }, 'exemplo-a');
+
+    expect(report).toMatchObject({ restored: [], written: 0 });
+    expect(store.objects).toEqual(files);
+  });
+
+  it('num site sem mídia, não grava nada', async () => {
+    await db.delete(mediaVariants).where(eq(mediaVariants.siteId, 'exemplo-b'));
+    await db.delete(media).where(eq(media.siteId, 'exemplo-b'));
+    const files = new Map(store.objects);
+
+    expect(await restoreSiteMedia({ db, store }, 'exemplo-b')).toEqual({
+      restored: [],
+      withoutOriginal: [],
+      written: 0,
+    });
+    expect(store.objects).toEqual(files);
   });
 });
 
