@@ -35,6 +35,7 @@ import {
   REVIEW_CHECKLIST,
   reviewChecks,
   reviewIssues,
+  reviewChanges,
   reviewQueue,
 } from '../../src/domain/reviews/reviews.ts';
 import {
@@ -53,6 +54,7 @@ import { resetDatabase, setupDatabase } from './helpers.ts';
 // Devolução ao editor (#598): comentário obrigatório, volta a rascunho e a devolução pendente.
 // Aprovar e publicar ou agendar numa decisão só, com transbordo para a próxima vaga (#759).
 // Fila de revisão com pendências, links e devolvido de cada item (#772).
+// O que mudou desde a última revisão (#768): a base é a versão da revisão mais recente.
 
 // Recursos da release: `resourcesFor` devolve os RESOURCES até o registro por release
 // (workspace#26); aqui o teste troca o retorno para simular uma release sem o bloco faq.
@@ -791,6 +793,80 @@ describe('devolução pendente', () => {
 
     expect(await pendingOf()).toEqual({ ok: true, value: null });
     expect(await pendingOf({ email: 'x@orakel.local', roles: [] })).toMatchObject({
+      issues: [{ code: 'forbidden' }],
+    });
+  });
+});
+
+describe('o que mudou desde a última revisão (#768)', () => {
+  const changesOf = (actor: Actor = role('editor')) => reviewChanges(db, actor, SITE, 1);
+  const resubmit = () => db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, 1));
+
+  it('na primeira revisão não há base', async () => {
+    await draft(1);
+
+    expect(await changesOf()).toEqual({ ok: true, value: null });
+  });
+
+  it('devolvida e corrigida, compara com a versão devolvida: campos e blocos', async () => {
+    const returned = await draft(1);
+    await giveBack(1, returned);
+    const base = (await versions(1)).at(-1)!.data;
+    const added: NewBlock = {
+      new: true,
+      type: 'text',
+      content: [{ type: 'paragraph', children: [{ type: 'text', text: 'Novo parágrafo' }] }],
+    };
+    const saved = await db.transaction((tx) =>
+      updateContent(tx, SYSTEM_ACTOR, SITE, 1, {
+        ...base,
+        title: 'Título corrigido',
+        blocks: [...base.blocks, added],
+      }),
+    );
+    if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
+    await resubmit();
+    const current = (await versions(1)).at(-1)!.data;
+    const block = current.blocks.at(-1)!;
+
+    const result = await changesOf();
+
+    expect(block).toMatchObject({ type: 'text' });
+    expect(base.blocks.some((item) => item.n === block.n)).toBe(false);
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        baseVersion: returned,
+        version: saved.value.version,
+        base,
+        fields: [{ field: 'title', before: base.title, after: 'Título corrigido' }],
+        blocks: [{ n: block.n, kind: 'adicionado', after: block }],
+      },
+    });
+  });
+
+  it('a base é a revisão mais recente, de qualquer decisão', async () => {
+    const returned = await draft(1);
+    await giveBack(1, returned);
+    await resubmit();
+    await confirm(1, returned);
+    const approved = await approve(1, returned);
+    if (!approved.ok) throw new Error(JSON.stringify(approved.issues));
+    const latest = await draft(1);
+
+    const result = await changesOf();
+
+    expect(result).toMatchObject({ ok: true, value: { baseVersion: returned, version: latest } });
+    expect(await db.select().from(reviews)).toHaveLength(2);
+  });
+
+  it('a revisão mais recente da própria versão atual não é base; sem papel, forbidden', async () => {
+    const returned = await draft(1);
+    await giveBack(1, returned);
+    await resubmit();
+
+    expect(await changesOf()).toEqual({ ok: true, value: null });
+    expect(await changesOf({ email: 'x@orakel.local', roles: [] })).toMatchObject({
       issues: [{ code: 'forbidden' }],
     });
   });

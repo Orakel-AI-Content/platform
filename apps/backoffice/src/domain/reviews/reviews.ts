@@ -3,7 +3,14 @@ import type { Resources } from '@orakel/content-model/v1';
 import { and, asc, desc, eq, gte, inArray, ne, or, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
-import { authors, contentVersions, redirects, reviews, taxonomies } from '../../db/schema/index.ts';
+import {
+  authors,
+  type ContentData,
+  contentVersions,
+  redirects,
+  reviews,
+  taxonomies,
+} from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import {
   nextPublicationSlot,
@@ -33,6 +40,7 @@ import {
   type SiteCheckContext,
 } from './checks.ts';
 import { linkCheckFor, type LinkCheckState } from './link-checks.ts';
+import { compareVersions, type VersionChanges } from './changes.ts';
 
 export {
   confirmedKeys,
@@ -579,6 +587,52 @@ export async function pendingReturn(
       reviewer: last.reviewer,
       comment: last.comment,
       returnedAt: last.createdAt,
+    },
+  };
+}
+
+/**
+ * O que mudou desde a última revisão (#768): a versão atual comparada (`compareVersions`) com a
+ * `base`, a versão da revisão mais recente do conteúdo, de qualquer decisão. Os dados da base
+ * voltam junto, para a tela resolver nomes e mídias. `null` sem base: o conteúdo nunca foi
+ * revisado, ou a revisão mais recente é da própria versão atual (devolvida e reenviada sem
+ * edição), o que já foi visto. Exige `site.read`.
+ */
+export async function reviewChanges(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+): Promise<
+  Result<(VersionChanges & { baseVersion: number; version: number; base: ContentData }) | null>
+> {
+  const allowed = requireRole(actor, 'site.read');
+  if (!allowed.ok) return allowed;
+
+  const latest = await latestVersion(db, siteId, contentId);
+  if (latest === undefined) return { ok: false, issues: [notFound(siteId, contentId)] };
+  const [last] = await db
+    .select({ version: reviews.version, data: contentVersions.data })
+    .from(reviews)
+    .innerJoin(
+      contentVersions,
+      and(
+        eq(contentVersions.siteId, reviews.siteId),
+        eq(contentVersions.contentId, reviews.contentId),
+        eq(contentVersions.version, reviews.version),
+      ),
+    )
+    .where(and(eq(reviews.siteId, siteId), eq(reviews.contentId, contentId)))
+    .orderBy(desc(reviews.id))
+    .limit(1);
+  if (last === undefined || last.version >= latest.version) return { ok: true, value: null };
+  return {
+    ok: true,
+    value: {
+      ...compareVersions(last.data, latest.data),
+      baseVersion: last.version,
+      version: latest.version,
+      base: last.data,
     },
   };
 }
