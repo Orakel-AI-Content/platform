@@ -12,6 +12,7 @@ import {
   taxonomies,
 } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
+import { enqueueCorrection } from '../generation/runs.ts';
 import {
   nextPublicationSlot,
   PUBLISH_SLOT_HORIZON_DAYS,
@@ -490,6 +491,8 @@ export async function approveAndSchedule(
  * com comentário obrigatório no lugar do checklist e sem validação da release (devolver não
  * leva nada ao site). Grava a revisão como `devolvido`, com o comentário, e leva a versão de
  * volta a `rascunho`: sai da fila e pode ser reenviada como está ou depois de editada.
+ * Com `autoCorrect`, pede também a correção automática (ADR 0023), na mesma transação: a
+ * execução `correcao` `pendente` e o job `correct-article`. A recusa não grava nada.
  */
 export async function returnVersion(
   tx: Executor,
@@ -498,7 +501,8 @@ export async function returnVersion(
   contentId: number,
   version: number,
   comment: string,
-): Promise<Result<{ reviewId: number }>> {
+  options: { autoCorrect?: boolean } = {},
+): Promise<Result<{ reviewId: number; runId?: number }>> {
   const allowed = requireRole(actor, 'content.publish');
   if (!allowed.ok) return allowed;
 
@@ -526,7 +530,15 @@ export async function returnVersion(
     .returning({ id: reviews.id });
   if (review === undefined) throw new Error('INSERT em reviews não devolveu o id');
   await setVersionStatus(tx, siteId, contentId, version, 'rascunho');
-  return { ok: true, value: { reviewId: review.id } };
+  if (options.autoCorrect !== true) return { ok: true, value: { reviewId: review.id } };
+  const { runId } = await enqueueCorrection(tx, {
+    siteId,
+    contentId,
+    baseVersion: version,
+    reviewId: review.id,
+    createdBy: actor.email,
+  });
+  return { ok: true, value: { reviewId: review.id, runId } };
 }
 
 /** Devolução que o editor ainda precisa atender: o que corrigir, quem devolveu e quando. */

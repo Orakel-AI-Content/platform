@@ -232,6 +232,13 @@
       "when": 1794527055729,
       "tag": "0032_data_de_envio_para_revisao",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794577515746,
+      "tag": "0033_correcao_automatica",
+      "breakpoints": true
     }
   ]
 }
