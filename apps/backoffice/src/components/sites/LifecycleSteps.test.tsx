@@ -9,7 +9,13 @@ import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { TITLE } from './CreateInfraDialog.tsx';
 import { LifecycleSteps } from './LifecycleSteps.tsx';
-import { LifecycleAction, LifecycleActionScope, type CreateInfraActions } from './SiteActions.tsx';
+import { REMOVE_TITLE } from './RemoveInfraDialog.tsx';
+import {
+  LifecycleAction,
+  LifecycleActionScope,
+  type CreateInfraActions,
+  type RemoveInfraActions,
+} from './SiteActions.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
@@ -292,6 +298,167 @@ describe('Criar infraestrutura (#825)', () => {
     const dialog = screen.getByRole('alertdialog', { name: TITLE });
     await waitFor(() => expect(within(dialog).queryByRole('list')).not.toBeNull());
     await user.click(within(dialog).getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(message));
+  });
+});
+
+describe('Remover infraestrutura (workspace#97)', () => {
+  const DOMAIN = 'exemplo-a.com.br';
+  const summary = {
+    formatVersion: 1 as const,
+    steps: {
+      endereco: [{ address: 'z', type: 'cloudflare_zone', action: 'delete' as const }],
+      dns: [],
+      email: [],
+      regras: [],
+      imagens: [{ address: 'b', type: 'cloudflare_r2_bucket', action: 'delete' as const }],
+    },
+  };
+  const removeActions = (overrides: Partial<RemoveInfraActions> = {}): RemoveInfraActions => ({
+    domain: DOMAIN,
+    activePages: 12,
+    active: false,
+    open: null,
+    request: vi.fn<RemoveInfraActions['request']>().mockResolvedValue({ ok: true, runId: 9 }),
+    read: vi
+      .fn<RemoveInfraActions['read']>()
+      .mockResolvedValue({ status: 'aguardando_confirmacao', summary }),
+    confirm: vi.fn<RemoveInfraActions['confirm']>(ok),
+    ...overrides,
+  });
+  const withRemove = (remove?: RemoveInfraActions, lifecycle: Lifecycle = 'publicado') => (
+    <LifecycleActionScope>
+      <LifecycleAction lifecycle={lifecycle} check={ok} undo={ok} remove={remove} />
+    </LifecycleActionScope>
+  );
+  const REMOVE = 'Remover infraestrutura';
+
+  async function openSummary(remove: RemoveInfraActions) {
+    const user = userEvent.setup();
+    render(withRemove(remove), { container: app });
+    await user.click(screen.getByRole('button', { name: REMOVE }));
+    const dialog = screen.getByRole('alertdialog', { name: REMOVE_TITLE });
+    await waitFor(() =>
+      expect(within(dialog).queryByRole('list', { name: 'O que será apagado' })).not.toBeNull(),
+    );
+    return { user, dialog };
+  }
+
+  it('sem as actions de remoção (sem site.destroy na página), não aparece', () => {
+    render(withRemove(undefined));
+
+    expect(screen.queryByRole('button', { name: REMOVE })).toBeNull();
+  });
+
+  it.each(['infra_aplicada', 'zona_ativa', 'publicado'] as const)(
+    'em %s, com o site pausado, aparece habilitada',
+    (lifecycle) => {
+      render(withRemove(removeActions(), lifecycle));
+
+      expect(screen.getByRole('button', { name: REMOVE }).hasAttribute('disabled')).toBe(false);
+    },
+  );
+
+  it('num site cadastrado, não aparece', () => {
+    render(withRemove(removeActions(), 'cadastrado'));
+
+    expect(screen.queryByRole('button', { name: REMOVE })).toBeNull();
+  });
+
+  it('com o site ativo, aparece desabilitada com o aviso de pausar antes', () => {
+    render(withRemove(removeActions({ active: true })));
+
+    const button = screen.getByRole('button', { name: REMOVE });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    const hint = screen.getByText('Para remover a infraestrutura, pause o site antes.');
+    expect(button.getAttribute('aria-describedby')).toBe(hint.id);
+  });
+
+  it.each([
+    { id: 4, kind: 'criar' as const, status: 'aguardando_confirmacao' as const },
+    { id: 4, kind: 'remover' as const, status: 'aplicando' as const },
+  ])('com outra execução aberta ($kind, $status), não aparece', (open) => {
+    render(withRemove(removeActions({ open })));
+
+    expect(screen.queryByRole('button', { name: /Remover|remoção/ })).toBeNull();
+  });
+
+  it.each(['planejando', 'aguardando_confirmacao'] as const)(
+    'com a remoção %s, vira "Revisar e confirmar a remoção" e reabre o diálogo no estado salvo',
+    async (status) => {
+      const user = userEvent.setup();
+      const remove = removeActions({ open: { id: 5, kind: 'remover', status } });
+      render(withRemove(remove), { container: app });
+
+      expect(screen.queryByRole('button', { name: REMOVE })).toBeNull();
+      await user.click(screen.getByRole('button', { name: 'Revisar e confirmar a remoção' }));
+
+      screen.getByRole('alertdialog', { name: REMOVE_TITLE });
+      await waitFor(() => expect(remove.read).toHaveBeenCalledWith(5));
+      expect(remove.request).not.toHaveBeenCalled();
+    },
+  );
+
+  it('lista o que será apagado e o que fica', async () => {
+    const { dialog } = await openSummary(removeActions());
+
+    const removed = within(dialog).getByRole('list', { name: 'O que será apagado' });
+    expect(
+      within(removed)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      'Páginas publicadas12 a remover',
+      'Endereço1 a remover',
+      'Registros de DNSNada muda',
+      'E-mailNada muda',
+      'RegrasNada muda',
+      'Armazenamento de imagens1 a remover',
+    ]);
+    const kept = within(dialog).getByRole('list', { name: 'O que fica' });
+    expect(within(kept).getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  it('"Remover" só se habilita com o domínio exato e envia o texto digitado', async () => {
+    const remove = removeActions();
+    const { user, dialog } = await openSummary(remove);
+    const confirm = within(dialog).getByRole('button', { name: 'Remover' });
+    const field = within(dialog).getByRole('textbox', { name: `Digite ${DOMAIN} para confirmar` });
+
+    expect(confirm.hasAttribute('disabled')).toBe(true);
+    await user.type(field, 'outro.com.br');
+    expect(confirm.hasAttribute('disabled')).toBe(true);
+    expect(within(dialog).getByText('O texto não é o domínio do site.')).not.toBeNull();
+    await user.click(confirm);
+    expect(remove.confirm).not.toHaveBeenCalled();
+
+    await user.clear(field);
+    await user.type(field, DOMAIN);
+    expect(confirm.hasAttribute('disabled')).toBe(false);
+    await user.click(confirm);
+    await waitFor(() => expect(remove.confirm).toHaveBeenCalledWith(9, DOMAIN));
+    expect(remove.confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Cancelar" fecha o diálogo sem confirmar', async () => {
+    const remove = removeActions();
+    const { user, dialog } = await openSummary(remove);
+
+    await user.type(within(dialog).getByRole('textbox'), DOMAIN);
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(remove.confirm).not.toHaveBeenCalled();
+  });
+
+  it('a recusa da confirmação vai ao Alert do escopo', async () => {
+    const message = 'O domínio digitado não é o do site; a remoção não foi confirmada';
+    const remove = removeActions({ confirm: () => Promise.resolve({ ok: false, message }) });
+    const { user, dialog } = await openSummary(remove);
+
+    await user.type(within(dialog).getByRole('textbox'), DOMAIN);
+    await user.click(within(dialog).getByRole('button', { name: 'Remover' }));
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(message));
   });

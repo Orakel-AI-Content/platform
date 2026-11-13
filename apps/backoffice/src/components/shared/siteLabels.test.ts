@@ -38,6 +38,7 @@ import {
   infraLiveResultText,
   infraLiveStatusText,
   infraStepChangesText,
+  infraRemovalPagesText,
   latestInfraCreation,
   liveResultText,
   liveStatusText,
@@ -329,6 +330,14 @@ describe('resumo do plano da infra (#825)', () => {
         change('replace'),
       ]),
     ).toBe('2 a criar · 1 a alterar · 1 a recriar · 1 a remover');
+  });
+});
+
+describe('infraRemovalPagesText', () => {
+  it('conta as páginas no ar, ou diz que nada está no ar', () => {
+    expect(infraRemovalPagesText(12)).toBe('12 a remover');
+    expect(infraRemovalPagesText(0)).toBe('Nada no ar');
+    expect(infraRemovalPagesText(null)).toBe('Nada no ar');
   });
 });
 

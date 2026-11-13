@@ -13,11 +13,12 @@ import {
   infraDestroyPlanOk,
 } from '../../src/domain/builds/fake-runtime.ts';
 import { localDriver, tofuDriver, type InfraDriver } from '../../src/domain/infra/drivers.ts';
-import { confirmInfraRemovalPlan } from '../../src/domain/infra/plan.ts';
+import { confirmInfraRemovalPlan, requestInfraRemovalPlan } from '../../src/domain/infra/plan.ts';
 import { requestInfraRemoval } from '../../src/domain/infra/runs.ts';
 import {
   BUILD_RUNNER_INFRA_RECOVERY,
   INFRA_APPLY_TASK,
+  INFRA_PLAN_TASK,
   INFRA_REMOVE_WORKER_TASK,
   INTERRUPTED_INFRA_MESSAGE,
   INTERRUPTED_WORKER_INFRA_MESSAGE,
@@ -163,6 +164,34 @@ beforeEach(async () => {
     .set({ lifecycle: 'publicado', state: 'pausado', pausedReason: 'remoção da infra' })
     .where(eq(sites.id, SITE));
   // O cadastro do site enfileira o build dele; a cadeia só olha a fila infra:<site>.
+});
+
+describe('pedido', () => {
+  const operacao: Actor = { email: 'opa@orakel.local', roles: ['operacao'] };
+
+  it('grava a remoção planejando e enfileira o plano na mesma transação', async () => {
+    const result = await db.transaction((tx) => requestInfraRemovalPlan(tx, admin, SITE));
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(await run(result.value.runId)).toMatchObject({ tipo: 'remover', status: 'planejando' });
+    expect((await queued()).map((job) => job.task)).toEqual([INFRA_PLAN_TASK]);
+  });
+
+  it('recusado (sem site.destroy ou com o site ativo), nada é enfileirado', async () => {
+    const denied = await db.transaction((tx) => requestInfraRemovalPlan(tx, operacao, SITE));
+    expect(denied.ok).toBe(false);
+    await db.update(sites).set({ state: 'ativo', pausedReason: null }).where(eq(sites.id, SITE));
+    const active = await db.transaction((tx) => requestInfraRemovalPlan(tx, admin, SITE));
+    expect(active.ok).toBe(false);
+    expect(await queued()).toEqual([]);
+    expect(await db.select().from(infraRuns)).toEqual([]);
+  });
+
+  it('com uma execução aberta, não enfileira outro plano', async () => {
+    await db.transaction((tx) => requestInfraRemovalPlan(tx, admin, SITE));
+    const again = await db.transaction((tx) => requestInfraRemovalPlan(tx, admin, SITE));
+    expect(again.ok).toBe(false);
+    expect((await queued()).map((job) => job.task)).toEqual([INFRA_PLAN_TASK]);
+  });
 });
 
 describe('confirmação', () => {

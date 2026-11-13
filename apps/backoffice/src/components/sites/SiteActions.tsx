@@ -1,18 +1,19 @@
 'use client';
 
-import { createContext, use, useRef, useState, type ReactNode } from 'react';
+import { createContext, use, useId, useRef, useState, type ReactNode } from 'react';
 
 import { SchemaForm } from '@/components/forms/SchemaForm';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
-import ConfirmDialog from '@/components/shared/ConfirmDialog.tsx';
-import { INFRA_STEP_TEXT } from '@/components/shared/siteLabels.ts';
+import ConfirmDialog, { dangerButtonClass } from '@/components/shared/ConfirmDialog.tsx';
+import { INFRA_REMOVAL_PAUSE_FIRST, INFRA_STEP_TEXT } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
 import type { OpenInfraRun } from '@/domain/infra/runs.ts';
 import type { InfraPlanView } from '@/domain/infra/plan.ts';
 import type { SiteSummary } from '@/domain/sites/sites.ts';
 
 import { CreateInfraDialog, useCreateInfra } from './CreateInfraDialog.tsx';
+import { INFRA_REMOVAL_ALREADY_CONFIRMED, RemoveInfraDialog } from './RemoveInfraDialog.tsx';
 
 import { useInfraCheckContext } from './LifecycleSteps.tsx';
 
@@ -53,6 +54,22 @@ export type CreateInfraActions = {
   confirm: (runId: number) => Promise<ActionResult>;
 };
 
+/**
+ * "Remover infraestrutura" (workspace#97), só para quem tem `site.destroy`: o domínio a digitar,
+ * as páginas no ar, se o site está ativo (a ação fica desabilitada, com o aviso de pausar), a
+ * execução aberta (com o tipo, para reabrir só a de remoção) e as actions ligadas ao site. A
+ * leitura do plano é a mesma da criação.
+ */
+export type RemoveInfraActions = {
+  domain: string;
+  activePages: number | null;
+  active: boolean;
+  open: Pick<OpenInfraRun, 'id' | 'status' | 'kind'> | null;
+  request: () => Promise<{ ok: true; runId: number } | { ok: false; message: string }>;
+  read: (runId: number) => Promise<InfraPlanView | null>;
+  confirm: (runId: number, typedDomain: string) => Promise<ActionResult>;
+};
+
 const LifecycleActionContext = createContext<ReturnType<typeof useActionResult> | null>(null);
 
 /**
@@ -80,8 +97,10 @@ export function LifecycleActionScope({ children }: { children: ReactNode }) {
  * `publicado` vem do build e não se desmarca. Com conferência pedida ou na fila, "Conferir agora"
  * diz "Conferindo…" e fica `aria-disabled` (não `disabled`: o foco continua no botão até o
  * resultado, como nas ações de operação). A etapa e a fila vêm da conferência relida pela aba
- * (`InfraCheckContext`); fora dela, da `lifecycle` da página. Sem nenhuma ação (publicado) não
- * renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de qualquer uma vai ao mesmo
+ * (`InfraCheckContext`); fora dela, da `lifecycle` da página. Com `remove` (só `site.destroy`),
+ * "Remover infraestrutura" (workspace#97) de `infra_aplicada` em diante, sem outra execução
+ * aberta: desabilitada, com o aviso de pausar, enquanto o site está ativo; "Revisar e confirmar a
+ * remoção" reabre a remoção aberta no estado salvo. Sem nenhuma ação não renderiza nada. Fica dentro de um `LifecycleActionScope`: o erro de qualquer uma vai ao mesmo
  * Alert.
  */
 export function LifecycleAction({
@@ -89,21 +108,30 @@ export function LifecycleAction({
   check,
   undo,
   infra,
+  remove,
 }: {
   lifecycle: SiteSummary['lifecycle'];
   check: () => Promise<ActionResult>;
   undo: (step: Step) => Promise<ActionResult>;
   infra?: CreateInfraActions;
+  remove?: RemoveInfraActions;
 }) {
   const scope = use(LifecycleActionContext);
   const view = useInfraCheckContext();
   const [confirming, setConfirming] = useState(false);
-  const [running, setRunning] = useState<'check' | 'undo' | 'infra' | null>(null);
+  const [running, setRunning] = useState<'check' | 'undo' | 'infra' | 'remove' | null>(null);
   const creating = useCreateInfra({
     request: infra?.request ?? noRequest,
     read: infra?.read ?? noRead,
   });
+  const removing = useCreateInfra({
+    request: remove?.request ?? noRequest,
+    read: remove?.read ?? noRead,
+    alreadyConfirmed: INFRA_REMOVAL_ALREADY_CONFIRMED,
+  });
   const infraTrigger = useRef<HTMLButtonElement>(null);
+  const removeTrigger = useRef<HTMLButtonElement>(null);
+  const pauseHintId = useId();
   if (scope === null) throw new Error('LifecycleAction fora de um LifecycleActionScope.');
   const lifecycle = view?.check.lifecycle ?? pageLifecycle;
   const queued = view?.check.queued ?? false;
@@ -112,8 +140,15 @@ export function LifecycleAction({
   const openRun = infra?.open ?? null;
   const creatable =
     infra !== undefined && lifecycle === 'cadastrado' && openRun?.status !== 'aplicando';
-  if (!checkable && current === null && !creatable) return null;
-  const pending = (kind: 'check' | 'undo' | 'infra') => scope.pending && running === kind;
+  // A remoção aberta (planejando ou aguardando) reabre o diálogo; outra execução aberta a esconde.
+  const removalRun = remove?.open ?? null;
+  const reviewRemoval =
+    removalRun !== null && removalRun.kind === 'remover' && removalRun.status !== 'aplicando';
+  const removable =
+    remove !== undefined && lifecycle !== 'cadastrado' && (removalRun === null || reviewRemoval);
+  if (!checkable && current === null && !creatable && !removable) return null;
+  const pending = (kind: 'check' | 'undo' | 'infra' | 'remove') =>
+    scope.pending && running === kind;
 
   return (
     <span className="flex flex-wrap gap-2">
@@ -196,6 +231,49 @@ export function LifecycleAction({
             </p>
           </ConfirmDialog>
         </>
+      )}
+      {removable && (
+        <>
+          <Button
+            ref={removeTrigger}
+            type="button"
+            size="sm"
+            customColorClass={dangerButtonClass}
+            disabled={scope.pending || remove.active}
+            aria-describedby={remove.active ? pauseHintId : undefined}
+            onClick={() =>
+              removalRun === null ? removing.start() : removing.reopen(removalRun.id)
+            }
+          >
+            {pending('remove')
+              ? 'Confirmando…'
+              : reviewRemoval
+                ? 'Revisar e confirmar a remoção'
+                : 'Remover infraestrutura'}
+          </Button>
+          {remove.active && (
+            <span id={pauseHintId} className="basis-full text-sm">
+              {INFRA_REMOVAL_PAUSE_FIRST}
+            </span>
+          )}
+        </>
+      )}
+      {remove !== undefined && (
+        <RemoveInfraDialog
+          isOpen={removing.isOpen}
+          state={removing.state}
+          domain={remove.domain}
+          activePages={remove.activePages}
+          onCancel={removing.close}
+          onConfirm={(typedDomain) => {
+            const runId = removing.runId;
+            removing.close();
+            if (runId === null) return;
+            setRunning('remove');
+            scope.run(() => remove.confirm(runId, typedDomain));
+          }}
+          onAfterClose={() => removeTrigger.current?.focus()}
+        />
       )}
     </span>
   );
