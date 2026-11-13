@@ -147,10 +147,10 @@ test(
       .filter({ hasText: 'Infra e zona' });
     const dialog = page.getByRole('alertdialog', { name: 'Criar a infraestrutura do site?' });
     const summary = dialog.getByRole('list', { name: 'Resumo por etapa' });
-    // A faixa ao vivo, não o toast da confirmação (também `role="status"`).
+    // A faixa da criação, não a do build que o cadastro enfileirou nem o toast da confirmação.
     const live = page
       .getByRole('status')
-      .filter({ hasText: /^Criação da infraestrutura (em andamento|concluída|falhou)/ });
+      .getByText(/^Criação da infraestrutura (em andamento|concluída|falhou)/);
     // O build-runner pega a task do plano e a do apply na fila.
     const queue = { timeout: 60_000 };
 

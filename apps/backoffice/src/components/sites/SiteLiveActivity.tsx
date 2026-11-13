@@ -100,25 +100,35 @@ function finishedInfra({ activity, watchedInfra }: Snapshot): InfraHistoryItem |
   );
 }
 
-function banner(
-  snapshot: Snapshot,
-  timeZone: string,
-): { type: TypeAttributes.Status; text: string } | null {
-  const { activity, watched } = snapshot;
-  if (activity.open !== null)
-    return { type: 'info', text: liveStatusText(activity.open, timeZone) };
-  const applying = applyingCreation(activity);
-  if (applying !== null) return { type: 'info', text: infraLiveStatusText(applying) };
+type Banner = { key: string; type: TypeAttributes.Status; text: string };
+
+/** Faixa do build: a execução aberta ou, quando ela termina, o resultado. */
+function buildBanner({ activity, watched }: Snapshot, timeZone: string): Banner | null {
+  if (activity.open !== null) {
+    return { key: 'build', type: 'info', text: liveStatusText(activity.open, timeZone) };
+  }
   const finished = activity.history.find(
     (item): item is ExecutionHistoryItem => item.type === 'execucao' && item.id === watched,
   );
-  if (finished)
-    return { type: RESULT_TYPE[finished.status], text: liveResultText(finished, timeZone) };
-  const infra = finishedInfra(snapshot);
-  return infra
+  return finished
     ? {
-        type: infra.status === 'ok' ? 'success' : 'danger',
-        text: infraLiveResultText(infra, timeZone),
+        key: 'build',
+        type: RESULT_TYPE[finished.status],
+        text: liveResultText(finished, timeZone),
+      }
+    : null;
+}
+
+/** Faixa da criação da infra (#826): a etapa aplicando ou, quando termina, o resultado. */
+function infraBanner(snapshot: Snapshot, timeZone: string): Banner | null {
+  const applying = applyingCreation(snapshot.activity);
+  if (applying !== null) return { key: 'infra', type: 'info', text: infraLiveStatusText(applying) };
+  const finished = finishedInfra(snapshot);
+  return finished
+    ? {
+        key: 'infra',
+        type: finished.status === 'ok' ? 'success' : 'danger',
+        text: infraLiveResultText(finished, timeZone),
       }
     : null;
 }
@@ -148,7 +158,11 @@ export function SiteLiveActivity({
   panel?: (activity: SiteActivity) => ReactNode;
 }) {
   const snapshot = useSiteActivity(activity, status, pollMs);
-  const current = banner(snapshot, timeZone);
+  // Build e criação da infra correm à parte (cadastrar o site já enfileira um build): uma faixa
+  // para cada.
+  const banners = [buildBanner(snapshot, timeZone), infraBanner(snapshot, timeZone)].filter(
+    (banner): banner is Banner => banner !== null,
+  );
   return (
     <div className="space-y-4">
       {panel && (
@@ -157,12 +171,12 @@ export function SiteLiveActivity({
           <h2 className="h5 pt-2">Histórico</h2>
         </>
       )}
-      <div role="status">
-        {current && (
-          <Alert type={current.type} showIcon duration={0}>
-            {current.text}
+      <div role="status" className="space-y-2">
+        {banners.map((banner) => (
+          <Alert key={banner.key} type={banner.type} showIcon duration={0}>
+            {banner.text}
           </Alert>
-        )}
+        ))}
       </div>
       <SiteBuildsTable history={snapshot.activity.history} timeZone={timeZone} />
     </div>

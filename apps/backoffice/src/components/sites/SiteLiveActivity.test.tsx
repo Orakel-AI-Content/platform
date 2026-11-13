@@ -273,6 +273,18 @@ describe('SiteLiveActivity na criação da infraestrutura (#826)', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('com build e criação ao mesmo tempo, uma faixa para cada', async () => {
+    status.mockResolvedValue(idle({ history: [finished, closed({}), PAUSE] }));
+    renderLive(idle({ open: running, openInfra: applying }));
+
+    await tick();
+    const alerts = [...region().children];
+    expect(alerts.map((alert) => alert.textContent)).toEqual([
+      'Publicação falhou em 11/10/2026, 14:05 BRT',
+      'Criação da infraestrutura concluída em 11/10/2026, 14:05 BRT',
+    ]);
+  });
+
   it('sem criação acompanhada, uma já terminada no histórico não mostra faixa nem relê', () => {
     renderLive(idle({ history: [closed({}), PAUSE] }));
 
