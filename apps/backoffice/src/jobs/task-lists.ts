@@ -12,7 +12,12 @@ import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
 import { REVIEW_OPINION_TASK } from '../domain/reviews/opinions.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
-import { INFRA_APPLY_TASK, INFRA_PLAN_TASK } from '../domain/infra/schedule.ts';
+import {
+  INFRA_APPLY_TASK,
+  INFRA_CHECK_ALL_KEY,
+  INFRA_CHECK_TASK,
+  INFRA_PLAN_TASK,
+} from '../domain/infra/schedule.ts';
 import {
   createAggregateAudienceTask,
   type AggregateAudienceTaskDeps,
@@ -29,6 +34,7 @@ import {
 import { createEmptySiteMediaTask } from './tasks/empty-site-media.ts';
 import { heartbeat } from './tasks/heartbeat.ts';
 import { createInfraApplyTask } from './tasks/infra-apply.ts';
+import { createInfraCheckTask } from './tasks/infra-check.ts';
 import { createInfraPlanTask } from './tasks/infra-plan.ts';
 import type { InfraTaskDeps } from './tasks/infra-run.ts';
 import { createIngestMediaTask } from './tasks/ingest-media.ts';
@@ -81,8 +87,8 @@ export const WORKER_CRONTAB = [
  * O build-runner executa builds e rollbacks (fila `build:<site>`), a conferência da imagem
  * das releases e a troca do container da prévia (fila `preview`, ADR 0024 da raiz), os únicos
  * jobs que falam com o Docker, e o run do release.yml, o único que usa a credencial do GitHub
- * (ADR 0022 da raiz), e o plano e o apply da infra do site (fila `infra:<site>`, ADR 0027 da
- * raiz), os únicos que recebem os segredos de infra; concorrência 2.
+ * (ADR 0022 da raiz), e o plano, o apply e a conferência da infra do site (fila `infra:<site>`,
+ * ADR 0027 da raiz), os únicos que recebem os segredos de infra; concorrência 2.
  */
 export function buildRunnerTasks(
   deps: BuildTaskDeps &
@@ -98,6 +104,16 @@ export function buildRunnerTasks(
     [RECONCILE_PREVIEW_TASK]: createReconcilePreviewTask(deps),
     [INFRA_PLAN_TASK]: createInfraPlanTask(deps),
     [INFRA_APPLY_TASK]: createInfraApplyTask(deps),
+    [INFRA_CHECK_TASK]: createInfraCheckTask(deps),
   };
 }
 export const BUILD_RUNNER_CONCURRENCY = 2;
+
+/**
+ * Cron do build-runner: a conferência da infra contra a descrição (workspace#98) uma vez por
+ * dia, para pegar mudanças feitas à mão na Cloudflare; a partida também a agenda. Mesma chave
+ * do job da partida, numa tentativa só: a próxima é o cron do dia seguinte.
+ */
+export const BUILD_RUNNER_CRONTAB = [
+  `0 6 * * * ${INFRA_CHECK_TASK} ?max=1&jobKey=${INFRA_CHECK_ALL_KEY}&jobKeyMode=replace`,
+].join('\n');

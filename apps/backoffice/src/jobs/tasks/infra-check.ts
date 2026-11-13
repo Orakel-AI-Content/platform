@@ -11,7 +11,8 @@ import { planHasChanges, type InfraDriver } from '../../domain/infra/drivers.ts'
 import { hasOpenInfraRun } from '../../domain/infra/runs.ts';
 import { scheduleSiteInfraDriftCheck } from '../../domain/infra/schedule.ts';
 
-export type InfraCheckTaskDeps = { db: Db; infra: InfraDriver; now?: () => Date };
+/** `now` em milissegundos, como o do build (as duas tasks dividem as deps do build-runner). */
+export type InfraCheckTaskDeps = { db: Db; infra: InfraDriver; now?: () => number };
 
 function siteIdOf(payload: unknown): string | undefined {
   const siteId = (payload as { siteId?: unknown } | null)?.siteId;
@@ -33,7 +34,7 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
  * (`em_dia`, `desatualizado` com o resumo do plano, ou `falhou` com o motivo). Nada é aplicado.
  */
 export function createInfraCheckTask(deps: InfraCheckTaskDeps): Task {
-  const now = deps.now ?? (() => new Date());
+  const now = deps.now ?? Date.now;
   return async (payload, helpers) => {
     const log = helpers.logger;
     const siteId = siteIdOf(payload);
@@ -68,7 +69,7 @@ export function createInfraCheckTask(deps: InfraCheckTaskDeps): Task {
     } catch (error) {
       outcome = { kind: 'falhou', message: `Erro inesperado na conferência: ${message(error)}` };
     }
-    await deps.db.transaction((tx) => recordInfraDrift(tx, siteId, outcome, now()));
+    await deps.db.transaction((tx) => recordInfraDrift(tx, siteId, outcome, new Date(now())));
     if (outcome.kind === 'falhou') {
       log.warn(`conferência da infra de ${siteId} falhou: ${outcome.message}`);
     } else {

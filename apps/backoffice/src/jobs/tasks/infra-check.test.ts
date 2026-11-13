@@ -51,7 +51,7 @@ const IMAGE = 'ghcr.io/orakel-ai-content/infra-runner:abc1234';
 const CHANGE = {
   address: 'module.site.cloudflare_ruleset.waf',
   type: 'cloudflare_ruleset',
-  action: 'update',
+  action: 'update' as const,
 };
 
 beforeEach(() => {
@@ -65,7 +65,7 @@ beforeEach(() => {
 
 function run(infra: InfraDriver, payload: unknown) {
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
-  const done = createInfraCheckTask({ db, infra, now: () => NOW })(payload, {
+  const done = createInfraCheckTask({ db, infra, now: () => NOW.getTime() })(payload, {
     logger,
   } as unknown as JobHelpers);
   return { done, logger };
