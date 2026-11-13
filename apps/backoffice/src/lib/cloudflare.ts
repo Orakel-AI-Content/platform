@@ -3,8 +3,16 @@
 // `local` não tem zona e pergunta ao edge-local se está no ar. `fetch` puro, no molde do
 // lib/github.ts. A falha volta como valor (`falha`), nunca como exceção, para nunca ser
 // confundida com "pendente"; o token só vai no cabeçalho e nenhuma mensagem o repete.
+//
+// No fim, a remoção do Worker do site (workspace#97), só no build-runner (ADR 0028 da raiz): o
+// mesmo par de modos e o mesmo contrato de falha, com o token de deploy.
 
-import type { ZoneCheckEnv } from '../env.ts';
+import { workerName } from '@orakel/build-contract';
+
+import type { BuildRunnerEnv, ZoneCheckEnv } from '../env.ts';
+
+/** Falha de uma chamada ao provedor; `transient` quando vale repetir. */
+export type ProviderFailure = { kind: 'falha'; message: string; transient: boolean };
 
 /**
  * - `inexistente`: a zona não existe na conta (infra ainda não aplicada);
@@ -16,7 +24,7 @@ export type ZoneStatus =
   | { kind: 'inexistente' }
   | { kind: 'pendente'; status: string }
   | { kind: 'ativa' }
-  | { kind: 'falha'; message: string; transient: boolean };
+  | ProviderFailure;
 
 export interface ZoneChecker {
   /** Situação da zona do domínio principal do site (nome exato da zona). */
@@ -27,7 +35,7 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 
 type Common = { fetch?: typeof fetch; timeoutMs?: number };
 
-const failure = (message: string, transient: boolean): ZoneStatus => ({
+const failure = (message: string, transient: boolean): ProviderFailure => ({
   kind: 'falha',
   message,
   transient,
@@ -175,6 +183,133 @@ export function zoneCheckerFrom(env: ZoneCheckEnv, common: Common = {}): ZoneChe
   return cloudflareZoneChecker({
     ...common,
     token: env.CLOUDFLARE_ZONE_READ_TOKEN,
+    accountId: env.CLOUDFLARE_ACCOUNT_ID,
+  });
+}
+
+/**
+ * - `removido`: o Worker existia e foi apagado;
+ * - `inexistente`: não havia Worker (já removido ou nunca publicado), o que também é sucesso;
+ * - `falha`: como no `ZoneStatus`.
+ */
+export type WorkerRemoval = { kind: 'removido' } | { kind: 'inexistente' } | ProviderFailure;
+
+export interface WorkerRemover {
+  /** Apaga o Worker `workerName(site)` do alvo de deploy. */
+  remove(site: string): Promise<WorkerRemoval>;
+}
+
+type CloudflareRemoverOptions = Common & {
+  /** Token de deploy (CLOUDFLARE_API_TOKEN), o mesmo do `wrangler deploy`. */
+  token: string;
+  /** Conta dona dos Workers (CLOUDFLARE_ACCOUNT_ID). */
+  accountId: string;
+  baseUrl?: string;
+};
+
+/** `DELETE` do script na API da Cloudflare, sem `force`: binding de outro script recusa. */
+export function cloudflareWorkerRemover(options: CloudflareRemoverOptions): WorkerRemover {
+  const base = (options.baseUrl ?? 'https://api.cloudflare.com/client/v4').replace(/\/$/, '');
+  const doFetch = options.fetch ?? fetch;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const { token } = options;
+  const scrub = (text: string) => text.replaceAll(token, '***');
+
+  return {
+    async remove(site) {
+      const name = workerName(site);
+      const url = `${base}/accounts/${encodeURIComponent(options.accountId)}/workers/scripts/${encodeURIComponent(name)}`;
+
+      let response: Response;
+      try {
+        response = await doFetch(url, {
+          method: 'DELETE',
+          headers: { accept: 'application/json', authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+      } catch (error) {
+        return failure(`Cloudflare indisponível (Worker ${name}): ${describe(error, token)}`, true);
+      }
+
+      const text = await response.text().catch(() => '');
+      let body: ZonesBody | undefined;
+      try {
+        body = JSON.parse(text) as ZonesBody;
+      } catch {
+        body = undefined;
+      }
+      const detail = scrub(apiMessage(body) ?? text.slice(0, 200));
+      const status = response.status;
+
+      if (response.ok) return { kind: 'removido' };
+      if (status === 404) return { kind: 'inexistente' };
+      if (status === 429 || status >= 500) {
+        return failure(`Cloudflare respondeu ${status} (Worker ${name}): ${detail}`, true);
+      }
+      if (status === 401) {
+        return failure(
+          'A Cloudflare recusou a credencial: o CLOUDFLARE_API_TOKEN está inválido ou expirou',
+          false,
+        );
+      }
+      if (status === 403) {
+        return failure(
+          'A credencial da Cloudflare não tem permissão: o CLOUDFLARE_API_TOKEN precisa de Workers Scripts: Edit na conta',
+          false,
+        );
+      }
+      return failure(`Cloudflare respondeu ${status} (Worker ${name}): ${detail}`, false);
+    },
+  };
+}
+
+/** No local, o Worker do site é o conjunto de versões no edge-local (`DELETE /sites/<site>`). */
+export function edgeLocalWorkerRemover(options: EdgeLocalOptions): WorkerRemover {
+  const base = options.edgeLocalUrl.replace(/\/$/, '');
+  const doFetch = options.fetch ?? fetch;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  return {
+    async remove(site) {
+      let response: Response;
+      try {
+        response = await doFetch(`${base}/sites/${encodeURIComponent(site)}`, {
+          method: 'DELETE',
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+      } catch (error) {
+        return failure(`edge-local indisponível: ${describe(error)}`, true);
+      }
+      const text = await response.text().catch(() => '');
+      if (response.ok) return { kind: 'removido' };
+      // 409: outra operação no site (publish ou rollback) em andamento; 5xx: erro do edge-local.
+      const transient = response.status === 409 || response.status >= 500;
+      return failure(
+        `edge-local respondeu ${response.status} ao remover ${site}: ${text.slice(0, 200)}`,
+        transient,
+      );
+    },
+  };
+}
+
+/** Escolhe o modo pelo DEPLOY_TARGET do build-runner (o env já exige as variáveis de cada um). */
+export function workerRemoverFrom(
+  env: Pick<
+    BuildRunnerEnv,
+    'DEPLOY_TARGET' | 'EDGE_LOCAL_URL' | 'CLOUDFLARE_API_TOKEN' | 'CLOUDFLARE_ACCOUNT_ID'
+  >,
+  common: Common = {},
+): WorkerRemover {
+  if (env.DEPLOY_TARGET === 'local') {
+    if (env.EDGE_LOCAL_URL === undefined) throw new Error('DEPLOY_TARGET=local sem EDGE_LOCAL_URL');
+    return edgeLocalWorkerRemover({ ...common, edgeLocalUrl: env.EDGE_LOCAL_URL });
+  }
+  if (env.CLOUDFLARE_API_TOKEN === undefined || env.CLOUDFLARE_ACCOUNT_ID === undefined) {
+    throw new Error('DEPLOY_TARGET=cloudflare sem CLOUDFLARE_API_TOKEN ou CLOUDFLARE_ACCOUNT_ID');
+  }
+  return cloudflareWorkerRemover({
+    ...common,
+    token: env.CLOUDFLARE_API_TOKEN,
     accountId: env.CLOUDFLARE_ACCOUNT_ID,
   });
 }

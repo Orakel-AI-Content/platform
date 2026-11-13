@@ -6,7 +6,13 @@ import { StoreError, type Store } from './store.ts';
 
 export type Log = (message: Record<string, unknown>) => void;
 
-type Active = { id: string; instance: Instance };
+type Active = { id: string; instance: Instance; inflight: number; idle?: () => void };
+
+/** Requisição em andamento numa instância; `release` ao terminar (idempotente). */
+export type Lease = { url: URL; release: () => void };
+
+/** Teto da espera pelas requisições em andamento antes de desligar a instância antiga. */
+const DRAIN_MS = 5000;
 
 export class Supervisor {
   readonly store: Store;
@@ -47,6 +53,26 @@ export class Supervisor {
     return this.#active.get(site)?.instance.url;
   }
 
+  /**
+   * Instância que atende o site agora, contando a requisição como em andamento: a troca só
+   * desliga a instância antiga depois que as requisições já encaminhadas a ela terminam.
+   */
+  acquire(site: string): Lease | undefined {
+    const active = this.#active.get(site);
+    if (!active) return undefined;
+    active.inflight += 1;
+    let released = false;
+    return {
+      url: active.instance.url,
+      release: () => {
+        if (released) return;
+        released = true;
+        active.inflight -= 1;
+        if (active.inflight === 0) active.idle?.();
+      },
+    };
+  }
+
   activeId(site: string): string | undefined {
     return this.#active.get(site)?.id;
   }
@@ -75,6 +101,20 @@ export class Supervisor {
     });
   }
 
+  /**
+   * Remoção do Worker do site (workspace#97): desliga a instância, tira o site do proxy (que
+   * passa a responder 404) e apaga as versões. Site que não existe também conta como removido.
+   */
+  async removeSite(site: string): Promise<void> {
+    return this.#exclusive(site, async () => {
+      const active = this.#active.get(site);
+      this.#active.delete(site);
+      if (active) await this.#retire(active);
+      await this.store.removeSite(site);
+      this.#log({ msg: 'site removido', site, id: active?.id });
+    });
+  }
+
   async stop(): Promise<void> {
     const instances = [...this.#active.values()].map((active) => active.instance);
     if (this.#aeSim) instances.push(this.#aeSim);
@@ -85,9 +125,26 @@ export class Supervisor {
   async #switch(site: string, id: string): Promise<void> {
     const next = await this.#runtime.start(this.store.configPath(site, id));
     const previous = this.#active.get(site);
-    this.#active.set(site, { id, instance: next });
+    this.#active.set(site, { id, instance: next, inflight: 0 });
     await this.store.setActive(site, id);
-    if (previous) await previous.instance.dispose().catch(() => undefined);
+    if (previous) await this.#retire(previous);
+  }
+
+  /** Espera as requisições em andamento (até `DRAIN_MS`) e desliga a instância. */
+  async #retire(active: Active): Promise<void> {
+    if (active.inflight > 0) {
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          active.idle = resolve;
+        }),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, DRAIN_MS);
+        }),
+      ]);
+      clearTimeout(timer);
+    }
+    await active.instance.dispose().catch(() => undefined);
   }
 
   async #exclusive<T>(site: string, work: () => Promise<T>): Promise<T> {
