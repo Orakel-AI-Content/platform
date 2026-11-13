@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { amendAction, approveAction, confirmAction, confirmAllAction } from './actions.ts';
+import {
+  amendAction,
+  approveAction,
+  approvePublishAction,
+  approveScheduleAction,
+  confirmAction,
+  confirmAllAction,
+} from './actions.ts';
 
 // A action só traduz: sessão → recusa, Result do domínio → resumo do formulário ou mensagem,
 // sucesso → revalida a revisão (e, na aprovação, a fila e o conteúdo). Regras e permissão estão
@@ -9,6 +16,8 @@ import { amendAction, approveAction, confirmAction, confirmAllAction } from './a
 const mocks = vi.hoisted(() => ({
   currentActor: vi.fn(),
   approveVersion: vi.fn(),
+  approveAndPublish: vi.fn(),
+  approveAndSchedule: vi.fn(),
   amendInReview: vi.fn(),
   resourcesFor: vi.fn(),
   setConfirmation: vi.fn(),
@@ -23,7 +32,11 @@ vi.mock('@/db/client.ts', () => ({
 }));
 vi.mock('@/domain/content/contents.ts', () => ({ amendInReview: mocks.amendInReview }));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
-vi.mock('@/domain/reviews/reviews.ts', () => ({ approveVersion: mocks.approveVersion }));
+vi.mock('@/domain/reviews/reviews.ts', () => ({
+  approveVersion: mocks.approveVersion,
+  approveAndPublish: mocks.approveAndPublish,
+  approveAndSchedule: mocks.approveAndSchedule,
+}));
 vi.mock('@/domain/reviews/confirmations.ts', () => ({
   setConfirmation: mocks.setConfirmation,
   setAllConfirmations: mocks.setAllConfirmations,

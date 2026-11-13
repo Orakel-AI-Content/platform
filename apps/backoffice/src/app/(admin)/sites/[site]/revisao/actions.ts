@@ -7,17 +7,27 @@ import { currentActor } from '@/auth/request-actor.ts';
 import type { ContentFormResult } from '@/components/contents/contentEditorValues.ts';
 import type { SchemaFormIssue } from '@/components/forms/SchemaForm';
 import type { FormActionResult } from '@/components/shared/actionResult.ts';
-import { getDb } from '@/db/client.ts';
+import { formatDateTime } from '@/components/shared/siteLabels.ts';
+import { getDb, type Executor } from '@/db/client.ts';
+import type { Actor } from '@/domain/access/rbac.ts';
 import { amendInReview, type ContentEdit } from '@/domain/content/contents.ts';
+import { PUBLISH_DAY_TIME_ZONE } from '@/domain/publications/publish.ts';
 import { setAllConfirmations, setConfirmation } from '@/domain/reviews/confirmations.ts';
-import { approveVersion, returnVersion } from '@/domain/reviews/reviews.ts';
+import {
+  approveAndPublish,
+  approveAndSchedule,
+  approveVersion,
+  returnVersion,
+  type ApprovalOutcome,
+} from '@/domain/reviews/reviews.ts';
 import { resourcesFor } from '@/domain/sites/sites.ts';
 
 import { noSession, refused } from '../content-form-result.ts';
 
-// Ações da tela de revisão (#75, #598, #749, #751): permissão, confirmações, comentário e validação da
-// release ficam no domínio (confirmations.ts, approveVersion, returnVersion); aqui só a tradução
-// do Result para o painel.
+// Ações da tela de revisão (#75, #598, #749, #751, workspace#89): permissão, confirmações,
+// comentário, validação da release, limite diário e transbordo ficam no domínio
+// (confirmations.ts, approveVersion, approveAndPublish, approveAndSchedule, returnVersion,
+// amendInReview); aqui só a tradução do Result para o painel.
 
 export type ApproveResult = FormActionResult<SchemaFormIssue>;
 
