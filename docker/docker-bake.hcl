@@ -51,8 +51,16 @@ target "backoffice" {
   tags       = tags("backoffice")
 }
 
+# Plano e apply da infra de um site (ADR 0027): o build-runner a inicia como
+# INFRA_RUNNER_IMAGE:<SHA do commit>.
+target "infra-runner" {
+  inherits   = ["_base"]
+  dockerfile = "docker/infra-runner/Dockerfile"
+  tags       = tags("infra-runner")
+}
+
 group "images" {
-  targets = ["backoffice"]
+  targets = ["backoffice", "infra-runner"]
 }
 
 # Versão do site-builder (ADR 0018): o release.yml, disparado com version=X.Y.Z, publica
@@ -132,7 +140,7 @@ target "events-test" {
 
 # Grupos: crie-os junto com o primeiro alvo de cada um (grupo vazio é erro no bake).
 #
-#   group "images"  { targets = ["backoffice"] }    # backoffice e serviços, a cada merge na main
+#   group "images"  { targets = ["backoffice", "infra-runner"] }  # a cada merge na main
 #   group "release" { targets = ["site-builder"] }  # no release.yml (dispatch)
 #   group "local"   { targets = ["edge-local"] }    # só o pnpm local:images
 #   group "default" { targets = ["images", "release", "local"] }
