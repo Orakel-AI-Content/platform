@@ -227,6 +227,23 @@ describe('Criar infraestrutura (#825)', () => {
     },
   );
 
+  it('com a última criação em falha, vira "Tentar de novo" e pede um plano novo (#826)', async () => {
+    const user = userEvent.setup();
+    const infra = infraActions({ retry: true });
+    render(withInfra(infra), { container: app });
+
+    expect(screen.queryByRole('button', { name: 'Criar infraestrutura' })).toBeNull();
+    await user.click(
+      screen.getByRole('button', { name: 'Tentar de novo a criação da infraestrutura' }),
+    );
+
+    const dialog = screen.getByRole('alertdialog', { name: TITLE });
+    await waitFor(() => expect(within(dialog).queryByRole('list')).not.toBeNull());
+    expect(infra.request).toHaveBeenCalledTimes(1);
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar' }));
+    expect(infra.confirm).toHaveBeenCalledWith(7);
+  });
+
   it('com execução aplicando, nenhuma das duas aparece', () => {
     render(withInfra(infraActions({ open: { id: 4, status: 'aplicando' } })));
 

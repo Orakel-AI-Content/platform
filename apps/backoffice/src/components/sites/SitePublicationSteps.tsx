@@ -4,6 +4,7 @@ import {
   PUBLICATION_STEPS,
   PUBLICATION_STEP_LABEL,
   SITE_STATE_LABEL,
+  latestInfraCreation,
   liveResultText,
   liveStatusText,
   liveVersionText,
@@ -101,7 +102,14 @@ function steps(
         : infraCheck !== undefined && infraCheckFailed(infraCheck.check)
           ? 'error'
           : 'in-progress',
-      text: <LifecycleSteps current={lifecycle} check={infraCheck} action={lifecycleAction} />,
+      text: (
+        <LifecycleSteps
+          current={lifecycle}
+          check={infraCheck}
+          action={lifecycleAction}
+          nameservers={latestInfraCreation(activity.history)?.nameservers}
+        />
+      ),
     },
     versao: {
       status: site.release === null ? 'pending' : 'complete',

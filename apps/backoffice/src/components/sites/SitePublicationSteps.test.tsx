@@ -230,6 +230,43 @@ describe('painel de etapas', () => {
     expect(description(1)).toBe('Nenhuma versão');
   });
 
+  it('com a infra aplicada, Infra e zona lista os nameservers da última criação (#826)', () => {
+    const creation = (id: number, nameservers: string[]): SiteHistoryItem => ({
+      type: 'infra',
+      id,
+      kind: 'criar',
+      status: 'ok',
+      requestedBy: 'operacao@orakel.local',
+      requestedAt: new Date('2026-10-11T16:58:00Z'),
+      confirmedBy: 'operacao@orakel.local',
+      at: new Date('2026-10-11T17:05:00Z'),
+      nameservers,
+      failure: null,
+    });
+    const history = [creation(2, ['ada.ns.example', 'bob.ns.example']), creation(1, ['velho.ns'])];
+    const { rerender } = render(
+      <SitePublicationSteps
+        site={{ ...SITE, lifecycle: 'infra_aplicada', release: null, activeVersionId: null }}
+        instance={{ activePages: null, activeSince: null }}
+        activity={activity(null, history)}
+      />,
+    );
+
+    expect(description(0)).toBe(
+      'Infra aplicada, zona pendenteNameservers a configurar no registrador do domínio: ' +
+        'ada.ns.example, bob.ns.example',
+    );
+
+    rerender(
+      <SitePublicationSteps
+        site={{ ...SITE, lifecycle: 'zona_ativa', release: null, activeVersionId: null }}
+        instance={{ activePages: null, activeSince: null }}
+        activity={activity(null, history)}
+      />,
+    );
+    expect(description(0)).toBe('Infra aplicada e zona ativa');
+  });
+
   it('com release mais recente disponível, a Versão diz a em uso e a Tag da mais recente (#690)', () => {
     renderPanel({ newerRelease: '1.5.0' });
 

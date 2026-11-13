@@ -6,7 +6,11 @@ import {
   LifecycleAction,
   RegisterG1Form,
 } from '@/components/sites/SiteActions';
-import { formatDateTime, formatDuration } from '@/components/shared/siteLabels.ts';
+import {
+  formatDateTime,
+  formatDuration,
+  latestInfraCreation,
+} from '@/components/shared/siteLabels.ts';
 import { SiteOperationButton, SiteOperationsScope } from '@/components/sites/SiteOperations';
 import { SitePublicationTab } from '@/components/sites/SitePublicationTab';
 import { SiteSummaryCard } from '@/components/sites/SiteSummaryCard';
@@ -196,6 +200,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                 id: activity.value.openInfra.id,
                 status: activity.value.openInfra.status,
               },
+              retry: latestInfraCreation(activity.value.history)?.status === 'falhou',
               request: requestInfraPlanAction.bind(null, site.id),
               read: infraPlanAction.bind(null, site.id),
               confirm: confirmInfraPlanAction.bind(null, site.id),

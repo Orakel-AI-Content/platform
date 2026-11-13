@@ -6,8 +6,9 @@ import { fieldLabel } from './fieldLabel.ts';
 
 // Fluxos críticos dos sites (ADR 0019 da raiz). Na pilha (`@stack`): o login pelo Access e a API
 // de exportação fora do hostname público. Na camada `telas`: a operação cadastra, edita e publica
-// um site, e o editor não configura. Ciclo de vida, G1, janela, layout e acessibilidade ficam nos
-// testes de domínio e de componente.
+// um site, e o editor não configura. Também na pilha, a criação da infraestrutura pelo
+// build-runner com o driver local (#826). Ciclo de vida, G1, janela, layout e acessibilidade
+// ficam nos testes de domínio e de componente.
 
 /** Sites cadastrados por estes testes; removidos do banco no fim, mesmo se um falhar. */
 const created: string[] = [];
@@ -115,6 +116,78 @@ test(
     await expect(
       page.getByRole('status').filter({ hasText: 'Build de exemplo-a enfileirado.' }),
     ).toBeVisible();
+  },
+);
+
+test(
+  'operação cria a infraestrutura do site, com falha e "Tentar de novo"',
+  { tag: '@stack' },
+  async ({ page }) => {
+    // INFRA_DRIVER=local com INFRA_LOCAL_FAIL_STEP=regras (infra/local/compose.override.yaml):
+    // a primeira criação de cada site falha em Regras; a nova tentativa só cria o que faltou.
+    test.setTimeout(180_000);
+    const siteId = `e2e-infra-${Date.now()}`;
+    created.push(siteId);
+    await asRole(page, 'operacao');
+    await page.goto('/sites/novo');
+    await page.waitForLoadState('networkidle');
+    await page.getByLabel(fieldLabel('ID')).fill(siteId);
+    await page.getByLabel(fieldLabel('Nome')).fill('Site da infra do E2E');
+    await page.getByRole('textbox', { name: 'Domínios' }).fill(`${siteId}.example.com`);
+    await page.getByRole('radio', { name: /Editorial claro/ }).check();
+    await page.getByRole('button', { name: 'Criar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Sites' })).toBeVisible();
+
+    await page.goto(`/sites/${siteId}`);
+    // Espera a página hidratar: um clique antes disso não chega ao onClick.
+    await page.waitForLoadState('networkidle');
+    const infra = page
+      .getByRole('list', { name: 'Etapas da publicação' })
+      .getByRole('listitem')
+      .filter({ hasText: 'Infra e zona' });
+    const dialog = page.getByRole('alertdialog', { name: 'Criar a infraestrutura do site?' });
+    const summary = dialog.getByRole('list', { name: 'Resumo por etapa' });
+    // A faixa da criação, não a do build que o cadastro enfileirou nem o toast da confirmação.
+    const live = page
+      .getByRole('status')
+      .getByText(/^Criação da infraestrutura (em andamento|concluída|falhou)/);
+    // O build-runner pega a task do plano e a do apply na fila.
+    const queue = { timeout: 60_000 };
+
+    // Primeira criação: o resumo e só então o apply, que falha na etapa Regras.
+    await infra.getByRole('button', { name: 'Criar infraestrutura' }).click();
+    await expect(summary).toBeVisible(queue);
+    await expect(summary.getByRole('listitem').filter({ hasText: 'Endereço' })).toContainText(
+      '1 a criar',
+    );
+    await dialog.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(live).toContainText('falhou na etapa Regras', queue);
+    await expect(live).toContainText('Falha simulada na etapa regras');
+
+    // Nova tentativa: novo plano, só com o que faltou, e a conclusão com os nameservers.
+    await infra
+      .getByRole('button', { name: 'Tentar de novo a criação da infraestrutura' })
+      .click(queue);
+    await expect(summary).toBeVisible(queue);
+    await expect(summary.getByRole('listitem').filter({ hasText: 'Endereço' })).toContainText(
+      'Nada muda',
+    );
+    await expect(summary.getByRole('listitem').filter({ hasText: 'Regras' })).toContainText(
+      '3 a criar',
+    );
+    await dialog.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(live).toContainText('Criação da infraestrutura concluída', queue);
+    await expect(infra).toContainText('Infra aplicada, zona pendente', queue);
+    await expect(infra).toContainText('ada.ns.orakel.localhost, bob.ns.orakel.localhost');
+
+    // O histórico: as duas criações, com quem pediu e o resultado.
+    // O item da linha do tempo começa pelo título; o da etapa, por "Infra e zona".
+    const history = page.getByRole('listitem').filter({ hasText: /^Criação da infraestrutura/ });
+    await expect(history).toHaveCount(2);
+    await expect(history.nth(0)).toContainText('operacao@orakel.local');
+    await expect(history.nth(0)).toContainText('Nameservers: ada.ns.orakel.localhost');
+    await expect(history.nth(1)).toContainText('falhou na etapa Regras');
+    await expect(history.nth(1)).toContainText('Motivo: Falha simulada na etapa regras');
   },
 );
 

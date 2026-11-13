@@ -18,6 +18,16 @@ import type { SiteHistoryItem } from '@/domain/builds/builds.ts';
 import { type FailedExecution, SiteExecutionDrawer } from './SiteExecutionDrawer.tsx';
 import { StateTag } from './SiteStatus.tsx';
 
+/** Resultado de uma criação da infra (#826): o motivo da falha ou os nameservers da zona. */
+function infraResult(item: SiteHistoryItem): string | null {
+  if (item.type !== 'infra') return null;
+  if (item.failure?.message) return `Motivo: ${item.failure.message}`;
+  if (item.nameservers && item.nameservers.length > 0) {
+    return `Nameservers: ${item.nameservers.join(', ')}`;
+  }
+  return null;
+}
+
 function isFailed(item: SiteHistoryItem): item is FailedExecution {
   return item.type === 'execucao' && item.failure !== null;
 }
@@ -50,7 +60,9 @@ function version(item: SiteHistoryItem): string | null {
  * nas execuções), quem (no cancelamento, quem cancelou), quando no fuso do site e a versão. O
  * marcador é decorativo, na cor do status. O item de uma falha tem o botão "Ver detalhe", que
  * abre o `SiteExecutionDrawer`; o item em si não é clicável, e o foco volta ao botão quando o
- * painel fecha. Sem itens, o `EmptyState`. O título "Histórico" fica acima, no
+ * painel fecha. A criação da infraestrutura (#826) diz, abaixo, o motivo da falha (a etapa vai
+ * no título) ou os nameservers a configurar no registrador. Sem itens, o `EmptyState`. O título
+ * "Histórico" fica acima, no
  * `SiteLiveActivity`.
  */
 export function SiteBuildsTable({
@@ -71,6 +83,7 @@ export function SiteBuildsTable({
           const failed = isFailed(item) ? item : null;
           const at = formatDateTime(item.at, timeZone);
           const itemVersion = version(item);
+          const result = infraResult(item);
           return (
             <Timeline.Item
               key={`${item.type}-${item.id}`}
@@ -101,6 +114,7 @@ export function SiteBuildsTable({
                     <time dateTime={item.at.toISOString()}>{at}</time>
                     {itemVersion !== null && ` · Versão ${itemVersion}`}
                   </p>
+                  {result !== null && <p className="wrap-anywhere">{result}</p>}
                 </div>
                 {failed && (
                   <IconButton

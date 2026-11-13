@@ -64,21 +64,29 @@ export function useInfraCheck(
  * conferência em falha, a etapa diz que não foi possível consultar o provedor no lugar do texto
  * de etapa pendente. A situação fica num `role="status"` sempre montado, para o leitor de tela
  * anunciar "Conferindo…" e o resultado. O erro das ações fica no `ActionAlert` do
- * `LifecycleActionScope`, abaixo do painel.
+ * `LifecycleActionScope`, abaixo do painel. Com a infra aplicada e a zona pendente, lista os
+ * nameservers da última criação da infraestrutura (#826), a configurar no registrador.
  */
 export function LifecycleSteps({
   current,
   check,
   action,
+  nameservers,
 }: {
   current: SiteSummary['lifecycle'];
   check?: InfraCheckView;
   action?: ReactNode;
+  nameservers?: readonly string[] | null;
 }) {
   return (
     <>
       {!(check !== undefined && infraCheckFailed(check.check)) && (
         <span className="block">{INFRA_STEP_TEXT[current]}</span>
+      )}
+      {current === 'infra_aplicada' && nameservers && nameservers.length > 0 && (
+        <span className="block wrap-anywhere">
+          Nameservers a configurar no registrador do domínio: {nameservers.join(', ')}
+        </span>
       )}
       {check !== undefined && (
         <span role="status" className="block">

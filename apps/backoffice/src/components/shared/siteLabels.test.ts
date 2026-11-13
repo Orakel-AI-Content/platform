@@ -11,6 +11,7 @@ import type {
   ExecutionHistoryItem,
   OpenExecution,
 } from '@/domain/builds/builds.ts';
+import type { InfraHistoryItem } from '@/domain/infra/runs.ts';
 
 import {
   BUILD_STAGE_LABEL,
@@ -33,7 +34,11 @@ import {
   formatDateTime,
   formatDuration,
   infraCheckText,
+  infraFailureText,
+  infraLiveResultText,
+  infraLiveStatusText,
   infraStepChangesText,
+  latestInfraCreation,
   liveResultText,
   liveStatusText,
   liveVersionText,
@@ -324,5 +329,62 @@ describe('resumo do plano da infra (#825)', () => {
         change('replace'),
       ]),
     ).toBe('2 a criar · 1 a alterar · 1 a recriar · 1 a remover');
+  });
+});
+
+describe('andamento e histórico da criação da infra (#826)', () => {
+  const run = (over: Partial<InfraHistoryItem>): InfraHistoryItem => ({
+    type: 'infra',
+    id: 3,
+    kind: 'criar',
+    status: 'ok',
+    requestedBy: 'operacao@orakel.local',
+    requestedAt: new Date('2026-10-01T11:58:00Z'),
+    confirmedBy: 'operacao@orakel.local',
+    at: new Date('2026-10-01T12:00:00Z'),
+    nameservers: ['ada.ns.example', 'bob.ns.example'],
+    failure: null,
+    ...over,
+  });
+  const failed = run({
+    status: 'falhou',
+    nameservers: null,
+    failure: { step: 'regras', message: 'Falha simulada' },
+  });
+
+  it('a faixa da criação aplicando diz a etapa corrente, quando já há uma', () => {
+    expect(infraLiveStatusText({ currentStep: null })).toBe(
+      'Criação da infraestrutura em andamento',
+    );
+    expect(infraLiveStatusText({ currentStep: 'dns' })).toBe(
+      'Criação da infraestrutura em andamento, etapa: Registros de DNS',
+    );
+  });
+
+  it('o resultado: concluída, ou a etapa e o motivo da falha', () => {
+    expect(infraLiveResultText(run({}), 'UTC')).toBe(
+      'Criação da infraestrutura concluída em 01/10/2026, 12:00 UTC',
+    );
+    expect(infraLiveResultText(failed, 'UTC')).toBe(
+      'Criação da infraestrutura falhou na etapa Regras em 01/10/2026, 12:00 UTC: Falha simulada',
+    );
+    expect(
+      infraLiveResultText(run({ status: 'falhou', failure: { step: null, message: null } }), 'UTC'),
+    ).toBe('Criação da infraestrutura falhou em 01/10/2026, 12:00 UTC');
+  });
+
+  it('no histórico, o título leva a etapa da falha e o detalhe, o motivo', () => {
+    expect(historyItemTitle(run({}))).toBe('Criação da infraestrutura');
+    expect(historyItemTitle(failed)).toBe('Criação da infraestrutura · falhou na etapa Regras');
+    expect(infraFailureText({ step: 'regras', message: 'Falha simulada' })).toBe(
+      'falhou na etapa Regras: Falha simulada',
+    );
+    expect(infraFailureText({ step: null, message: null })).toBe('falhou');
+  });
+
+  it('a criação mais recente ignora remoções e outros itens', () => {
+    const removal = run({ id: 9, kind: 'remover', nameservers: null });
+    expect(latestInfraCreation([removal, failed, run({ id: 1 })])).toBe(failed);
+    expect(latestInfraCreation([removal])).toBeUndefined();
   });
 });
