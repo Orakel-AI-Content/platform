@@ -4,7 +4,8 @@
 // execução guarda o plano salvo do `plan` ao `apply` e é apagado no fim do apply (ou na falha do
 // plano); o container, sempre. O andamento vem do `-json` do tofu no log do container, lido em
 // fatias durante a espera. `local` percorre as mesmas etapas sem rede nem segredos, com memória
-// do que já "criou" e uma falha forçável, para o compose local e o E2E. A conferência
+// do que já "criou" (e esquece o que "removeu") e uma falha forçável, para o compose local e o
+// E2E. A conferência
 // (`check`, workspace#98) roda o mesmo `plan` num volume e container só dela, apagados sempre:
 // o plano salvo é descartado e nada é aplicado.
 import {
@@ -183,6 +184,8 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
   type Slot = {
     siteId: string;
     domain: string;
+    /** O tipo da execução; a conferência compara com a criação. */
+    kind: InfraRunKind;
     volume: string;
     container: (command: 'plan' | 'apply') => string;
     labels: Record<string, string>;
@@ -190,6 +193,7 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
   const runSlot = (target: InfraTarget): Slot => ({
     siteId: target.siteId,
     domain: target.domain,
+    kind: target.kind,
     volume: `orakel-infra-${target.runId}`,
     container: (command) => `orakel-infra-${command}-${target.runId}`,
     labels: { 'orakel.infra': String(target.runId), 'orakel.site': target.siteId },
@@ -197,6 +201,7 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
   const checkSlot = (target: InfraCheckTarget): Slot => ({
     siteId: target.siteId,
     domain: target.domain,
+    kind: 'criar',
     volume: `orakel-infra-check-${target.siteId}`,
     container: () => `orakel-infra-check-${target.siteId}`,
     labels: { 'orakel.infra-check': target.siteId, 'orakel.site': target.siteId },
@@ -244,7 +249,13 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
         name: slot.container(command),
         image: options.image,
         command: [command],
-        env: { ...options.env, SITE_ID: slot.siteId, DOMAIN: slot.domain },
+        env: {
+          ...options.env,
+          SITE_ID: slot.siteId,
+          DOMAIN: slot.domain,
+          // Só no plan: o apply lê o modo do plano salvo.
+          ...(command === 'plan' && slot.kind === 'remover' && { INFRA_MODE: 'destroy' }),
+        },
         network: options.network,
         volume: { name: slot.volume, target: INFRA_DIR },
         labels: { ...slot.labels, 'orakel.stage': `infra-${command}` },
@@ -352,6 +363,15 @@ export function tofuDriver(options: TofuDriverOptions): InfraDriver {
         };
       }
       if (result.status === 'failed') return { status: 'failed', failure: result.failure };
+      if (result.mode !== MODE_OF[slot.kind]) {
+        return {
+          status: 'failed',
+          failure: {
+            kind: 'transient',
+            message: `${INFRA_PATHS.planResult} é de ${result.mode}, a execução é de ${slot.kind}`,
+          },
+        };
+      }
       ok = true;
       return { status: 'ok', summary: summarizePlan(result.changes) };
     } catch (error) {
@@ -486,8 +506,9 @@ export const LOCAL_DRIFT_CHANGE: InfraChange = {
 
 /**
  * Simulação sem rede: o "estado" de cada site é a memória do processo (as etapas já criadas),
- * então uma nova execução só cria o que faltou, como o OpenTofu faria. Reiniciar o build-runner
- * zera a memória; sem efeito fora do local e do E2E. A conferência não usa essa memória (ela
+ * então uma nova execução só cria (ou remove) o que faltou, como o OpenTofu faria. A remoção
+ * percorre as etapas na ordem inversa e as esquece; um site sem memória (build-runner reiniciado)
+ * conta como todo criado. Reiniciar o build-runner zera a memória; sem efeito fora do local e do E2E. A conferência não usa essa memória (ela
  * zeraria na partida e todo site sairia desatualizado): só `driftSites` sai desatualizado.
  */
 export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
