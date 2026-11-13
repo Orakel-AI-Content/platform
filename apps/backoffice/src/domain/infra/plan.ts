@@ -1,6 +1,7 @@
 // "Criar infraestrutura" pelo Backoffice (#825): o pedido do plano e a confirmação, cada um na
 // mesma transação que enfileira a task do build-runner (a confirmação da remoção, o primeiro elo
-// da cadeia dela, workspace#97), e a leitura do plano para o diálogo,
+// da cadeia dela, workspace#97; a reaplicação e o lote dela, workspace#98), e a leitura do plano
+// para o diálogo,
 // com o resumo já validado. Cancelar não tem transição: a execução fica aberta e o diálogo é
 // reaberto por "Revisar e confirmar"; se o estado mudar até a confirmação, o apply falha e pede
 // um plano novo.
@@ -12,10 +13,15 @@ import { infraRuns } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { InfraPlanSummarySchema, type InfraPlanSummary } from './drivers.ts';
 import {
+  confirmInfraBatch,
+  confirmInfraReapply,
   confirmInfraRemoval,
   confirmInfraRun,
+  requestInfraBatch,
+  requestInfraReapply,
   requestInfraRemoval,
   requestInfraRun,
+  type InfraBatchRun,
 } from './runs.ts';
 import { scheduleInfraApply, scheduleInfraPlan, scheduleInfraRemoveWorker } from './schedule.ts';
 
@@ -63,6 +69,53 @@ export async function requestInfraRemovalPlan(
   return { ok: true, value: { runId } };
 }
 
+/**
+ * Pede a reaplicação da infraestrutura e enfileira o plano (`requestInfraReapply` +
+ * `scheduleInfraPlan`, workspace#98): o mesmo `infra-plan`, sempre com um plano novo.
+ */
+export async function requestInfraReapplyPlan(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<{ runId: number }>> {
+  const requested = await requestInfraReapply(tx, actor, siteId);
+  if (!requested.ok) return requested;
+  const runId = requested.value.id;
+  await scheduleInfraPlan(tx, { siteId, runId });
+  return { ok: true, value: { runId } };
+}
+
+/**
+ * Pede o lote de reaplicação e enfileira o plano de cada site dele (`requestInfraBatch` +
+ * `scheduleInfraPlan`): todos os planos antes da confirmação, cada um na fila do site. Nenhum
+ * apply é enfileirado aqui.
+ */
+export async function requestInfraBatchPlans(
+  tx: Executor,
+  actor: Actor,
+): Promise<Result<{ batchId: number; runs: InfraBatchRun[] }>> {
+  const requested = await requestInfraBatch(tx, actor);
+  if (!requested.ok) return requested;
+  for (const run of requested.value.runs) await scheduleInfraPlan(tx, run);
+  return { ok: true, value: { batchId: requested.value.id, runs: requested.value.runs } };
+}
+
+/**
+ * Confirma o lote e enfileira só o apply do primeiro site (`confirmInfraBatch` +
+ * `scheduleInfraApply`); o de cada seguinte é enfileirado pelo `infra-apply` do anterior, na
+ * transação que o fecha `ok`.
+ */
+export async function confirmInfraBatchPlan(
+  tx: Executor,
+  actor: Actor,
+  batchId: number,
+): Promise<Result<InfraBatchRun>> {
+  const confirmed = await confirmInfraBatch(tx, actor, batchId);
+  if (!confirmed.ok) return confirmed;
+  await scheduleInfraApply(tx, confirmed.value);
+  return confirmed;
+}
+
 /** Linha da execução, só se for do site. */
 async function siteRun(db: Executor, siteId: string, runId: number) {
   const [run] = await db.select().from(infraRuns).where(eq(infraRuns.id, runId));
@@ -80,6 +133,25 @@ export async function confirmInfraPlan(
   if (!allowed.ok) return allowed;
   if ((await siteRun(tx, siteId, runId)) === undefined) return runNotFound(runId, siteId);
   const confirmed = await confirmInfraRun(tx, actor, runId);
+  if (!confirmed.ok) return confirmed;
+  await scheduleInfraApply(tx, { siteId, runId });
+  return confirmed;
+}
+
+/**
+ * Confirma a reaplicação do site e enfileira o apply (`confirmInfraReapply` +
+ * `scheduleInfraApply`). Recusada a confirmação, nada é enfileirado.
+ */
+export async function confirmInfraReapplyPlan(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  runId: number,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.configure');
+  if (!allowed.ok) return allowed;
+  if ((await siteRun(tx, siteId, runId)) === undefined) return runNotFound(runId, siteId);
+  const confirmed = await confirmInfraReapply(tx, actor, runId);
   if (!confirmed.ok) return confirmed;
   await scheduleInfraApply(tx, { siteId, runId });
   return confirmed;
