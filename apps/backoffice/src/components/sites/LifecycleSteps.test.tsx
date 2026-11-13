@@ -360,6 +360,26 @@ describe('Remover infraestrutura (workspace#97)', () => {
     },
   );
 
+  it('com a última remoção em falha, vira "Tentar de novo" e pede um plano novo', async () => {
+    const user = userEvent.setup();
+    const remove = removeActions({ retry: true });
+    render(withRemove(remove), { container: app });
+
+    expect(screen.queryByRole('button', { name: REMOVE })).toBeNull();
+    await user.click(
+      screen.getByRole('button', { name: 'Tentar de novo a remoção da infraestrutura' }),
+    );
+
+    const dialog = screen.getByRole('alertdialog', { name: REMOVE_TITLE });
+    await waitFor(() =>
+      expect(within(dialog).queryByRole('list', { name: 'O que será apagado' })).not.toBeNull(),
+    );
+    expect(remove.request).toHaveBeenCalledTimes(1);
+    await user.type(within(dialog).getByRole('textbox'), DOMAIN);
+    await user.click(within(dialog).getByRole('button', { name: 'Remover' }));
+    expect(remove.confirm).toHaveBeenCalledWith(9, DOMAIN);
+  });
+
   it('num site cadastrado, não aparece', () => {
     render(withRemove(removeActions(), 'cadastrado'));
 

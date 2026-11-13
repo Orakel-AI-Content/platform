@@ -184,6 +184,21 @@ describe('página do site: Remover infraestrutura', () => {
     expect(action?.props.remove).toBeUndefined();
   });
 
+  it('com a última remoção em falha, a remoção vem com "Tentar de novo"', async () => {
+    state.roles = ['admin'];
+    const removal = (id: number, status: string) => ({
+      type: 'infra',
+      id,
+      kind: 'remover',
+      status,
+    });
+    state.history = [{ type: 'infra', id: 9, kind: 'criar', status: 'ok' }, removal(3, 'falhou')];
+    expect(((await lifecycleAction())?.props.remove as { retry: boolean }).retry).toBe(true);
+
+    state.history = [removal(4, 'ok'), removal(3, 'falhou')];
+    expect(((await lifecycleAction())?.props.remove as { retry: boolean }).retry).toBe(false);
+  });
+
   it('a execução aberta vai com o tipo, para reabrir só a remoção', async () => {
     state.roles = ['admin'];
     state.openInfra = { id: 5, kind: 'remover', status: 'aguardando_confirmacao' };

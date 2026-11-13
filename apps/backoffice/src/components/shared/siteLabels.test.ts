@@ -40,6 +40,7 @@ import {
   infraStepChangesText,
   infraRemovalPagesText,
   latestInfraCreation,
+  latestInfraRemoval,
   liveResultText,
   liveStatusText,
   liveVersionText,
@@ -362,10 +363,10 @@ describe('andamento e histórico da criação da infra (#826)', () => {
   });
 
   it('a faixa da criação aplicando diz a etapa corrente, quando já há uma', () => {
-    expect(infraLiveStatusText({ currentStep: null })).toBe(
+    expect(infraLiveStatusText({ kind: 'criar', currentStep: null })).toBe(
       'Criação da infraestrutura em andamento',
     );
-    expect(infraLiveStatusText({ currentStep: 'dns' })).toBe(
+    expect(infraLiveStatusText({ kind: 'criar', currentStep: 'dns' })).toBe(
       'Criação da infraestrutura em andamento, etapa: Registros de DNS',
     );
   });
@@ -395,5 +396,43 @@ describe('andamento e histórico da criação da infra (#826)', () => {
     const removal = run({ id: 9, kind: 'remover', nameservers: null });
     expect(latestInfraCreation([removal, failed, run({ id: 1 })])).toBe(failed);
     expect(latestInfraCreation([removal])).toBeUndefined();
+  });
+
+  describe('remoção (workspace#97)', () => {
+    const removal = run({ kind: 'remover', nameservers: null });
+
+    it('a faixa da remoção aplicando diz a etapa, inclusive a das páginas do site', () => {
+      expect(infraLiveStatusText({ kind: 'remover', currentStep: null })).toBe(
+        'Remoção da infraestrutura em andamento',
+      );
+      expect(infraLiveStatusText({ kind: 'remover', currentStep: 'paginas' })).toBe(
+        'Remoção da infraestrutura em andamento, etapa: Páginas do site',
+      );
+    });
+
+    it('o resultado e o título do histórico distinguem a remoção da criação', () => {
+      const failedRemoval = run({
+        kind: 'remover',
+        status: 'falhou',
+        nameservers: null,
+        failure: { step: 'regras', message: 'Falha simulada' },
+      });
+      expect(infraLiveResultText(removal, 'UTC')).toBe(
+        'Remoção da infraestrutura concluída em 01/10/2026, 12:00 UTC',
+      );
+      expect(infraLiveResultText(failedRemoval, 'UTC')).toBe(
+        'Remoção da infraestrutura falhou na etapa Regras em 01/10/2026, 12:00 UTC: Falha simulada',
+      );
+      expect(historyItemTitle(removal)).toBe('Remoção da infraestrutura');
+      expect(historyItemTitle(failedRemoval)).toBe(
+        'Remoção da infraestrutura · falhou na etapa Regras',
+      );
+    });
+
+    it('a remoção mais recente ignora criações e outros itens', () => {
+      const older = run({ id: 1, kind: 'remover', status: 'falhou' });
+      expect(latestInfraRemoval([failed, removal, older])).toBe(removal);
+      expect(latestInfraRemoval([failed])).toBeUndefined();
+    });
   });
 });

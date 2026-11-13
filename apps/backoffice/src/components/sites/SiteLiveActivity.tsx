@@ -34,40 +34,46 @@ type Snapshot = {
   /** A última execução de build vista aberta. */
   watched: number | null;
   /**
-   * A última criação da infraestrutura vista aberta (#826), em qualquer estado: o apply do
-   * driver local termina antes de a página revalidada chegar, e a aba nunca a veria aplicando.
+   * A última criação (#826) ou remoção (workspace#97) da infraestrutura vista aberta, em qualquer
+   * estado: o apply do driver local termina antes de a página revalidada chegar, e a aba nunca a
+   * veria aplicando.
    */
   watchedInfra: number | null;
 };
 
-/** A criação da infraestrutura aberta, do pedido do plano ao fim do apply. */
-function openCreation(activity: SiteActivity): OpenInfraRun | null {
+/** Os tipos de execução de infra que a aba acompanha; a reaplicação vem com a ação dela (#852). */
+const TRACKED_INFRA_KINDS: readonly OpenInfraRun['kind'][] = ['criar', 'remover'];
+
+/** A criação ou a remoção da infraestrutura aberta, do pedido do plano ao fim do apply. */
+function openTracked(activity: SiteActivity): OpenInfraRun | null {
   const run = activity.openInfra;
-  return run !== null && run.kind === 'criar' ? run : null;
+  return run !== null && TRACKED_INFRA_KINDS.includes(run.kind) ? run : null;
 }
 
-/** A criação da infraestrutura aplicando: o andamento que a aba acompanha (#826). */
-function applyingCreation(activity: SiteActivity): OpenInfraRun | null {
-  const run = openCreation(activity);
+/** A criação ou a remoção aplicando: o andamento que a aba acompanha. */
+function applyingTracked(activity: SiteActivity): OpenInfraRun | null {
+  const run = openTracked(activity);
   return run?.status === 'aplicando' ? run : null;
 }
 
 const snapshotOf = (activity: SiteActivity, current: Snapshot | null): Snapshot => ({
   activity,
   watched: activity.open?.id ?? current?.watched ?? null,
-  watchedInfra: openCreation(activity)?.id ?? current?.watchedInfra ?? null,
+  watchedInfra: openTracked(activity)?.id ?? current?.watchedInfra ?? null,
 });
 
 const isPolling = (activity: SiteActivity) =>
-  activity.open !== null || applyingCreation(activity) !== null;
+  activity.open !== null || applyingTracked(activity) !== null;
 
 /**
  * Atividade da aba: a da página até o polling trazer outra; quando a página entrega uma nova
  * (depois do `revalidatePath` de uma ação), ela substitui a do polling, como em `ReleasesTable`.
- * `watched` e `watchedInfra` são a última execução de build e a última criação da infra vistas
- * abertas, para mostrar o resultado delas quando fecharem. O polling só roda com build aberto
- * ou criação aplicando (o plano tem o polling do diálogo). Quando a criação acompanhada fecha, a página é relida (`router.refresh`), para a etapa
- * Infra e zona seguir o ciclo de vida que o apply avançou, como em `useInfraCheck`.
+ * `watched` e `watchedInfra` são a última execução de build e a última criação ou remoção da
+ * infra vistas abertas, para mostrar o resultado delas quando fecharem. O polling só roda com
+ * build aberto ou criação ou remoção aplicando (o plano tem o polling do diálogo). Quando a
+ * execução de infra acompanhada fecha, a página é relida (`router.refresh`), para a etapa Infra e
+ * zona seguir o ciclo de vida que o apply mudou (a remoção leva o site a `cadastrado`, com
+ * "Criar infraestrutura" de novo), como em `useInfraCheck`.
  */
 function useSiteActivity(
   activity: SiteActivity,
@@ -94,7 +100,7 @@ function useSiteActivity(
 }
 
 function finishedInfra({ activity, watchedInfra }: Snapshot): InfraHistoryItem | undefined {
-  if (watchedInfra === null || openCreation(activity) !== null) return undefined;
+  if (watchedInfra === null || openTracked(activity) !== null) return undefined;
   return activity.history.find(
     (item): item is InfraHistoryItem => item.type === 'infra' && item.id === watchedInfra,
   );
@@ -119,9 +125,9 @@ function buildBanner({ activity, watched }: Snapshot, timeZone: string): Banner 
     : null;
 }
 
-/** Faixa da criação da infra (#826): a etapa aplicando ou, quando termina, o resultado. */
+/** Faixa da criação ou da remoção da infra: a etapa aplicando ou, quando termina, o resultado. */
 function infraBanner(snapshot: Snapshot, timeZone: string): Banner | null {
-  const applying = applyingCreation(snapshot.activity);
+  const applying = applyingTracked(snapshot.activity);
   if (applying !== null) return { key: 'infra', type: 'info', text: infraLiveStatusText(applying) };
   const finished = finishedInfra(snapshot);
   return finished
@@ -136,9 +142,9 @@ function infraBanner(snapshot: Snapshot, timeZone: string): Banner | null {
 /**
  * Atividade do site com o status ao vivo (#638): no topo, a faixa com a execução aberta ("na
  * fila" com o horário previsto, "em andamento" com a etapa) e, quando ela termina, o resultado;
- * embaixo, o `SiteBuildsTable` com o histórico relido. A criação da infraestrutura aplicando
- * (#826) entra na mesma faixa, com a etapa corrente e, no fim, concluída ou a etapa e o motivo da
- * falha. Enquanto há execução aberta, relê a
+ * embaixo, o `SiteBuildsTable` com o histórico relido. A criação (#826) e a remoção
+ * (workspace#97) da infraestrutura aplicando entram na mesma faixa, com a etapa corrente e, no
+ * fim, concluída ou a etapa e o motivo da falha. Enquanto há execução aberta, relê a
  * atividade pela Server Action a cada `pollMs`; sem execução aberta, não consulta. A faixa fica
  * num contêiner `role="status"` sempre montado, para o leitor de tela anunciar cada mudança.
  * Com `panel` (o painel de etapas da aba "Publicação", #647), desenha-o acima, com a mesma
@@ -158,7 +164,7 @@ export function SiteLiveActivity({
   panel?: (activity: SiteActivity) => ReactNode;
 }) {
   const snapshot = useSiteActivity(activity, status, pollMs);
-  // Build e criação da infra correm à parte (cadastrar o site já enfileira um build): uma faixa
+  // Build e execução de infra correm à parte (cadastrar o site já enfileira um build): uma faixa
   // para cada.
   const banners = [buildBanner(snapshot, timeZone), infraBanner(snapshot, timeZone)].filter(
     (banner): banner is Banner => banner !== null,

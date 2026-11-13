@@ -112,12 +112,14 @@ test(
       reviewer.getByRole('status').filter({ hasText: 'Versão 1 aprovada.' }),
     ).toBeVisible();
 
-    // Publica pela página do conteúdo, aberta pelo link da execução.
+    // Publica pela página do conteúdo. O link da execução leva à revisão (#811); o id do
+    // conteúdo vem dele.
     await page.reload();
     const contentLink = (await finishedRow(page, topic)).getByRole('link', { name: /^Conteúdo #/ });
-    const href = await contentLink.getAttribute('href');
-    expect(href).toMatch(new RegExp(`^/sites/${SITE}/conteudos/\\d+$`));
-    await reviewer.goto(href!);
+    const href = (await contentLink.getAttribute('href')) ?? '';
+    const contentId = new RegExp(`^/sites/${SITE}/revisao/(\\d+)$`).exec(href)?.[1];
+    expect(contentId, href).toBeDefined();
+    await reviewer.goto(`/sites/${SITE}/conteudos/${contentId}`);
     await reviewer.getByRole('button', { name: 'Publicar', exact: true }).click();
     await expect(reviewer.getByRole('status').filter({ hasText: 'Publicado.' })).toBeVisible();
     await context.close();
