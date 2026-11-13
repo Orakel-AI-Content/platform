@@ -29,6 +29,7 @@ jobs:
       sites: ${{ steps.filter.outputs.sites }}
       backoffice: ${{ steps.filter.outputs.backoffice }}
       infra: ${{ steps.filter.outputs.infra }}
+      tofu: ${{ steps.filter.outputs.tofu }}
       site-builder: ${{ steps.filter.outputs.site-builder }}
       workspace: ${{ steps.filter.outputs.workspace }}
     steps:
@@ -55,6 +56,11 @@ jobs:
             infra:
               - 'infra/**'
               - 'docker/**'
+            # Raiz OpenTofu por site e módulos (ADR 0027).
+            tofu:
+              - 'infra/site/**'
+              - 'infra/modules/**'
+              - '.github/workflows/ci.yml'
             site-builder:
               - 'tooling/build-site/**'
               - 'docker/site-builder/**'
@@ -281,3 +287,22 @@ jobs:
           infra/local/compose.sh config --quiet
       - name: Alvos do bake válidos
         run: docker/bake.sh default --print
+
+  # OpenTofu da infraestrutura de cada site (ADR 0027): formato e validação sem credenciais. O
+  # `init -backend=false` não toca no tofu-state nem pede a senha do estado.
+  tofu:
+    name: OpenTofu (fmt e validate)
+    needs: changes
+    if: needs.changes.outputs.tofu == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: opentofu/setup-opentofu@v2
+        with:
+          tofu_version: 1.13.9
+          tofu_wrapper: false
+      - run: tofu fmt -check -recursive -diff infra
+      - run: tofu init -backend=false -input=false -lockfile=readonly
+        working-directory: infra/site
+      - run: tofu validate
+        working-directory: infra/site
