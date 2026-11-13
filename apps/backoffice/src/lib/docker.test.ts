@@ -29,6 +29,7 @@ const json = (body: unknown, status = 200) =>
 
 const host = 'tcp://docker-socket-proxy:2375';
 const siteBuilderImage = 'ghcr.io/orakel-ai-content/site-builder';
+const infraRunnerImage = 'ghcr.io/orakel-ai-content/infra-runner';
 
 describe('dockerRuntime', () => {
   it('cria o container com rede, volume, limites e sem privilégios, e o inicia', async () => {
@@ -36,9 +37,9 @@ describe('dockerRuntime', () => {
       'POST /containers/create': [json({ Id: 'abc' }, 201)],
       'POST /containers/abc/start': [new Response(null, { status: 204 })],
     });
-    const id = await dockerRuntime({ host, siteBuilderImage, fetch: fn }).start({
+    const id = await dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).start({
       name: 'orakel-render-x',
-      image: 'site-builder:local',
+      image: 'ghcr.io/orakel-ai-content/site-builder:local',
       command: ['render'],
       env: { SITE_ID: 'exemplo-a' },
       network: 'orakel-export',
@@ -51,7 +52,7 @@ describe('dockerRuntime', () => {
       'http://docker-socket-proxy:2375/containers/create?name=orakel-render-x',
     );
     expect(calls[0]?.body).toMatchObject({
-      Image: 'site-builder:local',
+      Image: 'ghcr.io/orakel-ai-content/site-builder:local',
       Cmd: ['render'],
       Env: ['SITE_ID=exemplo-a'],
       HostConfig: {
@@ -66,6 +67,48 @@ describe('dockerRuntime', () => {
     });
   });
 
+  describe('start: imagem', () => {
+    const container = (image: string) => ({
+      name: 'orakel-infra-x',
+      image,
+      command: ['plan'],
+      env: {},
+      network: 'orakel-publish',
+      volume: { name: 'orakel-infra-x', target: '/infra' },
+      labels: {},
+    });
+
+    it('cria o container do INFRA_RUNNER_IMAGE:<tag>', async () => {
+      const { fn, calls } = fakeFetch({
+        'POST /containers/create': [json({ Id: 'inf' }, 201)],
+        'POST /containers/inf/start': [new Response(null, { status: 204 })],
+      });
+      const runtime = dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn });
+      expect(await runtime.start(container(`${infraRunnerImage}:1.0.0`))).toBe('inf');
+      expect(calls[0]?.body).toMatchObject({ Image: `${infraRunnerImage}:1.0.0`, Cmd: ['plan'] });
+    });
+
+    it.each([
+      'alpine:3',
+      'site-builder:local',
+      'ghcr.io/outro/infra-runner:1.0.0',
+      'ghcr.io/orakel-ai-content/infra-runner-x:1.0.0',
+      'ghcr.io/orakel-ai-content/infra-runner',
+      'ghcr.io/orakel-ai-content/infra-runner:',
+      'ghcr.io/orakel-ai-content/infra-runner@sha256:abc',
+      'ghcr.io/orakel-ai-content/infra-runner:1/../x',
+      'ghcr.io/orakel-ai-content/site-builder@sha256:abc',
+    ])('recusa %s sem chamar o Docker', async (image) => {
+      const { fn, calls } = fakeFetch({});
+      await expect(
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).start(
+          container(image),
+        ),
+      ).rejects.toThrow(/container recusado/);
+      expect(calls).toEqual([]);
+    });
+  });
+
   it('espera consultando o estado e devolve o código de saída', async () => {
     const { fn } = fakeFetch({
       'GET /containers/abc/json': [
@@ -76,6 +119,7 @@ describe('dockerRuntime', () => {
     const runtime = dockerRuntime({
       host,
       siteBuilderImage,
+      infraRunnerImage,
       fetch: fn,
       sleep: () => Promise.resolve(),
     });
@@ -92,6 +136,7 @@ describe('dockerRuntime', () => {
     const runtime = dockerRuntime({
       host,
       siteBuilderImage,
+      infraRunnerImage,
       fetch: fn,
       pollMs: 1000,
       now: () => clock,
@@ -110,7 +155,7 @@ describe('dockerRuntime', () => {
       'DELETE /containers/abc': [json({}, 404)],
       'DELETE /volumes/v': [json({}, 404)],
     });
-    const runtime = dockerRuntime({ host, siteBuilderImage, fetch: fn });
+    const runtime = dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn });
     expect(await runtime.imageExists('ghcr.io/orakel-ai-content/site-builder:local')).toBe(false);
     expect(await runtime.readFile('abc', '/build/result.json')).toBeUndefined();
     await runtime.removeContainer('abc');
@@ -129,9 +174,12 @@ describe('dockerRuntime', () => {
     const { fn, calls } = fakeFetch({
       'GET /containers/abc/logs': [new Response(body, { status: 200 })],
     });
-    expect(await dockerRuntime({ host, siteBuilderImage, fetch: fn }).logsTail('abc', 200)).toBe(
-      'render: 12 páginas\nerro: ç',
-    );
+    expect(
+      await dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).logsTail(
+        'abc',
+        200,
+      ),
+    ).toBe('render: 12 páginas\nerro: ç');
     expect(calls).toEqual([
       {
         method: 'GET',
@@ -149,11 +197,11 @@ describe('dockerRuntime', () => {
       'POST /volumes/create': [new Response('Forbidden', { status: 403 })],
     });
     await expect(
-      dockerRuntime({ host, siteBuilderImage, fetch: fn }).createVolume('v', {}),
+      dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).createVolume('v', {}),
     ).rejects.toBeInstanceOf(RuntimeError);
     const offline = (() => Promise.reject(new TypeError('fetch failed'))) as typeof fetch;
     await expect(
-      dockerRuntime({ host, siteBuilderImage, fetch: offline }).imageExists('x'),
+      dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: offline }).imageExists('x'),
     ).rejects.toThrow(/Docker indisponível/);
   });
 
@@ -173,13 +221,26 @@ describe('dockerRuntime', () => {
           ),
         ],
       });
-      await dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(
+      await dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).pullImage(
         'ghcr.io/orakel-ai-content/site-builder:1.4.0',
       );
       expect(calls.map((c) => [c.method, c.url])).toEqual([
         [
           'POST',
           'http://docker-socket-proxy:2375/images/create?fromImage=ghcr.io%2Forakel-ai-content%2Fsite-builder&tag=1.4.0',
+        ],
+      ]);
+    });
+
+    it('baixa INFRA_RUNNER_IMAGE:<tag> do próprio repositório', async () => {
+      const { fn, calls } = fakeFetch({ 'POST /images/create': [ndjson({ status: 'ok' })] });
+      await dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).pullImage(
+        `${infraRunnerImage}:1.0.0`,
+      );
+      expect(calls.map((c) => [c.method, c.url])).toEqual([
+        [
+          'POST',
+          'http://docker-socket-proxy:2375/images/create?fromImage=ghcr.io%2Forakel-ai-content%2Finfra-runner&tag=1.0.0',
         ],
       ]);
     });
@@ -192,10 +253,13 @@ describe('dockerRuntime', () => {
       'ghcr.io/orakel-ai-content/site-builder@sha256:abc',
       'ghcr.io/orakel-ai-content/site-builder:1.4.0&fromImage=alpine',
       'ghcr.io/orakel-ai-content/site-builder:1/../x',
+      'ghcr.io/outro/infra-runner:1.0.0',
+      'ghcr.io/orakel-ai-content/infra-runner',
+      'ghcr.io/orakel-ai-content/infra-runner@sha256:abc',
     ])('recusa %s sem chamar o Docker', async (image) => {
       const { fn, calls } = fakeFetch({});
       await expect(
-        dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(image),
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).pullImage(image),
       ).rejects.toThrow(/pull recusado/);
       expect(calls).toEqual([]);
     });
@@ -209,7 +273,7 @@ describe('dockerRuntime', () => {
           ),
         ],
       });
-      const pull = dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(
+      const pull = dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).pullImage(
         'ghcr.io/orakel-ai-content/site-builder:9.9.9',
       );
       await expect(pull).rejects.toBeInstanceOf(RuntimeError);
@@ -222,7 +286,7 @@ describe('dockerRuntime', () => {
           ndjson({ errorDetail: { message: 'manifest unknown' }, error: 'manifest unknown' }),
         ],
       });
-      const pull = dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(
+      const pull = dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).pullImage(
         'ghcr.io/orakel-ai-content/site-builder:9.9.9',
       );
       await expect(pull).rejects.toBeInstanceOf(ImageUnavailableError);
@@ -233,7 +297,7 @@ describe('dockerRuntime', () => {
       const { fn } = fakeFetch({
         'POST /images/create': [json({ message: 'error from registry: denied\ndenied' }, 500)],
       });
-      const pull = dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(
+      const pull = dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).pullImage(
         'ghcr.io/orakel-ai-content/site-builder:1.0.1',
       );
       await expect(pull).rejects.toBeInstanceOf(ImageUnavailableError);
@@ -245,7 +309,7 @@ describe('dockerRuntime', () => {
         'POST /images/create': [new Response('{"error":"toomanyrequests"}', { status: 200 })],
       });
       await expect(
-        dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).pullImage(
           'ghcr.io/orakel-ai-content/site-builder:1.4.0',
         ),
       ).rejects.toThrow(/toomanyrequests/);
@@ -256,7 +320,7 @@ describe('dockerRuntime', () => {
         'POST /images/create': [new Response('Forbidden', { status: 403 })],
       });
       await expect(
-        dockerRuntime({ host, siteBuilderImage, fetch: fn }).pullImage(
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).pullImage(
           'ghcr.io/orakel-ai-content/site-builder:1.4.0',
         ),
       ).rejects.toBeInstanceOf(RuntimeError);
@@ -270,7 +334,7 @@ describe('dockerRuntime', () => {
           new Response(null, { status: 201 }),
         ],
       });
-      await dockerRuntime({ host, siteBuilderImage, fetch: fn }).tagImage(
+      await dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).tagImage(
         'ghcr.io/orakel-ai-content/site-builder:local',
         'ghcr.io/orakel-ai-content/site-builder:1.4.0',
       );
@@ -291,10 +355,15 @@ describe('dockerRuntime', () => {
         'ghcr.io/orakel-ai-content/site-builder:1.4.0&repo=alpine',
       ],
       ['ghcr.io/orakel-ai-content/site-builder:1/../x', 'ghcr.io/orakel-ai-content/site-builder:1'],
+      ['ghcr.io/orakel-ai-content/infra-runner:1.0.0', 'ghcr.io/orakel-ai-content/site-builder:1'],
+      ['ghcr.io/orakel-ai-content/site-builder:local', 'ghcr.io/orakel-ai-content/infra-runner:1'],
     ])('recusa %s → %s sem chamar o Docker', async (source, target) => {
       const { fn, calls } = fakeFetch({});
       await expect(
-        dockerRuntime({ host, siteBuilderImage, fetch: fn }).tagImage(source, target),
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).tagImage(
+          source,
+          target,
+        ),
       ).rejects.toThrow(/tag recusado/);
       expect(calls).toEqual([]);
     });
@@ -306,7 +375,7 @@ describe('dockerRuntime', () => {
         ],
       });
       await expect(
-        dockerRuntime({ host, siteBuilderImage, fetch: fn }).tagImage(
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).tagImage(
           'ghcr.io/orakel-ai-content/site-builder:local',
           'ghcr.io/orakel-ai-content/site-builder:1.4.0',
         ),
@@ -338,7 +407,12 @@ describe('dockerRuntime', () => {
         'POST /v1.44/containers/create': [json({ Id: 'svc' }, 201)],
         'POST /containers/svc/start': [new Response(null, { status: 204 })],
       });
-      const id = await dockerRuntime({ host, siteBuilderImage, fetch: fn }).startService(service());
+      const id = await dockerRuntime({
+        host,
+        siteBuilderImage,
+        infraRunnerImage,
+        fetch: fn,
+      }).startService(service());
       expect(id).toBe('svc');
       expect(calls.map((c) => [c.method, c.url])).toEqual([
         [
@@ -377,11 +451,14 @@ describe('dockerRuntime', () => {
       'ghcr.io/outro/site-builder:1.4.0',
       'ghcr.io/orakel-ai-content/site-builder',
       'ghcr.io/orakel-ai-content/site-builder@sha256:abc',
+      'ghcr.io/orakel-ai-content/infra-runner:1.0.0',
       'alpine:3',
     ])('recusa %s sem chamar o Docker', async (image) => {
       const { fn, calls } = fakeFetch({});
       await expect(
-        dockerRuntime({ host, siteBuilderImage, fetch: fn }).startService(service(image)),
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).startService(
+          service(image),
+        ),
       ).rejects.toThrow(/serviço recusado/);
       expect(calls).toEqual([]);
     });
@@ -389,7 +466,7 @@ describe('dockerRuntime', () => {
     it('recusa serviço sem rede sem chamar o Docker', async () => {
       const { fn, calls } = fakeFetch({});
       await expect(
-        dockerRuntime({ host, siteBuilderImage, fetch: fn }).startService({
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).startService({
           ...service(),
           networks: [],
         }),
@@ -406,7 +483,12 @@ describe('dockerRuntime', () => {
           ),
         ],
       });
-      const start = dockerRuntime({ host, siteBuilderImage, fetch: fn }).startService(service());
+      const start = dockerRuntime({
+        host,
+        siteBuilderImage,
+        infraRunnerImage,
+        fetch: fn,
+      }).startService(service());
       await expect(start).rejects.toBeInstanceOf(RuntimeError);
       await expect(start).rejects.toThrow(/too new/);
     });
@@ -422,9 +504,9 @@ describe('dockerRuntime', () => {
       [{ Running: true }, 'unhealthy'],
     ])('estado %j → %s', async (state, expected) => {
       const { fn, calls } = fakeFetch({ 'GET /containers/svc/json': [json({ State: state })] });
-      expect(await dockerRuntime({ host, siteBuilderImage, fetch: fn }).health('svc')).toBe(
-        expected,
-      );
+      expect(
+        await dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).health('svc'),
+      ).toBe(expected);
       expect(calls.map((c) => [c.method, c.url])).toEqual([
         ['GET', 'http://docker-socket-proxy:2375/containers/svc/json'],
       ]);
@@ -434,9 +516,9 @@ describe('dockerRuntime', () => {
       const { fn } = fakeFetch({
         'GET /containers/svc/json': [json({ message: 'No such container' }, 404)],
       });
-      expect(await dockerRuntime({ host, siteBuilderImage, fetch: fn }).health('svc')).toBe(
-        'absent',
-      );
+      expect(
+        await dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).health('svc'),
+      ).toBe('absent');
     });
 
     it('recusa do proxy vira RuntimeError', async () => {
@@ -444,7 +526,7 @@ describe('dockerRuntime', () => {
         'GET /containers/svc/json': [new Response('Forbidden', { status: 403 })],
       });
       await expect(
-        dockerRuntime({ host, siteBuilderImage, fetch: fn }).health('svc'),
+        dockerRuntime({ host, siteBuilderImage, infraRunnerImage, fetch: fn }).health('svc'),
       ).rejects.toBeInstanceOf(RuntimeError);
     });
   });
