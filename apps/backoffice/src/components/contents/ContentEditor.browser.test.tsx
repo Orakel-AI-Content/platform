@@ -258,13 +258,15 @@ describe('salvar sem alteração (#525)', () => {
   });
 });
 
-describe('correção na revisão (#751)', () => {
+describe('correção na revisão (#751), no passo Ajustes (#767)', () => {
   const REVIEW = '/sites/exemplo-a/revisao/7';
+  // Salvar volta à revisão no passo Ajustes: a página remonta o painel na versão nova.
+  const AFTER_SAVE = `${REVIEW}?passo=ajustes`;
   const save = () => page.getByRole('button', { name: 'Salvar correção', exact: true });
   const title = () => page.getByRole('textbox', { name: 'Título', exact: true });
 
   async function renderAmend(respond: (input: ContentEdit) => Promise<ContentFormResult>) {
-    navigation.set(`${REVIEW}/corrigir`);
+    navigation.set(REVIEW);
     const action = vi.fn(respond);
     await renderInApp(
       <ContentEditor
@@ -274,7 +276,7 @@ describe('correção na revisão (#751)', () => {
         defaultValues={defaultValues}
         options={options}
         action={action}
-        backHref={REVIEW}
+        backHref={AFTER_SAVE}
       />,
     );
     return action;
@@ -294,7 +296,7 @@ describe('correção na revisão (#751)', () => {
     await expect.element(page.getByLabelText('Tipo', { exact: true })).not.toBeInTheDocument();
   });
 
-  it('salvar pelo teclado envia a correção e volta à revisão', async () => {
+  it('salvar pelo teclado envia a correção e volta à revisão, no passo Ajustes', async () => {
     const action = await renderAmend(() =>
       Promise.resolve({ ok: true, message: 'Correção salva na versão 3.', id: 7 }),
     );
@@ -303,7 +305,7 @@ describe('correção na revisão (#751)', () => {
     await userEvent.keyboard('{Enter}');
     await expect.poll(() => action.mock.calls.length).toBe(1);
     expect(action.mock.calls[0]?.[0].title).toBe('Artigo longo!');
-    await expect.poll(() => navigation.get()).toBe(REVIEW);
+    await expect.poll(() => navigation.get()).toBe(AFTER_SAVE);
   });
 
   it('recusa do domínio fica no editor, com o motivo no resumo', async () => {
@@ -317,7 +319,7 @@ describe('correção na revisão (#751)', () => {
     await userEvent.type(title(), '!');
     await userEvent.click(save());
     await expect.element(page.getByText('A versão 2 não está em revisão')).toBeVisible();
-    expect(navigation.get()).toBe(`${REVIEW}/corrigir`);
+    expect(navigation.get()).toBe(REVIEW);
   });
 });
 
