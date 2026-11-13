@@ -39,7 +39,8 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueEntr
       accessorKey: 'title',
       meta: { fluid: true },
       sortFn: byText((item) => item.title),
-      // A marca "Devolvido" fica fora do link: o nome acessível continua o título (#772).
+      // A marca fica fora do link: o nome acessível continua o título (#772). A versão da
+      // correção automática também voltou da devolução, mas leva a marca mais específica (#804).
       cell: ({ row }) => (
         <span className="flex min-w-0 items-center gap-2">
           <Link
@@ -49,10 +50,16 @@ function columnsFor(siteId: string, timeZone: string): ColumnDef<ReviewQueueEntr
             <Truncated text={row.original.title} />
             <span className="sr-only"> (revisar)</span>
           </Link>
-          {row.original.returned && (
-            <StateTag color="bg-warning" className="shrink-0">
-              Devolvido
+          {row.original.autoCorrected ? (
+            <StateTag color="bg-info" className="shrink-0">
+              Correção automática
             </StateTag>
+          ) : (
+            row.original.returned && (
+              <StateTag color="bg-warning" className="shrink-0">
+                Devolvido
+              </StateTag>
+            )
           )}
         </span>
       ),
