@@ -20,6 +20,7 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 // "Devolver ao editor" (#598) tem cartão próprio, com o comentário obrigatório. Em passos (#766):
 // Checagens, Ajustes, Leitura (o checklist) e Decisão (as aprovações e a devolução), todos
 // montados e os inativos com `hidden`; o passo vem da prop `step` e a troca vai a `?passo=`.
+// Ajustes (#767) mostra o editor da correção que a página monta, ou por que não há correção.
 // "O que mudou" (#768) fica em Checagens, abaixo das checagens, só quando a página o passa.
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
