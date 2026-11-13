@@ -14,9 +14,14 @@ import { createEditorialContext } from '../../src/domain/generation/editorial-co
 import { FIXTURE_INVALID_TOPIC } from '../../src/domain/generation/fixture.ts';
 import { resolveModel, type GenerationSettings } from '../../src/domain/generation/generate.ts';
 import {
+  CORRECT_ARTICLE_TASK,
+  enqueueCorrection,
   enqueueGeneration,
+  finishRun,
   GENERATE_ARTICLE_TASK,
   listGenerationRuns,
+  pendingRun,
+  scheduleCorrection,
   type GenerationRequest,
 } from '../../src/domain/generation/runs.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
@@ -396,5 +401,137 @@ describe('task generate-article (fixture)', () => {
     expect(modelCalls).toBe(0);
     expect(fetch).not.toHaveBeenCalled();
     expect(await runRow(runId)).toEqual(first);
+  });
+});
+
+describe('execuções de correção (#798)', () => {
+  /** Revisão `devolvido` da primeira versão de um conteúdo do site, gravada direto. */
+  async function returned(): Promise<{ contentId: number; version: number; reviewId: number }> {
+    const [base] = await db
+      .select({ contentId: contentVersions.contentId, version: contentVersions.version })
+      .from(contentVersions)
+      .where(eq(contentVersions.siteId, SITE))
+      .limit(1);
+    if (base === undefined) throw new Error('fixture sem versão');
+    const [review] = await db
+      .insert(reviews)
+      .values({
+        siteId: SITE,
+        ...base,
+        reviewer: revisor.email,
+        checklist: [],
+        decision: 'devolvido',
+        comment: 'Corrija.',
+      })
+      .returning({ id: reviews.id });
+    if (review === undefined) throw new Error('INSERT em reviews não devolveu o id');
+    return { ...base, reviewId: review.id };
+  }
+
+  async function correction(): Promise<{ runId: number; contentId: number; reviewId: number }> {
+    const { contentId, version, reviewId } = await returned();
+    const { runId } = await db.transaction((tx) =>
+      enqueueCorrection(tx, {
+        siteId: SITE,
+        contentId,
+        baseVersion: version,
+        reviewId,
+        createdBy: revisor.email,
+      }),
+    );
+    return { runId, contentId, reviewId };
+  }
+
+  /** Nome da restrição que o banco violou ao gravar. */
+  async function violated(write: Promise<unknown>): Promise<string | undefined> {
+    try {
+      await write;
+    } catch (error) {
+      const cause = (error as { cause?: { constraint?: string } }).cause;
+      return cause?.constraint;
+    }
+    return undefined;
+  }
+
+  it('o banco recusa uma geracao sem tema ou autor', async () => {
+    const version = await withContext();
+    const base = { siteId: SITE, editorialContextVersion: version, createdBy: editor.email };
+
+    expect(await violated(db.insert(generationRuns).values({ ...base, authorId }))).toBe(
+      'generation_runs_geracao_check',
+    );
+    expect(await violated(db.insert(generationRuns).values({ ...base, topic: 'Tema' }))).toBe(
+      'generation_runs_geracao_check',
+    );
+    expect(await db.select().from(generationRuns)).toEqual([]);
+  });
+
+  it('o banco recusa uma correcao sem conteúdo, versão-base ou revisão', async () => {
+    const { contentId, version, reviewId } = await returned();
+    const full = {
+      kind: 'correcao' as const,
+      siteId: SITE,
+      contentId,
+      baseVersion: version,
+      reviewId,
+      createdBy: revisor.email,
+    };
+
+    for (const missing of ['contentId', 'baseVersion', 'reviewId'] as const) {
+      expect(await violated(db.insert(generationRuns).values({ ...full, [missing]: null }))).toBe(
+        'generation_runs_correcao_check',
+      );
+    }
+    expect(await violated(db.insert(generationRuns).values({ ...full, topic: 'Tema' }))).toBe(
+      'generation_runs_correcao_check',
+    );
+    expect(await db.select().from(generationRuns)).toEqual([]);
+  });
+
+  it('pendingRun e a lista do site ignoram a correcao', async () => {
+    const { runId } = await correction();
+
+    expect(await pendingRun(db, runId)).toBeUndefined();
+    expect(await listGenerationRuns(db, editor, SITE)).toEqual({ ok: true, value: [] });
+  });
+
+  it('finishRun com falha mantém o conteúdo da correcao', async () => {
+    const { runId, contentId } = await correction();
+    const issues = [{ code: 'generation.failed', message: 'falhou', path: [] }];
+
+    expect(await finishRun(db, runId, { status: 'falha', issues, call: null })).toBe(true);
+
+    expect(await runRow(runId)).toMatchObject({ status: 'falha', contentId, error: issues });
+  });
+
+  it('repetir o enfileiramento para a mesma revisão não empilha jobs, nem com o job rodando', async () => {
+    const { runId, reviewId } = await correction();
+
+    await db.transaction((tx) => scheduleCorrection(tx, runId, reviewId));
+    // Job travado, como pelo worker: o modo `replace` criaria um segundo.
+    await db.execute(
+      sql`update graphile_worker._private_jobs set locked_at = now(), locked_by = 'teste'`,
+    );
+    await db.transaction((tx) => scheduleCorrection(tx, runId, reviewId));
+
+    const result = await db.execute(sql`
+      select j.payload, j.max_attempts, j.key
+      from graphile_worker._private_jobs j
+      join graphile_worker._private_tasks t on t.id = j.task_id
+      where t.identifier = ${CORRECT_ARTICLE_TASK}`);
+    expect(result.rows).toEqual([
+      { payload: { runId }, max_attempts: 1, key: `${CORRECT_ARTICLE_TASK}:${String(reviewId)}` },
+    ]);
+  });
+
+  it('a correcao grava a versão vigente do contexto editorial, se houver', async () => {
+    const version = await withContext();
+
+    const { runId } = await correction();
+
+    expect(await runRow(runId)).toMatchObject({
+      kind: 'correcao',
+      editorialContextVersion: version,
+    });
   });
 });

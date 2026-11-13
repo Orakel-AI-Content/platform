@@ -47,14 +47,14 @@ export function resolveModel(id: string, apiKey?: string): ResolvedModel {
 }
 
 /** Tipos de bloco que o gerador produz; `image` fica fora (exige mídia já cadastrada). */
-const GENERATED_BLOCKS = {
+export const GENERATED_BLOCKS = {
   text: TextBlockSchema.omit({ n: true }),
   toc: TocBlockSchema.omit({ n: true }),
   quote: QuoteBlockSchema.omit({ n: true }),
   faq: FaqBlockSchema.omit({ n: true }),
 } as const;
 
-type GeneratedBlockType = keyof typeof GENERATED_BLOCKS;
+export type GeneratedBlockType = keyof typeof GENERATED_BLOCKS;
 
 /** Os tipos de `resources.blockTypes` que o gerador sabe produzir, na ordem dos recursos. */
 export function generatedBlockTypes(resources: Resources): GeneratedBlockType[] {
@@ -118,7 +118,7 @@ export type GenerationResult = {
   durationMs: number;
 } & ({ ok: true; content: GeneratedContent } | { ok: false; issues: Issue[] });
 
-const MAX_OUTPUT_TOKENS = 16_000;
+export const MAX_OUTPUT_TOKENS = 16_000;
 
 export function buildPrompt(
   input: GenerationInput,
@@ -151,12 +151,14 @@ export function buildPrompt(
   return { system, user };
 }
 
-function tokens(usage: { inputTokens?: number; outputTokens?: number } | undefined): TokenUsage {
+export function tokens(
+  usage: { inputTokens?: number; outputTokens?: number } | undefined,
+): TokenUsage {
   return { inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0 };
 }
 
 /** Issues `schema.*` do Zod na cadeia de causas do erro do SDK, ou um issue genérico. */
-function outputIssues(error: NoObjectGeneratedError): Issue[] {
+export function outputIssues(error: NoObjectGeneratedError): Issue[] {
   let cause: unknown = error.cause;
   for (let depth = 0; depth < 4 && cause !== undefined; depth++) {
     if (cause instanceof z.ZodError) {

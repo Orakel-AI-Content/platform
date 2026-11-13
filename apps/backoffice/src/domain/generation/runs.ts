@@ -14,9 +14,10 @@ import { resourcesFor, siteExists } from '../sites/sites.ts';
 import { currentEditorialContext } from './editorial-contexts.ts';
 import type { GenerationInput, GenerationResult } from './generate.ts';
 
-// Execuções da geração básica (RN-CON-10, R5): o disparo cria a execução e o job na mesma
-// transação; a task `generate-article` lê os insumos daqui e grava o desfecho. A criação do
-// artigo não passa por aqui: a task usa a rota interna (contrato motor → Backoffice).
+// Execuções que chamam o modelo (RN-CON-10, R5): a geração básica (`geracao`) e a correção
+// automática pedida na devolução (`correcao`, ADR 0023). O disparo cria a execução e o job na
+// mesma transação; a task lê os insumos daqui e grava o desfecho. A gravação do artigo não
+// passa por aqui: a task usa a rota interna (contrato motor → Backoffice).
 
 /** Task do backoffice-worker que gera um artigo, uma vez (sem nova tentativa: R4). */
 export const GENERATE_ARTICLE_TASK = 'generate-article';
@@ -24,6 +25,24 @@ export const GENERATE_ARTICLE_TASK = 'generate-article';
 export type GenerateArticlePayload = { runId: number };
 
 export type GenerationRequest = { topic: string; authorId: number };
+
+/**
+ * Task do backoffice-worker que corrige a versão devolvida, uma vez por devolução: a exceção
+ * à R4 da ADR 0019 (ADR 0023) é essa tentativa automática, nunca uma retentativa.
+ */
+export const CORRECT_ARTICLE_TASK = 'correct-article';
+
+export type CorrectArticlePayload = { runId: number };
+
+/** O que a devolução registra para a correção: a versão devolvida e a revisão que a pediu. */
+export type CorrectionRequest = {
+  siteId: string;
+  contentId: number;
+  baseVersion: number;
+  reviewId: number;
+  /** E-mail de quem devolveu. */
+  createdBy: string;
+};
 
 const refused = (code: string, message: string, path: string[] = []): Result<never> => ({
   ok: false,
@@ -92,6 +111,55 @@ export async function enqueueGeneration(
   return { ok: true, value: { runId: run.id } };
 }
 
+/**
+ * Pede a correção automática da versão devolvida (ADR 0023): grava a execução `correcao`
+ * `pendente`, com o contexto editorial vigente se houver, e enfileira `correct-article`, tudo
+ * em `tx`. Sem checagem de permissão nem da versão: quem chama é `returnVersion`, que já fez
+ * as duas na mesma transação.
+ */
+export async function enqueueCorrection(
+  tx: Executor,
+  request: CorrectionRequest,
+): Promise<{ runId: number }> {
+  const context = await currentEditorialContext(tx, request.siteId);
+  const [run] = await tx
+    .insert(generationRuns)
+    .values({
+      kind: 'correcao',
+      siteId: request.siteId,
+      contentId: request.contentId,
+      baseVersion: request.baseVersion,
+      reviewId: request.reviewId,
+      editorialContextVersion: context?.version ?? null,
+      createdBy: request.createdBy,
+    })
+    .returning({ id: generationRuns.id });
+  if (run === undefined) throw new Error('INSERT em generation_runs não devolveu o id');
+  await scheduleCorrection(tx, run.id, request.reviewId);
+  return { runId: run.id };
+}
+
+/**
+ * Enfileira `correct-article` com `max_attempts => 1` e `job_key` pela revisão. Com
+ * `unsafe_dedupe`, um pedido repetido para a mesma revisão não cria outro job, nem com o
+ * primeiro já rodando (o `replace` padrão criaria: seria uma segunda tentativa).
+ */
+export async function scheduleCorrection(
+  tx: Executor,
+  runId: number,
+  reviewId: number,
+): Promise<void> {
+  const payload: CorrectArticlePayload = { runId };
+  await tx.execute(sql`
+    select graphile_worker.add_job(
+      identifier => ${CORRECT_ARTICLE_TASK},
+      payload => ${JSON.stringify(payload)}::json,
+      max_attempts => 1,
+      job_key => ${`${CORRECT_ARTICLE_TASK}:${reviewId}`},
+      job_key_mode => 'unsafe_dedupe'
+    )`);
+}
+
 /** Uma execução na lista do site: o que a operação acompanha (custo, tokens, duração). */
 export type GenerationRunSummary = {
   id: number;
@@ -110,8 +178,9 @@ export type GenerationRunSummary = {
 };
 
 /**
- * Execuções do site, da mais recente para a primeira (índice `generation_runs_site_created_idx`).
- * Ler exige site.read; o prompt e o erro completo ficam de fora (não há tela de detalhe).
+ * Execuções de geração do site, da mais recente para a primeira (índice
+ * `generation_runs_site_created_idx`); as de correção ficam de fora por enquanto. Ler exige
+ * site.read; o prompt e o erro completo ficam de fora (não há tela de detalhe).
  */
 export async function listGenerationRuns(
   db: Executor,
@@ -124,7 +193,8 @@ export async function listGenerationRuns(
     .select({
       id: generationRuns.id,
       createdAt: generationRuns.createdAt,
-      topic: generationRuns.topic,
+      // O CHECK `generation_runs_geracao_check` garante o tema na `geracao`.
+      topic: sql<string>`${generationRuns.topic}`,
       status: generationRuns.status,
       provider: generationRuns.provider,
       model: generationRuns.model,
@@ -135,7 +205,7 @@ export async function listGenerationRuns(
       contentId: generationRuns.contentId,
     })
     .from(generationRuns)
-    .where(eq(generationRuns.siteId, siteId))
+    .where(and(eq(generationRuns.siteId, siteId), eq(generationRuns.kind, 'geracao')))
     .orderBy(desc(generationRuns.createdAt), desc(generationRuns.id));
   return { ok: true, value: rows };
 }
@@ -205,7 +275,8 @@ export type RunOutcome = { call: GenerationCall | null } & (
 
 /**
  * Grava o desfecho da execução `pendente`, uma vez: devolve `false` se ela não existe ou já
- * terminou (nada é sobrescrito).
+ * terminou (nada é sobrescrito). O `contentId` só muda no `ok`: na `falha` fica o que havia,
+ * nulo na `geracao` e o conteúdo corrigido na `correcao`.
  */
 export async function finishRun(
   db: Executor,
@@ -218,7 +289,7 @@ export async function finishRun(
     .update(generationRuns)
     .set({
       status: outcome.status,
-      contentId: outcome.status === 'ok' ? outcome.contentId : null,
+      ...(outcome.status === 'ok' ? { contentId: outcome.contentId } : {}),
       error: outcome.status === 'falha' ? outcome.issues : null,
       prompt: call?.prompt ?? null,
       provider: call?.provider ?? null,
