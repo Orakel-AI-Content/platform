@@ -1,5 +1,6 @@
-# Zona do site e configurações da seção 3.1 dos requisitos. O domínio raiz e o www não têm
-# registro aqui: o domínio personalizado do Worker é do wrangler (ADR 0027).
+# Zona do site e configurações da seção 3.1 dos requisitos. O domínio raiz não tem registro
+# aqui: o domínio personalizado do Worker é do wrangler (ADR 0027). O www só tem o registro do
+# redirect (rules.tf).
 resource "cloudflare_zone" "site" {
   account = {
     id = var.account_id

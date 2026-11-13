@@ -1,7 +1,7 @@
 # infra/site
 
-A raiz OpenTofu de **um site** cria a zona, as configurações, o DNS e o e-mail desse site
-(ADR 0027). Ela usa o módulo `../modules/site`. Cada site tem o seu próprio estado,
+A raiz OpenTofu de **um site** cria a zona, as configurações, o DNS, o e-mail, as regras da
+zona e o bucket de mídia desse site (ADR 0027). Ela usa o módulo `../modules/site`. Cada site tem o seu próprio estado,
 `sites/<SITE_ID>.tfstate`, no bucket `tofu-state` do R2. O estado e o plano são cifrados.
 
 Quem roda o `plan` e o `apply` é o build-runner, na VPS, pela imagem `infra-runner`
@@ -29,6 +29,15 @@ também para rodar à mão, a partir de uma máquina com o IP liberado no token.
    | Zone    | DNS                           | Edit   |
    | Zone    | Email Routing Rules           | Edit   |
    | Zone    | Cache Settings (Tiered Cache) | Edit   |
+   | Zone    | Cache Rules                   | Edit   |
+   | Zone    | Dynamic URL Redirects         | Edit   |
+   | Zone    | Zone WAF                      | Edit   |
+   | Zone    | Bot Management                | Edit   |
+   | Account | Workers R2 Storage            | Edit   |
+
+   As regras da zona (redirect do `www`, rate limiting, WAF e cache da mídia) são _rulesets_,
+   um por fase. O R2 é recurso da conta: o token cria o bucket `media-<SITE_ID>` e o domínio
+   `media.<domínio>`.
 
    A criação de zona também exige **Account → Zone → Edit**. Se o painel separar as duas,
    dê as duas.
@@ -79,6 +88,21 @@ No `apply` à mão, o Crawler Hints não é ligado: siga o passo 2 acima.
 Por padrão, só `contato@<domínio>` é encaminhado. Para outros endereços, passe
 `-var 'email_aliases=["contato","imprensa"]'`. Qualquer outro endereço é descartado.
 
+## O que o módulo cria além da zona e do e-mail
+
+- **`www`**: um registro `AAAA 100::` com proxy e uma regra que redireciona (301) para o
+  domínio raiz, com caminho e query. O domínio raiz é do `wrangler`.
+- **Rate limiting** em `/_e/*`: a única regra do plano Free, 10 s por IP e por data center.
+  O limiar é `events_rate_limit_requests` (padrão 200).
+- **WAF**: uma regra que bloqueia os user-agents de `training_crawler_user_agents`, os crawlers
+  de treinamento de `packages/core/src/crawlers.ts` sem os tokens `-Extended`. Revise as duas
+  listas juntas a cada trimestre.
+- **Bot management**: Bot Fight Mode e `robots.txt` gerenciado desligados, bloqueio de
+  crawlers de IA da Cloudflare ligado (ADR-026).
+- **Mídia**: bucket `media-<SITE_ID>` com `prevent_destroy`, domínio `media.<domínio>`
+  (TLS 1.2), `r2.dev` desligado e cache de borda de um ano para esse host. Para remover um
+  site, esvazie o bucket e retire o `prevent_destroy` antes do `destroy`.
+
 ## A validar no primeiro `apply` real
 
 - O Crawler Hints pela rota de flags com o token de infra. Se o `infra-apply.json` trouxer
@@ -87,6 +111,11 @@ Por padrão, só `contato@<domínio>` é encaminhado. Para outros endereços, pa
 - O SPF do módulo (`v=spf1 include:_spf.mx.cloudflare.net -all`) ao lado do registro que o
   Email Routing cria ao ser ligado. Se surgir um segundo SPF, remova o da Cloudflare e mantenha
   o do módulo.
+- Que o plano Free aceita a regra de rate limiting como declarada (campos, `wildcard` e
+  `mitigation_timeout` de 10 s) e a regra do WAF com `lower()`.
+- Que o bloqueio de crawlers de IA da Cloudflare não atinge os bots de busca por IA que a P10
+  libera (`PerplexityBot`, `OAI-SearchBot` e os demais `ai-search`).
+- Que o cookie `__cf_bm` não é gravado e que o rate limiting não atinge leitores reais.
 
 ## CI
 
