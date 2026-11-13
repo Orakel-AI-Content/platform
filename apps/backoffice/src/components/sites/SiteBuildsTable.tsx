@@ -20,8 +20,8 @@ import { type FailedExecution, SiteExecutionDrawer } from './SiteExecutionDrawer
 import { StateTag } from './SiteStatus.tsx';
 
 /**
- * Resultado de uma execução da infra (#826): o motivo da falha, os nameservers da zona criada
- * ou, na reaplicação concluída (workspace#98), que a infra ficou em dia.
+ * Resultado de uma execução de infra: o motivo da falha, os nameservers da zona criada ou, na
+ * reaplicação concluída (workspace#98), que a infra ficou em dia.
  */
 function infraResult(item: SiteHistoryItem): string | null {
   if (item.type !== 'infra') return null;
@@ -65,9 +65,10 @@ function version(item: SiteHistoryItem): string | null {
  * nas execuções), quem (no cancelamento, quem cancelou), quando no fuso do site e a versão. O
  * marcador é decorativo, na cor do status. O item de uma falha tem o botão "Ver detalhe", que
  * abre o `SiteExecutionDrawer`; o item em si não é clicável, e o foco volta ao botão quando o
- * painel fecha. A execução da infraestrutura (#826) tem o tipo no título e diz, abaixo, o motivo
- * da falha (a etapa vai no título), os nameservers a configurar no registrador ou, na
- * reaplicação concluída, que a infra ficou em dia. Sem itens, o `EmptyState`. O título
+ * painel fecha. A criação (#826), a remoção (workspace#97) e a reaplicação (workspace#98) da
+ * infraestrutura têm o título pelo tipo e dizem, abaixo, o motivo da falha (a etapa vai no
+ * título), na criação os nameservers a configurar no registrador e, na reaplicação concluída,
+ * que a infra ficou em dia. Sem itens, o `EmptyState`. O título
  * "Histórico" fica acima, no
  * `SiteLiveActivity`.
  */

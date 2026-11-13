@@ -303,16 +303,57 @@ describe('SiteLiveActivity na criação da infraestrutura (#826)', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it('a remoção aplicando não entra na faixa', () => {
-    renderLive(idle({ openInfra: { ...applying, kind: 'remover' } }));
-
-    expect(region().textContent).toBe('');
-  });
-
   it('sem criação acompanhada, uma já terminada no histórico não mostra faixa nem relê', () => {
     renderLive(idle({ history: [closed({}), PAUSE] }));
 
     expect(region().textContent).toBe('');
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  describe('remoção (workspace#97)', () => {
+    const removing: OpenInfraRun = { ...applying, id: 5, kind: 'remover', currentStep: 'paginas' };
+    const removed = (over: Partial<InfraHistoryItem>) =>
+      closed({ id: 5, kind: 'remover', nameservers: null, ...over });
+
+    it('acompanha as etapas da remoção até concluir e relê a página no fim', async () => {
+      status
+        .mockResolvedValueOnce(idle({ openInfra: { ...removing, currentStep: 'imagens' } }))
+        .mockResolvedValueOnce(idle({ history: [removed({}), PAUSE] }));
+      renderLive(idle({ openInfra: removing }));
+
+      expect(region().textContent).toBe(
+        'Remoção da infraestrutura em andamento, etapa: Páginas do site',
+      );
+      await tick();
+      expect(region().textContent).toBe(
+        'Remoção da infraestrutura em andamento, etapa: Armazenamento de imagens',
+      );
+      expect(refresh).not.toHaveBeenCalled();
+      await tick();
+      expect(region().textContent).toBe(
+        'Remoção da infraestrutura concluída em 11/10/2026, 14:05 BRT',
+      );
+      expect(refresh).toHaveBeenCalledTimes(1);
+      await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 10));
+      expect(status).toHaveBeenCalledTimes(2);
+    });
+
+    it('na falha da remoção, a faixa diz a etapa e o motivo', async () => {
+      status.mockResolvedValue(
+        idle({
+          history: [
+            removed({ status: 'falhou', failure: { step: 'regras', message: 'Falha simulada' } }),
+            PAUSE,
+          ],
+        }),
+      );
+      renderLive(idle({ openInfra: { ...removing, currentStep: 'regras' } }));
+
+      await tick();
+      expect(region().textContent).toBe(
+        'Remoção da infraestrutura falhou na etapa Regras em 11/10/2026, 14:05 BRT: Falha simulada',
+      );
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
   });
 });

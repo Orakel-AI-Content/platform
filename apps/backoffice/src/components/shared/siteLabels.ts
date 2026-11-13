@@ -157,6 +157,14 @@ export const INFRA_RUN_KIND_LABEL = {
 } as const satisfies Record<InfraRunKind, string>;
 
 /**
+ * Uma execução de infra (`infra_runs`) pelo tipo, no histórico e na faixa ao vivo: a criação, a
+ * remoção (workspace#97) e a reaplicação (workspace#98).
+ */
+export function infraRunLabel(kind: InfraRunKind): string {
+  return INFRA_RUN_KIND_LABEL[kind];
+}
+
+/**
  * Etapas do módulo na criação da infraestrutura (`INFRA_RESOURCE_STEPS`), na mesma ordem, nos termos de quem opera
  * (#825): o resumo do plano e o andamento listam nesta ordem.
  */
@@ -245,11 +253,21 @@ export function latestInfraCreation(
 }
 
 /**
- * Faixa ao vivo da execução aplicando (#826; a reaplicação, workspace#98): o tipo e a etapa
+ * A remoção da infraestrutura mais recente do histórico (workspace#97), que decide "Tentar de
+ * novo" da remoção; `undefined` se o site nunca teve uma.
+ */
+export function latestInfraRemoval(
+  history: readonly SiteHistoryItem[],
+): InfraHistoryItem | undefined {
+  return latestInfraRun(history, 'remover');
+}
+
+/**
+ * Faixa ao vivo da execução aplicando (criação, remoção ou reaplicação): o tipo e a etapa
  * corrente, quando já há uma.
  */
 export function infraLiveStatusText(open: Pick<OpenInfraRun, 'kind' | 'currentStep'>): string {
-  const label = INFRA_RUN_KIND_LABEL[open.kind];
+  const label = infraRunLabel(open.kind);
   return open.currentStep === null
     ? `${label} em andamento`
     : `${label} em andamento, etapa: ${infraRunStepLabel(open.currentStep)}`;
@@ -266,12 +284,12 @@ export function infraFailureText(failure: NonNullable<InfraHistoryItem['failure'
 }
 
 /**
- * Faixa quando a execução acompanhada termina (#826): o tipo, concluída, ou a etapa e o motivo
- * da falha.
+ * Faixa quando a execução acompanhada termina: o tipo, concluída, ou a etapa e o motivo da
+ * falha.
  */
 export function infraLiveResultText(item: InfraHistoryItem, timeZone: string): string {
-  const label = INFRA_RUN_KIND_LABEL[item.kind];
   const at = formatDateTime(item.at, timeZone);
+  const label = infraRunLabel(item.kind);
   if (item.status === 'ok') return `${label} concluída em ${at}`;
   const { step, message } = item.failure ?? { step: null, message: null };
   const text = `${label} ${infraFailedText(step)} em ${at}`;
@@ -291,7 +309,7 @@ export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {
  */
 export function historyItemTitle(item: SiteHistoryItem): string {
   if (item.type === 'infra') {
-    const label = INFRA_RUN_KIND_LABEL[item.kind];
+    const label = infraRunLabel(item.kind);
     return item.status === 'falhou'
       ? `${label} · ${infraFailedText(item.failure?.step ?? null)}`
       : label;

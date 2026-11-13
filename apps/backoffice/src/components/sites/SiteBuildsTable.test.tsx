@@ -208,6 +208,55 @@ describe('SiteBuildsTable', () => {
     expect(failed?.textContent).toContain('Motivo: Falha simulada');
   });
 
+  it('a remoção da infra (workspace#97) sai distinta da criação, com quem pediu, quando e o resultado', () => {
+    const run = (over: Partial<InfraHistoryItem>): InfraHistoryItem => ({
+      type: 'infra',
+      id: 3,
+      kind: 'remover',
+      status: 'ok',
+      requestedBy: 'admin@orakel.local',
+      requestedAt: new Date('2026-10-12T16:58:00Z'),
+      confirmedBy: 'admin@orakel.local',
+      at: new Date('2026-10-12T17:05:00Z'),
+      nameservers: null,
+      failure: null,
+      ...over,
+    });
+    render(
+      <SiteBuildsTable
+        history={[
+          run({}),
+          run({
+            id: 2,
+            status: 'falhou',
+            at: new Date('2026-10-12T16:50:00Z'),
+            failure: { step: 'paginas', message: 'Worker não removido' },
+          }),
+          run({
+            id: 1,
+            kind: 'criar',
+            requestedBy: 'operacao@orakel.local',
+            at: new Date('2026-10-11T17:05:00Z'),
+            nameservers: ['ada.ns.example'],
+          }),
+        ]}
+        timeZone="America/Sao_Paulo"
+      />,
+      { container: app },
+    );
+
+    const [removed, failed, created] = screen.getAllByRole('listitem');
+    expect(removed?.textContent).toContain('Remoção da infraestrutura');
+    expect(removed?.textContent).toContain('admin@orakel.local · 12/10/2026, 14:05 BRT');
+    expect(removed?.textContent).not.toContain('Nameservers');
+    expect(failed?.textContent).toContain(
+      'Remoção da infraestrutura · falhou na etapa Páginas do site',
+    );
+    expect(failed?.textContent).toContain('Motivo: Worker não removido');
+    expect(created?.textContent).toContain('Criação da infraestrutura');
+    expect(created?.textContent).toContain('operacao@orakel.local');
+  });
+
   it('a reaplicação da infra diz quem pediu, quando e o resultado (workspace#98)', () => {
     const reapply = (over: Partial<InfraHistoryItem>): InfraHistoryItem => ({
       type: 'infra',
