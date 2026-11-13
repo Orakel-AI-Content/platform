@@ -11,7 +11,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/p
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { ARCHIVE_LAYOUT } from '@orakel/build-contract';
+import { ARCHIVE_LAYOUT, workerName } from '@orakel/build-contract';
 
 const run = promisify(execFile);
 const SITE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -117,7 +117,7 @@ export class Store {
     } catch {
       throw new StoreError(`${ARCHIVE_LAYOUT.config} não é JSON`, 400);
     }
-    if (config.name !== `orakel-${site}`) {
+    if (config.name !== workerName(site)) {
       throw new StoreError(
         `${ARCHIVE_LAYOUT.config} é de outro Worker: ${String(config.name)}`,
         400,

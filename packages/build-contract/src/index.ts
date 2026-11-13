@@ -139,6 +139,14 @@ export const ARCHIVE_LAYOUT = {
   config: 'wrangler.jsonc',
 } as const;
 
+/**
+ * Nome do Worker do site, o mesmo nos dois alvos: o `name` do wrangler.jsonc gerado, o do
+ * `wrangler rollback`, o que o edge-local confere no publish e o script que a remoção apaga.
+ */
+export function workerName(site: string): string {
+  return `orakel-${site}`;
+}
+
 /** Resposta do `PUT /sites/{site}/versions` do edge-local (12.0, L3). */
 export const EdgeLocalVersionSchema = z.object({ id: z.string().min(1) });
 

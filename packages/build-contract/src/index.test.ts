@@ -13,6 +13,7 @@ import {
   ResultSchema,
   RollbackResultSchema,
   exitCodeOf,
+  workerName,
 } from './index.ts';
 
 const base = { formatVersion: 1, site: 'exemplo-a', release: 'local', durationMs: 1200 };
@@ -162,5 +163,11 @@ describe('códigos de saída', () => {
     expect(exitCodeOf({ status: 'ok' })).toBe(EXIT_CODES.ok);
     expect(exitCodeOf({ status: 'failed', failure: { kind: 'permanent', message: 'x' } })).toBe(10);
     expect(exitCodeOf({ status: 'failed', failure: { kind: 'transient', message: 'x' } })).toBe(20);
+  });
+});
+
+describe('workerName', () => {
+  it('é orakel-<site>', () => {
+    expect(workerName('exemplo-a')).toBe('orakel-exemplo-a');
   });
 });

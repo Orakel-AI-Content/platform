@@ -5,6 +5,7 @@
 //   ALLOW_COUNTRY_OVERRIDE nem o ae-sim.
 // - local: Worker `orakel-<site>` no edge-local; EVENTS vira service binding do ae-sim e o
 //   cabeçalho X-Test-Country é aceito (testes de região).
+import { workerName } from '@orakel/build-contract';
 import { z } from 'zod';
 
 import { parseJsonc } from './jsonc.ts';
@@ -34,10 +35,6 @@ export type TargetInput = {
 };
 
 export const AE_SIM_SERVICE = 'ae-sim';
-
-export function workerName(site: string): string {
-  return `orakel-${site}`;
-}
 
 export function readBaseConfig(text: string): BaseConfig {
   return BaseConfigSchema.parse(parseJsonc(text));
