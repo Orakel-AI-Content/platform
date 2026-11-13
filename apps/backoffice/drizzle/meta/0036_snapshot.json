@@ -1,5 +1,5 @@
 {
-  "id": "e850c7c2-6c94-4406-b72c-1b3ab17fbaf3",
+  "id": "3a381336-53dd-4bf6-a9a9-29ae7d00af91",
   "prevId": "63fc554b-b94e-4a88-84cc-7b86afd78de7",
   "version": "7",
   "dialect": "postgresql",
@@ -1802,6 +1802,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'criar'"
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -2719,30 +2726,6 @@
         },
         "infra_check_error": {
           "name": "infra_check_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "infra_drift_status": {
-          "name": "infra_drift_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "infra_drift_summary": {
-          "name": "infra_drift_summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "infra_drift_checked_at": {
-          "name": "infra_drift_checked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "infra_drift_error": {
-          "name": "infra_drift_error",
           "type": "text",
           "primaryKey": false,
           "notNull": false

@@ -257,8 +257,15 @@
     {
       "idx": 36,
       "version": "7",
-      "when": 1794596322759,
-      "tag": "0036_conferencia_da_descricao_da_infra",
+      "when": 1794595551693,
+      "tag": "0036_tipo_das_execucoes_de_infra",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794597590630,
+      "tag": "0037_conferencia_da_descricao_da_infra",
       "breakpoints": true
     }
   ]
