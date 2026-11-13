@@ -10,6 +10,8 @@ import { upsertUser } from '../../src/domain/access/users.ts';
 import {
   fakeRuntime,
   infraApplyOk,
+  infraDestroyed,
+  infraDestroyPlanOk,
   infraFailed,
   infraPlanOk,
   type FakeStage,
@@ -21,7 +23,12 @@ import {
   tofuDriver,
   type InfraDriver,
 } from '../../src/domain/infra/drivers.ts';
-import { confirmInfraRun, requestInfraRun } from '../../src/domain/infra/runs.ts';
+import {
+  confirmInfraRemoval,
+  confirmInfraRun,
+  requestInfraRemoval,
+  requestInfraRun,
+} from '../../src/domain/infra/runs.ts';
 import {
   INFRA_APPLY_TASK,
   INFRA_PLAN_TASK,
@@ -35,14 +42,17 @@ import { createInfraApplyTask } from '../../src/jobs/tasks/infra-apply.ts';
 import { createInfraPlanTask } from '../../src/jobs/tasks/infra-plan.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
-// Tasks do plano e do apply da infra do site (#824): gravam em `infra_runs` pelo domínio, com o
-// driver local e com o driver tofu sobre o runtime falso; fila e recuperação na partida.
+// Tasks do plano e do apply da infra do site (#824) e da remoção (#839): gravam em `infra_runs`
+// pelo domínio, com o driver local e com o driver tofu sobre o runtime falso; fila e recuperação
+// na partida.
 
 let db: Db;
 let close: () => Promise<void>;
 
 const operacao: Actor = { email: 'opa@orakel.local', roles: ['operacao'] };
+const admin: Actor = { email: 'adm@orakel.local', roles: ['admin'] };
 const SITE = 'exemplo-a';
+let domain = '';
 const IMAGE = 'ghcr.io/orakel-ai-content/infra-runner:abc1234';
 const SECRETS = {
   CLOUDFLARE_INFRA_TOKEN: 'segredo-infra-'.padEnd(40, 'x'),
@@ -85,8 +95,11 @@ beforeEach(async () => {
   await resetDatabase(db);
   const line = (await readFixture(SITE)).find((l) => l.type === 'config');
   if (line?.type !== 'config') throw new Error('fixture sem config');
+  domain = line.data.domains[0] ?? '';
   await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, line.data));
-  await upsertUser(db, { email: operacao.email, name: operacao.email, roles: operacao.roles });
+  for (const actor of [operacao, admin]) {
+    await upsertUser(db, { email: actor.email, name: actor.email, roles: actor.roles });
+  }
 });
 
 async function request(): Promise<number> {
@@ -399,5 +412,165 @@ describe('fila e recuperação', () => {
     // O build do cadastro e o pedido acima seguem travados pelo dono deles.
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((row) => row.locked_by === 'outro')).toBe(true);
+  });
+});
+
+describe('remoção', () => {
+  const DELETES = CHANGES.map((change) => ({ ...change, action: 'delete' }));
+
+  beforeEach(async () => {
+    await db
+      .update(sites)
+      .set({ lifecycle: 'publicado', state: 'pausado', pausedReason: 'remoção da infra' })
+      .where(eq(sites.id, SITE));
+  });
+
+  async function requestRemoval(): Promise<number> {
+    const result = await db.transaction((tx) => requestInfraRemoval(tx, admin, SITE));
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value.id;
+  }
+
+  async function confirmRemoval(runId: number): Promise<void> {
+    const result = await db.transaction((tx) => confirmInfraRemoval(tx, admin, runId, domain));
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+  }
+
+  it('o plano grava as remoções por etapa e espera a confirmação, no modo destroy', async () => {
+    const t = tofu({ infraPlan: { file: infraDestroyPlanOk(DELETES) } });
+    const runId = await requestRemoval();
+
+    await plan(t.driver, runId);
+
+    const row = await run(runId);
+    expect(row).toMatchObject({ status: 'aguardando_confirmacao', currentStep: null });
+    const summary = InfraPlanSummarySchema.parse(JSON.parse(row?.planSummary ?? ''));
+    expect(summary.steps.endereco).toEqual([DELETES[0]]);
+    expect(summary.steps.dns).toEqual([DELETES[1]]);
+    expect(summary.steps.imagens).toEqual([DELETES[2]]);
+    expect(t.started[0]?.env).toMatchObject({ INFRA_MODE: 'destroy' });
+    expect(await lifecycle()).toBe('publicado');
+  });
+
+  it('a criação não recebe o modo destroy', async () => {
+    await db.update(sites).set({ lifecycle: 'cadastrado', state: 'ativo', pausedReason: null });
+    const t = tofu({ infraPlan: { file: infraPlanOk(CHANGES) } });
+    const runId = await request();
+    await plan(t.driver, runId);
+    expect(t.started[0]?.env).not.toHaveProperty('INFRA_MODE');
+  });
+
+  it('plano de modo diferente do tipo da execução fecha a execução falhou', async () => {
+    const t = tofu({ infraPlan: { file: infraPlanOk(DELETES) } });
+    const runId = await requestRemoval();
+    await plan(t.driver, runId);
+    expect(await run(runId)).toMatchObject({
+      status: 'falhou',
+      failedStep: null,
+      failureMessage: 'infra-plan.json é de create, a execução é de remover',
+    });
+  });
+
+  it('o apply grava a etapa conforme destrói e fecha ok com o site em cadastrado', async () => {
+    const log = ['cloudflare_r2_bucket', 'cloudflare_dns_record', 'cloudflare_zone']
+      .map((type) =>
+        JSON.stringify({ type: 'apply_start', hook: { resource: { resource_type: type } } }),
+      )
+      .join('\n');
+    const t = tofu({
+      infraPlan: { file: infraDestroyPlanOk(DELETES) },
+      infraApply: { file: infraDestroyed(), log },
+    });
+    const runId = await requestRemoval();
+    await plan(t.driver, runId);
+    await confirmRemoval(runId);
+
+    const seen: (InfraStep | null | undefined)[] = [];
+    const watched: InfraDriver = {
+      ...t.driver,
+      apply: (target, onStep) =>
+        t.driver.apply(target, async (step) => {
+          await onStep(step);
+          seen.push((await run(runId))?.currentStep);
+        }),
+    };
+    await apply(watched, runId);
+
+    // O log fixo vem inteiro de uma vez: a etapa vai direto à mais adiantada da destruição.
+    expect(seen).toEqual(['endereco']);
+    expect(await run(runId)).toMatchObject({ status: 'ok', currentStep: null, nameservers: null });
+    expect(await lifecycle()).toBe('cadastrado');
+  });
+
+  it('falha no apply fecha com a etapa e o motivo, e o site não volta', async () => {
+    const log = [
+      JSON.stringify({
+        type: 'apply_start',
+        hook: { resource: { resource_type: 'cloudflare_r2_bucket' } },
+      }),
+      JSON.stringify({
+        type: 'apply_errored',
+        hook: { resource: { resource_type: 'cloudflare_r2_bucket' } },
+      }),
+    ].join('\n');
+    const t = tofu({
+      infraPlan: { file: infraDestroyPlanOk(DELETES) },
+      infraApply: { exitCode: 10, log, file: infraFailed('permanent', 'bucket não está vazio') },
+    });
+    const runId = await requestRemoval();
+    await plan(t.driver, runId);
+    await confirmRemoval(runId);
+
+    await apply(t.driver, runId);
+
+    expect(await run(runId)).toMatchObject({
+      status: 'falhou',
+      failedStep: 'imagens',
+      failureMessage: 'bucket não está vazio',
+    });
+    expect(await lifecycle()).toBe('publicado');
+  });
+
+  it('apply que falha antes do primeiro recurso fica na primeira etapa da destruição', async () => {
+    const t = tofu({
+      infraPlan: { file: infraDestroyPlanOk(DELETES) },
+      infraApply: { exitCode: 20 },
+    });
+    const runId = await requestRemoval();
+    await plan(t.driver, runId);
+    await confirmRemoval(runId);
+
+    await apply(t.driver, runId);
+
+    expect(await run(runId)).toMatchObject({ status: 'falhou', failedStep: 'imagens' });
+  });
+
+  it('no local, depois da falha forçada a nova remoção termina ok e a criação volta a planejar tudo', async () => {
+    const local = localDriver({ failStep: 'email' });
+    const first = await requestRemoval();
+    await plan(local, first);
+    await confirmRemoval(first);
+    await apply(local, first);
+    expect(await run(first)).toMatchObject({ status: 'falhou', failedStep: 'email' });
+
+    const retry = await requestRemoval();
+    await plan(local, retry);
+    await confirmRemoval(retry);
+    await apply(local, retry);
+    expect(await run(retry)).toMatchObject({ status: 'ok', nameservers: null });
+    expect(await lifecycle()).toBe('cadastrado');
+
+    await db.update(sites).set({ state: 'ativo', pausedReason: null });
+    const creation = await request();
+    await plan(local, creation);
+    const summary = InfraPlanSummarySchema.parse(
+      JSON.parse((await run(creation))?.planSummary ?? ''),
+    );
+    // A criação volta a ter todas as etapas por criar (o apply dela é coberto em drivers.test.ts:
+    // aqui a falha forçada, que vale uma vez por tipo, ainda a pararia).
+    for (const changes of Object.values(summary.steps)) {
+      expect(changes.length).toBeGreaterThan(0);
+      expect(changes.every((change) => change.action === 'create')).toBe(true);
+    }
   });
 });

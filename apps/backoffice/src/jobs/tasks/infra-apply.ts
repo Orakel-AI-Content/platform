@@ -1,12 +1,8 @@
 import type { Task } from 'graphile-worker';
 
-import {
-  INFRA_RESOURCE_STEPS,
-  type InfraResourceStep,
-  type InfraStep,
-} from '../../db/schema/index.ts';
+import type { InfraResourceStep, InfraRunKind, InfraStep } from '../../db/schema/index.ts';
 import { loadBuildTarget } from '../../domain/builds/builds.ts';
-import { InfraPlanSummarySchema } from '../../domain/infra/drivers.ts';
+import { InfraPlanSummarySchema, stepOrder } from '../../domain/infra/drivers.ts';
 import {
   finishInfraRun,
   loadInfraRun,
@@ -16,22 +12,29 @@ import {
 import { INFRA_APPLY_TASK } from '../../domain/infra/schedule.ts';
 import { infraPayloadOf, type InfraTaskDeps } from './infra-run.ts';
 
-/** Primeira etapa com recurso no plano: onde o apply estava quando nenhum recurso começou. */
-function firstPlannedStep(planSummary: string | null): InfraResourceStep | null {
+/**
+ * Primeira etapa com recurso no plano, na ordem do tipo: onde o apply estava quando nenhum recurso
+ * começou.
+ */
+function firstPlannedStep(
+  planSummary: string | null,
+  kind: InfraRunKind,
+): InfraResourceStep | null {
   if (planSummary === null) return null;
   try {
     const { steps } = InfraPlanSummarySchema.parse(JSON.parse(planSummary));
-    return INFRA_RESOURCE_STEPS.find((step) => steps[step].length > 0) ?? null;
+    return stepOrder(kind).find((step) => steps[step].length > 0) ?? null;
   } catch {
     return null;
   }
 }
 
 /**
- * Apply da criação da infraestrutura (build-runner, ADR 0027 da raiz), só depois da confirmação
- * (`aplicando`): grava a etapa corrente conforme os recursos avançam e fecha `ok` com os
- * nameservers (o site vai a `infra_aplicada`) ou `falhou` com a etapa e o motivo. Erro
- * inesperado também fecha `falhou`: o job não se repete.
+ * Apply da criação ou da remoção da infraestrutura (build-runner, ADR 0027 da raiz), só depois da
+ * confirmação (`aplicando`): grava a etapa corrente conforme os recursos são criados ou destruídos
+ * e fecha `ok` (a criação, com os nameservers, leva o site a `infra_aplicada`; a remoção o devolve
+ * a `cadastrado`) ou `falhou` com a etapa e o motivo. Erro inesperado também fecha `falhou`: o job
+ * não se repete.
  */
 export function createInfraApplyTask(deps: InfraTaskDeps): Task {
   return async (payload, helpers) => {
@@ -55,7 +58,7 @@ export function createInfraApplyTask(deps: InfraTaskDeps): Task {
       log.error(`apply da infra de ${siteId} falhou na etapa ${step ?? '(nenhuma)'}: ${message}`);
       await close({
         status: 'falhou',
-        step: step ?? current ?? firstPlannedStep(run.planSummary),
+        step: step ?? current ?? firstPlannedStep(run.planSummary, run.kind),
         message,
       });
     };
@@ -63,9 +66,11 @@ export function createInfraApplyTask(deps: InfraTaskDeps): Task {
     try {
       const target = await loadBuildTarget(deps.db, siteId);
       if (target === undefined) return await fail(null, `Site ${siteId} não encontrado`);
-      log.info(`apply da infra de ${siteId} (execução ${runId}, driver ${deps.infra.kind})`);
+      log.info(
+        `apply da infra de ${siteId} (execução ${runId} de ${run.kind}, driver ${deps.infra.kind})`,
+      );
       const outcome = await deps.infra.apply(
-        { runId, siteId, domain: target.domain },
+        { runId, siteId, domain: target.domain, kind: run.kind },
         async (step) => {
           current = step;
           const recorded = await deps.db.transaction((tx) => recordInfraStep(tx, runId, step));
@@ -74,14 +79,23 @@ export function createInfraApplyTask(deps: InfraTaskDeps): Task {
       );
       if (outcome.status === 'failed') return await fail(outcome.step, outcome.failure.message);
 
-      if (await close({ status: 'ok', nameservers: outcome.nameservers })) {
-        log.info(`infra de ${siteId} aplicada: ${outcome.nameservers.join(', ')}`);
+      const removal = run.kind === 'remover';
+      if (
+        await close(removal ? { status: 'ok' } : { status: 'ok', nameservers: outcome.nameservers })
+      ) {
+        log.info(
+          removal
+            ? `infra de ${siteId} removida`
+            : `infra de ${siteId} aplicada: ${outcome.nameservers.join(', ')}`,
+        );
         return;
       }
-      // O avanço do site foi recusado (o lifecycle mudou): a execução não pode ficar aberta.
+      // A mudança do site foi recusada (o lifecycle mudou): a execução não pode ficar aberta.
       await fail(
         current,
-        'A infraestrutura foi aplicada, mas o site não pôde avançar a infra aplicada',
+        removal
+          ? 'A infraestrutura foi removida, mas o site não pôde voltar a cadastrado'
+          : 'A infraestrutura foi aplicada, mas o site não pôde avançar a infra aplicada',
       );
     } catch (error) {
       await fail(
