@@ -102,15 +102,15 @@ passa a constar do `CLAUDE.md` da raiz e de `units:` em `docs/project-spec.yaml`
 
 ## Raiz do repositório
 
-| Pasta/arquivo                                                    | Conteúdo                                           |
-| ---------------------------------------------------------------- | -------------------------------------------------- |
-| `tooling/{tsconfig,eslint-config,prettier-config,vitest-config}` | Configurações compartilhadas                       |
-| `infra/vps/compose.yaml`                                         | Compose base (produção) e redes (ADR 0010)         |
-| `infra/local/`                                                   | Override local, Caddy, init, seeds e `local:*`     |
-| `infra/site/`, `infra/modules/site/`                             | OpenTofu por site: zona, DNS e e-mail (ADR 0027)   |
-| `docker/docker-bake.hcl`, `docker/bake.sh`                       | Alvos e tags das imagens                           |
-| `.github/workflows/`                                             | `ci`, `images`, `release`, `e2e`, `add-to-project` |
-| `turbo.json`, `pnpm-workspace.yaml`                              | Tarefas e catálogo de versões                      |
+| Pasta/arquivo                                                    | Conteúdo                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| `tooling/{tsconfig,eslint-config,prettier-config,vitest-config}` | Configurações compartilhadas                                    |
+| `infra/vps/compose.yaml`                                         | Compose base (produção) e redes (ADR 0010)                      |
+| `infra/local/`                                                   | Override local, Caddy, init, seeds e `local:*`                  |
+| `infra/site/`, `infra/modules/site/`                             | OpenTofu por site: zona, DNS, e-mail, regras e mídia (ADR 0027) |
+| `docker/docker-bake.hcl`, `docker/bake.sh`                       | Alvos e tags das imagens                                        |
+| `.github/workflows/`                                             | `ci`, `images`, `release`, `e2e`, `add-to-project`              |
+| `turbo.json`, `pnpm-workspace.yaml`                              | Tarefas e catálogo de versões                                   |
 
 ## Como criar uma unidade
 

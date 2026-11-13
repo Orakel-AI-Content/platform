@@ -81,3 +81,20 @@ Os detalhes e os comandos ficam em `infra/site/README.md`.
   estado do site por importação.
 - O travamento do R2 com `use_lockfile` e o SPF ao lado do registro que o Email Routing cria só
   se confirmam no primeiro `apply` real (fase 12.1 dos requisitos).
+
+## Revisão (2026-11-13)
+
+A platform#822 completa o módulo `site` com o que a seção 4.1 do `05-infra-e-operacao.md` dos
+requisitos atribui ao OpenTofu. O módulo passa a declarar também:
+
+- o registro `www` com proxy e o redirect dele para o domínio raiz;
+- a regra de rate limiting em `/_e/*`, com o limiar em variável;
+- a regra do WAF para os crawlers de treinamento, com a lista em variável;
+- o bot management: Bot Fight Mode e `robots.txt` gerenciado desligados, bloqueio de crawlers
+  de IA ligado (ADR-026);
+- o bucket `media-<SITE_ID>` com `prevent_destroy`, o domínio `media.<domínio>`, o `r2.dev`
+  desligado e a regra de cache da mídia.
+
+O bucket de mídia é recurso da conta, mas tem nome por site: não colide entre os estados. A
+regra "nenhum recurso de conta no módulo" vale para os recursos compartilhados. O token de
+infra ganha as permissões dessas regras e do R2 (`infra/site/README.md`).

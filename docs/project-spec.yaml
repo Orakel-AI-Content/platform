@@ -522,7 +522,7 @@ units:
       name: site-infra,
       path: infra/site,
       type: iac,
-      role: 'Raiz OpenTofu aplicada por site (estado sites/<SITE_ID>.tfstate no R2, cifrado com pbkdf2) e módulo infra/modules/site: zona, configurações, SPF/DMARC e Email Routing; ADR 0027',
+      role: 'Raiz OpenTofu aplicada por site (estado sites/<SITE_ID>.tfstate no R2, cifrado com pbkdf2) e módulo infra/modules/site: zona, configurações, SPF/DMARC, Email Routing, regras da zona (redirect do www, rate limiting, WAF, bot management) e bucket R2 de mídia; ADR 0027',
       status: generated,
     }
 
