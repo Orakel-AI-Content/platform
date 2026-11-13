@@ -4,9 +4,11 @@ import { noRead } from '@/components/shared/ForbiddenScreen';
 import { ListHeader, PageTrail } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
+import { can } from '@/domain/access/rbac.ts';
 import { reviewQueue } from '@/domain/reviews/reviews.ts';
 
 import { sitePageContext } from '../editorial-page.tsx';
+import { approveBatchAction } from './actions.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +19,8 @@ export const metadata = { title: 'Revisão' };
  * pendências e a marca de devolvido de cada um (#772). Ler exige site.read (o domínio
  * confere); aprovar é da tela de revisão de cada conteúdo. Lista no padrão do template (#365):
  * a trilha acima do cartão; título, toolbar e tabela dentro dele. "Começar revisão" (#773)
- * abre o primeiro item na ordem do domínio; some com a fila vazia.
+ * abre o primeiro item na ordem do domínio; some com a fila vazia. Com content.publish, a fila
+ * seleciona os itens elegíveis e os aprova e publica em lote (#776).
  */
 export default async function ReviewQueuePage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
@@ -43,6 +46,8 @@ export default async function ReviewQueuePage({ params }: { params: Promise<{ si
             siteId={site.id}
             timeZone={site.timeZone}
             rows={queue.value}
+            canPublish={can(actor, 'content.publish')}
+            approveBatchAction={approveBatchAction}
             labelledBy="review-queue-title"
           />
         </div>
