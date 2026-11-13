@@ -3,18 +3,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { tabTo } from '../../../test/browser/a11y.ts';
+import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
 import { toast } from '@/components/ui/toast';
 
 import { ReviewChecks } from './ReviewChecks.tsx';
 import { ReviewPanel } from './ReviewPanel.tsx';
 
+vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
+
 // Revisão em Chromium (workspace#87, ADR 0020 da raiz: só teclado e foco na composição): a seção
 // de checagens não tem parada de Tab (o sistema marca, ninguém clica), e "Marcar todos" funciona
 // pelo teclado, fica com o foco e leva direto às caixas e às aprovações. Cada caixa grava ao ser
 // marcada pelo Espaço (#752), e o foco fica nela, inclusive quando a gravação falha. "Aprovar e
 // publicar agora" e "Aprovar e agendar" (workspace#89) só com o teclado: o agendamento envia o
-// instante em ISO da hora de parede de São Paulo escolhida no Dialog.
+// instante em ISO da hora de parede de São Paulo escolhida no Dialog. Em passos (#766): "Próximo"
+// leva de Checagens a Decisão só pelo teclado, grava `?passo=`, e o foco nunca cai no `body`.
 
 const CHECKLIST = [
   { key: 'valor_original', label: 'Valor original' },
@@ -23,6 +27,7 @@ const CHECKLIST = [
 ];
 
 afterEach(() => {
+  navigation.set('/');
   toast.removeAll();
   vi.restoreAllMocks();
 });
@@ -34,6 +39,7 @@ const decisionPanel = (props: Partial<Props>) => (
   <ReviewPanel
     version={2}
     status="em_revisao"
+    step="decisao"
     blocked={false}
     checklist={CHECKLIST}
     confirmed={CHECKLIST.map((item) => item.key)}
@@ -49,6 +55,36 @@ const decisionPanel = (props: Partial<Props>) => (
 );
 
 describe('Revisão no navegador', () => {
+  it('pelo teclado: Próximo leva de Checagens a Decisão, grava ?passo= e não solta o foco', async () => {
+    navigation.set('/sites/exemplo-a/revisao/7');
+    const screen = await renderInApp(
+      <>
+        <button type="button">antes</button>
+        {decisionPanel({ step: undefined })}
+      </>,
+    );
+    const nextButton = screen.getByRole('button', { name: 'Próximo' });
+
+    // Em Checagens, sem peça com parada de Tab, o primeiro Tab já é do rodapé ("Anterior" está
+    // desabilitado).
+    (screen.getByRole('button', { name: 'antes' }).element() as HTMLElement).focus();
+    await userEvent.keyboard('{Tab}');
+    await expect.element(nextButton).toHaveFocus();
+
+    for (const step of ['ajustes', 'leitura']) {
+      await userEvent.keyboard('{Enter}');
+      expect(navigation.get()).toBe(`/sites/exemplo-a/revisao/7?passo=${step}`);
+      await expect.element(nextButton).toHaveFocus();
+    }
+    // No último passo "Próximo" fica desabilitado, e o foco passa para "Anterior".
+    await userEvent.keyboard('{Enter}');
+    expect(navigation.get()).toBe('/sites/exemplo-a/revisao/7?passo=decisao');
+    await expect.element(nextButton).toBeDisabled();
+    await expect.element(screen.getByRole('button', { name: 'Anterior' })).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+    await expect.element(screen.getByRole('button', { name: 'Só aprovar' })).toBeVisible();
+  });
+
   it('pelo teclado: a seção de checagens não prende o Tab; marcar todos e aprovar', async () => {
     const approve = vi.fn().mockResolvedValue({ ok: true, message: 'Versão 2 aprovada.' });
     const confirmAll = vi
@@ -60,6 +96,7 @@ describe('Revisão no navegador', () => {
         <ReviewPanel
           version={2}
           status="em_revisao"
+          step="leitura"
           checks={
             <ReviewChecks
               items={[
@@ -107,9 +144,12 @@ describe('Revisão no navegador', () => {
 
     await userEvent.keyboard('{Tab}');
     await expect.element(screen.getByRole('checkbox', { name: CHECKLIST[0]!.label })).toHaveFocus();
-    // Depois das caixas, as três aprovações, com "Só aprovar" (o envio) por último.
+    // Depois das caixas, o rodapé: "Anterior" e "Próximo", que leva às aprovações.
     await userEvent.keyboard('{Tab}{Tab}{Tab}');
-    await expect.element(screen.getByRole('button', { name: 'Aprovar e agendar' })).toHaveFocus();
+    await expect.element(screen.getByRole('button', { name: 'Anterior' })).toHaveFocus();
+    await userEvent.keyboard('{Tab}{Enter}');
+    // Em Decisão, as três aprovações, com "Só aprovar" (o envio) por último.
+    await tabTo(screen.getByRole('button', { name: 'Aprovar e agendar' }));
     await userEvent.keyboard('{Tab}{Tab}');
     await expect.element(screen.getByRole('button', { name: 'Só aprovar' })).toHaveFocus();
     await userEvent.keyboard('{Enter}');
@@ -126,6 +166,7 @@ describe('Revisão no navegador', () => {
       <ReviewPanel
         version={2}
         status="em_revisao"
+        step="leitura"
         blocked={false}
         checklist={CHECKLIST}
         confirmed={[]}
