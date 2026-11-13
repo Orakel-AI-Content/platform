@@ -21,7 +21,7 @@ import { ReviewPanel } from './ReviewPanel.tsx';
 // montados e os inativos com `hidden`; o passo vem da prop `step` e a troca vai a `?passo=`.
 // Ajustes (#767) mostra o editor da correção que a página monta, ou por que não há correção.
 
-const router = vi.hoisted(() => ({ replace: vi.fn() }));
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }));
 const search = vi.hoisted(() => ({ value: '' }));
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
@@ -37,6 +37,7 @@ afterAll(() => {
 });
 afterEach(async () => {
   router.replace.mockClear();
+  router.push.mockReset();
   search.value = '';
   act(() => toast.removeAll());
   await act(() => new Promise((resolve) => setTimeout(resolve, 60)));

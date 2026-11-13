@@ -21,6 +21,7 @@ import {
   listContents,
   listContentVersions,
   listReviewQueue,
+  nextInReviewQueue,
   submitForReview,
   updateAndSubmit,
   updateContent,
@@ -593,6 +594,55 @@ describe('fila de revisão (#72)', () => {
       await listReviewQueue(db, { email: 'revisor@orakel.local', roles: ['revisor'] }, SITE),
     ).toMatchObject({ ok: true });
     expect(await listReviewQueue(db, { email: 'x@orakel.local', roles: [] }, SITE)).toMatchObject({
+      issues: [{ code: 'forbidden' }],
+    });
+  });
+});
+
+describe('próximo da fila de revisão (workspace#90)', () => {
+  const next = (currentId: number, actor: Actor = SYSTEM_ACTOR) =>
+    nextInReviewQueue(db, actor, SITE, currentId);
+
+  it('é o mais antigo da fila sem o conteúdo atual', async () => {
+    await edit(3, { ...(await latest(3)), title: 'Quem somos (2)' });
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await edit(2, { ...(await latest(2)), title: 'Outro guia' });
+    for (const [contentId, at] of [
+      [3, '2026-11-10T10:00:00Z'],
+      [1, '2026-11-10T11:00:00Z'],
+      [2, '2026-11-10T12:00:00Z'],
+    ] as const) {
+      await submit(contentId);
+      await db
+        .update(contentVersions)
+        .set({ submittedAt: new Date(at) })
+        .where(and(eq(contentVersions.siteId, SITE), eq(contentVersions.contentId, contentId)));
+    }
+
+    expect(await next(3)).toEqual({ ok: true, value: 1 });
+    expect(await next(1)).toEqual({ ok: true, value: 3 });
+    expect(await next(2)).toEqual({ ok: true, value: 3 });
+  });
+
+  it('o atual já fora da fila não muda o próximo: o mais antigo dela', async () => {
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await submit(1);
+
+    expect(await next(2)).toEqual({ ok: true, value: 1 });
+  });
+
+  it('sem nenhum outro na fila não há próximo', async () => {
+    expect(await next(1)).toEqual({ ok: true, value: null });
+
+    await edit(1, { ...(await latest(1)), title: 'Guia revisado' });
+    await submit(1);
+
+    expect(await next(1)).toEqual({ ok: true, value: null });
+  });
+
+  it('sem papel, forbidden', async () => {
+    expect(await next(1, { email: 'x@orakel.local', roles: [] })).toMatchObject({
+      ok: false,
       issues: [{ code: 'forbidden' }],
     });
   });

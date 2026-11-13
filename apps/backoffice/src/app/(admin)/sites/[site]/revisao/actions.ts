@@ -1,6 +1,6 @@
 'use server';
 
-import type { Result } from '@orakel/content-model';
+import type { Issue, Result } from '@orakel/content-model';
 import { revalidatePath } from 'next/cache';
 
 import { currentActor } from '@/auth/request-actor.ts';
@@ -10,7 +10,7 @@ import type { FormActionResult } from '@/components/shared/actionResult.ts';
 import { formatDateTime } from '@/components/shared/siteLabels.ts';
 import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
-import { amendInReview, type ContentEdit } from '@/domain/content/contents.ts';
+import { amendInReview, nextInReviewQueue, type ContentEdit } from '@/domain/content/contents.ts';
 import { PUBLISH_DAY_TIME_ZONE } from '@/domain/publications/publish.ts';
 import { setAllConfirmations, setConfirmation } from '@/domain/reviews/confirmations.ts';
 import {
@@ -27,16 +27,19 @@ import { noSession, refused } from '../content-form-result.ts';
 // Ações da tela de revisão (#75, #598, #749, #751, workspace#89): permissão, confirmações,
 // comentário, validação da release, limite diário e transbordo ficam no domínio
 // (confirmations.ts, approveVersion, approveAndPublish, approveAndSchedule, returnVersion,
-// amendInReview); aqui só a tradução do Result para o painel.
+// amendInReview); aqui só a tradução do Result para o painel. As quatro decisões devolvem
+// também o próximo da fila (`nextInReviewQueue`, workspace#90), lido na mesma transação.
 
 export type ApproveResult = FormActionResult<SchemaFormIssue>;
 
 /**
- * Desfecho de aprovar e publicar ou agendar: a mensagem de sucesso e, quando o dia pedido estava
- * cheio e a publicação foi para a próxima vaga, o aviso (`warning`).
+ * Desfecho de uma decisão (aprovar, publicar, agendar ou devolver): a mensagem de sucesso, o
+ * aviso (`warning`) quando o dia pedido estava cheio e a publicação foi para a próxima vaga, e o
+ * próximo conteúdo da fila (`next`), ou `null` com a fila vazia.
  */
 export type DecisionResult =
-  { ok: true; message: string; warning?: string } | Extract<ApproveResult, { ok: false }>;
+  | { ok: true; message: string; warning?: string; next: number | null }
+  | Extract<ApproveResult, { ok: false }>;
 
 /** Marcação gravada: as chaves confirmadas na versão depois dela, ou a recusa. */
 export type ConfirmResult = { ok: true; confirmed: string[] } | { ok: false; message: string };
@@ -94,7 +97,7 @@ export async function approveAction(
   siteId: string,
   contentId: number,
   version: number,
-): Promise<ApproveResult> {
+): Promise<DecisionResult> {
   const actor = await currentActor();
   if (!actor.ok) {
     return {
@@ -103,7 +106,7 @@ export async function approveAction(
       issues: [{ path: [], message: INVALID_SESSION }],
     };
   }
-  const result = await getDb().db.transaction((tx) =>
+  const result = await withNext(actor.value, siteId, contentId, (tx) =>
     approveVersion(tx, actor.value, siteId, contentId, version),
   );
   if (!result.ok) {
@@ -115,7 +118,7 @@ export async function approveAction(
     };
   }
   revalidateReview(siteId, contentId);
-  return { ok: true, message: `Versão ${version} aprovada.` };
+  return { ok: true, message: `Versão ${version} aprovada.`, next: result.value.next };
 }
 
 /** Aprova a versão que o revisor viu e a publica na hora (ou na próxima vaga, com o dia cheio). */
@@ -141,6 +144,39 @@ export async function approveScheduleAction(
   );
 }
 
+/** Recusa que desfaz a transação da decisão; volta como `Result` em `withNext`. */
+class DecisionRefused extends Error {
+  readonly issues: Issue[];
+  constructor(issues: Issue[]) {
+    super('Decisão recusada');
+    this.issues = issues;
+  }
+}
+
+/**
+ * Roda a decisão e, na mesma transação, lê o próximo da fila sem o conteúdo decidido. A recusa
+ * da decisão volta como veio; a do próximo desfaz a decisão.
+ */
+async function withNext<T>(
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  run: (tx: Executor) => Promise<Result<T>>,
+): Promise<Result<{ outcome: T; next: number | null }>> {
+  try {
+    return await getDb().db.transaction(async (tx) => {
+      const result = await run(tx);
+      if (!result.ok) return result;
+      const next = await nextInReviewQueue(tx, actor, siteId, contentId);
+      if (!next.ok) throw new DecisionRefused(next.issues);
+      return { ok: true as const, value: { outcome: result.value, next: next.value } };
+    });
+  } catch (error) {
+    if (error instanceof DecisionRefused) return { ok: false, issues: error.issues };
+    throw error;
+  }
+}
+
 async function decide(
   siteId: string,
   contentId: number,
@@ -155,7 +191,7 @@ async function decide(
       issues: [{ path: [], message: INVALID_SESSION }],
     };
   }
-  const result = await getDb().db.transaction((tx) => run(tx, actor.value));
+  const result = await withNext(actor.value, siteId, contentId, (tx) => run(tx, actor.value));
   if (!result.ok) {
     // Recusa da aprovação ou da publicação: tudo foi desfeito; no formulário, o resumo.
     return {
@@ -165,18 +201,20 @@ async function decide(
     };
   }
   revalidateReview(siteId, contentId);
-  return decisionMessage(version, result.value);
+  return { ok: true, ...decisionMessage(version, result.value.outcome), next: result.value.next };
 }
 
 /** "Foi ao ar" ou "agendado para <data e hora de São Paulo>", com o aviso do transbordo. */
-function decisionMessage(version: number, outcome: ApprovalOutcome): DecisionResult {
+function decisionMessage(
+  version: number,
+  outcome: ApprovalOutcome,
+): { message: string; warning?: string } {
   const message =
     outcome.outcome === 'published'
       ? `Versão ${version} aprovada: o artigo foi ao ar.`
       : `Versão ${version} aprovada: o artigo foi agendado para ${formatDateTime(outcome.at, PUBLISH_DAY_TIME_ZONE)}.`;
-  if (!outcome.overflowed) return { ok: true, message };
+  if (!outcome.overflowed) return { message };
   return {
-    ok: true,
     message,
     warning:
       'O dia pedido já tinha atingido o limite diário de publicações do site; a publicação foi para o próximo dia com vaga, no mesmo horário.',
@@ -189,7 +227,7 @@ export async function returnAction(
   contentId: number,
   version: number,
   comment: string,
-): Promise<ApproveResult> {
+): Promise<DecisionResult> {
   const actor = await currentActor();
   if (!actor.ok) {
     return {
@@ -198,7 +236,7 @@ export async function returnAction(
       issues: [{ path: [], message: INVALID_SESSION }],
     };
   }
-  const result = await getDb().db.transaction((tx) =>
+  const result = await withNext(actor.value, siteId, contentId, (tx) =>
     returnVersion(tx, actor.value, siteId, contentId, version, comment),
   );
   if (!result.ok) {
@@ -213,7 +251,11 @@ export async function returnAction(
     };
   }
   revalidateReview(siteId, contentId);
-  return { ok: true, message: `Versão ${version} devolvida ao editor.` };
+  return {
+    ok: true,
+    message: `Versão ${version} devolvida ao editor.`,
+    next: result.value.next,
+  };
 }
 
 /**
