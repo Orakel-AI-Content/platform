@@ -9,7 +9,9 @@ import { infraPayloadOf, type InfraTaskDeps } from './infra-run.ts';
  * Plano da criação ou da remoção da infraestrutura (build-runner, ADR 0027 da raiz), pelo tipo da
  * execução: o driver gera o plano e o resumo por etapa vai para a execução, que passa a `aguardando_confirmacao`. Nada é aplicado
  * aqui: o apply só é enfileirado pela confirmação. Falha, ou erro inesperado, fecha a execução
- * `falhou` sem etapa (o job não se repete; "Tentar de novo" é uma execução nova).
+ * `falhou` sem etapa (o job não se repete; "Tentar de novo" é uma execução nova). Num lote de
+ * reaplicação, a falha de outro site pode cancelar esta execução enquanto o plano roda: o
+ * resultado é descartado com um aviso, sem tentar fechá-la de novo.
  */
 export function createInfraPlanTask(deps: InfraTaskDeps): Task {
   return async (payload, helpers) => {
@@ -22,10 +24,17 @@ export function createInfraPlanTask(deps: InfraTaskDeps): Task {
       );
       return;
     }
+    /** O lote a que a execução pertence a cancelou enquanto o plano rodava? */
+    const cancelled = async () => {
+      if ((await loadInfraRun(deps.db, runId))?.status !== 'cancelado') return false;
+      log.warn(`plano da infra ${runId} de ${siteId} descartado: o lote cancelou a execução`);
+      return true;
+    };
     const fail = async (message: string) => {
       const closed = await deps.db.transaction((tx) =>
         finishInfraRun(tx, runId, { status: 'falhou', step: null, message }),
       );
+      if (!closed.ok && (await cancelled())) return;
       log.error(`plano da infra de ${siteId} falhou: ${message}`);
       if (!closed.ok) log.error(`execução ${runId} não fechada: ${JSON.stringify(closed.issues)}`);
     };
@@ -47,7 +56,10 @@ export function createInfraPlanTask(deps: InfraTaskDeps): Task {
       const recorded = await deps.db.transaction((tx) =>
         recordInfraPlan(tx, runId, JSON.stringify(outcome.summary)),
       );
-      if (!recorded.ok) return await fail(recorded.issues.map((i) => i.message).join('; '));
+      if (!recorded.ok) {
+        if (await cancelled()) return;
+        return await fail(recorded.issues.map((i) => i.message).join('; '));
+      }
       log.info(`plano da infra de ${siteId} pronto: aguardando confirmação`);
     } catch (error) {
       await fail(

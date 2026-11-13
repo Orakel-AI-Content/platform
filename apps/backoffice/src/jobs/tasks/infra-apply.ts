@@ -9,7 +9,7 @@ import {
   recordInfraStep,
   type InfraRunClosing,
 } from '../../domain/infra/runs.ts';
-import { INFRA_APPLY_TASK } from '../../domain/infra/schedule.ts';
+import { INFRA_APPLY_TASK, scheduleInfraApply } from '../../domain/infra/schedule.ts';
 import { infraPayloadOf, type InfraTaskDeps } from './infra-run.ts';
 
 /**
@@ -29,12 +29,34 @@ function firstPlannedStep(
   }
 }
 
+/** Log do `ok` e motivo da falha quando o site recusa o efeito do `ok`, pelo tipo. */
+const OUTCOME_OF = {
+  criar: {
+    done: (siteId: string, nameservers: readonly string[]) =>
+      `infra de ${siteId} aplicada: ${nameservers.join(', ')}`,
+    refused: 'A infraestrutura foi aplicada, mas o site não pôde avançar a infra aplicada',
+  },
+  remover: {
+    done: (siteId: string) => `infra de ${siteId} removida`,
+    refused: 'A infraestrutura foi removida, mas o site não pôde voltar a cadastrado',
+  },
+  reaplicar: {
+    done: (siteId: string) => `infra de ${siteId} reaplicada`,
+    refused: 'A infraestrutura foi reaplicada, mas o site não pôde ser marcado como em dia',
+  },
+} as const satisfies Record<
+  InfraRunKind,
+  { done: (siteId: string, nameservers: readonly string[]) => string; refused: string }
+>;
+
 /**
- * Apply da criação ou da remoção da infraestrutura (build-runner, ADR 0027 da raiz), só depois da
- * confirmação (`aplicando`): grava a etapa corrente conforme os recursos são criados ou destruídos
- * e fecha `ok` (a criação, com os nameservers, leva o site a `infra_aplicada`; a remoção o devolve
- * a `cadastrado`) ou `falhou` com a etapa e o motivo. Erro inesperado também fecha `falhou`: o job
- * não se repete.
+ * Apply da criação, da remoção ou da reaplicação da infraestrutura (build-runner, ADR 0027 da
+ * raiz), só depois da confirmação (`aplicando`): grava a etapa corrente conforme os recursos são
+ * criados ou destruídos e fecha `ok` (a criação, com os nameservers, leva o site a
+ * `infra_aplicada`; a remoção o devolve a `cadastrado`; a reaplicação o marca em dia) ou `falhou`
+ * com a etapa e o motivo. Numa execução do lote de reaplicação, a mesma transação que fecha `ok`
+ * enfileira o apply do próximo site (`next`); a falha para o lote. Erro inesperado também fecha
+ * `falhou`: o job não se repete.
  */
 export function createInfraApplyTask(deps: InfraTaskDeps): Task {
   return async (payload, helpers) => {
@@ -49,8 +71,18 @@ export function createInfraApplyTask(deps: InfraTaskDeps): Task {
     }
     let current: InfraStep | null = null;
     const close = async (closing: InfraRunClosing) => {
-      const closed = await deps.db.transaction((tx) => finishInfraRun(tx, runId, closing));
-      if (closed.ok) return true;
+      const closed = await deps.db.transaction(async (tx) => {
+        const finished = await finishInfraRun(tx, runId, closing);
+        if (finished.ok && finished.value.next !== null) {
+          await scheduleInfraApply(tx, finished.value.next);
+        }
+        return finished;
+      });
+      if (closed.ok) {
+        const { next } = closed.value;
+        if (next !== null) log.info(`lote: apply da infra de ${next.siteId} enfileirado`);
+        return true;
+      }
       log.error(`execução ${runId} não fechada: ${JSON.stringify(closed.issues)}`);
       return false;
     };
@@ -79,24 +111,19 @@ export function createInfraApplyTask(deps: InfraTaskDeps): Task {
       );
       if (outcome.status === 'failed') return await fail(outcome.step, outcome.failure.message);
 
-      const removal = run.kind === 'remover';
+      const outcomeOf = OUTCOME_OF[run.kind];
       if (
-        await close(removal ? { status: 'ok' } : { status: 'ok', nameservers: outcome.nameservers })
+        await close(
+          run.kind === 'criar'
+            ? { status: 'ok', nameservers: outcome.nameservers }
+            : { status: 'ok' },
+        )
       ) {
-        log.info(
-          removal
-            ? `infra de ${siteId} removida`
-            : `infra de ${siteId} aplicada: ${outcome.nameservers.join(', ')}`,
-        );
+        log.info(outcomeOf.done(siteId, outcome.nameservers));
         return;
       }
       // A mudança do site foi recusada (o lifecycle mudou): a execução não pode ficar aberta.
-      await fail(
-        current,
-        removal
-          ? 'A infraestrutura foi removida, mas o site não pôde voltar a cadastrado'
-          : 'A infraestrutura foi aplicada, mas o site não pôde avançar a infra aplicada',
-      );
+      await fail(current, outcomeOf.refused);
     } catch (error) {
       await fail(
         null,
