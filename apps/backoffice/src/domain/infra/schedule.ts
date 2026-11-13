@@ -1,12 +1,18 @@
-// Fila da criação da infraestrutura (ADR 0027 da raiz): o plano e o apply rodam no build-runner,
-// na fila nomeada `infra:<site>`, um job por vez por site. Fila própria, não a `build:<site>`: a
+// Fila da infraestrutura do site (ADR 0027 da raiz): o plano e o apply rodam no build-runner, na
+// fila nomeada `infra:<site>`, um job por vez por site. Fila própria, não a `build:<site>`: a
 // recuperação dos builds solta toda trava `build:%` e reexecutaria um apply interrompido. Uma
 // tentativa só (`max_attempts => 1`): o plano salvo não se reaplica, e "Tentar de novo" é uma
 // execução nova. A recuperação na partida fecha a execução cujo job o processo anterior largou.
+//
+// A remoção (workspace#97) é uma cadeia na mesma fila, atravessando dois processos: o build-runner
+// apaga o Worker (`infra-remove-worker`), o backoffice-worker esvazia `media-<site>`
+// (`empty-site-media`, o único com as credenciais S3 da mídia) e o build-runner aplica o plano de
+// destruição (`infra-apply`). Cada elo enfileira o próximo na mesma transação em que grava a etapa.
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import type { Db, Executor } from '../../db/client.ts';
 import { infraRuns } from '../../db/schema/index.ts';
+import { EMPTY_SITE_MEDIA_TASK } from '../media/variants.ts';
 import { finishInfraRun } from './runs.ts';
 
 export const INFRA_PLAN_TASK = 'infra-plan';
@@ -18,18 +24,23 @@ export const INFRA_APPLY_TASK = 'infra-apply';
 export const INFRA_CHECK_TASK = 'infra-check';
 /** Chave do job de distribuição: partida e cron no mesmo dia não acumulam duplicados. */
 export const INFRA_CHECK_ALL_KEY = 'infra-check:todos';
+export const INFRA_REMOVE_WORKER_TASK = 'infra-remove-worker';
 
 export const INTERRUPTED_INFRA_MESSAGE =
   'Execução interrompida: o build-runner parou no meio dela. Tente de novo.';
+export const INTERRUPTED_WORKER_INFRA_MESSAGE =
+  'Execução interrompida: o backoffice-worker parou no meio dela. Tente de novo.';
 
-/** Payload das duas tasks. */
+/** Payload das tasks da fila `infra:<site>`. */
 export type InfraJobPayload = { siteId: string; runId: number };
 
-async function addInfraJob(
-  tx: Executor,
-  task: typeof INFRA_PLAN_TASK | typeof INFRA_APPLY_TASK,
-  payload: InfraJobPayload,
-): Promise<void> {
+type InfraTask =
+  | typeof INFRA_PLAN_TASK
+  | typeof INFRA_APPLY_TASK
+  | typeof INFRA_REMOVE_WORKER_TASK
+  | typeof EMPTY_SITE_MEDIA_TASK;
+
+async function addInfraJob(tx: Executor, task: InfraTask, payload: InfraJobPayload): Promise<void> {
   await tx.execute(sql`
     select graphile_worker.add_job(
       identifier => ${task},
@@ -44,20 +55,50 @@ export function scheduleInfraPlan(tx: Executor, payload: InfraJobPayload): Promi
   return addInfraJob(tx, INFRA_PLAN_TASK, payload);
 }
 
-/** Enfileira o apply da execução recém-confirmada (`confirmInfraRun`), na mesma transação. */
+/**
+ * Enfileira o apply da execução recém-confirmada (`confirmInfraRun`) ou, na remoção, depois do
+ * esvaziamento da mídia; na mesma transação.
+ */
 export function scheduleInfraApply(tx: Executor, payload: InfraJobPayload): Promise<void> {
   return addInfraJob(tx, INFRA_APPLY_TASK, payload);
 }
 
+/** Elo 1 da remoção, enfileirado pela confirmação (`confirmInfraRemoval`), na mesma transação. */
+export function scheduleInfraRemoveWorker(tx: Executor, payload: InfraJobPayload): Promise<void> {
+  return addInfraJob(tx, INFRA_REMOVE_WORKER_TASK, payload);
+}
+
+/** Elo 2 da remoção, enfileirado pelo elo 1 depois de apagar o Worker, na mesma transação. */
+export function scheduleEmptySiteMedia(tx: Executor, payload: InfraJobPayload): Promise<void> {
+  return addInfraJob(tx, EMPTY_SITE_MEDIA_TASK, payload);
+}
+
+/** O que cada processo recupera na partida: só os jobs das próprias tasks da fila `infra:<site>`. */
+export type InfraRecovery = { tasks: readonly InfraTask[]; message: string };
+
+export const BUILD_RUNNER_INFRA_RECOVERY: InfraRecovery = {
+  tasks: [INFRA_PLAN_TASK, INFRA_APPLY_TASK, INFRA_REMOVE_WORKER_TASK],
+  message: INTERRUPTED_INFRA_MESSAGE,
+};
+
+export const WORKER_INFRA_RECOVERY: InfraRecovery = {
+  tasks: [EMPTY_SITE_MEDIA_TASK],
+  message: INTERRUPTED_WORKER_INFRA_MESSAGE,
+};
+
 export type InterruptedInfraRun = { siteId: string; runId: number; jobId: string };
 
 /**
- * Na partida do build-runner (o único que pega estes jobs): todo job de infra travado é de um
- * processo que morreu. A execução aberta do site (uma só, pelo índice único) fecha `falhou` com
- * a etapa em que estava, o job é encerrado sem nova tentativa e as travas são soltas. Execução
- * `aguardando_confirmacao` não tem job rodando e não é tocada.
+ * Na partida do processo: todo job travado das tasks dele na fila `infra:<site>` é de uma instância
+ * que morreu (só ele pega esses jobs). A execução aberta do site (uma só, pelo índice único) fecha
+ * `falhou` com a etapa em que estava, o job é encerrado sem nova tentativa e as travas dos donos
+ * desses jobs são soltas. Jobs do outro processo na mesma fila não são tocados: o elo da remoção
+ * que ele está rodando segue travado. Execução `aguardando_confirmacao` não tem job rodando.
  */
-export async function recoverInterruptedInfraRuns(db: Db): Promise<InterruptedInfraRun[]> {
+export async function recoverInterruptedInfraRuns(
+  db: Db,
+  recovery: InfraRecovery = BUILD_RUNNER_INFRA_RECOVERY,
+): Promise<InterruptedInfraRun[]> {
   return db.transaction(async (tx) => {
     // O site vem do nome da fila: a view pública graphile_worker.jobs não expõe o payload.
     const { rows: jobs } = await tx.execute<{
@@ -67,11 +108,12 @@ export async function recoverInterruptedInfraRuns(db: Db): Promise<InterruptedIn
     }>(sql`
       select id::text, substring(queue_name from '^infra:(.+)$') as site_id, locked_by
       from graphile_worker.jobs
-      where task_identifier in (${INFRA_PLAN_TASK}, ${INFRA_APPLY_TASK}) and locked_by is not null
+      where task_identifier in (${sql.join(
+        recovery.tasks.map((task) => sql`${task}`),
+        sql`, `,
+      )})
+        and queue_name like 'infra:%' and locked_by is not null
       order by id`);
-    const { rows: queues } = await tx.execute<{ locked_by: string }>(sql`
-      select distinct locked_by from graphile_worker._private_job_queues
-      where queue_name like 'infra:%' and locked_by is not null`);
 
     const recovered: InterruptedInfraRun[] = [];
     for (const job of jobs) {
@@ -89,12 +131,14 @@ export async function recoverInterruptedInfraRuns(db: Db): Promise<InterruptedIn
       const closed = await finishInfraRun(tx, run.id, {
         status: 'falhou',
         step: run.currentStep,
-        message: INTERRUPTED_INFRA_MESSAGE,
+        message: recovery.message,
       });
       if (closed.ok) recovered.push({ siteId: job.site_id, runId: run.id, jobId: job.id });
     }
 
-    const owners = [...new Set([...jobs, ...queues].map((row) => row.locked_by))];
+    // Só os donos dos jobs acima: soltar toda trava `infra:%` derrubaria o elo vivo do outro
+    // processo. O force_unlock_workers também solta a fila travada por esses donos.
+    const owners = [...new Set(jobs.map((row) => row.locked_by))];
     if (owners.length > 0) {
       await tx.execute(
         sql`select graphile_worker.force_unlock_workers(${sql.param(owners)}::text[])`,
@@ -102,7 +146,7 @@ export async function recoverInterruptedInfraRuns(db: Db): Promise<InterruptedIn
     }
     if (jobs.length > 0) {
       await tx.execute(sql`select graphile_worker.permanently_fail_jobs(
-        ${sql.param(jobs.map((job) => job.id))}::bigint[], ${INTERRUPTED_INFRA_MESSAGE})`);
+        ${sql.param(jobs.map((job) => job.id))}::bigint[], ${recovery.message})`);
     }
     return recovered;
   });

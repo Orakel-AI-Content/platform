@@ -36,17 +36,19 @@ import {
 export type InfraTarget = { runId: number; siteId: string; domain: string; kind: InfraRunKind };
 
 /**
- * Ordem das etapas no apply: a da criação, ou a inversa na remoção (o tofu destrói a zona por
- * último, depois do que depende dela).
+ * Ordem das etapas no apply: a da criação (também na reaplicação), ou a inversa na remoção (o tofu
+ * destrói a zona por último, depois do que depende dela).
  */
 export function stepOrder(kind: InfraRunKind): readonly InfraResourceStep[] {
-  return kind === 'criar' ? INFRA_RESOURCE_STEPS : [...INFRA_RESOURCE_STEPS].reverse();
+  return kind === 'remover' ? [...INFRA_RESOURCE_STEPS].reverse() : INFRA_RESOURCE_STEPS;
 }
 
-const MODE_OF = { criar: 'create', remover: 'destroy' } as const satisfies Record<
-  InfraRunKind,
-  InfraMode
->;
+/** A reaplicação planeja e aplica como a criação: o tofu converge a infra para a configuração. */
+const MODE_OF = {
+  criar: 'create',
+  remover: 'destroy',
+  reaplicar: 'create',
+} as const satisfies Record<InfraRunKind, InfraMode>;
 
 /** O site cuja infra é conferida contra a descrição atual; não há execução em `infra_runs`. */
 export type InfraCheckTarget = { siteId: string; domain: string };
@@ -506,10 +508,12 @@ export const LOCAL_DRIFT_CHANGE: InfraChange = {
 
 /**
  * Simulação sem rede: o "estado" de cada site é a memória do processo (as etapas já criadas),
- * então uma nova execução só cria (ou remove) o que faltou, como o OpenTofu faria. A remoção
- * percorre as etapas na ordem inversa e as esquece; um site sem memória (build-runner reiniciado)
- * conta como todo criado. Reiniciar o build-runner zera a memória; sem efeito fora do local e do E2E. A conferência não usa essa memória (ela
- * zeraria na partida e todo site sairia desatualizado): só `driftSites` sai desatualizado.
+ * então uma nova execução só cria (ou remove) o que faltou, como o OpenTofu faria; a reaplicação
+ * cria como a criação. A remoção percorre as etapas na ordem inversa e as esquece; um site sem
+ * memória (build-runner reiniciado) conta como todo criado na remoção e na reaplicação. Reiniciar
+ * o build-runner zera a memória; sem efeito fora do local e do E2E. A conferência não usa essa
+ * memória (ela zeraria na partida e todo site sairia desatualizado): só `driftSites` sai
+ * desatualizado.
  */
 export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
   const created = new Map<string, Set<InfraResourceStep>>();
@@ -517,7 +521,7 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
   const createdOf = ({ siteId, kind }: InfraTarget) => {
     const steps =
       created.get(siteId) ??
-      new Set<InfraResourceStep>(kind === 'remover' ? INFRA_RESOURCE_STEPS : []);
+      new Set<InfraResourceStep>(kind === 'criar' ? [] : INFRA_RESOURCE_STEPS);
     created.set(siteId, steps);
     return steps;
   };
@@ -525,7 +529,7 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
   const pending = (target: InfraTarget) => {
     const done = createdOf(target);
     return stepOrder(target.kind).filter((step) =>
-      target.kind === 'criar' ? !done.has(step) : done.has(step),
+      target.kind === 'remover' ? done.has(step) : !done.has(step),
     );
   };
 
@@ -533,7 +537,7 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
     kind: 'local',
 
     plan(target) {
-      const action = target.kind === 'criar' ? ('create' as const) : ('delete' as const);
+      const action = target.kind === 'remover' ? ('delete' as const) : ('create' as const);
       const changes = pending(target).flatMap((step) =>
         LOCAL_RESOURCES[step].map(({ name, type }) => ({
           address: `module.site.${type}.${name}`,
@@ -568,12 +572,12 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
             },
           };
         }
-        if (target.kind === 'criar') done.add(step);
-        else done.delete(step);
+        if (target.kind === 'remover') done.delete(step);
+        else done.add(step);
       }
       return {
         status: 'ok',
-        nameservers: target.kind === 'criar' ? [...LOCAL_NAMESERVERS] : [],
+        nameservers: target.kind === 'remover' ? [] : [...LOCAL_NAMESERVERS],
       };
     },
   };

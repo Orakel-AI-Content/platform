@@ -1,5 +1,6 @@
 // "Criar infraestrutura" pelo Backoffice (#825): o pedido do plano e a confirmação, cada um na
-// mesma transação que enfileira a task do build-runner, e a leitura do plano para o diálogo,
+// mesma transação que enfileira a task do build-runner (a confirmação da remoção, o primeiro elo
+// da cadeia dela, workspace#97), e a leitura do plano para o diálogo,
 // com o resumo já validado. Cancelar não tem transição: a execução fica aberta e o diálogo é
 // reaberto por "Revisar e confirmar"; se o estado mudar até a confirmação, o apply falha e pede
 // um plano novo.
@@ -10,8 +11,8 @@ import type { Executor } from '../../db/client.ts';
 import { infraRuns } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { InfraPlanSummarySchema, type InfraPlanSummary } from './drivers.ts';
-import { confirmInfraRun, requestInfraRun } from './runs.ts';
-import { scheduleInfraApply, scheduleInfraPlan } from './schedule.ts';
+import { confirmInfraRemoval, confirmInfraRun, requestInfraRun } from './runs.ts';
+import { scheduleInfraApply, scheduleInfraPlan, scheduleInfraRemoveWorker } from './schedule.ts';
 
 /** Mensagem do plano que falhou sem motivo gravado. */
 export const INFRA_PLAN_FAILED_MESSAGE = 'Não foi possível preparar o resumo.';
@@ -59,6 +60,27 @@ export async function confirmInfraPlan(
   const confirmed = await confirmInfraRun(tx, actor, runId);
   if (!confirmed.ok) return confirmed;
   await scheduleInfraApply(tx, { siteId, runId });
+  return confirmed;
+}
+
+/**
+ * Confirma a remoção do site com o domínio digitado e enfileira o primeiro elo da cadeia, o que
+ * apaga o Worker (`confirmInfraRemoval` + `scheduleInfraRemoveWorker`). Recusada a confirmação,
+ * nada é enfileirado.
+ */
+export async function confirmInfraRemovalPlan(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  runId: number,
+  typedDomain: string,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.destroy');
+  if (!allowed.ok) return allowed;
+  if ((await siteRun(tx, siteId, runId)) === undefined) return runNotFound(runId, siteId);
+  const confirmed = await confirmInfraRemoval(tx, actor, runId, typedDomain);
+  if (!confirmed.ok) return confirmed;
+  await scheduleInfraRemoveWorker(tx, { siteId, runId });
   return confirmed;
 }
 
