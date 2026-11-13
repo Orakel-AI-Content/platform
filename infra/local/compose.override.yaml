@@ -210,6 +210,9 @@ services:
       # "Criar infraestrutura" simulado, sem Cloudflare nem os segredos de infra (ADR 0027 da
       # raiz). A rodada com o tofu de verdade: LOCAL_INFRA_DRIVER=tofu e os segredos no .env.local.
       INFRA_DRIVER: ${LOCAL_INFRA_DRIVER:-local}
+    # A remoção do Worker do site (ADR 0028 da raiz) chama a API de administração do edge-local,
+    # que só escuta o :8081 na rede publish; na VPS, o build-runner chama a API da Cloudflare.
+    networks: [internal, docker, publish]
     depends_on:
       s3-init:
         condition: service_completed_successfully
