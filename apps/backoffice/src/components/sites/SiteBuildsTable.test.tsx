@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 import type { ExecutionHistoryItem, SiteHistoryItem } from '@/domain/builds/builds.ts';
+import type { InfraHistoryItem } from '@/domain/infra/runs.ts';
 
 import { SiteBuildsTable } from './SiteBuildsTable.tsx';
 
@@ -165,6 +166,46 @@ describe('SiteBuildsTable', () => {
 
     expect(screen.getByText('Nenhuma atividade ainda.')).toBeTruthy();
     expect(screen.queryByRole('list')).toBeNull();
+  });
+
+  it('a criação da infra diz quem pediu, quando e o resultado: nameservers ou o motivo da falha', () => {
+    const creation = (over: Partial<InfraHistoryItem>): InfraHistoryItem => ({
+      type: 'infra',
+      id: 2,
+      kind: 'criar',
+      status: 'ok',
+      requestedBy: 'operacao@orakel.local',
+      requestedAt: new Date('2026-10-11T16:58:00Z'),
+      confirmedBy: 'operacao@orakel.local',
+      at: new Date('2026-10-11T17:05:00Z'),
+      nameservers: ['ada.ns.example', 'bob.ns.example'],
+      failure: null,
+      ...over,
+    });
+    render(
+      <SiteBuildsTable
+        history={[
+          creation({}),
+          creation({
+            id: 1,
+            status: 'falhou',
+            at: new Date('2026-10-11T16:50:00Z'),
+            nameservers: null,
+            failure: { step: 'regras', message: 'Falha simulada' },
+          }),
+        ]}
+        timeZone="America/Sao_Paulo"
+      />,
+      { container: app },
+    );
+
+    const [ok, failed] = screen.getAllByRole('listitem');
+    expect(ok?.textContent).toContain('Criação da infraestrutura');
+    expect(ok?.textContent).toContain('operacao@orakel.local · 11/10/2026, 14:05 BRT');
+    expect(ok?.textContent).toContain('Nameservers: ada.ns.example, bob.ns.example');
+    expect(failed?.textContent).toContain('Criação da infraestrutura · falhou na etapa Regras');
+    expect(failed?.textContent).toContain('operacao@orakel.local · 11/10/2026, 13:50 BRT');
+    expect(failed?.textContent).toContain('Motivo: Falha simulada');
   });
 
   it('não usa mais a tabela', () => {
