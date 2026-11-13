@@ -1,14 +1,17 @@
 import { CreateBucketCommand, DeleteBucketCommand } from '@aws-sdk/client-s3';
+import { asc, eq } from 'drizzle-orm';
 import { contentPath, mediaUrl } from '@orakel/core/v1';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-import { createDb, createPool } from '../../src/db/client.ts';
+import { createDb, createPool, type Db } from '../../src/db/client.ts';
+import { infraRuns, sites } from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR } from '../../src/domain/access/rbac.ts';
 import { advanceLifecycle, pauseSiteManually } from '../../src/domain/builds/site-state.ts';
 import { buildNow } from '../../src/domain/builds/schedule.ts';
 import { createContent } from '../../src/domain/content/contents.ts';
 import { listMedia } from '../../src/domain/content/media.ts';
-import { currentConfig } from '../../src/domain/sites/sites.ts';
+import { scheduleSiteInfraDriftCheck } from '../../src/domain/infra/schedule.ts';
+import { createSite, currentConfig } from '../../src/domain/sites/sites.ts';
 import { getDatabaseUrl, getEnv } from '../../src/env.ts';
 import { createS3Client } from '../../src/lib/s3.ts';
 import { asRole } from './auth.ts';
@@ -18,7 +21,8 @@ import { fieldLabel } from './fieldLabel.ts';
 // Fluxos críticos dos sites (ADR 0019 da raiz). Na pilha (`@stack`): o login pelo Access e a API
 // de exportação fora do hostname público. Na camada `telas`: a operação cadastra, edita e publica
 // um site, e o editor não configura. Também na pilha, a criação da infraestrutura pelo
-// build-runner com o driver local (#826) e a remoção dela (workspace#97). Ciclo de vida, G1, janela, layout e acessibilidade
+// build-runner com o driver local (#826), a remoção dela (workspace#97) e a conferência, a
+// reaplicação e o lote de reaplicação dos desatualizados (workspace#98). Ciclo de vida, G1, janela, layout e acessibilidade
 // ficam nos testes de domínio e de componente.
 
 /** Sites cadastrados por estes testes; removidos do banco no fim, mesmo se um falhar. */
@@ -357,6 +361,186 @@ test(
     }
   },
 );
+
+// INFRA_DRIVER=local com INFRA_LOCAL_DRIFT_SITES=e2e-drift-* e INFRA_LOCAL_FAIL_STEP=regras
+// (infra/local/compose.override.yaml): a conferência dos sites e2e-drift-… sai desatualizada até
+// uma reaplicação ok, e a primeira reaplicação de cada site falha em Regras. Ids novos a cada
+// rodada: a memória do driver (reaplicados, falhas já forçadas) dura o processo do build-runner.
+// Em série: o lote pega todos os desatualizados e só há um aberto por vez.
+test.describe.serial('infraestrutura desatualizada', { tag: '@stack' }, () => {
+  const stamp = Date.now();
+  const single = `e2e-drift-${stamp}-0`;
+  const batchSites = [`e2e-drift-${stamp}-1`, `e2e-drift-${stamp}-2`] as const;
+  const queue = { timeout: 60_000 };
+  const pool = createPool(getDatabaseUrl());
+  const db = createDb(pool);
+  test.afterAll(async () => {
+    await pool.end();
+  });
+
+  /**
+   * Cadastra o site (a configuração do exemplo-a com id, nome e domínio próprios), marca a infra
+   * como aplicada e enfileira a conferência, como a partida do build-runner faria; espera o
+   * resultado `desatualizado` gravado no site.
+   */
+  async function outdatedSite(siteId: string, name: string): Promise<void> {
+    created.push(siteId);
+    const base = await currentConfig(db, 'exemplo-a');
+    if (base === undefined) throw new Error('exemplo-a sem configuração');
+    await db.transaction(async (tx) => {
+      must(
+        await createSite(tx, SYSTEM_ACTOR, {
+          ...base,
+          siteId,
+          name,
+          domains: [`${siteId}.example.com`],
+        }),
+      );
+      must(await advanceLifecycle(tx, SYSTEM_ACTOR, siteId, 'infra_aplicada'));
+      await scheduleSiteInfraDriftCheck(tx, siteId);
+    });
+    await expect
+      .poll(() => driftStatus(db, siteId), { message: `conferência de ${siteId}`, ...queue })
+      .toBe('desatualizado');
+  }
+
+  test('a conferência mostra o site desatualizado na lista e no site', async ({ page }) => {
+    await outdatedSite(single, 'Site desatualizado do E2E');
+    await asRole(page, 'operacao');
+    const row = page.getByRole('row').filter({ hasText: single });
+    await expect(row.getByText('Infra desatualizada', { exact: true })).toBeVisible();
+
+    await page.goto(`/sites/${single}`);
+    await expect(infraStep(page)).toContainText('Infra desatualizada');
+  });
+
+  test('a reaplicação, depois de uma falha e "Tentar de novo", deixa o site em dia', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await asRole(page, 'operacao');
+    await page.goto(`/sites/${single}`);
+    // Espera a página hidratar: um clique antes disso não chega ao onClick.
+    await page.waitForLoadState('networkidle');
+    const infra = infraStep(page);
+    const dialog = page.getByRole('alertdialog', { name: 'Reaplicar a infraestrutura do site?' });
+    const summary = dialog.getByRole('list', { name: 'Resumo por etapa' });
+    const live = page
+      .getByRole('status')
+      .getByText(/^Reaplicação da infraestrutura (em andamento|concluída|falhou)/);
+    const confirmReapply = async () => {
+      await expect(summary).toBeVisible(queue);
+      await expect(summary.getByRole('listitem').filter({ hasText: 'Regras' })).toContainText(
+        '1 a alterar',
+      );
+      await dialog.getByRole('button', { name: 'Confirmar' }).click();
+    };
+
+    // Primeira reaplicação: o resumo com a mudança simulada e a falha forçada em Regras.
+    await infra.getByRole('button', { name: 'Reaplicar infraestrutura' }).click();
+    await confirmReapply();
+    await expect(live).toContainText('falhou na etapa Regras', queue);
+    await expect(live).toContainText('Falha simulada na etapa regras');
+    await expect(infra).toContainText('Infra desatualizada');
+
+    // Nova tentativa: plano novo, a conclusão e o selo some.
+    await infra
+      .getByRole('button', { name: 'Tentar de novo a reaplicação da infraestrutura' })
+      .click(queue);
+    await confirmReapply();
+    await expect(live).toContainText('Reaplicação da infraestrutura concluída', queue);
+    await expect.poll(() => driftStatus(db, single), queue).toBe('em_dia');
+    await page.reload();
+    await expect(infraStep(page)).not.toContainText('Infra desatualizada');
+
+    // O histórico: as duas reaplicações, com quem pediu, quando e o resultado.
+    const history = page
+      .getByRole('listitem')
+      .filter({ hasText: /^Reaplicação da infraestrutura/ });
+    await expect(history).toHaveCount(2);
+    await expect(history.nth(0)).toContainText('operacao@orakel.local');
+    await expect(history.nth(0).locator('time')).toBeVisible();
+    await expect(history.nth(0)).toContainText('Infraestrutura em dia com a descrição atual');
+    await expect(history.nth(1)).toContainText('falhou na etapa Regras');
+
+    await page.goto('/sites');
+    await expect(
+      page.getByRole('row').filter({ hasText: single }).getByText('Infra desatualizada'),
+    ).toHaveCount(0);
+  });
+
+  test('o lote para no site que falhou e os seguintes continuam desatualizados', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await outdatedSite(batchSites[0], 'Lote do E2E, primeiro');
+    await outdatedSite(batchSites[1], 'Lote do E2E, segundo');
+    // O lote pega todos os desatualizados: com outro na base, a ordem e a parada mudariam.
+    const outdated = await db
+      .select({ id: sites.id })
+      .from(sites)
+      .where(eq(sites.infraDriftStatus, 'desatualizado'))
+      .orderBy(asc(sites.id));
+    expect(outdated.map((row) => row.id)).toEqual([...batchSites]);
+
+    await asRole(page, 'operacao');
+    // Espera a página hidratar: um clique antes disso não chega ao onClick.
+    await page.waitForLoadState('networkidle');
+    const dialog = page.getByRole('alertdialog', {
+      name: 'Reaplicar a infraestrutura dos sites desatualizados?',
+    });
+    await page.getByRole('button', { name: 'Reaplicar nos desatualizados' }).click();
+    const toReapply = dialog.getByRole('list', { name: 'Sites a reaplicar' });
+    await expect(toReapply).toBeVisible(queue);
+    await expect(toReapply.getByRole('listitem', { name: 'Lote do E2E, primeiro' })).toBeVisible();
+    await expect(toReapply.getByRole('listitem', { name: 'Lote do E2E, segundo' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Confirmar' }).click();
+
+    // O primeiro falha em Regras, e o lote para: o segundo fica sem aplicar.
+    await expect(page.getByRole('status', { name: 'Progresso da reaplicação' })).toContainText(
+      'interrompida',
+      queue,
+    );
+    const cardSites = page
+      .getByRole('list', { name: 'Sites da reaplicação' })
+      .getByRole('listitem');
+    await expect(cardSites.filter({ hasText: 'Lote do E2E, primeiro' })).toContainText(
+      'Falhou em Regras: Falha simulada na etapa regras (driver local)',
+    );
+    await expect(cardSites.filter({ hasText: 'Lote do E2E, segundo' })).toContainText(
+      'Não aplicado',
+    );
+
+    // Os dois continuam desatualizados, e o segundo não teve execução aplicada.
+    for (const siteId of batchSites) {
+      await expect(
+        page.getByRole('row').filter({ hasText: siteId }).getByText('Infra desatualizada'),
+      ).toBeVisible(queue);
+    }
+    const runs = await db
+      .select({ status: infraRuns.status })
+      .from(infraRuns)
+      .where(eq(infraRuns.siteId, batchSites[1]));
+    expect(runs.map((run) => run.status)).toEqual(['cancelado']);
+  });
+});
+
+/** O item "Infra e zona" das etapas da publicação, na página do site. */
+function infraStep(page: Page) {
+  return page
+    .getByRole('list', { name: 'Etapas da publicação' })
+    .getByRole('listitem')
+    .filter({ hasText: 'Infra e zona' });
+}
+
+/** O resultado da última conferência da infra gravado no site. */
+async function driftStatus(db: Db, siteId: string): Promise<string | null | undefined> {
+  const [site] = await db
+    .select({ status: sites.infraDriftStatus })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  return site?.status;
+}
 
 test('editor não cadastra nem edita a configuração', async ({ page }) => {
   await asRole(page, 'editor');
