@@ -7,11 +7,13 @@ import {
   contentVersions,
   editorialContexts,
   generationRuns,
+  reviews,
   taxonomies,
   type GenerationStatus,
 } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { resourcesFor, siteExists } from '../sites/sites.ts';
+import type { CorrectionInput } from './correct.ts';
 import { currentEditorialContext } from './editorial-contexts.ts';
 import type { GenerationInput, GenerationResult } from './generate.ts';
 
@@ -295,6 +297,83 @@ export async function pendingRun(
       categories,
       resources: await resourcesFor(db, row.siteId),
       publishedAt: options.now ?? new Date(),
+    },
+  };
+}
+
+export type PendingCorrection = {
+  runId: number;
+  siteId: string;
+  contentId: number;
+  /** Versão devolvida: a que a rota interna exige como base da N+1. */
+  baseVersion: number;
+  input: CorrectionInput;
+};
+
+/**
+ * Insumos da correção ainda `pendente` (ADR 0023): os dados da versão devolvida, o comentário da
+ * revisão que pediu a correção, o contexto editorial gravado no pedido (se houver) e os recursos
+ * da release do site. `undefined` se a execução não existe, já terminou ou não é `correcao`. Sem
+ * ator nem checagem da devolução: a permissão ficou na devolução, e a guarda da versão-base é da
+ * rota interna, que recusa se o editor já mexeu.
+ */
+export async function pendingCorrection(
+  db: Executor,
+  runId: number,
+): Promise<PendingCorrection | undefined> {
+  const [row] = await db
+    .select({
+      siteId: generationRuns.siteId,
+      contentId: generationRuns.contentId,
+      baseVersion: generationRuns.baseVersion,
+      data: contentVersions.data,
+      comment: reviews.comment,
+      editorialContext: editorialContexts.body,
+    })
+    .from(generationRuns)
+    .innerJoin(
+      contentVersions,
+      and(
+        eq(contentVersions.siteId, generationRuns.siteId),
+        eq(contentVersions.contentId, generationRuns.contentId),
+        eq(contentVersions.version, generationRuns.baseVersion),
+      ),
+    )
+    .innerJoin(reviews, eq(reviews.id, generationRuns.reviewId))
+    .leftJoin(
+      editorialContexts,
+      and(
+        eq(editorialContexts.siteId, generationRuns.siteId),
+        eq(editorialContexts.version, generationRuns.editorialContextVersion),
+      ),
+    )
+    .where(
+      and(
+        eq(generationRuns.id, runId),
+        eq(generationRuns.kind, 'correcao'),
+        eq(generationRuns.status, 'pendente'),
+      ),
+    );
+  // O CHECK `generation_runs_correcao_check` garante conteúdo e versão-base; a devolução exige
+  // o comentário.
+  if (
+    row === undefined ||
+    row.contentId === null ||
+    row.baseVersion === null ||
+    row.comment === null
+  ) {
+    return undefined;
+  }
+  return {
+    runId,
+    siteId: row.siteId,
+    contentId: row.contentId,
+    baseVersion: row.baseVersion,
+    input: {
+      version: row.data,
+      comment: row.comment,
+      ...(row.editorialContext === null ? {} : { editorialContext: row.editorialContext }),
+      resources: await resourcesFor(db, row.siteId),
     },
   };
 }
