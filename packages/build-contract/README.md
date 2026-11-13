@@ -20,11 +20,14 @@ if (result.status === 'failed') pause(result.failure.message); // permanent | tr
 O volume `/infra` da imagem `infra-runner` (ADR 0027 da raiz) segue o mesmo molde, com
 `INFRA_DIR` e `INFRA_PATHS`:
 
-| Arquivo (`/infra`) | Escrito por | Conteúdo                                                |
-| ------------------ | ----------- | ------------------------------------------------------- |
-| `site.tfplan`      | plan        | Plano salvo e cifrado, aplicado tal como foi gerado     |
-| `infra-plan.json`  | plan        | `ok` (recursos que mudam, com a ação) ou falha          |
-| `infra-apply.json` | apply       | `ok` (`nameServers`, `zoneId`, `crawlerHints`) ou falha |
+| Arquivo (`/infra`) | Escrito por | Conteúdo                                                             |
+| ------------------ | ----------- | -------------------------------------------------------------------- |
+| `site.tfplan`      | plan        | Plano salvo e cifrado, aplicado tal como foi gerado                  |
+| `infra-plan.json`  | plan        | `ok` (`mode` e recursos que mudam, com a ação) ou falha              |
+| `infra-apply.json` | apply       | `ok` (`nameServers`, `zoneId`, `crawlerHints`), `destroyed` ou falha |
+
+O `mode` do plano (`create` ou `destroy`, de `INFRA_MODE`) decide o resultado do apply: um plano
+de destruição termina em `destroyed`, sem saídas.
 
 Códigos de saída: `0` ok, `10` permanente, `20` transitória. Comandos (nesta pasta):
 `pnpm test` · `pnpm lint` · `pnpm typecheck`. Decisões: `docs/decisions/` e o ADR 0002 do

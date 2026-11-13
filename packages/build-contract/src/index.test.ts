@@ -5,6 +5,7 @@ import {
   EXIT_CODES,
   EdgeLocalRollbackSchema,
   INFRA_DIR,
+  INFRA_MODES,
   INFRA_PATHS,
   InfraApplyResultSchema,
   InfraPlanResultSchema,
@@ -137,6 +138,27 @@ describe('infra-plan.json e infra-apply.json (volume /infra)', () => {
     expect(InfraPlanResultSchema.safeParse(noop).success).toBe(false);
   });
 
+  it('plano sem modo é de criação; o de destruição traz mode destroy e as remoções', () => {
+    const legacy = InfraPlanResultSchema.parse({ ...infra, status: 'ok', changes: [] });
+    expect(legacy).toMatchObject({ status: 'ok', mode: 'create' });
+    const destroy = {
+      ...infra,
+      status: 'ok',
+      mode: 'destroy',
+      changes: [
+        { address: 'module.site.cloudflare_zone.site', type: 'cloudflare_zone', action: 'delete' },
+        {
+          address: 'module.site.cloudflare_r2_bucket.media',
+          type: 'cloudflare_r2_bucket',
+          action: 'delete',
+        },
+      ],
+    };
+    expect(InfraPlanResultSchema.safeParse(destroy).success).toBe(true);
+    expect(InfraPlanResultSchema.safeParse({ ...destroy, mode: 'remover' }).success).toBe(false);
+    expect(INFRA_MODES).toEqual(['create', 'destroy']);
+  });
+
   it('apply ok traz nameservers, zona e o estado do Crawler Hints', () => {
     const ok = {
       ...infra,
@@ -149,6 +171,12 @@ describe('infra-plan.json e infra-apply.json (volume /infra)', () => {
     expect(InfraApplyResultSchema.safeParse({ ...ok, crawlerHints: 'falhou' }).success).toBe(true);
     expect(InfraApplyResultSchema.safeParse({ ...ok, nameServers: [] }).success).toBe(false);
     expect(InfraApplyResultSchema.safeParse({ ...ok, crawlerHints: 'talvez' }).success).toBe(false);
+  });
+
+  it('apply de um plano de destruição confirma a remoção, sem saídas nem Crawler Hints', () => {
+    const destroyed = { ...infra, status: 'destroyed' };
+    expect(InfraApplyResultSchema.safeParse(destroyed).success).toBe(true);
+    expect(InfraApplyResultSchema.safeParse({ ...destroyed, durationMs: -1 }).success).toBe(false);
   });
 
   it('falha traz o tipo e a mensagem, nos dois arquivos', () => {

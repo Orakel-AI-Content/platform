@@ -287,6 +287,8 @@ jobs:
           infra/local/compose.sh config --quiet
       - name: Alvos do bake válidos
         run: docker/bake.sh default --print
+      - name: Resumo do plano do infra-runner
+        run: docker/infra-runner/test/summary.sh
 
   # OpenTofu da infraestrutura de cada site (ADR 0027): formato e validação sem credenciais. O
   # `init -backend=false` não toca no tofu-state nem pede a senha do estado.

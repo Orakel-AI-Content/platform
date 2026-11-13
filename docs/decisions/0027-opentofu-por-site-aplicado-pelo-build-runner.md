@@ -102,3 +102,21 @@ requisitos atribui ao OpenTofu. O módulo passa a declarar também:
 O bucket de mídia é recurso da conta, mas tem nome por site: não colide entre os estados. A
 regra "nenhum recurso de conta no módulo" vale para os recursos compartilhados. O token de
 infra ganha as permissões dessas regras e do R2 (`infra/site/README.md`).
+
+## Revisão (2026-11-13): remoção pelo Backoffice
+
+A platform#835 (Story workspace#97, remover a infraestrutura de um site) tira o
+`prevent_destroy` do bucket `media-<SITE_ID>`. Com ele, o `plan -destroy` falha, e o OpenTofu
+não aceita variável nesse campo: a remoção pelo Backoffice exigiria editar o módulo a cada site.
+A trava contra a remoção passa a ser o Backoffice: só o admin, só com o site pausado, depois do
+resumo do plano real e com o domínio digitado.
+
+O `infra-runner` ganha o modo destroy no `plan` (`INFRA_MODE=destroy`, `tofu plan -destroy
+-out`). O `infra-plan.json` registra o `mode`, e o `apply` lê o modo dali: o plano salvo é
+aplicado como antes, e o pedido do apply não diverge do plano. Numa destruição, o
+`infra-apply.json` traz `status: "destroyed"`, sem saídas nem Crawler Hints. O bucket precisa
+estar vazio antes do destroy, e o estado `sites/<SITE_ID>.tfstate` fica vazio e reaproveitável.
+
+Alternativas descartadas: `tofu state rm` do bucket com remoção pela API (dois caminhos de
+remoção e estado divergente do código) e preservar o bucket com um bloco `removed` (a mídia de
+um site removido ficaria para sempre na conta).

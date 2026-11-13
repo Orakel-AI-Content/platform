@@ -1,0 +1,107 @@
+[
+  {
+    "address": "module.site.cloudflare_zone.site",
+    "type": "cloudflare_zone",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_zone_setting.security_header",
+    "type": "cloudflare_zone_setting",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_zone_setting.min_tls_version",
+    "type": "cloudflare_zone_setting",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_zone_setting.always_use_https",
+    "type": "cloudflare_zone_setting",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_tiered_cache.site",
+    "type": "cloudflare_tiered_cache",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_dns_record.spf",
+    "type": "cloudflare_dns_record",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_dns_record.dmarc",
+    "type": "cloudflare_dns_record",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_email_routing_settings.site",
+    "type": "cloudflare_email_routing_settings",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_email_routing_dns.site",
+    "type": "cloudflare_email_routing_dns",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_email_routing_rule.alias[\"contato\"]",
+    "type": "cloudflare_email_routing_rule",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_email_routing_rule.alias[\"editorial\"]",
+    "type": "cloudflare_email_routing_rule",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_email_routing_catch_all.site",
+    "type": "cloudflare_email_routing_catch_all",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_r2_bucket.media",
+    "type": "cloudflare_r2_bucket",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_r2_custom_domain.media",
+    "type": "cloudflare_r2_custom_domain",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_r2_managed_domain.media",
+    "type": "cloudflare_r2_managed_domain",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_ruleset.cache",
+    "type": "cloudflare_ruleset",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_dns_record.www",
+    "type": "cloudflare_dns_record",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_ruleset.redirect",
+    "type": "cloudflare_ruleset",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_ruleset.rate_limit",
+    "type": "cloudflare_ruleset",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_ruleset.waf",
+    "type": "cloudflare_ruleset",
+    "action": "delete"
+  },
+  {
+    "address": "module.site.cloudflare_bot_management.site",
+    "type": "cloudflare_bot_management",
+    "action": "delete"
+  }
+]
