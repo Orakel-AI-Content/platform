@@ -3,15 +3,18 @@ import { isValidElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LifecycleAction } from '@/components/sites/SiteActions';
+import { SitePublicationTab } from '@/components/sites/SitePublicationTab';
 
 // Página do site (#825): "Criar infraestrutura" vem no `LifecycleAction` da etapa Infra e zona,
 // que a página só passa com site.configure (admin e operação), com a execução aberta do site.
-// "Remover infraestrutura" (workspace#97) vai no mesmo `LifecycleAction`, só com site.destroy.
+// "Remover infraestrutura" (workspace#97) vai no mesmo `LifecycleAction`, só com site.destroy;
+// "Reaplicar infraestrutura" (workspace#98), com site.configure.
 
 const state = vi.hoisted(() => ({
   roles: ['operacao'] as string[],
   openInfra: null as null | Record<string, unknown>,
   history: [] as Record<string, unknown>[],
+  driftStatus: null as null | 'em_dia' | 'desatualizado',
 }));
 
 const ok = <T,>(value: T) => Promise.resolve({ ok: true, value });
@@ -37,6 +40,7 @@ vi.mock('./editorial-page.tsx', () => ({
         dailyPublishLimit: null,
         effectiveDailyPublishLimit: 10,
         publishedToday: 0,
+        infraDrift: { status: state.driftStatus, summary: null, checkedAt: null, error: null },
       },
     }),
 }));
@@ -44,6 +48,7 @@ vi.mock('../actions.ts', () => ({
   cancelBuildAction: vi.fn(),
   checkSiteInfraAction: vi.fn(),
   confirmInfraPlanAction: vi.fn(),
+  confirmInfraReapplyAction: vi.fn(),
   confirmInfraRemovalAction: vi.fn(),
   infraPlanAction: vi.fn(),
   pauseSiteAction: vi.fn(),
@@ -51,6 +56,7 @@ vi.mock('../actions.ts', () => ({
   rebuildOnReleaseAction: vi.fn(),
   registerG1Action: vi.fn(),
   requestInfraPlanAction: vi.fn(),
+  requestInfraReapplyAction: vi.fn(),
   requestInfraRemovalAction: vi.fn(),
   resumeSiteAction: vi.fn(),
   retreatLifecycleAction: vi.fn(),
@@ -190,4 +196,55 @@ describe('página do site: Remover infraestrutura', () => {
     const remove = (await lifecycleAction())?.props.remove as { open: unknown };
     expect(remove.open).toEqual({ id: 5, kind: 'remover', status: 'aguardando_confirmacao' });
   });
+});
+
+describe('página do site: Reaplicar infraestrutura', () => {
+  beforeEach(() => {
+    state.openInfra = null;
+    state.history = [];
+    state.driftStatus = null;
+  });
+
+  it.each([['admin'], ['operacao']])('%s recebe a reaplicação', async (role) => {
+    state.roles = [role];
+    const reapply = (await lifecycleAction())?.props.reapply as Record<string, unknown> | undefined;
+    expect(reapply?.open).toBeNull();
+    expect(reapply?.retry).toBe(false);
+    for (const key of ['request', 'read', 'confirm']) {
+      expect(typeof reapply?.[key]).toBe('function');
+    }
+  });
+
+  it('a execução aberta vai com o tipo e o lote, para reabrir só a reaplicação pedida no site', async () => {
+    state.roles = ['operacao'];
+    state.openInfra = { id: 6, kind: 'reaplicar', status: 'planejando', inBatch: true };
+    const reapply = (await lifecycleAction())?.props.reapply as { open: unknown };
+    expect(reapply.open).toEqual({ id: 6, kind: 'reaplicar', status: 'planejando', inBatch: true });
+  });
+
+  it('com a última reaplicação em falha, vem com "Tentar de novo"', async () => {
+    state.roles = ['operacao'];
+    const reapply = (id: number, status: string) => ({
+      type: 'infra',
+      id,
+      kind: 'reaplicar',
+      status,
+    });
+    state.history = [{ type: 'infra', id: 9, kind: 'criar', status: 'ok' }, reapply(3, 'falhou')];
+    expect(((await lifecycleAction())?.props.reapply as { retry: boolean }).retry).toBe(true);
+
+    state.history = [reapply(4, 'ok'), reapply(3, 'falhou')];
+    expect(((await lifecycleAction())?.props.reapply as { retry: boolean }).retry).toBe(false);
+  });
+
+  it.each([['desatualizado' as const], ['em_dia' as const], [null]])(
+    'a aba Publicação recebe o resultado da conferência (%s), para todos os papéis',
+    async (driftStatus) => {
+      state.roles = ['editor'];
+      state.driftStatus = driftStatus;
+      const page = await SitePage({ params: Promise.resolve({ site: 'exemplo-a' }) });
+      const tab = find(page, SitePublicationTab);
+      expect((tab?.props.site as { infraDriftStatus: unknown }).infraDriftStatus).toBe(driftStatus);
+    },
+  );
 });

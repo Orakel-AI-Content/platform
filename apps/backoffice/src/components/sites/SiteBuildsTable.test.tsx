@@ -208,6 +208,48 @@ describe('SiteBuildsTable', () => {
     expect(failed?.textContent).toContain('Motivo: Falha simulada');
   });
 
+  it('a reaplicação da infra diz quem pediu, quando e o resultado (workspace#98)', () => {
+    const reapply = (over: Partial<InfraHistoryItem>): InfraHistoryItem => ({
+      type: 'infra',
+      id: 8,
+      kind: 'reaplicar',
+      status: 'ok',
+      requestedBy: 'adm@orakel.local',
+      requestedAt: new Date('2026-10-11T16:58:00Z'),
+      confirmedBy: 'adm@orakel.local',
+      at: new Date('2026-10-11T17:05:00Z'),
+      nameservers: null,
+      failure: null,
+      ...over,
+    });
+    render(
+      <SiteBuildsTable
+        history={[
+          reapply({}),
+          reapply({
+            id: 7,
+            status: 'falhou',
+            requestedBy: 'operacao@orakel.local',
+            at: new Date('2026-10-11T16:50:00Z'),
+            failure: { step: 'dns', message: 'token expirado' },
+          }),
+        ]}
+        timeZone="America/Sao_Paulo"
+      />,
+      { container: app },
+    );
+
+    const [ok, failed] = screen.getAllByRole('listitem');
+    expect(ok?.textContent).toContain('Reaplicação da infraestrutura');
+    expect(ok?.textContent).toContain('adm@orakel.local · 11/10/2026, 14:05 BRT');
+    expect(ok?.textContent).toContain('Infraestrutura em dia com a descrição atual');
+    expect(failed?.textContent).toContain(
+      'Reaplicação da infraestrutura · falhou na etapa Registros de DNS',
+    );
+    expect(failed?.textContent).toContain('operacao@orakel.local · 11/10/2026, 13:50 BRT');
+    expect(failed?.textContent).toContain('Motivo: token expirado');
+  });
+
   it('não usa mais a tabela', () => {
     render(<SiteBuildsTable history={HISTORY} timeZone="America/Sao_Paulo" />, { container: app });
 

@@ -10,6 +10,7 @@ import {
   BUILD_STATUS_VARIANT,
   formatDateTime,
   historyItemTitle,
+  INFRA_REAPPLY_OK_TEXT,
 } from '@/components/shared/siteLabels.ts';
 import { Timeline } from '@/components/ui/Timeline';
 import classNames from '@/components/ui/utils/classNames';
@@ -18,10 +19,14 @@ import type { SiteHistoryItem } from '@/domain/builds/builds.ts';
 import { type FailedExecution, SiteExecutionDrawer } from './SiteExecutionDrawer.tsx';
 import { StateTag } from './SiteStatus.tsx';
 
-/** Resultado de uma criação da infra (#826): o motivo da falha ou os nameservers da zona. */
+/**
+ * Resultado de uma execução da infra (#826): o motivo da falha, os nameservers da zona criada
+ * ou, na reaplicação concluída (workspace#98), que a infra ficou em dia.
+ */
 function infraResult(item: SiteHistoryItem): string | null {
   if (item.type !== 'infra') return null;
   if (item.failure?.message) return `Motivo: ${item.failure.message}`;
+  if (item.kind === 'reaplicar' && item.status === 'ok') return INFRA_REAPPLY_OK_TEXT;
   if (item.nameservers && item.nameservers.length > 0) {
     return `Nameservers: ${item.nameservers.join(', ')}`;
   }
@@ -60,8 +65,9 @@ function version(item: SiteHistoryItem): string | null {
  * nas execuções), quem (no cancelamento, quem cancelou), quando no fuso do site e a versão. O
  * marcador é decorativo, na cor do status. O item de uma falha tem o botão "Ver detalhe", que
  * abre o `SiteExecutionDrawer`; o item em si não é clicável, e o foco volta ao botão quando o
- * painel fecha. A criação da infraestrutura (#826) diz, abaixo, o motivo da falha (a etapa vai
- * no título) ou os nameservers a configurar no registrador. Sem itens, o `EmptyState`. O título
+ * painel fecha. A execução da infraestrutura (#826) tem o tipo no título e diz, abaixo, o motivo
+ * da falha (a etapa vai no título), os nameservers a configurar no registrador ou, na
+ * reaplicação concluída, que a infra ficou em dia. Sem itens, o `EmptyState`. O título
  * "Histórico" fica acima, no
  * `SiteLiveActivity`.
  */

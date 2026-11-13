@@ -216,6 +216,9 @@ export const INFRA_REMOVAL_PAUSE_FIRST = 'Para remover a infraestrutura, pause o
 /** Selo da etapa Infra e zona quando a conferência achou a infra fora da descrição (workspace#98). */
 export const INFRA_OUTDATED_LABEL = 'Infra desatualizada';
 
+/** Resultado de uma reaplicação concluída, no histórico do site (workspace#98). */
+export const INFRA_REAPPLY_OK_TEXT = 'Infraestrutura em dia com a descrição atual';
+
 /** Etapa de uma execução de infra: as do módulo e, só na remoção, as páginas do site. */
 export function infraRunStepLabel(step: InfraStep): string {
   return step === 'paginas' ? 'Páginas do site' : INFRA_STEP_LABEL[step];
