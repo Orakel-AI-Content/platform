@@ -90,8 +90,8 @@ export type InfraPlanView =
   /** `summary` nulo quando o resumo gravado não é um `InfraPlanSummary` válido. */
   | { status: 'aguardando_confirmacao'; summary: InfraPlanSummary | null }
   | { status: 'falhou'; message: string }
-  /** Já confirmada (ou concluída): não há mais o que confirmar. */
-  | { status: 'aplicando' | 'ok' };
+  /** Já confirmada, concluída ou cancelada pelo lote: não há mais o que confirmar. */
+  | { status: 'aplicando' | 'ok' | 'cancelado' };
 
 function parseSummary(raw: string | null): InfraPlanSummary | null {
   if (raw === null) return null;
