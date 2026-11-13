@@ -40,6 +40,7 @@ import {
   infraStepChangesText,
   infraRemovalPagesText,
   latestInfraCreation,
+  latestInfraRun,
   liveResultText,
   liveStatusText,
   liveVersionText,
@@ -362,10 +363,10 @@ describe('andamento e histórico da criação da infra (#826)', () => {
   });
 
   it('a faixa da criação aplicando diz a etapa corrente, quando já há uma', () => {
-    expect(infraLiveStatusText({ currentStep: null })).toBe(
+    expect(infraLiveStatusText({ kind: 'criar', currentStep: null })).toBe(
       'Criação da infraestrutura em andamento',
     );
-    expect(infraLiveStatusText({ currentStep: 'dns' })).toBe(
+    expect(infraLiveStatusText({ kind: 'criar', currentStep: 'dns' })).toBe(
       'Criação da infraestrutura em andamento, etapa: Registros de DNS',
     );
   });
@@ -395,5 +396,32 @@ describe('andamento e histórico da criação da infra (#826)', () => {
     const removal = run({ id: 9, kind: 'remover', nameservers: null });
     expect(latestInfraCreation([removal, failed, run({ id: 1 })])).toBe(failed);
     expect(latestInfraCreation([removal])).toBeUndefined();
+  });
+
+  it('a execução mais recente de um tipo ignora as de outro tipo', () => {
+    const reapply = run({ id: 9, kind: 'reaplicar', nameservers: null });
+    expect(latestInfraRun([failed, reapply, run({ id: 1, kind: 'reaplicar' })], 'reaplicar')).toBe(
+      reapply,
+    );
+    expect(latestInfraRun([failed], 'reaplicar')).toBeUndefined();
+  });
+
+  it('remoção e reaplicação levam o próprio rótulo no histórico e na faixa', () => {
+    const reapply = { ...failed, kind: 'reaplicar' as const };
+    expect(historyItemTitle(run({ kind: 'remover', nameservers: null }))).toBe(
+      'Remoção da infraestrutura',
+    );
+    expect(historyItemTitle(run({ kind: 'reaplicar', nameservers: null }))).toBe(
+      'Reaplicação da infraestrutura',
+    );
+    expect(historyItemTitle(reapply)).toBe(
+      'Reaplicação da infraestrutura · falhou na etapa Regras',
+    );
+    expect(infraLiveStatusText({ kind: 'reaplicar', currentStep: 'dns' })).toBe(
+      'Reaplicação da infraestrutura em andamento, etapa: Registros de DNS',
+    );
+    expect(infraLiveResultText(run({ kind: 'reaplicar', nameservers: null }), 'UTC')).toBe(
+      'Reaplicação da infraestrutura concluída em 01/10/2026, 12:00 UTC',
+    );
   });
 });
