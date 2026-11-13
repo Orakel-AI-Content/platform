@@ -10,6 +10,7 @@ import { LifecycleAction } from '@/components/sites/SiteActions';
 const state = vi.hoisted(() => ({
   roles: ['operacao'] as string[],
   openInfra: null as null | Record<string, unknown>,
+  history: [] as Record<string, unknown>[],
 }));
 
 const ok = <T,>(value: T) => Promise.resolve({ ok: true, value });
@@ -65,7 +66,7 @@ vi.mock('@/domain/sites/sites.ts', () => ({
 }));
 vi.mock('@/domain/content/contents.ts', () => ({ countContentsByStatus: () => ok({}) }));
 vi.mock('@/domain/builds/builds.ts', () => ({
-  siteActivity: () => ok({ open: null, openInfra: state.openInfra, history: [] }),
+  siteActivity: () => ok({ open: null, openInfra: state.openInfra, history: state.history }),
   listRollbackVersions: () => ok([]),
   previousVersion: () => ok(null),
 }));
@@ -103,6 +104,7 @@ async function lifecycleAction() {
 describe('página do site: Criar infraestrutura', () => {
   beforeEach(() => {
     state.openInfra = null;
+    state.history = [];
   });
 
   it.each([['admin'], ['operacao']])('%s recebe a ação com a infra do site', async (role) => {
@@ -135,5 +137,18 @@ describe('página do site: Criar infraestrutura', () => {
       id: 4,
       status: 'aguardando_confirmacao',
     });
+  });
+
+  it('com a última criação em falha, a ação vem com "Tentar de novo" (#826)', async () => {
+    state.roles = ['operacao'];
+    const creation = (id: number, status: string) => ({ type: 'infra', id, kind: 'criar', status });
+    state.history = [
+      { type: 'infra', id: 9, kind: 'remover', status: 'ok' },
+      creation(3, 'falhou'),
+    ];
+    expect(((await lifecycleAction())?.props.infra as { retry: boolean }).retry).toBe(true);
+
+    state.history = [creation(4, 'ok'), creation(3, 'falhou')];
+    expect(((await lifecycleAction())?.props.infra as { retry: boolean }).retry).toBe(false);
   });
 });

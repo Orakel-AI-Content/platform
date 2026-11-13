@@ -42,10 +42,12 @@ const UNDO_STEP = {
 
 /**
  * "Criar infraestrutura" (#825): a execução aberta do site (só o id e o estado) e as actions
- * de pedir o plano, lê-lo e confirmá-lo, ligadas ao site.
+ * de pedir o plano, lê-lo e confirmá-lo, ligadas ao site. `retry`: a última criação falhou, e o
+ * botão vira "Tentar de novo" (#826), uma nova execução com novo plano e nova confirmação.
  */
 export type CreateInfraActions = {
   open: Pick<OpenInfraRun, 'id' | 'status'> | null;
+  retry?: boolean;
   request: () => Promise<{ ok: true; runId: number } | { ok: false; message: string }>;
   read: (runId: number) => Promise<InfraPlanView | null>;
   confirm: (runId: number) => Promise<ActionResult>;
@@ -126,10 +128,12 @@ export function LifecycleAction({
         >
           {pending('infra')
             ? 'Confirmando…'
-            : openRun === null
-              ? 'Criar infraestrutura'
-              : 'Revisar e confirmar'}
-          {openRun !== null && !pending('infra') && (
+            : openRun !== null
+              ? 'Revisar e confirmar'
+              : infra.retry
+                ? 'Tentar de novo'
+                : 'Criar infraestrutura'}
+          {(openRun !== null || infra.retry) && !pending('infra') && (
             <span className="sr-only"> a criação da infraestrutura</span>
           )}
         </Button>
