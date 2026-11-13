@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  amendAction,
   approveAction,
   approvePublishAction,
   approveScheduleAction,
@@ -17,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   approveVersion: vi.fn(),
   approveAndPublish: vi.fn(),
   approveAndSchedule: vi.fn(),
+  amendInReview: vi.fn(),
+  resourcesFor: vi.fn(),
   setConfirmation: vi.fn(),
   setAllConfirmations: vi.fn(),
   revalidatePath: vi.fn(),
@@ -27,6 +30,8 @@ vi.mock('@/auth/request-actor.ts', () => ({ currentActor: mocks.currentActor }))
 vi.mock('@/db/client.ts', () => ({
   getDb: () => ({ db: { transaction: (fn: (tx: unknown) => unknown) => fn({}) } }),
 }));
+vi.mock('@/domain/content/contents.ts', () => ({ amendInReview: mocks.amendInReview }));
+vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
 vi.mock('@/domain/reviews/reviews.ts', () => ({
   approveVersion: mocks.approveVersion,
   approveAndPublish: mocks.approveAndPublish,
@@ -47,6 +52,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.currentActor.mockResolvedValue({ ok: true, value: revisor });
   mocks.setConfirmation.mockResolvedValue({ ok: true, value: { confirmed: [] } });
+  mocks.resourcesFor.mockResolvedValue({ release: 'r1' });
 });
 
 describe('aprovar na tela de revisão', () => {
@@ -245,5 +251,76 @@ describe('marcar e desmarcar as confirmações na tela de revisão', () => {
       ['/sites/exemplo-a/revisao/1'],
       ['/sites/exemplo-a/revisao/1'],
     ]);
+  });
+});
+
+describe('corrigir na revisão (#751)', () => {
+  const input = { kind: 'artigo', title: 'Título corrigido' } as never;
+
+  it('sem sessão não chama o domínio nem revalida', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await amendAction('exemplo-a', 1, 2, input)).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+      issues: [],
+    });
+    expect(mocks.amendInReview).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('recusa do domínio volta aos campos, como na edição, e não revalida', async () => {
+    mocks.amendInReview.mockResolvedValue({
+      ok: false,
+      issues: [
+        {
+          code: 'review.not_in_review',
+          message: 'A versão 2 não está em revisão',
+          path: [],
+        },
+        { code: 'content.invalid', message: 'Obrigatório', path: ['blocks', 0, 'text'] },
+      ],
+    });
+
+    expect(await amendAction('exemplo-a', 1, 2, input)).toEqual({
+      ok: false,
+      message: 'Não foi possível salvar o conteúdo.',
+      issues: [
+        { path: [], message: 'A versão 2 não está em revisão' },
+        { path: ['blocks', 0, 'text'], message: 'Obrigatório' },
+      ],
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('delega a versão vista com os recursos do site e revalida revisão e conteúdo', async () => {
+    mocks.amendInReview.mockResolvedValue({ ok: true, value: { version: 3, created: true } });
+
+    expect(await amendAction('exemplo-a', 1, 2, input)).toEqual({
+      ok: true,
+      message: 'Correção salva na versão 3.',
+      id: 1,
+    });
+    expect(mocks.amendInReview).toHaveBeenCalledWith({}, revisor, 'exemplo-a', 1, 2, input, {
+      release: 'r1',
+    });
+    expect(mocks.revalidatePath.mock.calls).toEqual([
+      ['/sites/exemplo-a/revisao'],
+      ['/sites/exemplo-a/revisao/1'],
+      ['/sites/exemplo-a/conteudos/1'],
+      ['/sites/exemplo-a/conteudos/1/editar'],
+      ['/sites/exemplo-a/conteudos'],
+    ]);
+  });
+
+  it('sem alteração avisa que nada mudou e não revalida', async () => {
+    mocks.amendInReview.mockResolvedValue({ ok: true, value: { version: 2, created: false } });
+
+    expect(await amendAction('exemplo-a', 1, 2, input)).toEqual({
+      ok: true,
+      message: 'Nenhuma alteração; a versão 2 continua em revisão.',
+      id: 1,
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });

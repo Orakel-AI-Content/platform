@@ -37,8 +37,14 @@ export function forbiddenReason(
 export function ForbiddenScreen({
   action,
   back,
+  reason,
 }: {
   action: Action;
+  /**
+   * Motivo no lugar do de papel, quando a pessoa tem a permissão mas o estado não deixa agir
+   * (#751: corrigir uma versão que não está em revisão).
+   */
+  reason?: string;
   /** O site, quando a pessoa pode vê-lo; senão, a lista de sites. */
   back: { href: string; label: string };
 }) {
@@ -49,7 +55,7 @@ export function ForbiddenScreen({
       action={<ButtonLink href={back.href}>{back.label}</ButtonLink>}
     >
       {/* Anunciado como o alerta que esta tela substitui: a aba mantém o título da página. */}
-      <p role="alert">{forbiddenReason(action)}</p>
+      <p role="alert">{reason ?? forbiddenReason(action)}</p>
     </StatusScreen>
   );
 }

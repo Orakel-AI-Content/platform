@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { PageMeta } from '@/components/shared/PageMeta';
 import { siteTrail } from '@/components/shared/trail.ts';
 import { Button } from '@/components/ui/Button';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 
 import { itemTitle } from '../../item-title.ts';
@@ -91,10 +92,23 @@ export default async function ReviewPage({ params }: Params) {
         title={<>Revisão de “{latest.data.title}”</>}
         action={
           // O mesmo `Button` e variante do "Ver prévia" do editor, em `sm` como as ações de
-          // cabeçalho do guia.
-          <Button asElement="a" href={preview} target="_blank" rel="noopener noreferrer" size="sm">
-            Abrir prévia<span className="sr-only"> (abre em nova aba)</span>
-          </Button>
+          // cabeçalho do guia. "Corrigir" (#751) só com a permissão e a versão em revisão.
+          <div className="flex flex-wrap gap-2">
+            {can(actor, 'content.amend') && latest.status === 'em_revisao' && (
+              <ButtonLink href={`/sites/${site.id}/revisao/${contentId}/corrigir`} size="sm">
+                Corrigir
+              </ButtonLink>
+            )}
+            <Button
+              asElement="a"
+              href={preview}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="sm"
+            >
+              Abrir prévia<span className="sr-only"> (abre em nova aba)</span>
+            </Button>
+          </div>
         }
       />
       <PageMeta
