@@ -3,6 +3,7 @@
 //   PUT  /sites/{site}/versions   tar.gz do publish → 201 { id }
 //   GET  /sites/{site}/versions   { active, versions: [{ id, createdAt, files, active }] }
 //   POST /sites/{site}/rollback   { id }? → { active }  (sem id: a anterior à ativa)
+//   DELETE /sites/{site}          → 204; apaga o site e o proxy responde 404 (mesmo se não existia)
 //   GET  /healthz
 //   POST /_ae-sim/points          ponto do Analytics Engine → ClickHouse (ou NDJSON, sem ele)
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -39,6 +40,7 @@ export function adminHandler(
   return async (req: IncomingMessage, res: ServerResponse) => {
     const { pathname } = new URL(req.url ?? '/', 'http://edge-local');
     const route = /^\/sites\/([^/]+)\/(versions|rollback)$/.exec(pathname);
+    const siteRoute = /^\/sites\/([^/]+)$/.exec(pathname);
     try {
       if (req.method === 'GET' && pathname === '/healthz') {
         return json(res, ready() ? 200 : 503, {
@@ -49,6 +51,11 @@ export function adminHandler(
       if (req.method === 'POST' && pathname === '/_ae-sim/points') {
         const point = JSON.parse((await body(req, 64 * 1024)).toString('utf8')) as DataPoint;
         await sink(point, new Date());
+        res.writeHead(204).end();
+        return;
+      }
+      if (siteRoute && req.method === 'DELETE') {
+        await supervisor.removeSite(decodeURIComponent(siteRoute[1]!));
         res.writeHead(204).end();
         return;
       }

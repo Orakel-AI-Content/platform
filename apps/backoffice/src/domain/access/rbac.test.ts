@@ -12,6 +12,7 @@ describe('RBAC', () => {
 
   it.each<[Action, string[]]>([
     ['site.configure', ['admin', 'operacao']],
+    ['site.destroy', ['admin']],
     ['content.write', ['admin', 'editor']],
     ['content.amend', ['admin', 'revisor']],
     ['content.publish', ['admin', 'revisor']],

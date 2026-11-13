@@ -599,6 +599,37 @@ export async function setDailyPublishLimit(
   return { ok: true, value: undefined };
 }
 
+/**
+ * Infraestrutura removida (workspace#97): o site volta a `cadastrado`, sem versão no ar nem
+ * conferência da infra, e pode ter a infra criada de novo. O estado (`pausado`, com o motivo) e a
+ * `release` ficam. Em nome de quem confirmou a remoção, com `site.destroy`.
+ */
+export async function resetSiteInfra(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.destroy');
+  if (!allowed.ok) return allowed;
+
+  const updated = await tx
+    .update(sites)
+    .set({
+      lifecycle: 'cadastrado',
+      activeVersionId: null,
+      infraCheckedAt: null,
+      infraCheckError: null,
+    })
+    .where(eq(sites.id, siteId))
+    .returning({ id: sites.id });
+  return updated.length > 0
+    ? { ok: true, value: undefined }
+    : {
+        ok: false,
+        issues: [{ code: 'site.not_found', message: `Site ${siteId} não encontrado`, path: [] }],
+      };
+}
+
 /** Conferência automática da infra (workspace#85): task do backoffice-worker, cron e "Conferir agora". */
 export const CHECK_SITE_INFRA_TASK = 'check-site-infra';
 

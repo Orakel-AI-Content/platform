@@ -161,12 +161,24 @@ export const OPEN_INFRA_RUN_STATUSES = [
   'aguardando_confirmacao',
   'aplicando',
 ] as const satisfies readonly InfraRunStatus[];
-/** Etapas do apply, na ordem e nos termos de quem opera. */
-export const INFRA_STEPS = ['endereco', 'dns', 'email', 'regras', 'imagens'] as const;
+/**
+ * Etapas dos recursos do módulo OpenTofu `site`, na ordem e nos termos de quem opera: as do plano,
+ * do resumo e do apply (drivers).
+ */
+export const INFRA_RESOURCE_STEPS = ['endereco', 'dns', 'email', 'regras', 'imagens'] as const;
+export type InfraResourceStep = (typeof INFRA_RESOURCE_STEPS)[number];
+/**
+ * Etapas de uma execução: as do módulo e, só na remoção e antes delas, `paginas` (apagar o
+ * Worker do site, fora do OpenTofu).
+ */
+export const INFRA_STEPS = ['paginas', ...INFRA_RESOURCE_STEPS] as const;
 export type InfraStep = (typeof INFRA_STEPS)[number];
+/** O que a execução faz com a infraestrutura do site (workspace#97). */
+export const INFRA_RUN_KINDS = ['criar', 'remover'] as const;
+export type InfraRunKind = (typeof INFRA_RUN_KINDS)[number];
 
 /**
- * Uma criação da infraestrutura do site (OpenTofu, ADR 0027): nasce `planejando` no pedido,
+ * Uma criação (ou remoção, pelo `tipo`) da infraestrutura do site (OpenTofu, ADR 0027): nasce `planejando` no pedido,
  * recebe o resumo do plano e espera a confirmação, aplica etapa por etapa e fecha `ok` (com os
  * nameservers da zona) ou `falhou` (com a etapa e o motivo). "Tentar de novo" é uma linha nova.
  * Uma linha aberta por site, garantida pelo índice único parcial. Não é um build: o histórico
@@ -179,6 +191,8 @@ export const infraRuns = pgTable(
     siteId: text()
       .notNull()
       .references(() => sites.id),
+    /** Criação ou remoção; as linhas anteriores à remoção são criações. */
+    tipo: text({ enum: INFRA_RUN_KINDS }).notNull().default('criar'),
     status: text({ enum: INFRA_RUN_STATUSES }).notNull(),
     /** Etapa em andamento, enquanto `aplicando`. */
     currentStep: text({ enum: INFRA_STEPS }),

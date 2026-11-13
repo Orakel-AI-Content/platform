@@ -104,9 +104,25 @@ Por padrão, só `contato@<domínio>` é encaminhado. Para outros endereços, pa
   listas juntas a cada trimestre.
 - **Bot management**: Bot Fight Mode e `robots.txt` gerenciado desligados, bloqueio de
   crawlers de IA da Cloudflare ligado (ADR-026).
-- **Mídia**: bucket `media-<SITE_ID>` com `prevent_destroy`, domínio `media.<domínio>`
-  (TLS 1.2), `r2.dev` desligado e cache de borda de um ano para esse host. Para remover um
-  site, esvazie o bucket e retire o `prevent_destroy` antes do `destroy`.
+- **Mídia**: bucket `media-<SITE_ID>`, domínio `media.<domínio>` (TLS 1.2), `r2.dev`
+  desligado e cache de borda de um ano para esse host.
+
+## Remoção
+
+O módulo não tem trava contra remoção no código: a trava é o Backoffice, que só deixa
+o admin remover um site pausado, depois de ver o resumo do plano real e digitar o domínio (ADR
+0027). No `infra-runner`, o `plan` com `INFRA_MODE=destroy` gera o plano de destruição
+(`tofu plan -destroy -out`), e o `apply` desse plano grava `status: "destroyed"`, sem saídas e
+sem Crawler Hints.
+
+O destroy pressupõe o bucket `media-<SITE_ID>` vazio: o R2 recusa apagar um bucket com objetos.
+O objeto de estado `sites/<SITE_ID>.tfstate` fica no `tofu-state`, vazio e reaproveitável para
+criar o site de novo. À mão, com as mesmas variáveis da execução:
+
+```sh
+tofu plan $vars -destroy -out=site.tfplan   # leia o plano
+tofu apply site.tfplan
+```
 
 ## A validar no primeiro `apply` real
 

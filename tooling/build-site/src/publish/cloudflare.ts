@@ -7,9 +7,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
+import { workerName } from '@orakel/build-contract';
+
 import { ClassifiedError } from '../failures.ts';
 import { WRANGLER_BIN } from '../paths.ts';
-import { workerName } from '../wrangler/targets.ts';
 
 type Credentials = { apiToken: string; accountId: string };
 

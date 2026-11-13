@@ -6,14 +6,11 @@ locals {
   media_host   = "media.${var.domain}"
 }
 
-# Para remover um site: esvazie o bucket e retire o prevent_destroy (runbook da seção 4.1 do 05).
+# Sem trava contra remoção no código: a remoção sai do Backoffice (só admin, site pausado,
+# resumo do plano real e domínio digitado; ADR 0027). O destroy pressupõe o bucket vazio.
 resource "cloudflare_r2_bucket" "media" {
   account_id = var.account_id
   name       = local.media_bucket
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "cloudflare_r2_custom_domain" "media" {
