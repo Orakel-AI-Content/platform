@@ -60,7 +60,9 @@ flowchart LR
   sites, um por vez, começando pelo canário. A infraestrutura de cada site é criada pelo
   `build-runner` em duas tasks, na fila `infra:<site>`: `infra-plan` grava o resumo e espera a
   confirmação; `infra-apply` aplica o plano salvo, etapa por etapa (tabela `infra_runs`, ADR
-  0027). O driver `tofu` roda a imagem `infra-runner`; o `local` simula as etapas.
+  0027). O driver `tofu` roda a imagem `infra-runner`; o `local` simula as etapas. A remoção é
+  uma cadeia na mesma fila: o `build-runner` apaga o Worker do site, o `backoffice-worker`
+  esvazia `media-<site>` e o `build-runner` aplica o plano de destruição (ADR 0028).
 - **Eventos:** o Worker de borda grava eventos anônimos no Analytics Engine e na fila;
   o agregador consolida no Postgres.
 
