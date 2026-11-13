@@ -3,11 +3,12 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { ReviewQueueItem } from '@/domain/content/contents.ts';
+import type { ReviewQueueEntry } from '@/domain/reviews/reviews.ts';
 
 import { ReviewQueueTable } from './ReviewQueueTable.tsx';
 
 // Fila de revisão (#74): título, tipo, versão e data; links para a revisão e teclado.
+// Pendências e a marca "Devolvido" de cada item (#772).
 // Busca, filtro por tipo, ordem e paginação com o estado na URL (#365): router.replace simulado.
 
 const navigation = vi.hoisted(() => {
@@ -40,13 +41,17 @@ afterEach(() => {
   navigation.set('');
 });
 
-const rows: ReviewQueueItem[] = [
+/** Sem pendência, links verificando e enviado pela primeira vez. */
+const fresh = { pending: 0, links: { state: 'verificando' }, returned: false } as const;
+
+const rows: ReviewQueueEntry[] = [
   {
     id: 3,
     kind: 'page',
     title: 'Quem somos',
     version: 2,
     submittedAt: new Date('2026-10-01T12:00:00Z'),
+    ...fresh,
   },
   {
     id: 1,
@@ -54,6 +59,9 @@ const rows: ReviewQueueItem[] = [
     title: 'Guia de uso',
     version: 4,
     submittedAt: new Date('2026-10-02T15:30:00Z'),
+    ...fresh,
+    pending: 3,
+    returned: true,
   },
 ];
 
@@ -75,6 +83,7 @@ describe('fila de revisão', () => {
       'Título',
       'Tipo',
       'Versão',
+      'Pendências',
       'Enviado em',
     ]);
     const [, first, second] = screen.getAllByRole('row');
@@ -105,6 +114,21 @@ describe('fila de revisão', () => {
     );
   });
 
+  it('mostra as pendências, ou "Nenhuma", e a marca "Devolvido" só no item devolvido (#772)', () => {
+    renderTable();
+
+    const [, first, second] = screen.getAllByRole('row');
+    const pendingCell = (row: HTMLElement | undefined) =>
+      within(row!).getAllByRole('cell')[3]?.textContent;
+    expect(pendingCell(first)).toBe('Nenhuma');
+    expect(pendingCell(second)).toBe('3');
+    expect(within(first!).queryByText('Devolvido')).toBeNull();
+    const titleCell = within(second!).getAllByRole('cell')[0]!;
+    expect(within(titleCell).getByText('Devolvido')).toBeTruthy();
+    // A marca fica fora do link: o nome acessível continua o do título.
+    expect(screen.getByRole('link', { name: 'Guia de uso (revisar)' })).toBeTruthy();
+  });
+
   it('mostra o instante do envio no fuso do site (#771)', () => {
     renderTable(rows, 'Europe/Lisbon');
 
@@ -126,7 +150,8 @@ const titles = () =>
     .slice(1)
     .map((row) => within(row).getAllByRole('link')[0]?.textContent?.replace(' (revisar)', ''));
 
-const many: ReviewQueueItem[] = Array.from({ length: 30 }, (_, index) => ({
+const many: ReviewQueueEntry[] = Array.from({ length: 30 }, (_, index) => ({
+  ...fresh,
   id: index + 10,
   kind: index % 3 === 0 ? 'page' : 'article',
   title: index === 0 ? 'Ação de graças' : `Receita ${String(index).padStart(2, '0')}`,

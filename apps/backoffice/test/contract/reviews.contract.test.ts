@@ -35,7 +35,14 @@ import {
   REVIEW_CHECKLIST,
   reviewChecks,
   reviewIssues,
+  reviewQueue,
 } from '../../src/domain/reviews/reviews.ts';
+import {
+  externalLinks,
+  linkCheckFor,
+  recordLinkCheck,
+} from '../../src/domain/reviews/link-checks.ts';
+import { reviewCheckItems } from '../../src/components/review/reviewCheckItems.ts';
 import type * as Sites from '../../src/domain/sites/sites.ts';
 import { unresolvedPendingChangeIds } from '../../src/domain/sites/sites.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
@@ -45,6 +52,7 @@ import { resetDatabase, setupDatabase } from './helpers.ts';
 // que exige as três gravadas.
 // Devolução ao editor (#598): comentário obrigatório, volta a rascunho e a devolução pendente.
 // Aprovar e publicar ou agendar numa decisão só, com transbordo para a próxima vaga (#759).
+// Fila de revisão com pendências, links e devolvido de cada item (#772).
 
 // Recursos da release: `resourcesFor` devolve os RESOURCES até o registro por release
 // (workspace#26); aqui o teste troca o retorno para simular uma release sem o bloco faq.
@@ -900,6 +908,125 @@ describe('checagens de conteúdo para a tela de revisão', () => {
     expect(await reviewChecks(db, role('revisor'), SITE, 999)).toMatchObject({
       ok: false,
       issues: [{ code: 'content.not_found' }],
+    });
+  });
+});
+
+describe('fila de revisão com pendências e devolvidos (#772)', () => {
+  const queueOf = async (actor = role('revisor')) => {
+    const result = await reviewQueue(db, actor, SITE);
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    return result.value;
+  };
+  const entryOf = async (contentId: number) =>
+    (await queueOf()).find((item) => item.id === contentId);
+  const resubmit = (contentId: number) =>
+    db.transaction((tx) => submitForReview(tx, SYSTEM_ACTOR, SITE, contentId));
+  const textLink = (href: string): NewBlock => ({
+    new: true,
+    type: 'text',
+    content: [
+      {
+        type: 'paragraph',
+        children: [{ type: 'link', href, children: [{ type: 'text', text: href }] }],
+      },
+    ],
+  });
+
+  it('pendências de cada item são os itens não ok da tela de revisão, com os links externos', async () => {
+    const last = (await versions(1)).at(-1);
+    if (last === undefined) throw new Error('conteúdo 1 sem versão');
+    const saved = await db.transaction((tx) =>
+      updateContent(tx, SYSTEM_ACTOR, SITE, 1, {
+        ...last.data,
+        description: undefined,
+        blocks: [
+          ...last.data.blocks,
+          textLink('/nao-existe/'),
+          textLink('https://fora-do-ar.example/'),
+        ],
+      }),
+    );
+    if (!saved.ok) throw new Error(JSON.stringify(saved.issues));
+    await resubmit(1);
+    const target = { siteId: SITE, contentId: 1, version: saved.value.version };
+    const blocks = (await versions(1)).at(-1)?.data.blocks ?? [];
+    await db.transaction((tx) =>
+      recordLinkCheck(
+        tx,
+        target,
+        externalLinks(blocks).map((link) => ({ ...link, ok: false, reason: 'HTTP 503' })),
+        new Date(),
+      ),
+    );
+    await draft(2);
+
+    const queue = await queueOf();
+
+    expect(queue.map((item) => item.id).sort()).toEqual([1, 2]);
+    for (const item of queue) {
+      const checks = await reviewChecks(db, role('revisor'), SITE, item.id);
+      const links = await linkCheckFor(db, role('revisor'), {
+        siteId: SITE,
+        contentId: item.id,
+        version: item.version,
+      });
+      if (!checks.ok || !links.ok) throw new Error('leitura recusada');
+      const shown = reviewCheckItems(
+        checks.value.checks,
+        links.value,
+        (await versions(item.id)).at(-1)?.data.blocks ?? [],
+      ).filter((check) => check.state === 'aviso' || check.state === 'erro');
+      expect(item.pending).toBe(shown.length);
+      expect(item.links).toEqual(links.value);
+      if (item.id === 1) {
+        expect(shown.map((check) => check.key)).toEqual(
+          expect.arrayContaining(['descricao', 'links_internos', 'links_externos']),
+        );
+      }
+    }
+    const first = queue.find((item) => item.id === 1);
+    expect(first?.links.state).toBe('verificado');
+  });
+
+  it('devolvido e reenviado, com ou sem edição, aparece como devolvido; enviado pela primeira vez, não', async () => {
+    const same = await draft(1);
+    await giveBack(1, same);
+    await resubmit(1);
+    const edited = await draft(2);
+    await giveBack(2, edited);
+    await draft(2);
+    await draft(3);
+
+    const queue = await queueOf();
+
+    expect(queue.map(({ id, returned }) => ({ id, returned }))).toEqual(
+      expect.arrayContaining([
+        { id: 1, returned: true },
+        { id: 2, returned: true },
+        { id: 3, returned: false },
+      ]),
+    );
+    expect(queue).toHaveLength(3);
+  });
+
+  it('aprovado antes e reenviado não aparece como devolvido, mesmo com uma devolução anterior', async () => {
+    const version = await draft(1);
+    await giveBack(1, version);
+    await resubmit(1);
+    await confirm(1, version);
+    const approved = await approve(1, version);
+    if (!approved.ok) throw new Error(JSON.stringify(approved.issues));
+    await draft(1);
+
+    expect(await entryOf(1)).toMatchObject({ returned: false });
+  });
+
+  it('sem conteúdo em revisão, fila vazia; sem papel, forbidden', async () => {
+    expect(await queueOf()).toEqual([]);
+    expect(await reviewQueue(db, { email: 'x@orakel.local', roles: [] }, SITE)).toMatchObject({
+      ok: false,
+      issues: [{ code: 'forbidden' }],
     });
   });
 });

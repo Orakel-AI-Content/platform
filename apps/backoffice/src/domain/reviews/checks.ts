@@ -112,6 +112,38 @@ export function sitePaths(site: {
   };
 }
 
+/**
+ * O que as checagens precisam do site inteiro, lido uma vez (#772): a tela de revisão e a fila
+ * derivam daqui o contexto de cada conteúdo com `checkContextFor`.
+ */
+export type SiteCheckContext = {
+  /** Conteúdos no ar do site. */
+  live: readonly { id: number; slug: string }[];
+  taxonomies: readonly (Pick<Taxonomy, 'kind' | 'slug'> & { id: number })[];
+  authorSlugs: readonly string[];
+  config: SiteConfig | undefined;
+  redirectFroms: readonly string[];
+  /** Título da versão mais recente de cada conteúdo do site, em qualquer status. */
+  titles: readonly { contentId: number; title: string }[];
+};
+
+/** Contexto das checagens de um conteúdo: o do site sem o próprio conteúdo. Função pura. */
+export function checkContextFor(site: SiteCheckContext, contentId: number): ReviewCheckContext {
+  return {
+    paths: sitePaths({
+      liveSlugs: site.live.filter((item) => item.id !== contentId).map((item) => item.slug),
+      taxonomies: site.taxonomies,
+      authorSlugs: site.authorSlugs,
+      config: site.config,
+      redirectFroms: site.redirectFroms,
+    }),
+    categoryIds: new Set(
+      site.taxonomies.filter((row) => row.kind === 'category').map((row) => row.id),
+    ),
+    otherTitles: site.titles.filter((row) => row.contentId !== contentId),
+  };
+}
+
 function isSitePath(paths: SitePaths, path: string): boolean {
   return paths.static.has(path) || paths.dynamic.some((pattern) => pattern.test(path));
 }

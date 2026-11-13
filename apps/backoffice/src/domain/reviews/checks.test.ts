@@ -1,13 +1,15 @@
 import type { Issue } from '@orakel/content-model';
 import type { Block, SiteConfig } from '@orakel/content-model/v1';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import type { ContentData } from '../../db/schema/index.ts';
 import {
+  checkContextFor,
   computeReviewChecks,
   REVIEW_CHECKS,
   type ReviewCheckContext,
   type ReviewCheckKey,
+  type SiteCheckContext,
   sitePaths,
 } from './checks.ts';
 
@@ -247,5 +249,39 @@ describe('computeReviewChecks', () => {
     it('diferente dos outros: ok', () => {
       expect(check('titulo_duplicado').level).toBe('ok');
     });
+  });
+});
+
+describe('checkContextFor', () => {
+  const site: SiteCheckContext = {
+    live: [
+      { id: 1, slug: 'proprio' },
+      { id: 2, slug: 'outro' },
+    ],
+    taxonomies: [
+      { id: 10, kind: 'category', slug: 'guias' },
+      { id: 11, kind: 'tag', slug: 'rapido' },
+    ],
+    authorSlugs: ['ana'],
+    config: undefined,
+    redirectFroms: ['/antigo/'],
+    titles: [
+      { contentId: 1, title: 'Próprio' },
+      { contentId: 2, title: 'Outro' },
+    ],
+  };
+
+  it('é pura: recebe o contexto do site já lido e o conteúdo, nunca o banco (#772)', () => {
+    expectTypeOf(checkContextFor).parameters.toEqualTypeOf<[SiteCheckContext, number]>();
+  });
+
+  it('tira o próprio conteúdo dos caminhos no ar e dos títulos', () => {
+    const context = checkContextFor(site, 1);
+
+    expect(context.paths.static.has('/outro/')).toBe(true);
+    expect(context.paths.static.has('/proprio/')).toBe(false);
+    expect(context.paths.static.has('/antigo/')).toBe(true);
+    expect(context.otherTitles).toEqual([{ contentId: 2, title: 'Outro' }]);
+    expect([...context.categoryIds]).toEqual([10]);
   });
 });

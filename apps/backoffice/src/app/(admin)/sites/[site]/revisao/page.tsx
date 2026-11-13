@@ -4,7 +4,7 @@ import { noRead } from '@/components/shared/ForbiddenScreen';
 import { ListHeader, PageTrail } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
-import { listReviewQueue } from '@/domain/content/contents.ts';
+import { reviewQueue } from '@/domain/reviews/reviews.ts';
 
 import { sitePageContext } from '../editorial-page.tsx';
 
@@ -13,17 +13,18 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Revisão' };
 
 /**
- * Fila de revisão do site (#74): conteúdos cuja versão mais recente está em revisão. Ler
- * exige site.read (o domínio confere); aprovar é da tela de revisão de cada conteúdo. Lista no
- * padrão do template (#365): a trilha acima do cartão; título, toolbar e tabela dentro dele.
- * "Começar revisão" (#773) abre o primeiro item na ordem do domínio; some com a fila vazia.
+ * Fila de revisão do site (#74): conteúdos cuja versão mais recente está em revisão, com as
+ * pendências e a marca de devolvido de cada um (#772). Ler exige site.read (o domínio
+ * confere); aprovar é da tela de revisão de cada conteúdo. Lista no padrão do template (#365):
+ * a trilha acima do cartão; título, toolbar e tabela dentro dele. "Começar revisão" (#773)
+ * abre o primeiro item na ordem do domínio; some com a fila vazia.
  */
 export default async function ReviewQueuePage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { actor, db, site } = context.value;
-  const queue = await listReviewQueue(db, actor, siteId);
+  const queue = await reviewQueue(db, actor, siteId);
   if (!queue.ok) return noRead;
   const [first] = queue.value;
   const start = first && (
