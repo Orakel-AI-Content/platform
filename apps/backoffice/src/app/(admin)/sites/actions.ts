@@ -20,9 +20,11 @@ import { getDb, type Executor } from '@/db/client.ts';
 import type { Actor } from '@/domain/access/rbac.ts';
 import {
   confirmInfraPlan,
+  confirmInfraReapplyPlan,
   confirmInfraRemovalPlan,
   readInfraPlan,
   requestInfraPlan,
+  requestInfraReapplyPlan,
   requestInfraRemovalPlan,
   type InfraPlanView,
 } from '@/domain/infra/plan.ts';
@@ -247,6 +249,39 @@ export async function confirmInfraRemovalAction(
     siteId,
     (tx, actor) => confirmInfraRemovalPlan(tx, actor, siteId, runId, typedDomain),
     'Remoção da infraestrutura confirmada.',
+  );
+}
+
+/**
+ * "Reaplicar infraestrutura" (workspace#98): grava a reaplicação e enfileira um plano novo;
+ * papel (`site.configure`), etapa e execução aberta são do domínio. Como na criação, sem toast:
+ * o diálogo lê o plano por `infraPlanAction`.
+ */
+export async function requestInfraReapplyAction(siteId: string): Promise<InfraPlanRequest> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: 'Sessão inválida; entre de novo.' };
+  const result = await getDb().db.transaction((tx) =>
+    requestInfraReapplyPlan(tx, actor.value, siteId),
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      message: result.issues[0]?.message ?? 'Não foi possível pedir o plano.',
+    };
+  }
+  revalidatePath(`/sites/${siteId}`);
+  return { ok: true, runId: result.value.runId };
+}
+
+/** "Confirmar" a reaplicação: a execução passa a aplicando e o apply entra na fila (domínio). */
+export async function confirmInfraReapplyAction(
+  siteId: string,
+  runId: number,
+): Promise<ActionResult> {
+  return siteOperation(
+    siteId,
+    (tx, actor) => confirmInfraReapplyPlan(tx, actor, siteId, runId),
+    'Reaplicação da infraestrutura confirmada.',
   );
 }
 

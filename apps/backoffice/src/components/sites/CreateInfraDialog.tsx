@@ -55,6 +55,20 @@ export function infraPlanState(
 
 export const TITLE = 'Criar a infraestrutura do site?';
 
+/** O resumo do plano por etapa, na ordem do `INFRA_STEP_LABEL`; a reaplicação usa o mesmo. */
+export function InfraPlanSteps({ summary }: { summary: InfraPlanSummary }) {
+  return (
+    <ul aria-label="Resumo por etapa" className="flex flex-col gap-1">
+      {INFRA_STEP_ORDER.map((step) => (
+        <li key={step} className="flex justify-between gap-4">
+          <span className="heading-text font-semibold">{INFRA_STEP_LABEL[step]}</span>
+          <span>{infraStepChangesText(summary.steps[step])}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function CreateInfraDialog({
   isOpen,
   state,
@@ -96,14 +110,7 @@ export function CreateInfraDialog({
           <p className="mb-3">
             Confira o que muda em cada etapa. Nada é aplicado antes de &quot;Confirmar&quot;.
           </p>
-          <ul aria-label="Resumo por etapa" className="flex flex-col gap-1">
-            {INFRA_STEP_ORDER.map((step) => (
-              <li key={step} className="flex justify-between gap-4">
-                <span className="heading-text font-semibold">{INFRA_STEP_LABEL[step]}</span>
-                <span>{infraStepChangesText(state.summary.steps[step])}</span>
-              </li>
-            ))}
-          </ul>
+          <InfraPlanSteps summary={state.summary} />
         </>
       )}
       <ActionAlert error={state.kind === 'erro' ? state.message : null} />

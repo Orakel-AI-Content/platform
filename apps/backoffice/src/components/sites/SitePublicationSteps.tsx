@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import {
+  INFRA_OUTDATED_LABEL,
   PUBLICATION_STEPS,
   PUBLICATION_STEP_LABEL,
   SITE_STATE_LABEL,
@@ -16,9 +17,10 @@ import type { StepStatus } from '@/components/ui/@types/common';
 import { Steps } from '@/components/ui/Steps';
 import { Tag } from '@/components/ui/Tag';
 import type { ExecutionHistoryItem, SiteActivity } from '@/domain/builds/builds.ts';
-import type { SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
+import type { InfraDrift, SiteInstance, SiteSummary } from '@/domain/sites/sites.ts';
 
 import { infraCheckFailed, LifecycleSteps, type InfraCheckView } from './LifecycleSteps.tsx';
+import { StateTag } from './SiteStatus.tsx';
 
 export type PublicationSite = Pick<
   SiteSummary,
@@ -29,6 +31,11 @@ export type PublicationSite = Pick<
    * decide; o painel só a mostra numa `Tag` na etapa Versão. Ausente ou `null`, nenhuma Tag.
    */
   newerRelease?: string | null;
+  /**
+   * Resultado da última conferência da infra contra a descrição (workspace#98): com
+   * `desatualizado`, a etapa Infra e zona mostra o selo "Infra desatualizada". Ausente, nenhum selo.
+   */
+  infraDriftStatus?: InfraDrift['status'];
 };
 
 export type PublicationInstance = Pick<SiteInstance, 'activePages' | 'activeSince'>;
@@ -103,12 +110,19 @@ function steps(
           ? 'error'
           : 'in-progress',
       text: (
-        <LifecycleSteps
-          current={lifecycle}
-          check={infraCheck}
-          action={lifecycleAction}
-          nameservers={latestInfraCreation(activity.history)?.nameservers}
-        />
+        <>
+          {site.infraDriftStatus === 'desatualizado' && (
+            <span className="mb-1 block">
+              <StateTag color="bg-warning">{INFRA_OUTDATED_LABEL}</StateTag>
+            </span>
+          )}
+          <LifecycleSteps
+            current={lifecycle}
+            check={infraCheck}
+            action={lifecycleAction}
+            nameservers={latestInfraCreation(activity.history)?.nameservers}
+          />
+        </>
       ),
     },
     versao: {

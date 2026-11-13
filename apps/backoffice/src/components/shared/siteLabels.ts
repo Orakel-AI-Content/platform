@@ -5,6 +5,7 @@ import type {
   BuildKind,
   BuildStatus,
   InfraResourceStep,
+  InfraRunKind,
   InfraStep,
   SiteEventKind,
 } from '@/db/schema/operations.ts';
@@ -148,13 +149,19 @@ export const HISTORY_KIND_LABEL: Record<BuildKind | SiteEventKind, string> = {
   troca_de_versao: 'Troca de versão',
 };
 
+/** Item do histórico de uma execução da infraestrutura (`infra_runs`), pelo tipo. */
+export const INFRA_RUN_KIND_LABEL = {
+  criar: 'Criação da infraestrutura',
+  remover: 'Remoção da infraestrutura',
+  reaplicar: 'Reaplicação da infraestrutura',
+} as const satisfies Record<InfraRunKind, string>;
+
 /**
- * Uma execução de infra (`infra_runs`) pelo tipo, no histórico e na faixa ao vivo: a criação e a
- * remoção (workspace#97). A reaplicação ganha o rótulo dela com a ação (#852); até lá, sai como a
- * criação.
+ * Uma execução de infra (`infra_runs`) pelo tipo, no histórico e na faixa ao vivo: a criação, a
+ * remoção (workspace#97) e a reaplicação (workspace#98).
  */
-export function infraRunLabel(kind: InfraHistoryItem['kind']): string {
-  return kind === 'remover' ? 'Remoção da infraestrutura' : 'Criação da infraestrutura';
+export function infraRunLabel(kind: InfraRunKind): string {
+  return INFRA_RUN_KIND_LABEL[kind];
 }
 
 /**
@@ -214,9 +221,25 @@ export const INFRA_REMOVAL_KEPT = [
 /** Por que "Remover infraestrutura" está desabilitada com o site ativo. */
 export const INFRA_REMOVAL_PAUSE_FIRST = 'Para remover a infraestrutura, pause o site antes.';
 
+/** Selo da etapa Infra e zona quando a conferência achou a infra fora da descrição (workspace#98). */
+export const INFRA_OUTDATED_LABEL = 'Infra desatualizada';
+
+/** Resultado de uma reaplicação concluída, no histórico do site (workspace#98). */
+export const INFRA_REAPPLY_OK_TEXT = 'Infraestrutura em dia com a descrição atual';
+
 /** Etapa de uma execução de infra: as do módulo e, só na remoção, as páginas do site. */
 export function infraRunStepLabel(step: InfraStep): string {
   return step === 'paginas' ? 'Páginas do site' : INFRA_STEP_LABEL[step];
+}
+
+/** A execução da infraestrutura mais recente do histórico com o tipo pedido; `undefined` sem nenhuma. */
+export function latestInfraRun(
+  history: readonly SiteHistoryItem[],
+  kind: InfraRunKind,
+): InfraHistoryItem | undefined {
+  return history.find(
+    (item): item is InfraHistoryItem => item.type === 'infra' && item.kind === kind,
+  );
 }
 
 /**
@@ -239,16 +262,10 @@ export function latestInfraRemoval(
   return latestInfraRun(history, 'remover');
 }
 
-function latestInfraRun(
-  history: readonly SiteHistoryItem[],
-  kind: InfraHistoryItem['kind'],
-): InfraHistoryItem | undefined {
-  return history.find(
-    (item): item is InfraHistoryItem => item.type === 'infra' && item.kind === kind,
-  );
-}
-
-/** Faixa ao vivo da criação ou da remoção aplicando: a etapa corrente, quando já há uma. */
+/**
+ * Faixa ao vivo da execução aplicando (criação, remoção ou reaplicação): o tipo e a etapa
+ * corrente, quando já há uma.
+ */
 export function infraLiveStatusText(open: Pick<OpenInfraRun, 'kind' | 'currentStep'>): string {
   const label = infraRunLabel(open.kind);
   return open.currentStep === null
@@ -267,7 +284,7 @@ export function infraFailureText(failure: NonNullable<InfraHistoryItem['failure'
 }
 
 /**
- * Faixa quando a criação ou a remoção acompanhada termina: concluída, ou a etapa e o motivo da
+ * Faixa quando a execução acompanhada termina: o tipo, concluída, ou a etapa e o motivo da
  * falha.
  */
 export function infraLiveResultText(item: InfraHistoryItem, timeZone: string): string {

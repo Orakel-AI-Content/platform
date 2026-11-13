@@ -183,6 +183,7 @@ describe('SiteLiveActivity na criação da infraestrutura (#826)', () => {
     requestedBy: 'operacao@orakel.local',
     requestedAt: new Date('2026-10-11T16:58:00Z'),
     confirmedBy: 'operacao@orakel.local',
+    inBatch: false,
   };
   const closed = (over: Partial<InfraHistoryItem>): InfraHistoryItem => ({
     type: 'infra',
@@ -285,6 +286,23 @@ describe('SiteLiveActivity na criação da infraestrutura (#826)', () => {
     ]);
   });
 
+  it('acompanha a reaplicação aplicando até concluir, com o rótulo dela, e relê a página', async () => {
+    const reapplying: OpenInfraRun = { ...applying, kind: 'reaplicar', currentStep: 'dns' };
+    status.mockResolvedValueOnce(
+      idle({ history: [closed({ kind: 'reaplicar', nameservers: null }), PAUSE] }),
+    );
+    renderLive(idle({ openInfra: reapplying }));
+
+    expect(region().textContent).toBe(
+      'Reaplicação da infraestrutura em andamento, etapa: Registros de DNS',
+    );
+    await tick();
+    expect(region().textContent).toBe(
+      'Reaplicação da infraestrutura concluída em 11/10/2026, 14:05 BRT',
+    );
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('sem criação acompanhada, uma já terminada no histórico não mostra faixa nem relê', () => {
     renderLive(idle({ history: [closed({}), PAUSE] }));
 
@@ -336,14 +354,6 @@ describe('SiteLiveActivity na criação da infraestrutura (#826)', () => {
         'Remoção da infraestrutura falhou na etapa Regras em 11/10/2026, 14:05 BRT: Falha simulada',
       );
       expect(refresh).toHaveBeenCalledTimes(1);
-    });
-
-    it('a reaplicação aplicando não liga o polling da aba', async () => {
-      renderLive(idle({ openInfra: { ...applying, kind: 'reaplicar' } }));
-
-      expect(region().textContent).toBe('');
-      await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 10));
-      expect(status).not.toHaveBeenCalled();
     });
   });
 });

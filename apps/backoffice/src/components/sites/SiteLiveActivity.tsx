@@ -34,23 +34,23 @@ type Snapshot = {
   /** A última execução de build vista aberta. */
   watched: number | null;
   /**
-   * A última criação (#826) ou remoção (workspace#97) da infraestrutura vista aberta, em qualquer
-   * estado: o apply do driver local termina antes de a página revalidada chegar, e a aba nunca a
-   * veria aplicando.
+   * A última criação (#826), remoção (workspace#97) ou reaplicação (workspace#98) da
+   * infraestrutura vista aberta, em qualquer estado: o apply do driver local termina antes de a
+   * página revalidada chegar, e a aba nunca a veria aplicando.
    */
   watchedInfra: number | null;
 };
 
-/** Os tipos de execução de infra que a aba acompanha; a reaplicação vem com a ação dela (#852). */
-const TRACKED_INFRA_KINDS: readonly OpenInfraRun['kind'][] = ['criar', 'remover'];
+/** Os tipos de execução de infra que a aba acompanha: todos (criação, remoção e reaplicação). */
+const TRACKED_INFRA_KINDS: readonly OpenInfraRun['kind'][] = ['criar', 'remover', 'reaplicar'];
 
-/** A criação ou a remoção da infraestrutura aberta, do pedido do plano ao fim do apply. */
+/** A execução da infraestrutura aberta, do pedido do plano ao fim do apply. */
 function openTracked(activity: SiteActivity): OpenInfraRun | null {
   const run = activity.openInfra;
   return run !== null && TRACKED_INFRA_KINDS.includes(run.kind) ? run : null;
 }
 
-/** A criação ou a remoção aplicando: o andamento que a aba acompanha. */
+/** A execução da infraestrutura aplicando: o andamento que a aba acompanha. */
 function applyingTracked(activity: SiteActivity): OpenInfraRun | null {
   const run = openTracked(activity);
   return run?.status === 'aplicando' ? run : null;
@@ -125,7 +125,7 @@ function buildBanner({ activity, watched }: Snapshot, timeZone: string): Banner 
     : null;
 }
 
-/** Faixa da criação ou da remoção da infra: a etapa aplicando ou, quando termina, o resultado. */
+/** Faixa da execução da infra: o tipo e a etapa aplicando ou, quando termina, o resultado. */
 function infraBanner(snapshot: Snapshot, timeZone: string): Banner | null {
   const applying = applyingTracked(snapshot.activity);
   if (applying !== null) return { key: 'infra', type: 'info', text: infraLiveStatusText(applying) };
@@ -142,9 +142,10 @@ function infraBanner(snapshot: Snapshot, timeZone: string): Banner | null {
 /**
  * Atividade do site com o status ao vivo (#638): no topo, a faixa com a execução aberta ("na
  * fila" com o horário previsto, "em andamento" com a etapa) e, quando ela termina, o resultado;
- * embaixo, o `SiteBuildsTable` com o histórico relido. A criação (#826) e a remoção
- * (workspace#97) da infraestrutura aplicando entram na mesma faixa, com a etapa corrente e, no
- * fim, concluída ou a etapa e o motivo da falha. Enquanto há execução aberta, relê a
+ * embaixo, o `SiteBuildsTable` com o histórico relido. A criação (#826), a remoção
+ * (workspace#97) e a reaplicação (workspace#98) da infraestrutura aplicando entram na mesma
+ * faixa, com a etapa corrente e, no fim, concluída ou a etapa e o motivo da falha. Enquanto há
+ * execução aberta, relê a
  * atividade pela Server Action a cada `pollMs`; sem execução aberta, não consulta. A faixa fica
  * num contêiner `role="status"` sempre montado, para o leitor de tela anunciar cada mudança.
  * Com `panel` (o painel de etapas da aba "Publicação", #647), desenha-o acima, com a mesma

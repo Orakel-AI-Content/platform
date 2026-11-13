@@ -476,6 +476,11 @@ export type OpenInfraRun = {
   requestedBy: string;
   requestedAt: Date;
   confirmedBy: string | null;
+  /**
+   * Faz parte de um lote de reaplicação (`infra_batches`): a confirmação é a do lote, e a página
+   * do site não a reabre sozinha.
+   */
+  inBatch: boolean;
 };
 
 /** Item do histórico do site: uma criação, remoção ou reaplicação da infraestrutura que terminou. */
@@ -520,6 +525,7 @@ export async function infraActivity(
           requestedBy: openRow.requestedBy,
           requestedAt: openRow.requestedAt,
           confirmedBy: openRow.confirmedBy,
+          inBatch: openRow.batchId !== null,
         }
       : null;
 

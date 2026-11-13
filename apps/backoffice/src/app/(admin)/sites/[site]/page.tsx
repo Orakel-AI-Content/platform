@@ -11,6 +11,7 @@ import {
   formatDuration,
   latestInfraCreation,
   latestInfraRemoval,
+  latestInfraRun,
 } from '@/components/shared/siteLabels.ts';
 import { SiteOperationButton, SiteOperationsScope } from '@/components/sites/SiteOperations';
 import { SitePublicationTab } from '@/components/sites/SitePublicationTab';
@@ -35,6 +36,7 @@ import {
   cancelBuildAction,
   checkSiteInfraAction,
   confirmInfraPlanAction,
+  confirmInfraReapplyAction,
   confirmInfraRemovalAction,
   infraPlanAction,
   pauseSiteAction,
@@ -42,6 +44,7 @@ import {
   rebuildOnReleaseAction,
   registerG1Action,
   requestInfraPlanAction,
+  requestInfraReapplyAction,
   requestInfraRemovalAction,
   resumeSiteAction,
   retreatLifecycleAction,
@@ -184,6 +187,7 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
         state: site.state,
         pausedReason: site.pausedReason,
         timeZone: site.timeZone,
+        infraDriftStatus: site.infraDrift.status,
       }}
       instance={{
         activePages: instance.value.activePages,
@@ -227,6 +231,18 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
                   }
                 : undefined
             }
+            reapply={{
+              open: activity.value.openInfra && {
+                id: activity.value.openInfra.id,
+                status: activity.value.openInfra.status,
+                kind: activity.value.openInfra.kind,
+                inBatch: activity.value.openInfra.inBatch,
+              },
+              retry: latestInfraRun(activity.value.history, 'reaplicar')?.status === 'falhou',
+              request: requestInfraReapplyAction.bind(null, site.id),
+              read: infraPlanAction.bind(null, site.id),
+              confirm: confirmInfraReapplyAction.bind(null, site.id),
+            }}
           />
         ) : undefined
       }

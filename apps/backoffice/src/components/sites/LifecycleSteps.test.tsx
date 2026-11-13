@@ -9,11 +9,13 @@ import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 
 import { TITLE } from './CreateInfraDialog.tsx';
 import { LifecycleSteps } from './LifecycleSteps.tsx';
+import { REAPPLY_TITLE } from './ReapplyInfraDialog.tsx';
 import { REMOVE_TITLE } from './RemoveInfraDialog.tsx';
 import {
   LifecycleAction,
   LifecycleActionScope,
   type CreateInfraActions,
+  type ReapplyInfraActions,
   type RemoveInfraActions,
 } from './SiteActions.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
@@ -479,6 +481,139 @@ describe('Remover infraestrutura (workspace#97)', () => {
 
     await user.type(within(dialog).getByRole('textbox'), DOMAIN);
     await user.click(within(dialog).getByRole('button', { name: 'Remover' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(message));
+  });
+});
+
+describe('Reaplicar infraestrutura (workspace#98)', () => {
+  const summary = {
+    formatVersion: 1 as const,
+    steps: {
+      endereco: [],
+      dns: [{ address: 'd', type: 'cloudflare_dns_record', action: 'update' as const }],
+      email: [],
+      regras: [],
+      imagens: [],
+    },
+  };
+  const reapplyActions = (overrides: Partial<ReapplyInfraActions> = {}): ReapplyInfraActions => ({
+    open: null,
+    request: vi.fn<ReapplyInfraActions['request']>().mockResolvedValue({ ok: true, runId: 12 }),
+    read: vi
+      .fn<ReapplyInfraActions['read']>()
+      .mockResolvedValue({ status: 'aguardando_confirmacao', summary }),
+    confirm: vi.fn<ReapplyInfraActions['confirm']>(ok),
+    ...overrides,
+  });
+  const withReapply = (reapply?: ReapplyInfraActions, lifecycle: Lifecycle = 'publicado') => (
+    <LifecycleActionScope>
+      <LifecycleAction lifecycle={lifecycle} check={ok} undo={ok} reapply={reapply} />
+    </LifecycleActionScope>
+  );
+  const REAPPLY = 'Reaplicar infraestrutura';
+  const REVIEW = 'Revisar e confirmar a reaplicação';
+
+  async function openSummary(reapply: ReapplyInfraActions) {
+    const user = userEvent.setup();
+    render(withReapply(reapply), { container: app });
+    await user.click(screen.getByRole('button', { name: REAPPLY }));
+    const dialog = screen.getByRole('alertdialog', { name: REAPPLY_TITLE });
+    await waitFor(() =>
+      expect(within(dialog).queryByRole('list', { name: 'Resumo por etapa' })).not.toBeNull(),
+    );
+    return { user, dialog };
+  }
+
+  it('sem as actions de reaplicação (sem site.configure na página), não aparece', () => {
+    render(withReapply(undefined));
+
+    expect(screen.queryByRole('button', { name: /Reaplicar|reaplicação/ })).toBeNull();
+  });
+
+  it.each(['infra_aplicada', 'zona_ativa', 'publicado'] as const)(
+    'em %s, sem execução aberta, aparece',
+    (lifecycle) => {
+      render(withReapply(reapplyActions(), lifecycle));
+
+      expect(screen.getByRole('button', { name: REAPPLY })).not.toBeNull();
+    },
+  );
+
+  it('num site cadastrado, não aparece', () => {
+    render(withReapply(reapplyActions(), 'cadastrado'));
+
+    expect(screen.queryByRole('button', { name: /Reaplicar|reaplicação/ })).toBeNull();
+  });
+
+  it.each([
+    { id: 4, kind: 'criar' as const, status: 'aguardando_confirmacao' as const, inBatch: false },
+    { id: 4, kind: 'remover' as const, status: 'planejando' as const, inBatch: false },
+    { id: 4, kind: 'reaplicar' as const, status: 'aplicando' as const, inBatch: false },
+    { id: 4, kind: 'reaplicar' as const, status: 'aguardando_confirmacao' as const, inBatch: true },
+  ])('com outra execução aberta ($kind, $status, lote: $inBatch), não aparece', (open) => {
+    render(withReapply(reapplyActions({ open })));
+
+    expect(screen.queryByRole('button', { name: /Reaplicar|reaplicação/ })).toBeNull();
+  });
+
+  it.each(['planejando', 'aguardando_confirmacao'] as const)(
+    'com a reaplicação %s pedida no site, vira "Revisar e confirmar a reaplicação" e reabre o diálogo',
+    async (status) => {
+      const user = userEvent.setup();
+      const reapply = reapplyActions({
+        open: { id: 6, kind: 'reaplicar', status, inBatch: false },
+      });
+      render(withReapply(reapply), { container: app });
+
+      expect(screen.queryByRole('button', { name: REAPPLY })).toBeNull();
+      await user.click(screen.getByRole('button', { name: REVIEW }));
+
+      screen.getByRole('alertdialog', { name: REAPPLY_TITLE });
+      await waitFor(() => expect(reapply.read).toHaveBeenCalledWith(6));
+      expect(reapply.request).not.toHaveBeenCalled();
+    },
+  );
+
+  it('com a última reaplicação em falha, vira "Tentar de novo" e pede um plano novo', async () => {
+    const user = userEvent.setup();
+    const reapply = reapplyActions({ retry: true });
+    render(withReapply(reapply), { container: app });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Tentar de novo a reaplicação da infraestrutura' }),
+    );
+
+    await waitFor(() => expect(reapply.request).toHaveBeenCalledTimes(1));
+  });
+
+  it('nada é confirmado antes de "Confirmar"; "Confirmar" confirma a execução pedida', async () => {
+    const reapply = reapplyActions();
+    const { user, dialog } = await openSummary(reapply);
+
+    expect(reapply.confirm).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() => expect(reapply.confirm).toHaveBeenCalledWith(12));
+    expect(reapply.confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('"Cancelar" fecha o diálogo sem confirmar', async () => {
+    const reapply = reapplyActions();
+    const { user, dialog } = await openSummary(reapply);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(reapply.confirm).not.toHaveBeenCalled();
+  });
+
+  it('a recusa da confirmação vai ao Alert do escopo', async () => {
+    const message = 'A execução 12 não está em aguardando_confirmacao';
+    const reapply = reapplyActions({ confirm: () => Promise.resolve({ ok: false, message }) });
+    const { user, dialog } = await openSummary(reapply);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar' }));
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(message));
   });
