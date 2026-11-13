@@ -550,6 +550,56 @@ export async function submitForReview(
   return { ok: true, value: { version: latest.version } };
 }
 
+/**
+ * Recusa do envio depois de gravar uma versão nova: ela acabou de nascer em rascunho, então é
+ * invariante quebrada, e o throw desfaz a transação inteira (a versão não fica em rascunho).
+ */
+function submitRefusedAfterWrite(issues: readonly Issue[]): never {
+  throw new Error(`Envio para revisão recusado: ${issues[0]?.code}`);
+}
+
+/**
+ * Salvar e enviar na criação (#778): grava a versão 1 com `createContent` e a envia com
+ * `submitForReview`, no mesmo `tx` (padrão de `createForReview`). A recusa da criação volta
+ * como `Result`, sem nada gravado; a do envio desfaz a criação.
+ */
+export async function createAndSubmit(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  input: ContentEdit,
+  resources: Resources = RESOURCES,
+): Promise<Result<{ id: number; version: number }>> {
+  const created = await createContent(tx, actor, siteId, input, { resources });
+  if (!created.ok) return created;
+  const submitted = await submitForReview(tx, actor, siteId, created.value.id);
+  if (!submitted.ok) return submitRefusedAfterWrite(submitted.issues);
+  return { ok: true, value: { id: created.value.id, version: submitted.value.version } };
+}
+
+/**
+ * Salvar e enviar na edição (#778): grava a N+1 com `updateContent` e a envia com
+ * `submitForReview`, no mesmo `tx`. Sem alteração, nada é gravado e o envio vale para a versão
+ * mais recente: em rascunho, ela vai para revisão; fora dele, a recusa (`content.not_draft`)
+ * volta como `Result`. Com versão nova, a recusa do envio desfaz a gravação.
+ */
+export async function updateAndSubmit(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+  contentId: number,
+  input: ContentEdit,
+  resources: Resources = RESOURCES,
+): Promise<Result<{ version: number; created: boolean }>> {
+  const updated = await updateContent(tx, actor, siteId, contentId, input, resources);
+  if (!updated.ok) return updated;
+  const submitted = await submitForReview(tx, actor, siteId, contentId);
+  if (!submitted.ok) {
+    return updated.value.created ? submitRefusedAfterWrite(submitted.issues) : submitted;
+  }
+  return { ok: true, value: { version: submitted.value.version, created: updated.value.created } };
+}
+
 export type ContentListItem = {
   id: number;
   kind: Content['kind'];

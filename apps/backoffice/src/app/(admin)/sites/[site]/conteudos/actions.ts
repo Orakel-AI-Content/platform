@@ -8,9 +8,11 @@ import type { ContentFormResult } from '@/components/contents/contentEditorValue
 import type { ActionResult } from '@/components/shared/actionResult.ts';
 import { getDb } from '@/db/client.ts';
 import {
+  createAndSubmit,
   createContent,
   listContentVersions,
   submitForReview,
+  updateAndSubmit,
   updateContent,
   type ContentEdit,
 } from '@/domain/content/contents.ts';
@@ -85,6 +87,58 @@ export async function updateContentAction(
   return { ok: true, message, id: contentId, saved };
 }
 
+/** O status mudou: aparece no conteúdo, na lista e na revisão. */
+function revalidateContentAndReview(siteId: string, contentId: number): void {
+  revalidatePath(`/sites/${siteId}/conteudos`);
+  revalidatePath(`/sites/${siteId}/conteudos/${contentId}`);
+  revalidatePath(`/sites/${siteId}/revisao`);
+}
+
+/**
+ * Salvar e enviar na criação (#778): a versão 1 nasce e vai para revisão na mesma transação
+ * (`createAndSubmit`). A recusa volta no formato de `createContentAction`.
+ */
+export async function createAndSubmitContentAction(
+  siteId: string,
+  input: ContentEdit,
+): Promise<ContentFormResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return noSession;
+  const result = await getDb().db.transaction(async (tx) =>
+    createAndSubmit(tx, actor.value, siteId, input, await resourcesFor(tx, siteId)),
+  );
+  if (!result.ok) return refused(result.issues);
+  revalidateContentAndReview(siteId, result.value.id);
+  return { ok: true, message: 'Conteúdo criado e enviado para revisão.', id: result.value.id };
+}
+
+/**
+ * Salvar e enviar na edição (#778): grava a N+1 e a envia na mesma transação
+ * (`updateAndSubmit`); sem alteração, só envia a mais recente. Devolve a versão enviada relida
+ * do servidor, como `updateContentAction`.
+ */
+export async function updateAndSubmitContentAction(
+  siteId: string,
+  contentId: number,
+  input: ContentEdit,
+): Promise<ContentFormResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return noSession;
+  const { db } = getDb();
+  const result = await db.transaction(async (tx) =>
+    updateAndSubmit(tx, actor.value, siteId, contentId, input, await resourcesFor(tx, siteId)),
+  );
+  if (!result.ok) return refused(result.issues);
+  const { version, created } = result.value;
+  revalidateContentAndReview(siteId, contentId);
+  const versions = await listContentVersions(db, actor.value, siteId, contentId);
+  const saved = versions.ok ? versions.value.find((v) => v.version === version)?.data : undefined;
+  const message = created
+    ? `Versão ${version} salva e enviada para revisão.`
+    : `Nenhuma alteração; a versão ${version} foi enviada para revisão.`;
+  return { ok: true, message, id: contentId, saved };
+}
+
 /** Envia a versão mais recente (em rascunho) para revisão; a regra é do domínio. */
 export async function submitForReviewAction(
   siteId: string,
@@ -111,9 +165,7 @@ function translated(
   if (!result.ok) {
     return { ok: false, message: result.issues.map((issue) => issue.message).join(' ') };
   }
-  revalidatePath(`/sites/${siteId}/conteudos`);
-  revalidatePath(`/sites/${siteId}/conteudos/${contentId}`);
-  revalidatePath(`/sites/${siteId}/revisao`);
+  revalidateContentAndReview(siteId, contentId);
   return { ok: true, message };
 }
 
