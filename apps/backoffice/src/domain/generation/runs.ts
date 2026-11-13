@@ -215,7 +215,7 @@ export type PendingRun = { runId: number; siteId: string; input: GenerationInput
 /**
  * Insumos da chamada ao modelo para a execução ainda `pendente`: o tema, a versão do contexto
  * gravada no disparo, o autor, as categorias e os recursos da release do site. `undefined` se a execução não
- * existe ou já terminou. Sem ator: leitura interna da task; a permissão ficou no disparo.
+ * existe, já terminou ou não é `geracao`. Sem ator: leitura interna da task; a permissão ficou no disparo.
  */
 export async function pendingRun(
   db: Executor,
@@ -242,8 +242,14 @@ export async function pendingRun(
       authors,
       and(eq(authors.siteId, generationRuns.siteId), eq(authors.id, generationRuns.authorId)),
     )
-    .where(and(eq(generationRuns.id, runId), eq(generationRuns.status, 'pendente')));
-  if (row === undefined) return undefined;
+    .where(
+      and(
+        eq(generationRuns.id, runId),
+        eq(generationRuns.kind, 'geracao'),
+        eq(generationRuns.status, 'pendente'),
+      ),
+    );
+  if (row === undefined || row.topic === null || row.authorId === null) return undefined;
   const categories = await db
     .select({ id: taxonomies.id, slug: taxonomies.slug, name: taxonomies.name })
     .from(taxonomies)

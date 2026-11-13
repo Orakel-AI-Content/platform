@@ -8,7 +8,13 @@ import type * as ClientModule from '../../src/db/client.ts';
 import { POST } from '../../src/app/api/internal/v1/contents/route.ts';
 import { readFixture } from '../../src/bin/seed.ts';
 import type { Db } from '../../src/db/client.ts';
-import { authors, contentVersions, generationRuns, taxonomies } from '../../src/db/schema/index.ts';
+import {
+  authors,
+  contentVersions,
+  generationRuns,
+  reviews,
+  taxonomies,
+} from '../../src/db/schema/index.ts';
 import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import { createEditorialContext } from '../../src/domain/generation/editorial-contexts.ts';
 import { FIXTURE_INVALID_TOPIC } from '../../src/domain/generation/fixture.ts';
