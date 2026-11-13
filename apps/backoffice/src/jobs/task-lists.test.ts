@@ -63,7 +63,7 @@ describe('backoffice-worker', () => {
     expect(tasks[LINK_CHECK_TASK]).toBeTypeOf('function');
   });
 
-  it('registra a geração e a correção automática no worker, com o modelo e a rota interna', () => {
+  it('registra a geração, a correção e o parecer automáticos no worker, com o modelo e a rota interna', () => {
     const tasks = workerTasks({
       db: {} as Db,
       store: {} as ObjectStore,
@@ -72,6 +72,8 @@ describe('backoffice-worker', () => {
       zones: {} as ZoneChecker,
     });
 
+    expect(REVIEW_OPINION_TASK).toBe('review-opinion');
+    expect(tasks[REVIEW_OPINION_TASK]).toBeTypeOf('function');
     expect(CORRECT_ARTICLE_TASK).toBe('correct-article');
     expect(tasks[GENERATE_ARTICLE_TASK]).toBeTypeOf('function');
     expect(tasks[CORRECT_ARTICLE_TASK]).toBeTypeOf('function');
