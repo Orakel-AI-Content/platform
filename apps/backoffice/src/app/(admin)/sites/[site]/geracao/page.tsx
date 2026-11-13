@@ -1,5 +1,6 @@
 import { GenerationForm } from '@/components/generation/GenerationForm';
 import { GenerationRunsTable } from '@/components/generation/GenerationRunsTable';
+import { ReviewOpinionsTable } from '@/components/generation/ReviewOpinionsTable';
 import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -7,6 +8,7 @@ import { SECTION_TITLE_CLASS } from '@/components/shared/sectionText.ts';
 import { siteTrail } from '@/components/shared/trail.ts';
 import { currentEditorialContext } from '@/domain/generation/editorial-contexts.ts';
 import { listGenerationRuns } from '@/domain/generation/runs.ts';
+import { listReviewOpinions } from '@/domain/reviews/opinions.ts';
 
 import { readAuthors, sitePageContext } from '../editorial-page.tsx';
 import { enqueueGenerationAction, generationRunsAction } from './actions.ts';
@@ -20,14 +22,18 @@ export const metadata = { title: 'Geração' };
  * execuções com o custo. Ver exige site.read; disparar, content.write (o formulário só aparece
  * com ela, e o domínio confere de novo; sem contexto editorial, o aviso aparece para todos). A
  * lista se relê sozinha enquanto há execução pendente (#779), e a concluída leva à revisão.
+ * Abaixo, os pareceres automáticos da revisão com o custo (#796), também com site.read.
  */
 export default async function GenerationPage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
   const context = await sitePageContext(siteId);
   if (!context.ok) return context.render;
   const { actor, db, site, canWrite } = context.value;
-  const runs = await listGenerationRuns(db, actor, site.id);
-  if (!runs.ok) return noRead;
+  const [runs, opinions] = await Promise.all([
+    listGenerationRuns(db, actor, site.id),
+    listReviewOpinions(db, actor, site.id),
+  ]);
+  if (!runs.ok || !opinions.ok) return noRead;
 
   // O contexto vale para qualquer papel (#600): sem ele, o aviso aparece também para quem só
   // lê, e o estado vazio das execuções não manda gerar. Os autores, só para quem dispara.
@@ -63,6 +69,18 @@ export default async function GenerationPage({ params }: { params: Promise<{ sit
             hasContext={current !== undefined}
             labelledBy="generation-runs-title"
             status={generationRunsAction.bind(null, site.id)}
+          />
+        </section>
+      </AdaptiveCard>
+      <AdaptiveCard>
+        <section aria-labelledby="review-opinions-title" className="flex flex-col gap-4">
+          <h2 id="review-opinions-title" className={SECTION_TITLE_CLASS}>
+            Pareceres
+          </h2>
+          <ReviewOpinionsTable
+            siteId={site.id}
+            rows={opinions.value}
+            labelledBy="review-opinions-title"
           />
         </section>
       </AdaptiveCard>
