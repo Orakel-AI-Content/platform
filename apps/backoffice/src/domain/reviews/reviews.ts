@@ -1,6 +1,6 @@
 import type { Issue, Result } from '@orakel/content-model';
 import type { Resources } from '@orakel/content-model/v1';
-import { and, asc, desc, eq, gte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, ne, or, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
 import { authors, contentVersions, redirects, reviews, taxonomies } from '../../db/schema/index.ts';
@@ -11,7 +11,12 @@ import {
   publishVersion,
 } from '../publications/publish.ts';
 import { schedulePublication } from '../publications/schedule.ts';
-import { listLiveContents, validateContentData } from '../content/contents.ts';
+import {
+  listLiveContents,
+  listReviewQueue,
+  type ReviewQueueItem,
+  validateContentData,
+} from '../content/contents.ts';
 import { currentConfig, resourcesFor } from '../sites/sites.ts';
 import {
   confirmedKeys,
@@ -27,6 +32,7 @@ import {
   type ReviewCheck,
   type SiteCheckContext,
 } from './checks.ts';
+import { linkCheckFor, type LinkCheckState } from './link-checks.ts';
 
 export {
   confirmedKeys,
@@ -152,6 +158,104 @@ export async function reviewChecks(
       checks: computeReviewChecks(latest.data, issues, checkContextFor(site, contentId)),
     },
   };
+}
+
+/** Item da fila de revisão com o que o revisor precisa ver antes de abrir o conteúdo (#772). */
+export type ReviewQueueEntry = ReviewQueueItem & {
+  /**
+   * Itens da revisão que não estão `ok`, contados como na tela de revisão: as checagens com
+   * `aviso` ou `erro`, mais os links externos quando algum não respondeu.
+   */
+  pending: number;
+  /** Checagem de links externos da versão, à parte da contagem: diz se ela já terminou. */
+  links: LinkCheckState;
+  /** A revisão mais recente do conteúdo devolveu uma versão até a da fila: voltou da devolução. */
+  returned: boolean;
+};
+
+function pendingCount(checks: readonly ReviewCheck[], links: LinkCheckState): number {
+  const failedLinks = links.state === 'verificado' && links.links.some((link) => !link.ok);
+  return checks.filter((check) => check.level !== 'ok').length + (failedLinks ? 1 : 0);
+}
+
+/**
+ * Fila de revisão (`listReviewQueue`) com pendências, links e devolução de cada item,
+ * calculados na leitura e nunca gravados. O contexto do site e os recursos da release são lidos
+ * uma vez para a fila inteira; cada item deriva o seu com `checkContextFor`. Exige `site.read`.
+ */
+export async function reviewQueue(
+  db: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<ReviewQueueEntry[]>> {
+  const queue = await listReviewQueue(db, actor, siteId);
+  if (!queue.ok) return queue;
+  if (queue.value.length === 0) return { ok: true, value: [] };
+  const context = await siteCheckContext(db, actor, siteId);
+  if (!context.ok) return context;
+  const { site, resources } = context.value;
+
+  const [dataRows, lastReviews] = await Promise.all([
+    db
+      .select({ contentId: contentVersions.contentId, data: contentVersions.data })
+      .from(contentVersions)
+      .where(
+        and(
+          eq(contentVersions.siteId, siteId),
+          or(
+            ...queue.value.map((item) =>
+              and(
+                eq(contentVersions.contentId, item.id),
+                eq(contentVersions.version, item.version),
+              ),
+            ),
+          ),
+        ),
+      ),
+    db
+      .selectDistinctOn([reviews.contentId], {
+        contentId: reviews.contentId,
+        version: reviews.version,
+        decision: reviews.decision,
+      })
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.siteId, siteId),
+          inArray(
+            reviews.contentId,
+            queue.value.map((item) => item.id),
+          ),
+        ),
+      )
+      .orderBy(asc(reviews.contentId), desc(reviews.id)),
+  ]);
+  const dataOf = new Map(dataRows.map((row) => [row.contentId, row.data]));
+  const lastReviewOf = new Map(lastReviews.map((row) => [row.contentId, row]));
+
+  const entries: ReviewQueueEntry[] = [];
+  for (const item of queue.value) {
+    const data = dataOf.get(item.id);
+    // A versão listada existe: versões não são apagadas.
+    if (data === undefined)
+      throw new Error(`versão ${String(item.version)} de ${String(item.id)} sumiu`);
+    const issues = await validationIssues(db, siteId, item.id, data, resources);
+    const checks = computeReviewChecks(data, issues, checkContextFor(site, item.id));
+    const links = await linkCheckFor(db, actor, {
+      siteId,
+      contentId: item.id,
+      version: item.version,
+    });
+    if (!links.ok) return links;
+    const last = lastReviewOf.get(item.id);
+    entries.push({
+      ...item,
+      pending: pendingCount(checks, links.value),
+      links: links.value,
+      returned: last?.decision === 'devolvido' && last.version <= item.version,
+    });
+  }
+  return { ok: true, value: entries };
 }
 
 /** Muda só o status da versão (ADR 0015): sem mudança pendente, o snapshot não o carrega. */
