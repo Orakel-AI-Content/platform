@@ -254,6 +254,25 @@ describe('SiteLiveActivity na criação da infraestrutura (#826)', () => {
     expect(status).not.toHaveBeenCalled();
   });
 
+  it('a criação vista aguardando confirmação que a página entrega já fechada mostra o resultado', () => {
+    const { rerender } = renderLive(
+      idle({ openInfra: { ...applying, status: 'aguardando_confirmacao', currentStep: null } }),
+    );
+    rerender(
+      <SiteLiveActivity
+        activity={idle({ history: [closed({}), PAUSE] })}
+        status={status}
+        timeZone={TZ}
+        pollMs={POLL_MS}
+      />,
+    );
+
+    expect(region().textContent).toBe(
+      'Criação da infraestrutura concluída em 11/10/2026, 14:05 BRT',
+    );
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('sem criação acompanhada, uma já terminada no histórico não mostra faixa nem relê', () => {
     renderLive(idle({ history: [closed({}), PAUSE] }));
 

@@ -33,20 +33,29 @@ type Snapshot = {
   activity: SiteActivity;
   /** A última execução de build vista aberta. */
   watched: number | null;
-  /** A última criação da infraestrutura vista aplicando (#826). */
+  /**
+   * A última criação da infraestrutura vista aberta (#826), em qualquer estado: o apply do
+   * driver local termina antes de a página revalidada chegar, e a aba nunca a veria aplicando.
+   */
   watchedInfra: number | null;
 };
 
+/** A criação da infraestrutura aberta, do pedido do plano ao fim do apply. */
+function openCreation(activity: SiteActivity): OpenInfraRun | null {
+  const run = activity.openInfra;
+  return run !== null && run.kind === 'criar' ? run : null;
+}
+
 /** A criação da infraestrutura aplicando: o andamento que a aba acompanha (#826). */
 function applyingCreation(activity: SiteActivity): OpenInfraRun | null {
-  const run = activity.openInfra;
-  return run !== null && run.kind === 'criar' && run.status === 'aplicando' ? run : null;
+  const run = openCreation(activity);
+  return run?.status === 'aplicando' ? run : null;
 }
 
 const snapshotOf = (activity: SiteActivity, current: Snapshot | null): Snapshot => ({
   activity,
   watched: activity.open?.id ?? current?.watched ?? null,
-  watchedInfra: applyingCreation(activity)?.id ?? current?.watchedInfra ?? null,
+  watchedInfra: openCreation(activity)?.id ?? current?.watchedInfra ?? null,
 });
 
 const isPolling = (activity: SiteActivity) =>
@@ -56,8 +65,8 @@ const isPolling = (activity: SiteActivity) =>
  * Atividade da aba: a da página até o polling trazer outra; quando a página entrega uma nova
  * (depois do `revalidatePath` de uma ação), ela substitui a do polling, como em `ReleasesTable`.
  * `watched` e `watchedInfra` são a última execução de build e a última criação da infra vistas
- * abertas, para mostrar o resultado delas quando fecharem. O polling só roda com uma delas
- * aberta. Quando a criação acompanhada fecha, a página é relida (`router.refresh`), para a etapa
+ * abertas, para mostrar o resultado delas quando fecharem. O polling só roda com build aberto
+ * ou criação aplicando (o plano tem o polling do diálogo). Quando a criação acompanhada fecha, a página é relida (`router.refresh`), para a etapa
  * Infra e zona seguir o ciclo de vida que o apply avançou, como em `useInfraCheck`.
  */
 function useSiteActivity(
@@ -85,7 +94,7 @@ function useSiteActivity(
 }
 
 function finishedInfra({ activity, watchedInfra }: Snapshot): InfraHistoryItem | undefined {
-  if (watchedInfra === null || applyingCreation(activity) !== null) return undefined;
+  if (watchedInfra === null || openCreation(activity) !== null) return undefined;
   return activity.history.find(
     (item): item is InfraHistoryItem => item.type === 'infra' && item.id === watchedInfra,
   );
