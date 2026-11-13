@@ -7,6 +7,7 @@ import {
   authors,
   type ContentData,
   contentVersions,
+  generationRuns,
   redirects,
   reviews,
   taxonomies,
@@ -188,6 +189,23 @@ export type ReviewQueueEntry = ReviewQueueItem & {
   opinion: OpinionOutlook;
 };
 
+/**
+ * Execução `correcao` `ok` que criou a versão (ADR 0023), derivada na leitura e nunca gravada:
+ * a rota interna só grava sobre a devolução pendente, então a versão corrigida é sempre a
+ * seguinte à base (`baseVersion + 1`). Uma correção em `falha` não cria versão.
+ */
+function correctionRuns(siteId: string, contentIds: readonly number[]) {
+  return and(
+    eq(generationRuns.siteId, siteId),
+    eq(generationRuns.kind, 'correcao'),
+    eq(generationRuns.status, 'ok'),
+    inArray(generationRuns.contentId, [...contentIds]),
+  );
+}
+
+const correctionKey = (contentId: number, version: number): string =>
+  `${String(contentId)}:${String(version)}`;
+
 function pendingCount(checks: readonly ReviewCheck[], links: LinkCheckState): number {
   const failedLinks = links.state === 'verificado' && links.links.some((link) => !link.ok);
   return checks.filter((check) => check.level !== 'ok').length + (failedLinks ? 1 : 0);
@@ -210,7 +228,8 @@ export async function reviewQueue(
   if (!context.ok) return context;
   const { site, resources } = context.value;
 
-  const [dataRows, lastReviews] = await Promise.all([
+  const ids = queue.value.map((item) => item.id);
+  const [dataRows, lastReviews, corrections] = await Promise.all([
     db
       .select({ contentId: contentVersions.contentId, data: contentVersions.data })
       .from(contentVersions)
@@ -234,19 +253,19 @@ export async function reviewQueue(
         decision: reviews.decision,
       })
       .from(reviews)
-      .where(
-        and(
-          eq(reviews.siteId, siteId),
-          inArray(
-            reviews.contentId,
-            queue.value.map((item) => item.id),
-          ),
-        ),
-      )
+      .where(and(eq(reviews.siteId, siteId), inArray(reviews.contentId, ids)))
       .orderBy(asc(reviews.contentId), desc(reviews.id)),
+    db
+      .select({ contentId: generationRuns.contentId, baseVersion: generationRuns.baseVersion })
+      .from(generationRuns)
+      .where(correctionRuns(siteId, ids)),
   ]);
   const dataOf = new Map(dataRows.map((row) => [row.contentId, row.data]));
   const lastReviewOf = new Map(lastReviews.map((row) => [row.contentId, row]));
+  // O CHECK `generation_runs_correcao_check` garante conteúdo e versão-base na `correcao`.
+  const corrected = new Set(
+    corrections.map((row) => correctionKey(row.contentId!, row.baseVersion! + 1)),
+  );
 
   const entries: ReviewQueueEntry[] = [];
   for (const item of queue.value) {
@@ -611,12 +630,16 @@ export async function pendingReturn(
   };
 }
 
+/** A devolução que pediu a correção automática da versão: o comentário do revisor. */
+export type ReviewCorrection = { reviewer: string; comment: string };
+
 /**
  * O que mudou desde a última revisão (#768): a versão atual comparada (`compareVersions`) com a
  * `base`, a versão da revisão mais recente do conteúdo, de qualquer decisão. Os dados da base
- * voltam junto, para a tela resolver nomes e mídias. `null` sem base: o conteúdo nunca foi
- * revisado, ou a revisão mais recente é da própria versão atual (devolvida e reenviada sem
- * edição), o que já foi visto. Exige `site.read`.
+ * voltam junto, para a tela resolver nomes e mídias. Quando a versão atual veio da correção
+ * automática (`correctionRuns`), `correction` traz o comentário da devolução que a pediu; senão,
+ * `null`. `null` sem base: o conteúdo nunca foi revisado, ou a revisão mais recente é da própria
+ * versão atual (devolvida e reenviada sem edição), o que já foi visto. Exige `site.read`.
  */
 export async function reviewChanges(
   db: Executor,
@@ -624,7 +647,15 @@ export async function reviewChanges(
   siteId: string,
   contentId: number,
 ): Promise<
-  Result<(VersionChanges & { baseVersion: number; version: number; base: ContentData }) | null>
+  Result<
+    | (VersionChanges & {
+        baseVersion: number;
+        version: number;
+        base: ContentData;
+        correction: ReviewCorrection | null;
+      })
+    | null
+  >
 > {
   const allowed = requireRole(actor, 'site.read');
   if (!allowed.ok) return allowed;
@@ -646,6 +677,14 @@ export async function reviewChanges(
     .orderBy(desc(reviews.id))
     .limit(1);
   if (last === undefined || last.version >= latest.version) return { ok: true, value: null };
+  const [correction] = await db
+    .select({ reviewer: reviews.reviewer, comment: reviews.comment })
+    .from(generationRuns)
+    .innerJoin(reviews, eq(reviews.id, generationRuns.reviewId))
+    .where(
+      and(correctionRuns(siteId, [contentId]), eq(generationRuns.baseVersion, latest.version - 1)),
+    )
+    .limit(1);
   return {
     ok: true,
     value: {
@@ -653,6 +692,11 @@ export async function reviewChanges(
       baseVersion: last.version,
       version: latest.version,
       base: last.data,
+      // A devolução exige o comentário (ADR 0020).
+      correction:
+        correction === undefined
+          ? null
+          : { reviewer: correction.reviewer, comment: correction.comment ?? '' },
     },
   };
 }

@@ -13,7 +13,7 @@ import {
   sites,
 } from '../../src/db/schema/index.ts';
 import { readFixture } from '../../src/bin/seed.ts';
-import { SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
+import { GENERATOR_ACTOR, SYSTEM_ACTOR, type Actor } from '../../src/domain/access/rbac.ts';
 import {
   type ContentEdit,
   type NewBlock,
@@ -21,7 +21,8 @@ import {
   submitForReview,
   updateContent,
 } from '../../src/domain/content/contents.ts';
-import { CORRECT_ARTICLE_TASK } from '../../src/domain/generation/runs.ts';
+import { correctForReview } from '../../src/domain/content/generated.ts';
+import { CORRECT_ARTICLE_TASK, finishRun } from '../../src/domain/generation/runs.ts';
 import { importSnapshot } from '../../src/domain/import/import-snapshot.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../../src/domain/publications/schedule.ts';
 import {
@@ -66,6 +67,7 @@ import { resetDatabase, setupDatabase } from './helpers.ts';
 // Aprovar e publicar ou agendar numa decisão só, com transbordo para a próxima vaga (#759).
 // Fila de revisão com pendências, links e devolvido de cada item (#772) e o parecer (#774).
 // O que mudou desde a última revisão (#768): a base é a versão da revisão mais recente.
+// Correção automática na fila e no que mudou (#804): derivada da execução `correcao` `ok`.
 
 // Recursos da release: `resourcesFor` devolve os RESOURCES até o registro por release
 // (workspace#26); aqui o teste troca o retorno para simular uma release sem o bloco faq.
@@ -680,6 +682,44 @@ async function correctionJobs(): Promise<CorrectionJob[]> {
   return result.rows as CorrectionJob[];
 }
 
+/**
+ * Devolve a versão pedindo a correção automática e termina a execução como o job
+ * `correct-article`: no `ok`, grava a versão corrigida pela guarda da rota interna
+ * (`correctForReview`), que já a envia à fila; na `falha`, nada é gravado.
+ */
+async function autoCorrect(
+  contentId: number,
+  version: number,
+  status: 'ok' | 'falha',
+  comment = 'Falta a fonte da tabela de plantio.',
+): Promise<number | undefined> {
+  const returned = await giveBack(contentId, version, comment, role('revisor'), {
+    autoCorrect: true,
+  });
+  if (!returned.ok) throw new Error(JSON.stringify(returned.issues));
+  const [run] = await db
+    .select({ id: generationRuns.id })
+    .from(generationRuns)
+    .where(and(eq(generationRuns.contentId, contentId), eq(generationRuns.status, 'pendente')));
+  if (run === undefined) throw new Error('correção sem execução');
+  if (status === 'falha') {
+    await finishRun(db, run.id, {
+      call: null,
+      status: 'falha',
+      issues: [{ code: 'generation.failed', message: 'falhou', path: [] }],
+    });
+    return undefined;
+  }
+  const base = (await versions(contentId)).at(-1)!.data;
+  const corrected = await correctForReview(db, GENERATOR_ACTOR, SITE, contentId, version, {
+    ...base,
+    title: 'Título corrigido',
+  });
+  if (!corrected.ok) throw new Error(JSON.stringify(corrected.issues));
+  await finishRun(db, run.id, { call: null, status: 'ok', contentId });
+  return corrected.value.version;
+}
+
 describe('devolver ao editor (#598)', () => {
   it('grava a devolução com o comentário em reviews e leva a versão a rascunho', async () => {
     const version = await draft(1);
@@ -929,7 +969,39 @@ describe('o que mudou desde a última revisão (#768)', () => {
         base,
         fields: [{ field: 'title', before: base.title, after: 'Título corrigido' }],
         blocks: [{ n: block.n, kind: 'adicionado', after: block }],
+        correction: null,
       },
+    });
+  });
+
+  it('da correção automática, compara com a versão devolvida e traz o comentário (#804)', async () => {
+    const returned = await draft(1);
+    const base = (await versions(1)).at(-1)!.data;
+    const corrected = await autoCorrect(1, returned, 'ok', 'Corrija o título.');
+
+    const result = await changesOf();
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        baseVersion: returned,
+        version: corrected,
+        base,
+        fields: [{ field: 'title', before: base.title, after: 'Título corrigido' }],
+        blocks: [],
+        correction: { reviewer: 'revisor@orakel.local', comment: 'Corrija o título.' },
+      },
+    });
+  });
+
+  it('com a correção automática em falha, a versão salva pelo editor não traz comentário (#804)', async () => {
+    const returned = await draft(1);
+    await autoCorrect(1, returned, 'falha');
+    const edited = await draft(1);
+
+    expect(await changesOf()).toMatchObject({
+      ok: true,
+      value: { baseVersion: returned, version: edited, correction: null },
     });
   });
 
@@ -1169,6 +1241,30 @@ describe('fila de revisão com pendências e devolvidos (#772)', () => {
         { id: 1, returned: true },
         { id: 2, returned: true },
         { id: 3, returned: false },
+      ]),
+    );
+    expect(queue).toHaveLength(3);
+  });
+
+  it('só a versão criada pela correção automática ok aparece como correção automática (#804)', async () => {
+    const auto = await draft(1);
+    await autoCorrect(1, auto, 'ok');
+    const failed = await draft(2);
+    await autoCorrect(2, failed, 'falha');
+    await draft(2);
+    const edited = await draft(3);
+    await giveBack(3, edited);
+    await draft(3);
+
+    const queue = await queueOf();
+
+    expect(
+      queue.map(({ id, returned, autoCorrected }) => ({ id, returned, autoCorrected })),
+    ).toEqual(
+      expect.arrayContaining([
+        { id: 1, returned: true, autoCorrected: true },
+        { id: 2, returned: true, autoCorrected: false },
+        { id: 3, returned: true, autoCorrected: false },
       ]),
     );
     expect(queue).toHaveLength(3);
