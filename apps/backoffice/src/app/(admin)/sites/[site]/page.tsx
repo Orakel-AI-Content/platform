@@ -29,10 +29,13 @@ import { siteTrail } from '@/components/shared/trail.ts';
 import {
   cancelBuildAction,
   checkSiteInfraAction,
+  confirmInfraPlanAction,
+  infraPlanAction,
   pauseSiteAction,
   publishNow,
   rebuildOnReleaseAction,
   registerG1Action,
+  requestInfraPlanAction,
   resumeSiteAction,
   retreatLifecycleAction,
   revertReleaseAction,
@@ -63,7 +66,8 @@ export const dynamic = 'force-dynamic';
  * abaixo do painel. Lê o site pelo
  * sitePageContext (a mesma busca do layout), os gatilhos e o uso de redirects, que vira um aviso
  * acima do resumo quando o core marca `alert` (#487); as ações do ciclo, do G1, da janela e do
- * limite só aparecem com site.configure, e o domínio confere de novo.
+ * limite só aparecem com site.configure, e o domínio confere de novo; com ele, a etapa Infra e
+ * zona oferece "Criar infraestrutura" ou "Revisar e confirmar" pela execução aberta (#825).
  */
 export default async function SitePage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;
@@ -187,6 +191,15 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
             lifecycle={site.lifecycle}
             check={checkSiteInfraAction.bind(null, site.id)}
             undo={retreatLifecycleAction.bind(null, site.id)}
+            infra={{
+              open: activity.value.openInfra && {
+                id: activity.value.openInfra.id,
+                status: activity.value.openInfra.status,
+              },
+              request: requestInfraPlanAction.bind(null, site.id),
+              read: infraPlanAction.bind(null, site.id),
+              confirm: confirmInfraPlanAction.bind(null, site.id),
+            }}
           />
         ) : undefined
       }
