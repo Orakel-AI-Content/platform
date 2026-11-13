@@ -11,6 +11,7 @@ import type { ObjectStore } from '../domain/media/store.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
 import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
+import { REVIEW_OPINION_TASK } from '../domain/reviews/opinions.ts';
 import type { ZoneChecker } from '../lib/cloudflare.ts';
 import { buildRunnerTasks, WORKER_CRONTAB, workerTasks } from './task-lists.ts';
 

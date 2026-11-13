@@ -10,6 +10,7 @@ import { CHECK_SITE_INFRA_TASK } from '../domain/builds/site-state.ts';
 import { PUBLISH_SCHEDULED_TASK } from '../domain/publications/schedule.ts';
 import { RECONCILE_PREVIEW_TASK } from '../domain/preview/preview.ts';
 import { LINK_CHECK_TASK } from '../domain/reviews/link-checks.ts';
+import { REVIEW_OPINION_TASK } from '../domain/reviews/opinions.ts';
 import { CHECK_RELEASE_IMAGE_TASK, RELEASE_RUN_TASK } from '../domain/releases/releases.ts';
 import {
   createAggregateAudienceTask,
@@ -34,6 +35,7 @@ import {
   type ReconcilePreviewTaskDeps,
 } from './tasks/reconcile-preview.ts';
 import { createReleaseRunTask, type ReleaseRunTaskDeps } from './tasks/release-run.ts';
+import { createReviewOpinionTask } from './tasks/review-opinion.ts';
 import { createRollbackTask } from './tasks/rollback.ts';
 
 export type WorkerTaskDeps = MediaVariantsTaskDeps &
@@ -54,6 +56,7 @@ export function workerTasks(deps: WorkerTaskDeps): TaskList {
     [AGGREGATE_AUDIENCE_TASK]: createAggregateAudienceTask(deps),
     [CHECK_SITE_INFRA_TASK]: createCheckSiteInfraTask(deps),
     [LINK_CHECK_TASK]: createCheckContentLinksTask(deps),
+    [REVIEW_OPINION_TASK]: createReviewOpinionTask(deps),
   };
 }
 

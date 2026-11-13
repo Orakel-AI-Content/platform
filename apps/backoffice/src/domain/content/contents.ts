@@ -39,6 +39,7 @@ import { requireRole, type Actor } from '../access/rbac.ts';
 import { recordPendingChange } from '../pending-changes/record.ts';
 import { carryConfirmations } from '../reviews/confirmations.ts';
 import { enqueueLinkCheck } from '../reviews/link-checks.ts';
+import { carryOpinion, enqueueOpinion } from '../reviews/opinions.ts';
 import { lockVersionInReview } from '../reviews/version-guard.ts';
 import { checkWrite, type WriteOptions } from './write.ts';
 
@@ -437,7 +438,9 @@ export async function updateContent(
  * aprovar e devolver). Grava a N+1 já `em_revisao`, com a autoria de quem corrigiu, pelas regras
  * da edição; a N vai a `substituido` (só histórico, fora da fila), as confirmações que a mudança
  * não afeta passam para a N+1 (`carryConfirmations`) e a checagem de links é enfileirada para
- * ela. Dados iguais aos da versão em revisão não gravam nada, como em `updateContent`.
+ * ela. O parecer automático é enfileirado para ela se o texto mudou; senão, a N+1 herda o da N
+ * (`carryOpinion`). Dados iguais aos da versão em revisão não gravam nada, como em
+ * `updateContent`.
  */
 export async function amendInReview(
   tx: Executor,
@@ -490,6 +493,8 @@ export async function amendInReview(
     );
   await carryConfirmations(tx, siteId, contentId, version, next, textChanged);
   await enqueueLinkCheck(tx, { siteId, contentId, version: next });
+  if (textChanged) await enqueueOpinion(tx, { siteId, contentId, version: next });
+  else await carryOpinion(tx, siteId, contentId, version, next);
   return { ok: true, value: { version: next, created } };
 }
 
@@ -498,7 +503,8 @@ export async function amendInReview(
  * `status` (os dados da versão continuam imutáveis, ADR 0015) e não registra mudança
  * pendente: o status não entra no snapshot. A linha de `contents` fica travada, como na
  * edição: o envio não marca uma versão que outra gravação acabou de substituir. Na mesma
- * transação, enfileira a checagem dos links externos da versão (#745).
+ * transação, enfileira a checagem dos links externos da versão (#745) e o parecer automático
+ * (workspace#94).
  */
 export async function submitForReview(
   tx: Executor,
@@ -547,6 +553,7 @@ export async function submitForReview(
       ),
     );
   await enqueueLinkCheck(tx, { siteId, contentId, version: latest.version });
+  await enqueueOpinion(tx, { siteId, contentId, version: latest.version });
   return { ok: true, value: { version: latest.version } };
 }
 
