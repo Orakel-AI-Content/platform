@@ -3,6 +3,7 @@ import AdaptiveCard from '@/components/shared/AdaptiveCard';
 import { noRead } from '@/components/shared/ForbiddenScreen';
 import { ListHeader, PageTrail } from '@/components/shared/PageHeader';
 import { siteTrail } from '@/components/shared/trail.ts';
+import ButtonLink from '@/components/ui/Button/ButtonLink';
 import { reviewQueue } from '@/domain/reviews/reviews.ts';
 
 import { sitePageContext } from '../editorial-page.tsx';
@@ -15,7 +16,8 @@ export const metadata = { title: 'Revisão' };
  * Fila de revisão do site (#74): conteúdos cuja versão mais recente está em revisão, com as
  * pendências e a marca de devolvido de cada um (#772). Ler exige site.read (o domínio
  * confere); aprovar é da tela de revisão de cada conteúdo. Lista no padrão do template (#365):
- * a trilha acima do cartão; título, toolbar e tabela dentro dele.
+ * a trilha acima do cartão; título, toolbar e tabela dentro dele. "Começar revisão" (#773)
+ * abre o primeiro item na ordem do domínio; some com a fila vazia.
  */
 export default async function ReviewQueuePage({ params }: { params: Promise<{ site: string }> }) {
   const { site: siteId } = await params;

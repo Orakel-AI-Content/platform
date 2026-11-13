@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ListHeader } from '@/components/shared/PageHeader';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
-import type { ReviewQueueItem } from '@/domain/content/contents.ts';
+import type { ReviewQueueEntry } from '@/domain/reviews/reviews.ts';
 
 // Fila de revisão (#773): "Começar revisão" no cabeçalho leva ao primeiro item na ordem de
-// `listReviewQueue`; com a fila vazia, não aparece.
+// `reviewQueue` (#772); com a fila vazia, não aparece.
 
 const queue = vi.hoisted(() => ({ items: [] as unknown[] }));
 
@@ -17,18 +17,21 @@ vi.mock('../editorial-page.tsx', () => ({
       value: { actor: {}, db: {}, site: { id: 'exemplo-a', name: 'Exemplo A', timeZone: 'UTC' } },
     }),
 }));
-vi.mock('@/domain/content/contents.ts', () => ({
-  listReviewQueue: () => Promise.resolve({ ok: true, value: queue.items }),
+vi.mock('@/domain/reviews/reviews.ts', () => ({
+  reviewQueue: () => Promise.resolve({ ok: true, value: queue.items }),
 }));
 
 const { default: ReviewQueuePage } = await import('./page.tsx');
 
-const item = (id: number): ReviewQueueItem => ({
+const item = (id: number): ReviewQueueEntry => ({
   id,
   kind: 'article',
   title: `Artigo ${id}`,
   version: 1,
   submittedAt: new Date(0),
+  pending: 0,
+  links: { state: 'verificando' },
+  returned: false,
 });
 
 /** Primeiro elemento do tipo pedido na árvore devolvida pela página. */
