@@ -184,6 +184,30 @@ export function infraStepChangesText(changes: readonly InfraChange[]): string {
     .join(' · ');
 }
 
+/**
+ * "Remover infraestrutura" (workspace#97): as páginas publicadas, que saem com o Worker do site
+ * (fora do plano do OpenTofu), no resumo do que será apagado.
+ */
+export const INFRA_REMOVAL_PAGES_LABEL = 'Páginas publicadas';
+
+/**
+ * As páginas no ar que a remoção apaga: "12 a remover", ou "Nada no ar" sem versão ativa
+ * (`null`) ou sem página.
+ */
+export function infraRemovalPagesText(activePages: number | null): string {
+  return activePages === null || activePages === 0 ? 'Nada no ar' : `${activePages} a remover`;
+}
+
+/** O que a remoção não toca: fica no Backoffice e nos originais, para recriar depois. */
+export const INFRA_REMOVAL_KEPT = [
+  'Conteúdo e histórico do site no Backoffice',
+  'Originais das imagens',
+  'Cadastro e configuração do site',
+] as const;
+
+/** Por que "Remover infraestrutura" está desabilitada com o site ativo. */
+export const INFRA_REMOVAL_PAUSE_FIRST = 'Para remover a infraestrutura, pause o site antes.';
+
 /** Etapa de uma execução de infra: as do módulo e, só na remoção, as páginas do site. */
 export function infraRunStepLabel(step: InfraStep): string {
   return step === 'paginas' ? 'Páginas do site' : INFRA_STEP_LABEL[step];

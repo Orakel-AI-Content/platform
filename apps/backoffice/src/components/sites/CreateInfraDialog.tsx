@@ -31,8 +31,14 @@ export const INFRA_REQUEST_FAILED = 'Não foi possível pedir o plano. Tente de 
 export const INFRA_ALREADY_CONFIRMED =
   'Esta criação da infraestrutura já foi confirmada; o andamento aparece na etapa Infra e zona.';
 
-/** O estado do diálogo a partir do plano lido; `null` (leitura falhou) mantém o atual. */
-export function infraPlanState(view: InfraPlanView): CreateInfraState {
+/**
+ * O estado do diálogo a partir do plano lido; `null` (leitura falhou) mantém o atual. Já
+ * confirmada, a execução mostra `alreadyConfirmed` (o da remoção é outro texto).
+ */
+export function infraPlanState(
+  view: InfraPlanView,
+  alreadyConfirmed: string = INFRA_ALREADY_CONFIRMED,
+): CreateInfraState {
   switch (view.status) {
     case 'planejando':
       return { kind: 'preparando' };
@@ -43,7 +49,7 @@ export function infraPlanState(view: InfraPlanView): CreateInfraState {
     case 'falhou':
       return { kind: 'erro', message: view.message };
     default:
-      return { kind: 'erro', message: INFRA_ALREADY_CONFIRMED };
+      return { kind: 'erro', message: alreadyConfirmed };
   }
 }
 
@@ -117,10 +123,13 @@ export function useCreateInfra({
   request,
   read,
   pollMs = INFRA_PLAN_POLL_MS,
+  alreadyConfirmed = INFRA_ALREADY_CONFIRMED,
 }: {
   request: () => Promise<{ ok: true; runId: number } | { ok: false; message: string }>;
   read: (runId: number) => Promise<InfraPlanView | null>;
   pollMs?: number;
+  /** Mensagem da execução que já foi confirmada (`infraPlanState`). */
+  alreadyConfirmed?: string;
 }) {
   const [isOpen, setOpen] = useState(false);
   const [runId, setRunId] = useState<number | null>(null);
@@ -129,9 +138,9 @@ export function useCreateInfra({
   const load = useCallback(
     async (id: number) => {
       const view = await read(id);
-      if (view !== null) setState(infraPlanState(view));
+      if (view !== null) setState(infraPlanState(view, alreadyConfirmed));
     },
-    [read],
+    [read, alreadyConfirmed],
   );
   const poll = useCallback(() => (runId === null ? Promise.resolve() : load(runId)), [runId, load]);
   usePolling(isOpen && runId !== null && state.kind === 'preparando', poll, pollMs);
