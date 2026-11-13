@@ -6,6 +6,7 @@ import type { ComponentProps } from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { toast, ToastProvider } from '@/components/ui/toast';
+import type { Opinion } from '@/domain/reviews/opinion.ts';
 
 import { ReviewChanges } from './ReviewChanges.tsx';
 import { ReviewChecks } from './ReviewChecks.tsx';
@@ -95,7 +96,7 @@ const opinionPoints: OpinionPointLabel[] = [
 ];
 
 // Parecer desfavorável em tudo: só informa (workspace#94), não mexe nas aprovações.
-const unfavorable = {
+const unfavorable: Opinion = {
   valor_original: { verdict: 'nao_atende', justification: 'Só parafraseia.', excerpts: ['x'] },
   politicas_anuncios_afiliados: {
     verdict: 'nao_atende',
@@ -103,7 +104,7 @@ const unfavorable = {
     excerpts: ['lucro garantido'],
   },
   linha_editorial: { verdict: 'nao_atende', justification: 'Fora do tema.', excerpts: ['y'] },
-} as const;
+};
 
 const STEP_TITLES = ['Checagens', 'Ajustes', 'Leitura', 'Decisão'];
 
