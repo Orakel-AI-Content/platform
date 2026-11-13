@@ -1,4 +1,5 @@
 import type { Issue, Result } from '@orakel/content-model';
+import type { Resources } from '@orakel/content-model/v1';
 import { and, asc, desc, eq, gte, ne, sql } from 'drizzle-orm';
 
 import type { Executor } from '../../db/client.ts';
@@ -21,10 +22,10 @@ import {
   REVIEW_CHECKLIST,
 } from './version-guard.ts';
 import {
+  checkContextFor,
   computeReviewChecks,
-  sitePaths,
   type ReviewCheck,
-  type ReviewCheckContext,
+  type SiteCheckContext,
 } from './checks.ts';
 
 export {
@@ -41,9 +42,15 @@ async function validationIssues(
   siteId: string,
   contentId: number,
   data: Parameters<typeof validateContentData>[3],
+  resources?: Resources,
 ): Promise<Issue[]> {
-  const resources = await resourcesFor(db, siteId);
-  const validated = await validateContentData(db, siteId, contentId, data, resources);
+  const validated = await validateContentData(
+    db,
+    siteId,
+    contentId,
+    data,
+    resources ?? (await resourcesFor(db, siteId)),
+  );
   return validated.ok ? [] : validated.issues;
 }
 
@@ -71,16 +78,19 @@ export async function reviewIssues(
   };
 }
 
-/** Contexto do site para as checagens: caminhos que existem, categorias e títulos dos outros. */
-async function reviewCheckContext(
+/**
+ * Contexto do site inteiro para as checagens, lido uma vez (#772): conteúdos no ar,
+ * taxonomias, autores, redirects, configuração, títulos e os recursos da release. Cada
+ * conteúdo deriva o seu com `checkContextFor`.
+ */
+async function siteCheckContext(
   db: Executor,
   actor: Actor,
   siteId: string,
-  contentId: number,
-): Promise<Result<ReviewCheckContext>> {
+): Promise<Result<{ site: SiteCheckContext; resources: Resources }>> {
   const live = await listLiveContents(db, actor, siteId);
   if (!live.ok) return live;
-  const [taxonomyRows, authorRows, redirectRows, config, titleRows] = await Promise.all([
+  const [taxonomyRows, authorRows, redirectRows, config, titleRows, resources] = await Promise.all([
     db
       .select({ id: taxonomies.id, kind: taxonomies.kind, slug: taxonomies.slug })
       .from(taxonomies)
@@ -88,30 +98,29 @@ async function reviewCheckContext(
     db.select({ slug: authors.slug }).from(authors).where(eq(authors.siteId, siteId)),
     db.select({ from: redirects.from }).from(redirects).where(eq(redirects.siteId, siteId)),
     currentConfig(db, siteId),
-    // Versão mais recente de cada outro conteúdo do site, em qualquer status.
+    // Versão mais recente de cada conteúdo do site, em qualquer status.
     db
       .selectDistinctOn([contentVersions.contentId], {
         contentId: contentVersions.contentId,
         title: sql<string>`${contentVersions.data}->>'title'`,
       })
       .from(contentVersions)
-      .where(and(eq(contentVersions.siteId, siteId), ne(contentVersions.contentId, contentId)))
+      .where(eq(contentVersions.siteId, siteId))
       .orderBy(asc(contentVersions.contentId), desc(contentVersions.version)),
+    resourcesFor(db, siteId),
   ]);
   return {
     ok: true,
     value: {
-      paths: sitePaths({
-        liveSlugs: live.value.filter((item) => item.id !== contentId).map((item) => item.slug),
+      site: {
+        live: live.value,
         taxonomies: taxonomyRows,
         authorSlugs: authorRows.map((row) => row.slug),
         config,
         redirectFroms: redirectRows.map((row) => row.from),
-      }),
-      categoryIds: new Set(
-        taxonomyRows.filter((row) => row.kind === 'category').map((row) => row.id),
-      ),
-      otherTitles: titleRows,
+        titles: titleRows,
+      },
+      resources,
     },
   };
 }
@@ -132,14 +141,15 @@ export async function reviewChecks(
 
   const latest = await latestVersion(db, siteId, contentId);
   if (latest === undefined) return { ok: false, issues: [notFound(siteId, contentId)] };
-  const context = await reviewCheckContext(db, actor, siteId, contentId);
+  const context = await siteCheckContext(db, actor, siteId);
   if (!context.ok) return context;
-  const issues = await validationIssues(db, siteId, contentId, latest.data);
+  const { site, resources } = context.value;
+  const issues = await validationIssues(db, siteId, contentId, latest.data, resources);
   return {
     ok: true,
     value: {
       version: latest.version,
-      checks: computeReviewChecks(latest.data, issues, context.value),
+      checks: computeReviewChecks(latest.data, issues, checkContextFor(site, contentId)),
     },
   };
 }
