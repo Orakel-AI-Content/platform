@@ -10,6 +10,8 @@ import { upsertUser } from '../../src/domain/access/users.ts';
 import {
   fakeRuntime,
   infraApplyOk,
+  infraDestroyed,
+  infraDestroyPlanOk,
   infraFailed,
   infraPlanOk,
   type FakeStage,
@@ -39,14 +41,17 @@ import { createInfraCheckTask } from '../../src/jobs/tasks/infra-check.ts';
 import { createInfraPlanTask } from '../../src/jobs/tasks/infra-plan.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
-// Tasks do plano e do apply da infra do site (#824): gravam em `infra_runs` pelo domínio, com o
-// driver local e com o driver tofu sobre o runtime falso; fila e recuperação na partida.
+// Tasks do plano e do apply da infra do site (#824) e da remoção (#839): gravam em `infra_runs`
+// pelo domínio, com o driver local e com o driver tofu sobre o runtime falso; fila e recuperação
+// na partida.
 
 let db: Db;
 let close: () => Promise<void>;
 
 const operacao: Actor = { email: 'opa@orakel.local', roles: ['operacao'] };
+const admin: Actor = { email: 'adm@orakel.local', roles: ['admin'] };
 const SITE = 'exemplo-a';
+let domain = '';
 const IMAGE = 'ghcr.io/orakel-ai-content/infra-runner:abc1234';
 const SECRETS = {
   CLOUDFLARE_INFRA_TOKEN: 'segredo-infra-'.padEnd(40, 'x'),
@@ -89,8 +94,11 @@ beforeEach(async () => {
   await resetDatabase(db);
   const line = (await readFixture(SITE)).find((l) => l.type === 'config');
   if (line?.type !== 'config') throw new Error('fixture sem config');
+  domain = line.data.domains[0] ?? '';
   await db.transaction((tx) => createSite(tx, SYSTEM_ACTOR, line.data));
-  await upsertUser(db, { email: operacao.email, name: operacao.email, roles: operacao.roles });
+  for (const actor of [operacao, admin]) {
+    await upsertUser(db, { email: actor.email, name: actor.email, roles: actor.roles });
+  }
 });
 
 async function request(): Promise<number> {

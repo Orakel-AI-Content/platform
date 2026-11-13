@@ -3,6 +3,7 @@ import type { TaskList } from 'graphile-worker';
 import { AGGREGATE_AUDIENCE_TASK, AUDIENCE_QUEUE } from '../domain/audience/schedule.ts';
 import { CORRECT_ARTICLE_TASK, GENERATE_ARTICLE_TASK } from '../domain/generation/runs.ts';
 import { REPROCESS_TASK } from '../domain/media/reprocess.ts';
+import { RESTORE_MEDIA_TASK } from '../domain/media/schedule.ts';
 import { INGEST_TASK } from '../domain/media/upload.ts';
 import { EMPTY_SITE_MEDIA_TASK, VARIANTS_TASK } from '../domain/media/variants.ts';
 import { ROLLBACK_TASK } from '../domain/builds/schedule.ts';
@@ -45,6 +46,7 @@ import {
   createReconcilePreviewTask,
   type ReconcilePreviewTaskDeps,
 } from './tasks/reconcile-preview.ts';
+import { createRestoreSiteMediaTask } from './tasks/restore-site-media.ts';
 import { createReleaseRunTask, type ReleaseRunTaskDeps } from './tasks/release-run.ts';
 import { createReviewOpinionTask } from './tasks/review-opinion.ts';
 import { createRollbackTask } from './tasks/rollback.ts';
@@ -62,6 +64,7 @@ export function workerTasks(deps: WorkerTaskDeps): TaskList {
     [VARIANTS_TASK]: createMediaVariantsTask(deps),
     [REPROCESS_TASK]: createMediaReprocessTask(deps),
     [EMPTY_SITE_MEDIA_TASK]: createEmptySiteMediaTask(deps),
+    [RESTORE_MEDIA_TASK]: createRestoreSiteMediaTask(deps),
     [PUBLISH_SCHEDULED_TASK]: createPublishScheduledTask(deps),
     [GENERATE_ARTICLE_TASK]: createGenerateArticleTask(deps),
     [CORRECT_ARTICLE_TASK]: createCorrectArticleTask(deps),

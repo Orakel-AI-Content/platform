@@ -213,6 +213,20 @@ export const infraApplyOk = (
   durationMs: 4000,
 });
 
+/** `infra-plan.json` de sucesso de um plano de destruição (`INFRA_MODE=destroy`). */
+export const infraDestroyPlanOk = (
+  changes: { address: string; type: string; action: string }[],
+  site = 'exemplo-a',
+) => ({ ...infraPlanOk(changes, site), mode: 'destroy' });
+
+/** `infra-apply.json` do apply de um plano de destruição. */
+export const infraDestroyed = (site = 'exemplo-a') => ({
+  formatVersion: 1,
+  status: 'destroyed',
+  site,
+  durationMs: 3000,
+});
+
 /** Resultado de falha do plano ou do apply. */
 export const infraFailed = (
   kind: 'permanent' | 'transient',
