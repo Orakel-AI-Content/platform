@@ -5,6 +5,7 @@ import { page, userEvent } from 'vitest/browser';
 import { tabTo } from '../../../test/browser/a11y.ts';
 import { navigation } from '../../../test/browser/navigation.ts';
 import { renderInApp } from '../../../test/browser/render.tsx';
+import { ContentEditor, type ContentEditorOptions } from '@/components/contents/ContentEditor';
 import { toast } from '@/components/ui/toast';
 
 import { ReviewChecks } from './ReviewChecks.tsx';
@@ -19,6 +20,8 @@ vi.mock('next/navigation', () => import('../../../test/browser/navigation.ts'));
 // publicar agora" e "Aprovar e agendar" (workspace#89) só com o teclado: o agendamento envia o
 // instante em ISO da hora de parede de São Paulo escolhida no Dialog. Em passos (#766): "Próximo"
 // leva de Checagens a Decisão só pelo teclado, grava `?passo=`, e o foco nunca cai no `body`.
+// No passo Ajustes (#767), o editor da correção é alcançado pelo Tab, e o que foi digitado
+// continua nele depois de ir a Leitura e voltar.
 
 const CHECKLIST = [
   { key: 'valor_original', label: 'Valor original' },
@@ -44,6 +47,7 @@ const decisionPanel = (props: Partial<Props>) => (
     checklist={CHECKLIST}
     confirmed={CHECKLIST.map((item) => item.key)}
     canApprove
+    canAmend={false}
     confirm={vi.fn()}
     confirmAll={vi.fn()}
     approve={vi.fn()}
@@ -267,5 +271,72 @@ describe('Revisão no navegador', () => {
     await expect
       .element(screen.getByRole('complementary').getByText(/agendado para o dia escolhido/))
       .toBeVisible();
+  });
+
+  it('pelo teclado: no passo Ajustes, o editor recebe o Tab e a edição sobrevive à troca de passo', async () => {
+    const options: ContentEditorOptions = {
+      blockTypes: ['toc'],
+      media: {
+        load: (page) => Promise.resolve({ items: [], total: 0, page, pageSize: 24 }),
+        byIds: () => Promise.resolve([]),
+      },
+      authors: [],
+      taxonomies: [],
+    };
+    const amend = vi.fn();
+    navigation.set('/sites/exemplo-a/revisao/7?passo=ajustes');
+    const screen = await renderInApp(
+      <>
+        <button type="button">antes</button>
+        {decisionPanel({
+          step: 'ajustes',
+          canAmend: true,
+          amend: (
+            <ContentEditor
+              mode="amend"
+              siteId="exemplo-a"
+              timeZone="America/Sao_Paulo"
+              defaultValues={{
+                kind: 'article',
+                slug: 'guia',
+                title: 'Guia',
+                authorIds: [],
+                taxonomyIds: [],
+                publishedAt: '2026-10-06T12:00:00-03:00',
+                blocks: [{ n: 1, type: 'toc', title: 'Sumário' }],
+              }}
+              options={options}
+              action={amend}
+              backHref="/sites/exemplo-a/revisao/7?passo=ajustes"
+            />
+          ),
+        })}
+      </>,
+    );
+    const title = screen.getByRole('textbox', { name: 'Título', exact: true });
+    const save = screen.getByRole('button', { name: 'Salvar correção', exact: true });
+
+    (screen.getByRole('button', { name: 'antes' }).element() as HTMLElement).focus();
+    await tabTo(title);
+    // O Tab seleciona o texto; a seta leva o cursor ao fim.
+    await userEvent.keyboard('{ArrowRight} revisado');
+    await expect.element(title).toHaveValue('Guia revisado');
+    await tabTo(save);
+    await expect.element(save).not.toHaveAttribute('aria-disabled');
+
+    await tabTo(screen.getByRole('button', { name: 'Próximo' }));
+    await userEvent.keyboard('{Enter}');
+    expect(navigation.get()).toBe('/sites/exemplo-a/revisao/7?passo=leitura');
+    // Fora do passo, o editor fica montado e oculto.
+    expect(document.querySelector<HTMLElement>('[data-step="ajustes"]')?.hidden).toBe(true);
+    await userEvent.keyboard('{Shift>}{Tab}{/Shift}');
+    await expect.element(screen.getByRole('button', { name: 'Anterior' })).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+
+    expect(navigation.get()).toBe('/sites/exemplo-a/revisao/7?passo=ajustes');
+    expect(document.activeElement).not.toBe(document.body);
+    await expect.element(title).toBeVisible();
+    await expect.element(title).toHaveValue('Guia revisado');
+    expect(amend).not.toHaveBeenCalled();
   });
 });
