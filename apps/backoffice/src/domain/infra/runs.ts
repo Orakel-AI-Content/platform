@@ -21,12 +21,16 @@ import {
 } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { resolveActor } from '../access/users.ts';
+
 import {
   advanceLifecycle,
   INFRA_DRIFT_STEPS,
   recordInfraDrift,
   resetSiteInfra,
 } from '../builds/site-state.ts';
+
+import { advanceLifecycle, resetSiteInfra } from '../builds/site-state.ts';
+import { enqueueRestoreMedia } from '../media/schedule.ts';
 
 type OpenInfraRunStatus = (typeof OPEN_INFRA_RUN_STATUSES)[number];
 type ClosedInfraRunStatus = Exclude<InfraRunStatus, OpenInfraRunStatus>;
@@ -433,6 +437,7 @@ export async function finishInfraRun(
     .update(infraRuns)
     .set({ status: 'ok', currentStep: null, nameservers, finishedAt })
     .where(eq(infraRuns.id, runId));
+  if (run.tipo === 'criar') await enqueueRestoreMedia(tx, run.siteId);
   return done;
 }
 
@@ -523,14 +528,18 @@ export async function infraActivity(
   return { open, history };
 }
 
-/** O que as tasks do build-runner leem da execução: o site, o estado e o resumo do plano. */
+/** O que as tasks do build-runner leem da execução: o site, o tipo, o estado e o resumo do plano. */
 export async function loadInfraRun(
   db: Executor,
   runId: number,
-): Promise<{ siteId: string; status: InfraRunStatus; planSummary: string | null } | undefined> {
+): Promise<
+  | { siteId: string; kind: InfraRunKind; status: InfraRunStatus; planSummary: string | null }
+  | undefined
+> {
   const [run] = await db
     .select({
       siteId: infraRuns.siteId,
+      kind: infraRuns.tipo,
       status: infraRuns.status,
       planSummary: infraRuns.planSummary,
     })

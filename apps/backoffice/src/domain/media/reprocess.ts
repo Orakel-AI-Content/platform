@@ -77,6 +77,50 @@ export async function reprocessSiteMedia(
   return report;
 }
 
+export type RestoreReport = {
+  /** Mídias que tiveram alguma variante regravada. */
+  restored: number[];
+  /** Mídias com variante registrada e sem original guardado. */
+  withoutOriginal: number[];
+  /** Arquivos gravados no bucket do site. */
+  written: number;
+};
+
+/**
+ * Regrava em `media-<site>` as variantes já registradas de cada mídia, a partir do original:
+ * depois de uma remoção, a infra recriada traz o bucket vazio, e o reprocessamento (que compara
+ * com o registro) não as regravaria. O que já existe no bucket é pulado; o registro de variantes
+ * e as mudanças pendentes não mudam.
+ */
+export async function restoreSiteMedia(
+  deps: ReprocessDeps,
+  siteId: string,
+): Promise<RestoreReport> {
+  const report: RestoreReport = { restored: [], withoutOriginal: [], written: 0 };
+  for (const item of await mediaWithOriginals(deps.db, siteId)) {
+    if (item.variants.length === 0) continue;
+    const specs = item.variants.map(({ width, format }) => ({ width, format }));
+    const generated =
+      item.originalKey === null
+        ? ({ status: 'missing' } as const)
+        : await generateVariants(
+            deps.store,
+            { siteId, originalKey: item.originalKey, width: item.width, height: item.height },
+            specs,
+          );
+    if (generated.status === 'missing') {
+      report.withoutOriginal.push(item.id);
+      deps.warn?.(
+        `mídia ${item.id} de ${siteId} sem original guardado: ${specs.length} variantes não regravadas`,
+      );
+      continue;
+    }
+    report.written += generated.written;
+    if (generated.written > 0) report.restored.push(item.id);
+  }
+  return report;
+}
+
 type MediaRow = Pick<Media, 'id' | 'width' | 'height' | 'variants'> & {
   originalKey: string | null;
 };
