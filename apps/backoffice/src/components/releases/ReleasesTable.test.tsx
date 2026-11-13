@@ -60,10 +60,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Desmontar com o Dialog aberto agenda a remoção do portal para depois do `closeTimeoutMS`;
+  // com timers falsos ela roda aqui, e não depois que o arquivo acaba e o DOM some (#381).
+  vi.useFakeTimers();
   cleanup();
+  vi.runAllTimers();
+  vi.useRealTimers();
   app.remove();
   navigation.set('');
-  vi.useRealTimers();
 });
 
 const release = (overrides: Partial<ReleaseRecord> & { tag: string }): ReleaseRecord => ({
