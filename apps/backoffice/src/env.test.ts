@@ -275,6 +275,10 @@ describe('parseBuildRunnerEnv', () => {
           .INFRA_LOCAL_DRIFT_SITES,
       ).toEqual(['exemplo-a', 'exemplo-b']);
       expect(
+        parseBuildRunnerEnv({ ...runner, INFRA_LOCAL_DRIFT_SITES: 'e2e-drift-*' })
+          .INFRA_LOCAL_DRIFT_SITES,
+      ).toEqual(['e2e-drift-*']);
+      expect(
         parseBuildRunnerEnv({ ...runner, INFRA_LOCAL_DRIFT_SITES: '' }).INFRA_LOCAL_DRIFT_SITES,
       ).toBeUndefined();
       expect(() => parseBuildRunnerEnv({ ...tofu, INFRA_LOCAL_DRIFT_SITES: 'exemplo-a' })).toThrow(

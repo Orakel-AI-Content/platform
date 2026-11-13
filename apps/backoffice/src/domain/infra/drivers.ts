@@ -471,10 +471,19 @@ export type LocalDriverOptions = {
   failStep?: InfraResourceStep;
   /**
    * A conferência destes sites sai desatualizada (INFRA_LOCAL_DRIFT_SITES) até uma reaplicação
-   * `ok`; a dos outros, em dia.
+   * `ok`; a dos outros, em dia. Um item terminado em `*` vale para todos os ids com esse
+   * prefixo (`e2e-drift-*`): o E2E cria sites novos a cada rodada, que a memória do processo
+   * ainda não conhece.
    */
   driftSites?: readonly string[];
 };
+
+/** O site está entre os `driftSites`: id exato ou prefixo (item terminado em `*`). */
+export function matchesDriftSites(siteId: string, driftSites: readonly string[]): boolean {
+  return driftSites.some((item) =>
+    item.endsWith('*') ? siteId.startsWith(item.slice(0, -1)) : siteId === item,
+  );
+}
 
 /** Recursos fictícios de cada etapa, nos tipos do módulo `site`. */
 const LOCAL_RESOURCES: Record<InfraResourceStep, { name: string; type: string }[]> = {
@@ -525,7 +534,7 @@ export function localDriver(options: LocalDriverOptions = {}): InfraDriver {
   const failedOnce = new Set<string>();
   const reapplied = new Set<string>();
   const drifted = (siteId: string) =>
-    (options.driftSites?.includes(siteId) ?? false) && !reapplied.has(siteId);
+    matchesDriftSites(siteId, options.driftSites ?? []) && !reapplied.has(siteId);
   const createdOf = ({ siteId, kind }: InfraTarget) => {
     const steps =
       created.get(siteId) ??

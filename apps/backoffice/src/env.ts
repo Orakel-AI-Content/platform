@@ -177,7 +177,8 @@ export const BuildRunnerEnvSchema = z
     INFRA_LOCAL_FAIL_STEP: optional(z.enum(INFRA_RESOURCE_STEPS)),
     /**
      * Só com INFRA_DRIVER=local (E2E): ids de site, separados por vírgula, cuja conferência da
-     * infra contra a descrição sai desatualizada (workspace#98). Vazio: todos em dia.
+     * infra contra a descrição sai desatualizada (workspace#98); um item terminado em `*` vale
+     * para todos os ids com esse prefixo (`e2e-drift-*`). Vazio: todos em dia.
      */
     INFRA_LOCAL_DRIFT_SITES: blankAsUndefined(
       z

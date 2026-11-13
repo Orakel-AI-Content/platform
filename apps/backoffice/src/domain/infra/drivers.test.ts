@@ -15,6 +15,7 @@ import {
   LOCAL_DRIFT_CHANGE,
   LOCAL_NAMESERVERS,
   localDriver,
+  matchesDriftSites,
   planHasChanges,
   readApplyProgress,
   stepOfResourceType,
@@ -575,6 +576,25 @@ describe('localDriver', () => {
 
     const drifted = await driver.check({ ...check, siteId: 'exemplo-b' });
     expect(drifted).toEqual({ status: 'ok', summary: summarizePlan([LOCAL_DRIFT_CHANGE]) });
+  });
+
+  it('check: um item terminado em * vale para todos os ids com o prefixo', async () => {
+    const driver = localDriver({ driftSites: ['e2e-drift-*', 'exemplo-b'] });
+    const outdated = async (siteId: string) => {
+      const result = await driver.check({ ...check, siteId });
+      return result.status === 'ok' && planHasChanges(result.summary);
+    };
+    expect(await outdated('e2e-drift-1-a')).toBe(true);
+    expect(await outdated('exemplo-b')).toBe(true);
+    expect(await outdated('exemplo-a')).toBe(false);
+    expect(await outdated('e2e-drif')).toBe(false);
+  });
+
+  it('matchesDriftSites: id exato não casa por prefixo', () => {
+    expect(matchesDriftSites('exemplo-a', ['exemplo-a'])).toBe(true);
+    expect(matchesDriftSites('exemplo-a-2', ['exemplo-a'])).toBe(false);
+    expect(matchesDriftSites('exemplo-a-2', ['exemplo-*'])).toBe(true);
+    expect(matchesDriftSites('exemplo-a', [])).toBe(false);
   });
 
   it('a memória é por site', async () => {
