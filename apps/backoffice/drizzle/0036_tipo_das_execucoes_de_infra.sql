@@ -1,0 +1,1 @@
+ALTER TABLE "infra_runs" ADD COLUMN "tipo" text DEFAULT 'criar' NOT NULL;

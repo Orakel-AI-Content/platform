@@ -1,8 +1,10 @@
-// Execuções da criação da infraestrutura do site (`infra_runs`, ADR 0027): o pedido e a
-// confirmação, feitos por quem opera, e as gravações do infra-runner (resumo do plano, etapa
-// corrente e o fechamento). Cada transição é um update condicional no estado de origem: fora de
-// ordem, devolve issue de domínio sem gravar. No `ok`, o site avança a `infra_aplicada` na mesma
-// transação, em nome de quem confirmou. O histórico do site lê daqui (`infraActivity`).
+// Execuções da infraestrutura do site (`infra_runs`, ADR 0027), de criação ou de remoção (`tipo`,
+// workspace#97): o pedido e a confirmação, feitos por quem opera (a remoção, só pelo admin), e as
+// gravações do infra-runner (resumo do plano, etapa corrente e o fechamento), comuns aos dois
+// tipos. Cada transição é um update condicional no estado de origem: fora de ordem, devolve issue
+// de domínio sem gravar. No `ok`, na mesma transação e em nome de quem confirmou, a criação leva o
+// site a `infra_aplicada` e a remoção o devolve a `cadastrado`. O histórico do site lê daqui
+// (`infraActivity`).
 import type { Issue, Result } from '@orakel/content-model';
 import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 
@@ -10,13 +12,15 @@ import type { Executor } from '../../db/client.ts';
 import {
   infraRuns,
   OPEN_INFRA_RUN_STATUSES,
+  siteConfigs,
   sites,
+  type InfraRunKind,
   type InfraRunStatus,
   type InfraStep,
 } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { resolveActor } from '../access/users.ts';
-import { advanceLifecycle } from '../builds/site-state.ts';
+import { advanceLifecycle, resetSiteInfra } from '../builds/site-state.ts';
 
 type OpenInfraRunStatus = (typeof OPEN_INFRA_RUN_STATUSES)[number];
 type ClosedInfraRunStatus = Exclude<InfraRunStatus, OpenInfraRunStatus>;
@@ -61,7 +65,7 @@ export async function requestInfraRun(
   if (row === undefined) {
     return refused(
       'infra.run_open',
-      `O site ${siteId} já tem uma criação de infraestrutura aberta`,
+      `O site ${siteId} já tem uma execução de infraestrutura aberta`,
     );
   }
   return { ok: true, value: row };
@@ -113,9 +117,143 @@ export async function confirmInfraRun(
   const updated = await tx
     .update(infraRuns)
     .set({ status: 'aplicando', confirmedBy: actor.email, confirmedAt: new Date() })
-    .where(and(eq(infraRuns.id, runId), eq(infraRuns.status, 'aguardando_confirmacao')))
+    .where(
+      and(
+        eq(infraRuns.id, runId),
+        eq(infraRuns.tipo, 'criar'),
+        eq(infraRuns.status, 'aguardando_confirmacao'),
+      ),
+    )
     .returning({ id: infraRuns.id });
-  return updated.length > 0 ? done : wrongState(tx, runId, ['aguardando_confirmacao']);
+  if (updated.length > 0) return done;
+  const kind = await wrongKind(tx, runId, 'criar');
+  return kind ?? wrongState(tx, runId, ['aguardando_confirmacao']);
+}
+
+/** Recusa de uma execução de outro tipo; `undefined` se é do tipo pedido ou não existe. */
+async function wrongKind(
+  tx: Executor,
+  runId: number,
+  expected: InfraRunKind,
+): Promise<{ ok: false; issues: Issue[] } | undefined> {
+  const [run] = await tx
+    .select({ tipo: infraRuns.tipo })
+    .from(infraRuns)
+    .where(eq(infraRuns.id, runId));
+  return run === undefined || run.tipo === expected
+    ? undefined
+    : refused(
+        'infra.run_kind',
+        `A execução ${runId} é de ${run.tipo === 'criar' ? 'criação' : 'remoção'}`,
+        ['tipo'],
+      );
+}
+
+/** Recusa da remoção num site que não está pausado; `undefined` se está. */
+function notPaused(siteId: string, state: string): { ok: false; issues: Issue[] } | undefined {
+  return state === 'pausado'
+    ? undefined
+    : refused(
+        'infra.site_not_paused',
+        `A infraestrutura só é removida com o site pausado; o site ${siteId} está ${state}`,
+        ['state'],
+      );
+}
+
+/**
+ * Pede a remoção da infraestrutura (workspace#97): grava a linha `remover` em `planejando` com
+ * quem pediu. Só o admin (`site.destroy`), num site `pausado` que já passou de `cadastrado`, e sem
+ * execução aberta (de criação ou de remoção: o índice único parcial decide a corrida).
+ */
+export async function requestInfraRemoval(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<{ id: number }>> {
+  const allowed = requireRole(actor, 'site.destroy');
+  if (!allowed.ok) return allowed;
+
+  const [site] = await tx
+    .select({ lifecycle: sites.lifecycle, state: sites.state })
+    .from(sites)
+    .where(eq(sites.id, siteId));
+  if (site === undefined) return refused('site.not_found', `Site ${siteId} não encontrado`);
+  const active = notPaused(siteId, site.state);
+  if (active !== undefined) return active;
+  if (site.lifecycle === 'cadastrado') {
+    return refused(
+      'infra.lifecycle',
+      `O site ${siteId} está cadastrado: não há infraestrutura a remover`,
+      ['lifecycle'],
+    );
+  }
+
+  const [row] = await tx
+    .insert(infraRuns)
+    .values({ siteId, tipo: 'remover', status: 'planejando', requestedBy: actor.email })
+    .onConflictDoNothing()
+    .returning({ id: infraRuns.id });
+  if (row === undefined) {
+    return refused(
+      'infra.run_open',
+      `O site ${siteId} já tem uma execução de infraestrutura aberta`,
+    );
+  }
+  return { ok: true, value: row };
+}
+
+/**
+ * Confirma a remoção: `aguardando_confirmacao → aplicando`, com quem confirmou e quando. Só o
+ * admin, com o site ainda pausado e o domínio digitado exatamente igual ao principal do site
+ * (`domains[0]` da configuração corrente); fora disso, nada é gravado.
+ */
+export async function confirmInfraRemoval(
+  tx: Executor,
+  actor: Actor,
+  runId: number,
+  typedDomain: string,
+): Promise<Result<void>> {
+  const allowed = requireRole(actor, 'site.destroy');
+  if (!allowed.ok) return allowed;
+
+  const [run] = await tx
+    .select({ siteId: infraRuns.siteId, state: sites.state })
+    .from(infraRuns)
+    .innerJoin(sites, eq(sites.id, infraRuns.siteId))
+    .where(
+      and(
+        eq(infraRuns.id, runId),
+        eq(infraRuns.tipo, 'remover'),
+        eq(infraRuns.status, 'aguardando_confirmacao'),
+      ),
+    )
+    .for('update');
+  if (run === undefined) {
+    const kind = await wrongKind(tx, runId, 'remover');
+    return kind ?? wrongState(tx, runId, ['aguardando_confirmacao']);
+  }
+  const active = notPaused(run.siteId, run.state);
+  if (active !== undefined) return active;
+
+  const [config] = await tx
+    .select({ config: siteConfigs.config })
+    .from(siteConfigs)
+    .where(eq(siteConfigs.siteId, run.siteId))
+    .orderBy(desc(siteConfigs.version))
+    .limit(1);
+  if (config?.config.domains[0] !== typedDomain) {
+    return refused(
+      'infra.domain_mismatch',
+      'O domínio digitado não é o do site; a remoção não foi confirmada',
+      ['domain'],
+    );
+  }
+
+  await tx
+    .update(infraRuns)
+    .set({ status: 'aplicando', confirmedBy: actor.email, confirmedAt: new Date() })
+    .where(eq(infraRuns.id, runId));
+  return done;
 }
 
 /** Grava a etapa em andamento, enquanto `aplicando`. */
@@ -134,7 +272,8 @@ export async function recordInfraStep(
 
 /** Desfecho do apply ou do plano. */
 export type InfraRunClosing =
-  | { status: 'ok'; nameservers: readonly string[] }
+  /** `nameservers` da zona criada; a remoção não os tem e os ignora. */
+  | { status: 'ok'; nameservers?: readonly string[] }
   /** `step` nulo quando a falha foi no plano. */
   | { status: 'falhou'; step: InfraStep | null; message: string };
 
@@ -145,9 +284,10 @@ const CLOSING_FROM = {
 } as const satisfies Record<ClosedInfraRunStatus, readonly OpenInfraRunStatus[]>;
 
 /**
- * Fecha a execução. No `ok`, grava os nameservers e leva o site a `infra_aplicada` pelo
- * `advanceLifecycle`, em nome de quem confirmou: a linha é travada antes, e a recusa do avanço
- * devolve a issue sem gravar nada. No `falhou`, grava a etapa e o motivo; o lifecycle não muda.
+ * Fecha a execução. No `ok`, pelo `tipo` gravado e em nome de quem confirmou: a criação grava os
+ * nameservers e leva o site a `infra_aplicada` (`advanceLifecycle`); a remoção devolve o site a
+ * `cadastrado` (`resetSiteInfra`). A linha é travada antes, e a recusa do site devolve a issue
+ * sem gravar nada. No `falhou`, grava a etapa e o motivo; o lifecycle não muda.
  */
 export async function finishInfraRun(
   tx: Executor,
@@ -156,7 +296,7 @@ export async function finishInfraRun(
 ): Promise<Result<void>> {
   const from = CLOSING_FROM[closing.status];
   const [run] = await tx
-    .select({ siteId: infraRuns.siteId, confirmedBy: infraRuns.confirmedBy })
+    .select({ siteId: infraRuns.siteId, tipo: infraRuns.tipo, confirmedBy: infraRuns.confirmedBy })
     .from(infraRuns)
     .where(and(eq(infraRuns.id, runId), inArray(infraRuns.status, from)))
     .for('update');
@@ -182,19 +322,24 @@ export async function finishInfraRun(
   }
   const confirmer = await resolveActor(tx, run.confirmedBy);
   if (!confirmer.ok) return confirmer;
-  const advanced = await advanceLifecycle(tx, confirmer.value, run.siteId, 'infra_aplicada');
-  if (!advanced.ok) return advanced;
+  const site =
+    run.tipo === 'criar'
+      ? await advanceLifecycle(tx, confirmer.value, run.siteId, 'infra_aplicada')
+      : await resetSiteInfra(tx, confirmer.value, run.siteId);
+  if (!site.ok) return site;
 
+  const nameservers = run.tipo === 'criar' ? [...(closing.nameservers ?? [])] : null;
   await tx
     .update(infraRuns)
-    .set({ status: 'ok', currentStep: null, nameservers: [...closing.nameservers], finishedAt })
+    .set({ status: 'ok', currentStep: null, nameservers, finishedAt })
     .where(eq(infraRuns.id, runId));
   return done;
 }
 
-/** Criação da infraestrutura em andamento, para o status ao vivo. */
+/** Criação ou remoção da infraestrutura em andamento, para o status ao vivo. */
 export type OpenInfraRun = {
   id: number;
+  kind: InfraRunKind;
   status: OpenInfraRunStatus;
   /** Etapa em andamento, enquanto `aplicando`. */
   currentStep: InfraStep | null;
@@ -205,17 +350,18 @@ export type OpenInfraRun = {
   confirmedBy: string | null;
 };
 
-/** Item do histórico do site: uma criação da infraestrutura que terminou. */
+/** Item do histórico do site: uma criação ou remoção da infraestrutura que terminou. */
 export type InfraHistoryItem = {
   type: 'infra';
   id: number;
+  kind: InfraRunKind;
   status: ClosedInfraRunStatus;
   requestedBy: string;
   requestedAt: Date;
   confirmedBy: string | null;
   /** Fim da execução. */
   at: Date;
-  /** Só no `ok`. */
+  /** Só no `ok` de uma criação. */
   nameservers: string[] | null;
   /** Só no `falhou`. */
   failure: { step: InfraStep | null; message: string | null } | null;
@@ -239,6 +385,7 @@ export async function infraActivity(
     openRow !== undefined && isOpen(openRow.status)
       ? {
           id: openRow.id,
+          kind: openRow.tipo,
           status: openRow.status,
           currentStep: openRow.currentStep,
           planSummary: openRow.planSummary,
@@ -261,6 +408,7 @@ export async function infraActivity(
           {
             type: 'infra',
             id: row.id,
+            kind: row.tipo,
             status,
             requestedBy: row.requestedBy,
             requestedAt: row.requestedAt,

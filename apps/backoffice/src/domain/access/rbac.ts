@@ -8,6 +8,8 @@ import type { Role } from '../../db/schema/index.ts';
 export type Action =
   | 'site.read'
   | 'site.configure'
+  /** Remover a infraestrutura de um site (workspace#97): destrutivo, só do admin. */
+  | 'site.destroy'
   | 'content.write'
   | 'content.amend'
   | 'content.publish'
@@ -18,6 +20,7 @@ export const PERMISSIONS: Record<Role, readonly Action[]> = {
   admin: [
     'site.read',
     'site.configure',
+    'site.destroy',
     'content.write',
     'content.amend',
     'content.publish',
