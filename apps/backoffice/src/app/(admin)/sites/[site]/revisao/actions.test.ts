@@ -7,6 +7,7 @@ import {
   approveScheduleAction,
   confirmAction,
   confirmAllAction,
+  returnAction,
 } from './actions.ts';
 
 // A action só traduz: sessão → recusa, Result do domínio → resumo do formulário ou mensagem,
@@ -19,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   approveAndPublish: vi.fn(),
   approveAndSchedule: vi.fn(),
   amendInReview: vi.fn(),
+  nextInReviewQueue: vi.fn(),
+  returnVersion: vi.fn(),
   resourcesFor: vi.fn(),
   setConfirmation: vi.fn(),
   setAllConfirmations: vi.fn(),
@@ -30,12 +33,16 @@ vi.mock('@/auth/request-actor.ts', () => ({ currentActor: mocks.currentActor }))
 vi.mock('@/db/client.ts', () => ({
   getDb: () => ({ db: { transaction: (fn: (tx: unknown) => unknown) => fn({}) } }),
 }));
-vi.mock('@/domain/content/contents.ts', () => ({ amendInReview: mocks.amendInReview }));
+vi.mock('@/domain/content/contents.ts', () => ({
+  amendInReview: mocks.amendInReview,
+  nextInReviewQueue: mocks.nextInReviewQueue,
+}));
 vi.mock('@/domain/sites/sites.ts', () => ({ resourcesFor: mocks.resourcesFor }));
 vi.mock('@/domain/reviews/reviews.ts', () => ({
   approveVersion: mocks.approveVersion,
   approveAndPublish: mocks.approveAndPublish,
   approveAndSchedule: mocks.approveAndSchedule,
+  returnVersion: mocks.returnVersion,
 }));
 vi.mock('@/domain/reviews/confirmations.ts', () => ({
   setConfirmation: mocks.setConfirmation,
@@ -53,6 +60,7 @@ beforeEach(() => {
   mocks.currentActor.mockResolvedValue({ ok: true, value: revisor });
   mocks.setConfirmation.mockResolvedValue({ ok: true, value: { confirmed: [] } });
   mocks.resourcesFor.mockResolvedValue({ release: 'r1' });
+  mocks.nextInReviewQueue.mockResolvedValue({ ok: true, value: 7 });
 });
 
 describe('aprovar na tela de revisão', () => {
@@ -95,6 +103,7 @@ describe('aprovar na tela de revisão', () => {
     expect(await approveAction('exemplo-a', 1, 2)).toEqual({
       ok: true,
       message: 'Versão 2 aprovada.',
+      next: 7,
     });
     expect(mocks.approveVersion).toHaveBeenCalledWith({}, revisor, 'exemplo-a', 1, 2);
     expect(mocks.setConfirmation).not.toHaveBeenCalled();
@@ -137,6 +146,7 @@ describe('aprovar e publicar ou agendar na tela de revisão (workspace#89)', () 
     expect(await approvePublishAction('exemplo-a', 1, 2)).toEqual({
       ok: true,
       message: 'Versão 2 aprovada: o artigo foi ao ar.',
+      next: 7,
     });
     expect(mocks.approveAndPublish).toHaveBeenCalledWith({}, revisor, 'exemplo-a', 1, 2);
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/revisao');
@@ -151,6 +161,7 @@ describe('aprovar e publicar ou agendar na tela de revisão (workspace#89)', () 
     expect(await approveScheduleAction('exemplo-a', 1, 2, '2026-11-20T13:00:00.000Z')).toEqual({
       ok: true,
       message: 'Versão 2 aprovada: o artigo foi agendado para 20/11/2026, 10:00 BRT.',
+      next: 7,
     });
     expect(mocks.approveAndSchedule).toHaveBeenCalledWith(
       {},
@@ -171,6 +182,7 @@ describe('aprovar e publicar ou agendar na tela de revisão (workspace#89)', () 
       ok: true,
       message: 'Versão 2 aprovada: o artigo foi agendado para 13/11/2026, 10:00 BRT.',
       warning: overflow,
+      next: 7,
     });
   });
 
@@ -204,6 +216,129 @@ describe('aprovar e publicar ou agendar na tela de revisão (workspace#89)', () 
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
+});
+
+describe('devolver ao editor na tela de revisão (#598)', () => {
+  it('sem sessão não chama o domínio nem revalida', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await returnAction('exemplo-a', 1, 2, 'Corrija a fonte.')).toEqual({
+      ok: false,
+      message: 'Sessão inválida; entre de novo.',
+      issues: [{ path: [], message: 'Sessão inválida; entre de novo.' }],
+    });
+    expect(mocks.returnVersion).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('a recusa do comentário vai ao campo; o resto, ao resumo; não revalida', async () => {
+    mocks.returnVersion.mockResolvedValue({
+      ok: false,
+      issues: [
+        { code: 'review.comment_required', message: 'Diga o que corrigir', path: ['comment'] },
+        { code: 'review.not_in_review', message: 'A versão 2 não está em revisão', path: [] },
+      ],
+    });
+
+    expect(await returnAction('exemplo-a', 1, 2, '')).toEqual({
+      ok: false,
+      message: 'Não foi possível devolver.',
+      issues: [
+        { path: ['comment'], message: 'Diga o que corrigir' },
+        { path: [], message: 'A versão 2 não está em revisão' },
+      ],
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('devolve a versão vista com o comentário e revalida a fila e a revisão', async () => {
+    mocks.returnVersion.mockResolvedValue({ ok: true, value: { reviewId: 9 } });
+
+    expect(await returnAction('exemplo-a', 1, 2, 'Corrija a fonte.')).toEqual({
+      ok: true,
+      message: 'Versão 2 devolvida ao editor.',
+      next: 7,
+    });
+    expect(mocks.returnVersion).toHaveBeenCalledWith(
+      {},
+      revisor,
+      'exemplo-a',
+      1,
+      2,
+      'Corrija a fonte.',
+    );
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/revisao');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/revisao/1');
+  });
+});
+
+describe('próximo da fila depois da decisão (workspace#90)', () => {
+  const decisions = [
+    ['só aprovar', mocks.approveVersion, () => approveAction('exemplo-a', 1, 2)],
+    ['aprovar e publicar', mocks.approveAndPublish, () => approvePublishAction('exemplo-a', 1, 2)],
+    [
+      'aprovar e agendar',
+      mocks.approveAndSchedule,
+      () => approveScheduleAction('exemplo-a', 1, 2, '2026-11-20T13:00:00.000Z'),
+    ],
+    ['devolver', mocks.returnVersion, () => returnAction('exemplo-a', 1, 2, 'Corrija a fonte.')],
+  ] as const;
+  const approved = {
+    ok: true,
+    value: {
+      reviewId: 9,
+      publicationId: 4,
+      overflowed: false,
+      outcome: 'published',
+      at: new Date('2026-11-12T13:00:00Z'),
+    },
+  };
+
+  it.each(decisions)(
+    '%s: devolve o próximo da fila sem o conteúdo decidido, lido na transação',
+    async (_, domain, action) => {
+      domain.mockResolvedValue(approved);
+
+      expect(await action()).toMatchObject({ ok: true, next: 7 });
+      expect(mocks.nextInReviewQueue).toHaveBeenCalledWith({}, revisor, 'exemplo-a', 1);
+    },
+  );
+
+  it.each(decisions)('%s: com a fila vazia, o próximo é null', async (_, domain, action) => {
+    domain.mockResolvedValue(approved);
+    mocks.nextInReviewQueue.mockResolvedValue({ ok: true, value: null });
+
+    expect(await action()).toMatchObject({ ok: true, next: null });
+  });
+
+  it.each(decisions)(
+    '%s: recusa do domínio não traz próximo nem lê a fila',
+    async (_, domain, action) => {
+      domain.mockResolvedValue(forbidden);
+
+      const result = await action();
+      expect(result).toMatchObject({ ok: false });
+      expect(result).not.toHaveProperty('next');
+      expect(mocks.nextInReviewQueue).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(decisions)(
+    '%s: recusa ao ler o próximo desfaz a decisão e volta ao resumo',
+    async (_, domain, action) => {
+      domain.mockResolvedValue(approved);
+      mocks.nextInReviewQueue.mockResolvedValue({
+        ok: false,
+        issues: [{ code: 'forbidden', message: 'Sem permissão para site.read', path: [] }],
+      });
+
+      expect(await action()).toMatchObject({
+        ok: false,
+        issues: [{ path: [], message: 'Sem permissão para site.read' }],
+      });
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('marcar e desmarcar as confirmações na tela de revisão', () => {
