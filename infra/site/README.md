@@ -5,8 +5,9 @@ zona e o bucket de mídia desse site (ADR 0027). Ela usa o módulo `../modules/s
 `sites/<SITE_ID>.tfstate`, no bucket `tofu-state` do R2. O estado e o plano são cifrados.
 
 Quem roda o `plan` e o `apply` é o build-runner, na VPS, pela imagem `infra-runner`
-(platform#823). Os comandos abaixo servem também para rodar à mão, a partir de uma máquina
-com o IP liberado no token.
+(`docker/infra-runner`). Ela traz esta raiz, o módulo e o provider espelhado, e grava os
+resultados no volume `/infra` (contrato em `@orakel/build-contract`). Os comandos abaixo servem
+também para rodar à mão, a partir de uma máquina com o IP liberado no token.
 
 ## Passos manuais (uma vez por conta)
 
@@ -53,8 +54,11 @@ com o IP liberado no token.
 
 1. **Nameservers.** Depois do `apply`, troque no registrador os nameservers do domínio pelos
    da saída `name_servers`.
-2. **Crawler Hints.** O provider v5 não o declara. Ligue em **Caching → Configuration →
-   Crawler Hints**, na zona do site.
+2. **Crawler Hints.** O provider v5 não o declara. O `apply` do `infra-runner` o liga pela rota
+   de flags da zona (`POST /zones/{zone_id}/flags/products/cache/changes`, com
+   `crawlhints_enabled`), que a Cloudflare não documenta. Por isso, uma falha não derruba o
+   `apply`: o `infra-apply.json` traz `crawlerHints: "falhou"`. Nesse caso, ou no `apply` à mão,
+   ligue em **Caching → Configuration → Crawler Hints**, na zona do site.
 
 ## Execução
 
@@ -79,6 +83,8 @@ tofu apply site.tfplan
 tofu output name_servers
 ```
 
+No `apply` à mão, o Crawler Hints não é ligado: siga o passo 2 acima.
+
 Por padrão, só `contato@<domínio>` é encaminhado. Para outros endereços, passe
 `-var 'email_aliases=["contato","imprensa"]'`. Qualquer outro endereço é descartado.
 
@@ -99,6 +105,8 @@ Por padrão, só `contato@<domínio>` é encaminhado. Para outros endereços, pa
 
 ## A validar no primeiro `apply` real
 
+- O Crawler Hints pela rota de flags com o token de infra. Se o `infra-apply.json` trouxer
+  `crawlerHints: "falhou"`, falta permissão ao token ou a rota mudou.
 - O travamento do estado no R2 com `use_lockfile`.
 - O SPF do módulo (`v=spf1 include:_spf.mx.cloudflare.net -all`) ao lado do registro que o
   Email Routing cria ao ser ligado. Se surgir um segundo SPF, remova o da Cloudflare e mantenha

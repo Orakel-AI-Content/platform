@@ -1,4 +1,4 @@
-# Imagens do backoffice e serviços no GHCR a cada merge na main (ADR 0008).
+# Imagens do backoffice, do infra-runner e serviços no GHCR a cada merge na main (ADR 0008).
 # Tag = SHA do commit; mesmas tags do `pnpm local:images`. Usa só o GITHUB_TOKEN.
 # Sem alvos no grupo "images" do docker/docker-bake.hcl, termina sem construir nada.
 name: Images
@@ -12,6 +12,9 @@ on:
       - 'packages/**'
       - 'tooling/**'
       - 'docker/**'
+      # Raiz e módulo OpenTofu embutidos no infra-runner (ADR 0027).
+      - 'infra/site/**'
+      - 'infra/modules/**'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/images.yml'

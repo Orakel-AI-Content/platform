@@ -1,0 +1,10 @@
+# CLI do OpenTofu no infra-runner: provider só pelo espelho da imagem, nunca pelo registry.
+provider_installation {
+  filesystem_mirror {
+    path    = "/opt/infra/providers"
+    include = ["registry.opentofu.org/*/*"]
+  }
+  direct {
+    exclude = ["*/*"]
+  }
+}

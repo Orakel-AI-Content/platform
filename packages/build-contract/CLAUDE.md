@@ -2,7 +2,8 @@
 
 Contrato do volume `/build` (schemas Zod de `result.json` e `publish.json`, caminhos, códigos
 de saída, layout do `tar.gz` do publish). Escrito pelo site-builder (`tooling/build-site`),
-lido pelo `build-runner` do backoffice e pelo `edge-local`. Parte do monorepo — regras gerais
+lido pelo `build-runner` do backoffice e pelo `edge-local`. Também o do volume `/infra`
+(`infra-plan.json`, `infra-apply.json`), escrito pela imagem `infra-runner`. Parte do monorepo — regras gerais
 no `CLAUDE.md` da raiz.
 
 ## Comandos (rodar nesta pasta)
