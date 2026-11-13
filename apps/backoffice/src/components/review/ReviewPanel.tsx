@@ -27,7 +27,8 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 // Painel da tela de revisão (#75), ao lado da visualização a partir de `xl` e abaixo dela antes
 // (#373). É um wizard de quatro passos (#766) sobre o `Steps` do Ecme, no exemplo "Controlled":
 // Checagens (`checks`, workspace#87, e `changes`, o que mudou desde a última revisão, #768),
-// Ajustes (a correção, #767), Leitura (o checklist) e Decisão (as aprovações e a devolução), com
+// Ajustes (a correção, #767), Leitura (`opinion`, o parecer automático, workspace#94, acima do
+// checklist, que só informa e nunca entra em `blocked`) e Decisão (as aprovações e a devolução), com
 // "Anterior" e "Próximo" no rodapé. Em Ajustes fica o editor no modo `amend` (#751), montado pela
 // página com a Server Action dele: a prévia continua ao lado, e salvar volta à revisão neste
 // passo, já na versão nova. Sem `content.amend`, ou com a versão fora de revisão, o passo diz
@@ -215,6 +216,7 @@ export function ReviewPanel({
   step,
   checks,
   changes,
+  opinion,
   amend,
   canAmend,
   blocked,
@@ -236,6 +238,11 @@ export function ReviewPanel({
   checks?: ReactNode;
   /** Seção "O que mudou" (`ReviewChanges`), abaixo das checagens; ausente na primeira revisão. */
   changes?: ReactNode;
+  /**
+   * Parecer automático (`ReviewOpinion`), no passo Leitura acima do checklist. Só informa: não
+   * muda `blocked` nem habilita ou desabilita nada.
+   */
+  opinion?: ReactNode;
   /**
    * O editor da correção (`ContentEditor` no modo `amend`), no passo Ajustes; a página só o
    * monta com `content.amend` e a versão em revisão.
@@ -357,54 +364,57 @@ export function ReviewPanel({
       </div>
     ),
     leitura: (
-      <Card bodyClass="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className={SECTION_TITLE_CLASS}>Checklist</h2>
-          {open && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                const before = confirmed;
-                void write(
-                  () => checklist.map((item) => item.key),
-                  () => before,
-                  () => confirmAll(true),
-                );
-              }}
-            >
-              Marcar todos
-            </Button>
-          )}
-        </div>
-        {open ? (
-          <div className="flex flex-col gap-3">
-            {checklist.map((item) => (
-              <Checkbox
-                key={item.key}
-                name={item.key}
-                checked={confirmed.includes(item.key)}
-                onChange={(checked) => {
+      <div className="flex flex-col gap-4">
+        {opinion}
+        <Card bodyClass="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className={SECTION_TITLE_CLASS}>Checklist</h2>
+            {open && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  const before = confirmed;
                   void write(
-                    (keys) => (checked ? withKey(keys, item.key) : withoutKey(keys, item.key)),
-                    (keys) => (checked ? withoutKey(keys, item.key) : withKey(keys, item.key)),
-                    () => confirm(item.key, checked),
+                    () => checklist.map((item) => item.key),
+                    () => before,
+                    () => confirmAll(true),
                   );
                 }}
               >
-                {item.label}
-              </Checkbox>
-            ))}
+                Marcar todos
+              </Button>
+            )}
           </div>
-        ) : (
-          <ul className="list-disc space-y-1 pl-5 text-sm">
-            {checklist.map((item) => (
-              <li key={item.key}>{item.label}</li>
-            ))}
-          </ul>
-        )}
-        <ActionAlert error={error} />
-      </Card>
+          {open ? (
+            <div className="flex flex-col gap-3">
+              {checklist.map((item) => (
+                <Checkbox
+                  key={item.key}
+                  name={item.key}
+                  checked={confirmed.includes(item.key)}
+                  onChange={(checked) => {
+                    void write(
+                      (keys) => (checked ? withKey(keys, item.key) : withoutKey(keys, item.key)),
+                      (keys) => (checked ? withoutKey(keys, item.key) : withKey(keys, item.key)),
+                      () => confirm(item.key, checked),
+                    );
+                  }}
+                >
+                  {item.label}
+                </Checkbox>
+              ))}
+            </div>
+          ) : (
+            <ul className="list-disc space-y-1 pl-5 text-sm">
+              {checklist.map((item) => (
+                <li key={item.key}>{item.label}</li>
+              ))}
+            </ul>
+          )}
+          <ActionAlert error={error} />
+        </Card>
+      </div>
     ),
     decisao: open ? (
       <div className="flex flex-col gap-4">
