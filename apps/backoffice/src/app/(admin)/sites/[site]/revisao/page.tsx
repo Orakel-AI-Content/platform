@@ -24,13 +24,19 @@ export default async function ReviewQueuePage({ params }: { params: Promise<{ si
   const { actor, db, site } = context.value;
   const queue = await reviewQueue(db, actor, siteId);
   if (!queue.ok) return noRead;
+  const [first] = queue.value;
+  const start = first && (
+    <ButtonLink href={`/sites/${site.id}/revisao/${first.id}`} size="sm">
+      Começar revisão
+    </ButtonLink>
+  );
 
   return (
     <section aria-labelledby="review-queue-title" className="list-width space-y-4">
       <PageTrail items={siteTrail(site, 'Revisão')} />
       <AdaptiveCard>
         <div className="flex flex-col gap-4">
-          <ListHeader id="review-queue-title" title="Revisão" />
+          <ListHeader id="review-queue-title" title="Revisão" action={start} />
           <ReviewQueueTable
             siteId={site.id}
             timeZone={site.timeZone}

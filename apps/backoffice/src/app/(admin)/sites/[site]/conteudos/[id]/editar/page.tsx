@@ -13,7 +13,7 @@ import { siteTrail } from '@/components/shared/trail.ts';
 
 import { noWrite } from '../../../editorial-page.tsx';
 import { itemTitle } from '../../../item-title.ts';
-import { updateContentAction } from '../../actions.ts';
+import { updateAndSubmitContentAction, updateContentAction } from '../../actions.ts';
 import { previewUrl } from '../../content-urls.ts';
 import { readContentVersions } from '../../content-versions.ts';
 import { editorOptions } from '../../editor-options.ts';
@@ -97,6 +97,7 @@ export default async function EditContentPage({ params, searchParams }: Params &
         defaultValues={latest.data}
         options={options}
         action={updateContentAction.bind(null, siteId, contentId)}
+        submitAction={updateAndSubmitContentAction.bind(null, siteId, contentId)}
         created={criado === '1'}
         previewUrl={previewUrl(siteId, latest.data)}
       />

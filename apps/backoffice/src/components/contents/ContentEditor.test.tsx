@@ -77,10 +77,12 @@ type RenderProps = {
   defaultValues?: FieldValues;
   blockTypes?: readonly string[];
   result?: ContentFormResult;
-  mode?: 'create' | 'edit';
+  mode?: 'create' | 'edit' | 'amend';
   created?: boolean;
   previewUrl?: string;
   respond?: (input: ContentEdit) => Promise<ContentFormResult>;
+  /** Salvar e enviar para revisão (#780); sem ela, o botão não aparece. */
+  submitAction?: (input: ContentEdit) => Promise<ContentFormResult>;
 };
 
 function renderEditor({
@@ -91,6 +93,7 @@ function renderEditor({
   created,
   previewUrl,
   respond = () => Promise.resolve(result),
+  submitAction,
 }: RenderProps = {}) {
   const action = vi.fn<(input: ContentEdit) => Promise<ContentFormResult>>(respond);
   render(
@@ -102,6 +105,7 @@ function renderEditor({
         defaultValues={defaultValues}
         options={{ ...options, blockTypes }}
         action={action}
+        submitAction={submitAction}
         backHref={mode === 'create' ? '/sites/exemplo-a/conteudos' : BACK}
         created={created}
         previewUrl={previewUrl}
@@ -1036,5 +1040,132 @@ describe('título, slug e SEO (#590)', () => {
 
     await user.type(screen.getByLabelText('Descrição para buscadores'), 'A');
     expect(described('Descrição para buscadores')).toContain('1 caractere');
+  });
+});
+
+describe('salvar e enviar para revisão (#780)', () => {
+  const SEND = 'Salvar e enviar para revisão';
+  const sendButton = () => screen.getByRole('button', { name: SEND });
+  const sent: ContentFormResult = {
+    ok: true,
+    message: 'Versão 2 salva e enviada para revisão.',
+    id: 7,
+  };
+  const sender = (respond: () => Promise<ContentFormResult> = () => Promise.resolve(sent)) =>
+    vi.fn<(input: ContentEdit) => Promise<ContentFormResult>>(respond);
+
+  it('na criação e na edição, a barra tem o botão; na correção, não', () => {
+    for (const mode of ['create', 'edit'] as const) {
+      renderEditor({ mode, submitAction: sender() });
+      const bar = screen.getByRole('button', { name: mode === 'create' ? 'Criar' : 'Salvar' });
+      expect(bar.closest('.sticky')?.contains(sendButton())).toBe(true);
+      cleanup();
+    }
+    renderEditor({ mode: 'amend', submitAction: sender() });
+    expect(screen.getByRole('button', { name: 'Salvar correção' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: SEND })).toBeNull();
+  });
+
+  it('sem a action da página, o botão não aparece', () => {
+    renderEditor();
+    expect(screen.queryByRole('button', { name: SEND })).toBeNull();
+  });
+
+  it('válido: chama a action de enviar, não a de salvar, e vai para o detalhe do conteúdo', async () => {
+    const user = userEvent.setup();
+    const submitAction = sender(() => Promise.resolve({ ...sent, id: 9 }));
+    const action = renderEditor({ mode: 'create', submitAction });
+
+    await user.click(sendButton());
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/sites/exemplo-a/conteudos/9'));
+    expect(submitAction.mock.calls[0]?.[0]).toMatchObject({ title: 'Guia', slug: 'guia' });
+    expect(action).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(await screen.findByText(sent.message)).toBeTruthy();
+  });
+
+  it('na edição sem alteração, "Salvar" segue indisponível e o botão ainda envia', async () => {
+    const user = userEvent.setup();
+    const submitAction = sender();
+    renderEditor({ submitAction });
+
+    expect(screen.getByRole('button', { name: 'Salvar' }).getAttribute('aria-disabled')).toBe(
+      'true',
+    );
+    expect(sendButton().hasAttribute('aria-disabled')).toBe(false);
+    await user.click(sendButton());
+
+    await waitFor(() => expect(submitAction).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(BACK));
+  });
+
+  it('formulário inválido: o resumo e o campo, como em "Salvar", sem enviar nem navegar', async () => {
+    const user = userEvent.setup();
+    const submitAction = sender();
+    renderEditor({ submitAction });
+
+    await user.clear(screen.getByLabelText(fieldLabel('Título'), { exact: true }));
+    await user.click(sendButton());
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('Corrija os campos destacados.'),
+    );
+    expect(
+      screen.getByLabelText(fieldLabel('Título'), { exact: true }).getAttribute('aria-invalid'),
+    ).toBe('true');
+    expect(submitAction).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('recusa do domínio: o campo do caminho e o resumo, sem navegar', async () => {
+    const user = userEvent.setup();
+    renderEditor({
+      submitAction: sender(() =>
+        Promise.resolve({
+          ok: false,
+          message: 'Não foi possível salvar o conteúdo.',
+          issues: [
+            { path: ['blocks', 0, 'title'], message: 'Título recusado' },
+            { path: [], message: 'A versão mais recente não está em rascunho' },
+          ],
+        }),
+      ),
+    });
+
+    await user.click(sendButton());
+
+    expect(await screen.findByText('Título recusado')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain(
+      'A versão mais recente não está em rascunho',
+    );
+    expect(router.push).not.toHaveBeenCalled();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it('durante o envio, "Enviando…" e nenhum outro clique, nem em "Salvar"', async () => {
+    const user = userEvent.setup();
+    let finish: (result: ContentFormResult) => void = () => {};
+    const submitAction = sender(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const action = renderEditor({ submitAction });
+
+    await touch(user);
+    await user.click(sendButton());
+    const button = await screen.findByRole('button', { name: 'Enviando…' });
+    expect(button).toHaveProperty('disabled', true);
+    const save = screen.getByRole('button', { name: 'Salvar' });
+    expect(save).toHaveProperty('disabled', true);
+    await user.click(button);
+    await user.click(save);
+    expect(submitAction).toHaveBeenCalledTimes(1);
+    expect(action).not.toHaveBeenCalled();
+
+    act(() => finish(sent));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(BACK));
   });
 });
