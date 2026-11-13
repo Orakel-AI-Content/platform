@@ -28,8 +28,6 @@ import {
   recordInfraDrift,
   resetSiteInfra,
 } from '../builds/site-state.ts';
-
-import { advanceLifecycle, resetSiteInfra } from '../builds/site-state.ts';
 import { enqueueRestoreMedia } from '../media/schedule.ts';
 
 type OpenInfraRunStatus = (typeof OPEN_INFRA_RUN_STATUSES)[number];
