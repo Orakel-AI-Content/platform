@@ -15,10 +15,12 @@ import { PUBLISH_DAY_TIME_ZONE } from '@/domain/publications/publish.ts';
 import { setAllConfirmations, setConfirmation } from '@/domain/reviews/confirmations.ts';
 import {
   approveAndPublish,
+  approveAndPublishBatch,
   approveAndSchedule,
   approveVersion,
   returnVersion,
   type ApprovalOutcome,
+  type BatchItem,
 } from '@/domain/reviews/reviews.ts';
 import { resourcesFor } from '@/domain/sites/sites.ts';
 
@@ -28,7 +30,8 @@ import { noSession, refused } from '../content-form-result.ts';
 // comentário, validação da release, limite diário e transbordo ficam no domínio
 // (confirmations.ts, approveVersion, approveAndPublish, approveAndSchedule, returnVersion,
 // amendInReview); aqui só a tradução do Result para o painel. As quatro decisões devolvem
-// também o próximo da fila (`nextInReviewQueue`, workspace#90), lido na mesma transação.
+// também o próximo da fila (`nextInReviewQueue`, workspace#90), lido na mesma transação. O
+// lote da fila (#776) delega a `approveAndPublishBatch` e devolve o desfecho de cada artigo.
 
 export type ApproveResult = FormActionResult<SchemaFormIssue>;
 
@@ -214,11 +217,63 @@ function decisionMessage(
       ? `Versão ${version} aprovada: o artigo foi ao ar.`
       : `Versão ${version} aprovada: o artigo foi agendado para ${formatDateTime(outcome.at, PUBLISH_DAY_TIME_ZONE)}.`;
   if (!outcome.overflowed) return { message };
-  return {
-    message,
-    warning:
-      'O dia pedido já tinha atingido o limite diário de publicações do site; a publicação foi para o próximo dia com vaga, no mesmo horário.',
-  };
+  return { message, warning: OVERFLOW_WARNING };
+}
+
+const OVERFLOW_WARNING =
+  'O dia pedido já tinha atingido o limite diário de publicações do site; a publicação foi para o próximo dia com vaga, no mesmo horário.';
+
+/**
+ * Desfecho de um artigo do lote, pronto para o resultado do diálogo: no ar, agendado em `at`
+ * (data e hora de São Paulo, o dia do limite diário) com o aviso do transbordo, ou falhou, com o
+ * motivo.
+ */
+export type BatchItemResult =
+  | { contentId: number; outcome: 'published' }
+  | { contentId: number; outcome: 'scheduled'; at: string; warning?: string }
+  | { contentId: number; outcome: 'failed'; message: string };
+
+/** Lote enviado (um desfecho por artigo, na ordem enviada) ou recusado inteiro. */
+export type ApproveBatchResult =
+  { ok: true; items: BatchItemResult[] } | { ok: false; message: string };
+
+/**
+ * Aprova e publica em lote os artigos que o revisor confirmou ter lido no resumo (#776). O
+ * domínio confere a elegibilidade de cada um, grava as confirmações e publica ou agenda o
+ * transbordo; uma falha desfaz só aquele artigo. Revalida a fila e cada artigo decidido.
+ */
+export async function approveBatchAction(
+  siteId: string,
+  items: BatchItem[],
+): Promise<ApproveBatchResult> {
+  const actor = await currentActor();
+  if (!actor.ok) return { ok: false, message: INVALID_SESSION };
+  const result = await getDb().db.transaction((tx) =>
+    approveAndPublishBatch(tx, actor.value, siteId, items),
+  );
+  if (!result.ok) {
+    return { ok: false, message: result.issues.map((issue) => issue.message).join(' ') };
+  }
+  revalidatePath(`/sites/${siteId}/revisao`);
+  const outcomes = result.value.map((item): BatchItemResult => {
+    const { contentId } = item;
+    if (item.outcome === 'failed') {
+      return {
+        contentId,
+        outcome: 'failed',
+        message: item.issues.map((issue) => issue.message).join(' '),
+      };
+    }
+    revalidateReview(siteId, contentId);
+    if (item.outcome === 'published') return { contentId, outcome: 'published' };
+    return {
+      contentId,
+      outcome: 'scheduled',
+      at: formatDateTime(item.at, PUBLISH_DAY_TIME_ZONE),
+      ...(item.overflowed ? { warning: OVERFLOW_WARNING } : {}),
+    };
+  });
+  return { ok: true, items: outcomes };
 }
 
 /**
