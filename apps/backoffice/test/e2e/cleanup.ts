@@ -53,6 +53,13 @@ export async function removeSites(siteIds: readonly string[]): Promise<void> {
   const pool = createPool(getDatabaseUrl());
   try {
     await createDb(pool).transaction(async (tx) => {
+      // Um lote de reaplicação que a rodada deixou aberto (o teste caiu no meio) travaria os
+      // próximos: só há um aberto por vez, e o produto não cancela lote. `infra_batches` não
+      // tem site_id; o lote é dos sites pelas execuções, que saem logo abaixo.
+      await tx.execute(sql`
+        update infra_batches set state = 'interrompido', finished_at = now()
+        where state in ('planejando', 'aguardando_confirmacao', 'aplicando')
+          and id in (select batch_id from infra_runs where site_id in ${ids})`);
       for (const table of SITE_TABLES) {
         await tx.execute(sql`delete from ${sql.identifier(table)} where site_id in ${ids}`);
       }
