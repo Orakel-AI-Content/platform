@@ -123,12 +123,14 @@ export function buildPrompt(
   return { system, user };
 }
 
-function tokens(usage: { inputTokens?: number; outputTokens?: number } | undefined): TokenUsage {
+export function tokens(
+  usage: { inputTokens?: number; outputTokens?: number } | undefined,
+): TokenUsage {
   return { inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0 };
 }
 
 /** Issues `schema.*` do Zod na cadeia de causas do erro do SDK, ou um issue genérico. */
-function outputIssues(error: NoObjectGeneratedError): Issue[] {
+export function outputIssues(error: NoObjectGeneratedError): Issue[] {
   let cause: unknown = error.cause;
   for (let depth = 0; depth < 4 && cause !== undefined; depth++) {
     if (cause instanceof z.ZodError) {
