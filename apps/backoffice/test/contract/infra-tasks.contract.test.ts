@@ -21,17 +21,21 @@ import {
   tofuDriver,
   type InfraDriver,
 } from '../../src/domain/infra/drivers.ts';
-import { confirmInfraRun, requestInfraRun } from '../../src/domain/infra/runs.ts';
+import { confirmInfraRun, hasOpenInfraRun, requestInfraRun } from '../../src/domain/infra/runs.ts';
 import {
   INFRA_APPLY_TASK,
+  INFRA_CHECK_ALL_KEY,
+  INFRA_CHECK_TASK,
   INFRA_PLAN_TASK,
   INTERRUPTED_INFRA_MESSAGE,
   recoverInterruptedInfraRuns,
   scheduleInfraApply,
+  scheduleInfraCheckAll,
   scheduleInfraPlan,
 } from '../../src/domain/infra/schedule.ts';
 import { createSite } from '../../src/domain/sites/sites.ts';
 import { createInfraApplyTask } from '../../src/jobs/tasks/infra-apply.ts';
+import { createInfraCheckTask } from '../../src/jobs/tasks/infra-check.ts';
 import { createInfraPlanTask } from '../../src/jobs/tasks/infra-plan.ts';
 import { resetDatabase, setupDatabase } from './helpers.ts';
 
@@ -179,6 +183,7 @@ describe('infra-plan', () => {
       kind: 'local',
       plan: () => Promise.reject(new Error('pane')),
       apply: () => Promise.reject(new Error('pane')),
+      check: () => Promise.reject(new Error('pane')),
     };
     await plan(broken, runId);
     expect(await run(runId)).toMatchObject({
@@ -399,5 +404,76 @@ describe('fila e recuperação', () => {
     // O build do cadastro e o pedido acima seguem travados pelo dono deles.
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((row) => row.locked_by === 'outro')).toBe(true);
+  });
+});
+
+describe('infra-check', () => {
+  async function applied(): Promise<void> {
+    const local = localDriver();
+    const runId = await request();
+    await plan(local, runId);
+    await confirm(runId);
+    await apply(local, runId);
+  }
+
+  const check = (infra: InfraDriver, payload: unknown) =>
+    createInfraCheckTask({ db, infra })(payload, helpers);
+
+  async function checkJobs() {
+    const { rows } = await db.execute<{
+      queue_name: string | null;
+      key: string | null;
+      max_attempts: number;
+    }>(sql`select queue_name, key, max_attempts from graphile_worker.jobs
+           where task_identifier = ${INFRA_CHECK_TASK} order by id`);
+    return rows;
+  }
+
+  it('a distribuição enfileira um job por site na fila infra:<site>, sem duplicar', async () => {
+    await applied();
+    await check(localDriver(), {});
+    await check(localDriver(), {});
+
+    expect(await checkJobs()).toEqual([
+      { queue_name: 'infra:exemplo-a', key: 'infra-check:exemplo-a', max_attempts: 1 },
+    ]);
+  });
+
+  it('a da partida fica fora das filas de site, com uma chave só', async () => {
+    await db.transaction((tx) => scheduleInfraCheckAll(tx));
+    await db.transaction((tx) => scheduleInfraCheckAll(tx));
+
+    expect(await checkJobs()).toEqual([
+      { queue_name: null, key: INFRA_CHECK_ALL_KEY, max_attempts: 1 },
+    ]);
+  });
+
+  it('site em cadastrado não entra na distribuição', async () => {
+    await check(localDriver(), {});
+    expect(await checkJobs()).toEqual([]);
+  });
+
+  it('grava no site o resultado da conferência', async () => {
+    await applied();
+    await check(localDriver({ driftSites: [SITE] }), { siteId: SITE });
+
+    const [row] = await db
+      .select({ status: sites.infraDriftStatus, summary: sites.infraDriftSummary })
+      .from(sites)
+      .where(eq(sites.id, SITE));
+    expect(row?.status).toBe('desatualizado');
+    expect(InfraPlanSummarySchema.parse(JSON.parse(row?.summary ?? '')).steps.regras).toHaveLength(
+      1,
+    );
+  });
+
+  it('execução de infra aberta é vista até fechar', async () => {
+    const local = localDriver();
+    const runId = await request();
+    expect(await hasOpenInfraRun(db, SITE)).toBe(true);
+    await plan(local, runId);
+    await confirm(runId);
+    await apply(local, runId);
+    expect(await hasOpenInfraRun(db, SITE)).toBe(false);
   });
 });
