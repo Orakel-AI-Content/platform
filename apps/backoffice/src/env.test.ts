@@ -225,10 +225,48 @@ describe('parseBuildRunnerEnv', () => {
       TOFU_STATE_SECRET_ACCESS_KEY: 'segredo-acesso',
       TOFU_STATE_PASSPHRASE: 'segredo-senha-do-estado',
     };
-    const tofu = { ...runner, ...secrets, INFRA_DRIVER: 'tofu' };
+    const inputs = {
+      INFRA_RUNNER_TAG: 'abc1234',
+      INFRA_EMAIL_FORWARD_TO: 'caixa@orakel.example',
+      CLOUDFLARE_ACCOUNT_ID: 'f'.repeat(32),
+    };
+    const tofu = { ...runner, ...secrets, ...inputs, INFRA_DRIVER: 'tofu' };
 
-    it('tofu com todos os segredos sobe', () => {
-      expect(parseBuildRunnerEnv(tofu)).toMatchObject({ INFRA_DRIVER: 'tofu', ...secrets });
+    it('tofu com todos os segredos e entradas sobe', () => {
+      expect(parseBuildRunnerEnv(tofu)).toMatchObject({
+        INFRA_DRIVER: 'tofu',
+        ...secrets,
+        ...inputs,
+      });
+    });
+
+    it.each(Object.keys(inputs))('tofu sem %s não sobe e diz qual falta', (name) => {
+      for (const value of [undefined, '']) {
+        expect(() => parseBuildRunnerEnv({ ...tofu, [name]: value })).toThrow(
+          new RegExp(`- ${name}: Defina ${name}`),
+        );
+      }
+    });
+
+    it('recusa caixa central que não é e-mail', () => {
+      expect(() =>
+        parseBuildRunnerEnv({ ...tofu, INFRA_EMAIL_FORWARD_TO: 'caixa-central' }),
+      ).toThrow(/INFRA_EMAIL_FORWARD_TO/);
+    });
+
+    it('a falha forçada é só do driver local e só numa etapa conhecida', () => {
+      expect(parseBuildRunnerEnv({ ...runner, INFRA_LOCAL_FAIL_STEP: 'dns' })).toMatchObject({
+        INFRA_LOCAL_FAIL_STEP: 'dns',
+      });
+      expect(
+        parseBuildRunnerEnv({ ...runner, INFRA_LOCAL_FAIL_STEP: '' }).INFRA_LOCAL_FAIL_STEP,
+      ).toBeUndefined();
+      expect(() => parseBuildRunnerEnv({ ...runner, INFRA_LOCAL_FAIL_STEP: 'zona' })).toThrow(
+        /INFRA_LOCAL_FAIL_STEP/,
+      );
+      expect(() => parseBuildRunnerEnv({ ...tofu, INFRA_LOCAL_FAIL_STEP: 'dns' })).toThrow(
+        /INFRA_LOCAL_FAIL_STEP só vale com INFRA_DRIVER=local/,
+      );
     });
 
     it.each(Object.keys(secrets))(
@@ -254,6 +292,8 @@ describe('parseBuildRunnerEnv', () => {
     it('local sobe sem os segredos', () => {
       const env = parseBuildRunnerEnv(runner);
       expect(env.INFRA_DRIVER).toBe('local');
+      expect(env.INFRA_RUNNER_TAG).toBeUndefined();
+      expect(env.INFRA_EMAIL_FORWARD_TO).toBeUndefined();
       expect(env.CLOUDFLARE_INFRA_TOKEN).toBeUndefined();
       expect(env.TOFU_STATE_PASSPHRASE).toBeUndefined();
     });
