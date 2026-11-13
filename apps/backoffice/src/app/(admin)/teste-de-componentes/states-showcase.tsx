@@ -41,7 +41,7 @@ const SITE: PublicationSite = {
   timeZone: 'America/Sao_Paulo',
 };
 
-const IDLE: SiteActivity = { open: null, history: [] };
+const IDLE: SiteActivity = { open: null, openInfra: null, history: [] };
 
 /** Publicação rodando: a etapa Build é a atual. */
 const RUNNING: SiteActivity = {
@@ -55,6 +55,7 @@ const RUNNING: SiteActivity = {
     requestedBy: 'ana@orakel.local',
     cancelRequestedAt: null,
   },
+  openInfra: null,
   history: [],
 };
 

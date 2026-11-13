@@ -64,6 +64,7 @@ const QUEUED: OpenExecution = {
 
 const activity = (open: OpenExecution | null, history: SiteHistoryItem[] = []): SiteActivity => ({
   open,
+  openInfra: null,
   history,
 });
 

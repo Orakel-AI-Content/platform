@@ -140,6 +140,9 @@ export const HISTORY_KIND_LABEL: Record<BuildKind | SiteEventKind, string> = {
   troca_de_versao: 'Troca de versão',
 };
 
+/** Item do histórico de uma criação da infraestrutura (`infra_runs`); o detalhe é da #826. */
+export const INFRA_RUN_LABEL = 'Criação da infraestrutura';
+
 /** Etapa de uma execução de build, no detalhe de uma falha (#637). */
 export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {
   image: 'Imagem',
@@ -152,6 +155,9 @@ export const BUILD_STAGE_LABEL: Record<BuildStage, string> = {
  * que o status sozinho não diz (o cancelamento e a etapa da falha); na pausa, o motivo.
  */
 export function historyItemTitle(item: SiteHistoryItem): string {
+  if (item.type === 'infra') {
+    return item.status === 'falhou' ? `${INFRA_RUN_LABEL} · falhou` : INFRA_RUN_LABEL;
+  }
   const kind = HISTORY_KIND_LABEL[item.kind];
   if (item.type === 'evento') {
     return item.kind === 'pausa' && item.reason ? `${kind}: ${item.reason}` : kind;

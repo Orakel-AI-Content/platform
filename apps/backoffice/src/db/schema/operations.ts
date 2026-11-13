@@ -144,6 +144,72 @@ export const siteEvents = pgTable(
   (t) => [index().on(t.siteId, t.createdAt)],
 );
 
+/**
+ * Estados da criação da infraestrutura do site. `planejando`, `aguardando_confirmacao` e
+ * `aplicando` são linhas abertas (sem `finishedAt`); `ok` e `falhou` são fechadas.
+ */
+export const INFRA_RUN_STATUSES = [
+  'planejando',
+  'aguardando_confirmacao',
+  'aplicando',
+  'ok',
+  'falhou',
+] as const;
+export type InfraRunStatus = (typeof INFRA_RUN_STATUSES)[number];
+export const OPEN_INFRA_RUN_STATUSES = [
+  'planejando',
+  'aguardando_confirmacao',
+  'aplicando',
+] as const satisfies readonly InfraRunStatus[];
+/** Etapas do apply, na ordem e nos termos de quem opera. */
+export const INFRA_STEPS = ['endereco', 'dns', 'email', 'regras', 'imagens'] as const;
+export type InfraStep = (typeof INFRA_STEPS)[number];
+
+/**
+ * Uma criação da infraestrutura do site (OpenTofu, ADR 0027): nasce `planejando` no pedido,
+ * recebe o resumo do plano e espera a confirmação, aplica etapa por etapa e fecha `ok` (com os
+ * nameservers da zona) ou `falhou` (com a etapa e o motivo). "Tentar de novo" é uma linha nova.
+ * Uma linha aberta por site, garantida pelo índice único parcial. Não é um build: o histórico
+ * do site une esta tabela a `builds` e `site_events`.
+ */
+export const infraRuns = pgTable(
+  'infra_runs',
+  {
+    id: serial().primaryKey(),
+    siteId: text()
+      .notNull()
+      .references(() => sites.id),
+    status: text({ enum: INFRA_RUN_STATUSES }).notNull(),
+    /** Etapa em andamento, enquanto `aplicando`. */
+    currentStep: text({ enum: INFRA_STEPS }),
+    /** Resumo do plano que a confirmação aplica; o formato é do infra-runner. */
+    planSummary: text(),
+    /** E-mail de quem pediu. */
+    requestedBy: text().notNull(),
+    requestedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** E-mail de quem confirmou o plano; o lifecycle avança em nome dele. */
+    confirmedBy: text(),
+    confirmedAt: timestamp({ withTimezone: true }),
+    /** Nameservers da zona, no `ok`. */
+    nameservers: text().array(),
+    /** Etapa em que falhou (nula se falhou no plano) e o motivo. */
+    failedStep: text({ enum: INFRA_STEPS }),
+    failureMessage: text(),
+    /** Nulo enquanto a linha está aberta (`infra_runs_finished_check`). */
+    finishedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    index().on(t.siteId, t.finishedAt),
+    uniqueIndex('infra_runs_open_site_unique')
+      .on(t.siteId)
+      .where(sql`${t.status} in ('planejando', 'aguardando_confirmacao', 'aplicando')`),
+    check(
+      'infra_runs_finished_check',
+      sql`(${t.status} in ('planejando', 'aguardando_confirmacao', 'aplicando')) = (${t.finishedAt} is null)`,
+    ),
+  ],
+);
+
 export const ROLES = ['admin', 'editor', 'revisor', 'operacao'] as const;
 export type Role = (typeof ROLES)[number];
 

@@ -1668,6 +1668,7 @@ describe('atividade do site', () => {
           requestedBy: 'system',
           cancelRequestedAt: null,
         },
+        openInfra: null,
         history: [],
       },
     });
@@ -1697,7 +1698,10 @@ describe('atividade do site', () => {
 
   it('sem nada aberto, não há execução aberta', async () => {
     await clearQueue();
-    expect(await activity()).toEqual({ ok: true, value: { open: null, history: [] } });
+    expect(await activity()).toEqual({
+      ok: true,
+      value: { open: null, openInfra: null, history: [] },
+    });
   });
 
   it('o histórico une execuções e eventos, do mais recente ao mais antigo, com tipo, quem, quando e resultado', async () => {
@@ -1718,7 +1722,12 @@ describe('atividade do site', () => {
     if (!result.ok) throw new Error('consulta recusada');
     expect(result.value.open).toBeNull();
     expect(
-      result.value.history.map((item) => [item.type, item.kind, item.requestedBy, item.at]),
+      result.value.history.map((item) => [
+        item.type,
+        'kind' in item ? item.kind : null,
+        item.requestedBy,
+        item.at,
+      ]),
     ).toEqual([
       ['execucao', 'build', 'system', at(6)],
       ['evento', 'troca_de_versao', operacao.email, at(5)],

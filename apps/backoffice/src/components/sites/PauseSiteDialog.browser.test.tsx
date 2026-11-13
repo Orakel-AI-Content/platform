@@ -47,7 +47,7 @@ function Panel({ pause }: { pause: (reason: string) => Promise<ActionResult> }) 
             timeZone: 'America/Sao_Paulo',
           }}
           instance={{ activePages: 120, activeSince: null }}
-          activity={{ open: null, history: [] }}
+          activity={{ open: null, openInfra: null, history: [] }}
           actions={{
             site: (
               <>

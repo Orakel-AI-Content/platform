@@ -114,6 +114,7 @@ const ACTIVITY: SiteActivity = {
     requestedBy: 'ana@orakel.local',
     cancelRequestedAt: null,
   },
+  openInfra: null,
   history: HISTORY,
 };
 

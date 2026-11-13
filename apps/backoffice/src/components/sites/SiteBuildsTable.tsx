@@ -24,7 +24,7 @@ function isFailed(item: SiteHistoryItem): item is FailedExecution {
 
 /** Quem: no cancelado pedido por alguém, quem cancelou; senão, quem pediu. */
 function actor(item: SiteHistoryItem): string {
-  if (item.type === 'evento') return item.requestedBy;
+  if (item.type === 'evento' || item.type === 'infra') return item.requestedBy;
   if (item.status === 'cancelado' && item.cancelRequestedBy !== null) {
     return item.cancelRequestedBy;
   }
@@ -34,6 +34,7 @@ function actor(item: SiteHistoryItem): string {
 /** Versão: a do site da execução; na troca de versão, a release anterior e a nova. */
 function version(item: SiteHistoryItem): string | null {
   if (item.type === 'execucao') return item.versionId;
+  if (item.type === 'infra') return null;
   if (item.kind === 'troca_de_versao' && item.release !== null) {
     return item.previousRelease ? `${item.previousRelease} → ${item.release}` : item.release;
   }

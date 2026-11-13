@@ -91,14 +91,14 @@ const QUEUED: OpenExecution = {
 };
 const RUNNING: OpenExecution = { ...QUEUED, status: 'rodando', currentStage: 'render' };
 const ROLLING_BACK: OpenExecution = { ...RUNNING, kind: 'rollback', currentStage: null };
-const QUEUED_ACTIVITY: SiteActivity = { open: QUEUED, history: [] };
+const QUEUED_ACTIVITY: SiteActivity = { open: QUEUED, openInfra: null, history: [] };
 
 type Props = Partial<Omit<ComponentProps<typeof SiteOperationsScope>, 'children'>>;
 
 /** O painel com os botões nas etapas, como a página monta com operations.run. */
 function Panel({
   pausedReason = null,
-  activity = { open: null, history: [] },
+  activity = { open: null, openInfra: null, history: [] },
   ...props
 }: Props & { pausedReason?: string | null; activity?: SiteActivity }) {
   const paused = props.paused ?? false;
@@ -206,14 +206,14 @@ describe('ações nas etapas', () => {
   });
 
   it('com publicação em andamento, só "Cancelar" na Build', () => {
-    renderPanel({ ...ALL, activity: { open: RUNNING, history: [] } });
+    renderPanel({ ...ALL, activity: { open: RUNNING, openInfra: null, history: [] } });
 
     expect(stepButtons(2)).toEqual(['Cancelar exemplo-a']);
     expect(screen.queryByRole('button', { name: /Publicar agora/ })).toBeNull();
   });
 
   it('com reversão em andamento, a Build não oferece "Cancelar"', () => {
-    renderPanel({ ...ALL, activity: { open: ROLLING_BACK, history: [] } });
+    renderPanel({ ...ALL, activity: { open: ROLLING_BACK, openInfra: null, history: [] } });
 
     expect(stepButtons(2)).toEqual(['Publicar agora exemplo-a']);
   });
@@ -377,7 +377,7 @@ describe('confirmação', () => {
   it('"Cancelar" só cancela depois de confirmar; o sucesso vai ao toast', async () => {
     const user = userEvent.setup();
     const cancel = ok('Publicação de exemplo-a cancelada.');
-    renderPanel({ ...ALL, cancel, activity: { open: RUNNING, history: [] } });
+    renderPanel({ ...ALL, cancel, activity: { open: RUNNING, openInfra: null, history: [] } });
 
     await user.click(screen.getByRole('button', { name: 'Cancelar exemplo-a' }));
     expect(cancel).not.toHaveBeenCalled();
