@@ -11,7 +11,12 @@ import type { Executor } from '../../db/client.ts';
 import { infraRuns } from '../../db/schema/index.ts';
 import { requireRole, type Actor } from '../access/rbac.ts';
 import { InfraPlanSummarySchema, type InfraPlanSummary } from './drivers.ts';
-import { confirmInfraRemoval, confirmInfraRun, requestInfraRun } from './runs.ts';
+import {
+  confirmInfraRemoval,
+  confirmInfraRun,
+  requestInfraRemoval,
+  requestInfraRun,
+} from './runs.ts';
 import { scheduleInfraApply, scheduleInfraPlan, scheduleInfraRemoveWorker } from './schedule.ts';
 
 /** Mensagem do plano que falhou sem motivo gravado. */
@@ -35,6 +40,23 @@ export async function requestInfraPlan(
   siteId: string,
 ): Promise<Result<{ runId: number }>> {
   const requested = await requestInfraRun(tx, actor, siteId);
+  if (!requested.ok) return requested;
+  const runId = requested.value.id;
+  await scheduleInfraPlan(tx, { siteId, runId });
+  return { ok: true, value: { runId } };
+}
+
+/**
+ * Pede a remoção da infraestrutura e enfileira o plano de destruição (`requestInfraRemoval` +
+ * `scheduleInfraPlan`, workspace#97): o mesmo `infra-plan`, que roda no modo destroy pelo tipo da
+ * execução. Recusado o pedido, nada é enfileirado.
+ */
+export async function requestInfraRemovalPlan(
+  tx: Executor,
+  actor: Actor,
+  siteId: string,
+): Promise<Result<{ runId: number }>> {
+  const requested = await requestInfraRemoval(tx, actor, siteId);
   if (!requested.ok) return requested;
   const runId = requested.value.id;
   await scheduleInfraPlan(tx, { siteId, runId });
