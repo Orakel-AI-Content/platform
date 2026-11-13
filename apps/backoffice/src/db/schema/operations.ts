@@ -5,6 +5,7 @@ import {
   integer,
   pgTable,
   primaryKey,
+  unique,
   uniqueIndex,
   serial,
   text,
@@ -146,7 +147,9 @@ export const siteEvents = pgTable(
 
 /**
  * Estados da criação da infraestrutura do site. `planejando`, `aguardando_confirmacao` e
- * `aplicando` são linhas abertas (sem `finishedAt`); `ok` e `falhou` são fechadas.
+ * `aplicando` são linhas abertas (sem `finishedAt`); `ok`, `falhou` e `cancelado` são fechadas.
+ * `cancelado` é só de lote (workspace#98): a execução que não chegou a aplicar porque um site
+ * anterior do lote falhou.
  */
 export const INFRA_RUN_STATUSES = [
   'planejando',
@@ -154,6 +157,7 @@ export const INFRA_RUN_STATUSES = [
   'aplicando',
   'ok',
   'falhou',
+  'cancelado',
 ] as const;
 export type InfraRunStatus = (typeof INFRA_RUN_STATUSES)[number];
 export const OPEN_INFRA_RUN_STATUSES = [
@@ -179,6 +183,54 @@ export type InfraStep = (typeof INFRA_STEPS)[number];
  */
 export const INFRA_RUN_KINDS = ['criar', 'remover', 'reaplicar'] as const;
 export type InfraRunKind = (typeof INFRA_RUN_KINDS)[number];
+
+/**
+ * Estados do lote de reaplicação: `planejando` até todos os planos chegarem,
+ * `aguardando_confirmacao` à espera da confirmação única e `aplicando` um site por vez são
+ * abertos (sem `finishedAt`); `concluido` (todos `ok`) e `interrompido` (um site falhou) são
+ * fechados.
+ */
+export const INFRA_BATCH_STATES = [
+  'planejando',
+  'aguardando_confirmacao',
+  'aplicando',
+  'concluido',
+  'interrompido',
+] as const;
+export type InfraBatchState = (typeof INFRA_BATCH_STATES)[number];
+export const OPEN_INFRA_BATCH_STATES = [
+  'planejando',
+  'aguardando_confirmacao',
+  'aplicando',
+] as const satisfies readonly InfraBatchState[];
+
+/**
+ * "Reaplicar em todos os desatualizados" (workspace#98): uma execução `reaplicar` por site em
+ * `infra_runs` (`batchId` e `batchPosition`), todos os planos antes, uma confirmação para todas e
+ * o apply de um site por vez, parando na primeira falha. O estado de cada site é o da própria
+ * execução. Só um lote aberto por vez (índice único parcial).
+ */
+export const infraBatches = pgTable(
+  'infra_batches',
+  {
+    id: serial().primaryKey(),
+    state: text({ enum: INFRA_BATCH_STATES }).notNull().default('planejando'),
+    /** E-mail de quem pediu. */
+    requestedBy: text().notNull(),
+    startedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Nulo enquanto o lote está aberto (`infra_batches_finished_check`). */
+    finishedAt: timestamp({ withTimezone: true }),
+  },
+  () => [
+    uniqueIndex('infra_batches_open_unique')
+      .on(sql`(true)`)
+      .where(sql`state in ('planejando', 'aguardando_confirmacao', 'aplicando')`),
+    check(
+      'infra_batches_finished_check',
+      sql`(state in ('planejando', 'aguardando_confirmacao', 'aplicando')) = (finished_at is null)`,
+    ),
+  ],
+);
 
 /**
  * Uma criação (ou remoção ou reaplicação, pelo `tipo`) da infraestrutura do site (OpenTofu, ADR 0027): nasce `planejando` no pedido,
@@ -214,9 +266,14 @@ export const infraRuns = pgTable(
     failureMessage: text(),
     /** Nulo enquanto a linha está aberta (`infra_runs_finished_check`). */
     finishedAt: timestamp({ withTimezone: true }),
+    /** Lote de reaplicação da execução, e a posição dela (de 0); nulos fora de lote. */
+    batchId: integer().references(() => infraBatches.id),
+    batchPosition: integer(),
   },
   (t) => [
     index().on(t.siteId, t.finishedAt),
+    unique('infra_runs_batch_position_unique').on(t.batchId, t.batchPosition),
+    check('infra_runs_batch_check', sql`(${t.batchId} is null) = (${t.batchPosition} is null)`),
     uniqueIndex('infra_runs_open_site_unique')
       .on(t.siteId)
       .where(sql`${t.status} in ('planejando', 'aguardando_confirmacao', 'aplicando')`),
