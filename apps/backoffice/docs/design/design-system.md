@@ -173,7 +173,7 @@ leading-normal`, antialiased, com o texto em `text-gray-600 dark:text-gray-400` 
   lista, a ação do `ListHeader` segue o `CustomerListActionTools` do Ecme. O botão fica no
   tamanho padrão, com o ícone de `react-icons/tb` na prop `icon`, em `text-xl` e `aria-hidden`
   (`TbPlus` para criar, `TbCloudDownload` para baixar, `TbCloudUpload` para enviar). A
-  secundária vem antes, no `Button` padrão (baixar o tfvars em Sites), e a principal fica na
+  secundária vem antes, no `Button` padrão, e a principal fica na
   ponta direita. O ícone vai como elemento JSX, que atravessa a fronteira para o
   `ButtonLink`, nunca como componente. O `EmptyState` recebe o mesmo nó. A tabela nunca desenha
   o link de criar.

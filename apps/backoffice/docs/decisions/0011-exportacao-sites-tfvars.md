@@ -1,7 +1,11 @@
 # 0011 – Exportação do sites.auto.tfvars.json
 
-- Status: aceito
-- Data: 2026-10-06
+- Status: substituída pela 0027 da raiz (`docs/decisions/0027-opentofu-por-site-aplicado-pelo-build-runner.md`)
+- Data: 2026-10-06 (substituída em 2026-11-13: rota, botão e exportação retirados, #827)
+
+> Com a criação da infraestrutura por botão e o estado por site (ADR 0027 da raiz), a lista
+> única de sites perdeu o uso. `GET /sites/tfvars`, o botão de download e `exportSitesTfvars`
+> saíram do código; o texto abaixo fica como histórico.
 
 ## Contexto
 
