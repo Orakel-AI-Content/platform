@@ -266,8 +266,29 @@ describe('devolver ao editor na tela de revisão (#598)', () => {
       1,
       2,
       'Corrija a fonte.',
+      { autoCorrect: false },
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/revisao');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/revisao/1');
+  });
+
+  it('com a correção automática, a pede na devolução e diz isso na mensagem (workspace#95)', async () => {
+    mocks.returnVersion.mockResolvedValue({ ok: true, value: { reviewId: 9, runId: 3 } });
+
+    expect(await returnAction('exemplo-a', 1, 2, 'Corrija a fonte.', true)).toEqual({
+      ok: true,
+      message: 'Versão 2 devolvida ao editor; a correção automática foi pedida.',
+      next: 7,
+    });
+    expect(mocks.returnVersion).toHaveBeenCalledWith(
+      {},
+      revisor,
+      'exemplo-a',
+      1,
+      2,
+      'Corrija a fonte.',
+      { autoCorrect: true },
+    );
     expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a/revisao/1');
   });
 });

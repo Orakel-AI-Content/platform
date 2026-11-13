@@ -667,12 +667,56 @@ describe('painel de revisão', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Devolver ao editor' }));
 
-    expect(giveBack).toHaveBeenCalledWith('Falta a fonte da tabela.');
+    expect(giveBack).toHaveBeenCalledWith('Falta a fonte da tabela.', false);
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('Versão 2 devolvida ao editor.'),
     );
     expect(screen.queryByRole('button', { name: 'Devolver ao editor' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Só aprovar' })).toBeNull();
+  });
+
+  it('oferece os dois caminhos da devolução, com "Devolver ao editor" marcado (workspace#95)', () => {
+    renderPanel({ step: 'decisao' });
+
+    const group = screen.getByRole('radiogroup', { name: 'Como devolver' });
+    const editor = within(group).getByRole('radio', { name: 'Devolver ao editor' });
+    const correction = within(group).getByRole('radio', { name: 'Pedir correção automática' });
+    expect((editor as HTMLInputElement).checked).toBe(true);
+    expect((correction as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('com a correção automática, devolve com ela pedida e anuncia no toast', async () => {
+    const giveBack = vi.fn().mockResolvedValue({
+      ok: true,
+      message: 'Versão 2 devolvida ao editor; a correção automática foi pedida.',
+    });
+    renderPanel({ step: 'decisao', giveBack });
+    render(<ToastProvider />);
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Pedir correção automática' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: /O que corrigir/ }),
+      'Falta a fonte da tabela.',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver ao editor' }));
+
+    expect(giveBack).toHaveBeenCalledWith('Falta a fonte da tabela.', true);
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe(
+        'Versão 2 devolvida ao editor; a correção automática foi pedida.',
+      ),
+    );
+  });
+
+  it('com a correção automática, o comentário continua obrigatório', async () => {
+    const giveBack = vi.fn();
+    renderPanel({ step: 'decisao', giveBack });
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Pedir correção automática' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver ao editor' }));
+
+    expect(giveBack).not.toHaveBeenCalled();
+    expect(screen.getByText('Escreva o que o editor precisa corrigir.')).toBeTruthy();
   });
 
   it('recusa do comentário pelo domínio aparece no campo', async () => {

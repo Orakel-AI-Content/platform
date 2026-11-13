@@ -221,12 +221,16 @@ function decisionMessage(
   };
 }
 
-/** Devolve ao editor a versão que o revisor viu, com o comentário do que corrigir. */
+/**
+ * Devolve ao editor a versão que o revisor viu, com o comentário do que corrigir. Com
+ * `autoCorrect`, pede também a correção automática (workspace#95, ADR 0023 da unidade).
+ */
 export async function returnAction(
   siteId: string,
   contentId: number,
   version: number,
   comment: string,
+  autoCorrect = false,
 ): Promise<DecisionResult> {
   const actor = await currentActor();
   if (!actor.ok) {
@@ -237,7 +241,7 @@ export async function returnAction(
     };
   }
   const result = await withNext(actor.value, siteId, contentId, (tx) =>
-    returnVersion(tx, actor.value, siteId, contentId, version, comment),
+    returnVersion(tx, actor.value, siteId, contentId, version, comment, { autoCorrect }),
   );
   if (!result.ok) {
     // O comentário é o único campo: a recusa dele vai ao campo; o resto, ao resumo.
@@ -253,7 +257,9 @@ export async function returnAction(
   revalidateReview(siteId, contentId);
   return {
     ok: true,
-    message: `Versão ${version} devolvida ao editor.`,
+    message: autoCorrect
+      ? `Versão ${version} devolvida ao editor; a correção automática foi pedida.`
+      : `Versão ${version} devolvida ao editor.`,
     next: result.value.next,
   };
 }

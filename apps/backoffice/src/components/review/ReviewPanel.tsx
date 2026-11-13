@@ -20,6 +20,7 @@ import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import Checkbox from '@/components/ui/Checkbox';
 import Input from '@/components/ui/Input';
+import { Radio } from '@/components/ui/Radio';
 import { Steps } from '@/components/ui/Steps';
 import type { ContentListItem } from '@/domain/content/contents.ts';
 
@@ -51,7 +52,8 @@ import type { ContentListItem } from '@/domain/content/contents.ts';
 // (`h2`, #372). A validação da release é um item das checagens (`erro`): só ela, além do
 // checklist, bloqueia as aprovações (`blocked`), com o aviso no `Alert` de erro do Ecme (#444),
 // sem `role="alert"`: chega no carregamento. "Devolver ao editor" (#598) tem cartão próprio, com
-// o comentário obrigatório, e não depende do checklist nem da validação. Decidida a versão, os
+// o comentário obrigatório, e não depende do checklist nem da validação; nele o revisor escolhe
+// entre só devolver e pedir também a correção automática (workspace#95), no `Radio.Group`. Decidida a versão, os
 // dois formulários saem. Toda decisão devolve o próximo da fila (workspace#90): depois do toast,
 // a tela vai para `revisao/<próximo>`; com a fila vazia, o cartão da decisão diz que ela acabou,
 // com o link para a fila. Uma recusa não navega e fica no resumo de erros.
@@ -92,8 +94,52 @@ export type ConfirmOutcome = { ok: true; confirmed: string[] } | { ok: false; me
 const SAVE_FAILED = 'Não foi possível gravar a confirmação; tente de novo.';
 
 const returnSchema = z.object({
+  mode: z.enum(['editor', 'correcao']),
   comment: z.string().trim().min(1, 'Escreva o que o editor precisa corrigir.'),
 });
+
+const RETURN_MODES = [
+  { value: 'editor', label: 'Devolver ao editor' },
+  { value: 'correcao', label: 'Pedir correção automática' },
+] as const;
+
+/** Caminho da devolução: só ao editor ou com a correção automática, no `Radio.Group` do Ecme. */
+function ReturnModeField({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  invalid,
+  required,
+  describedBy,
+  ref,
+}: FieldProps) {
+  const selected = value === 'correcao' ? 'correcao' : 'editor';
+  return (
+    <Radio.Group
+      id={id}
+      name={name}
+      value={selected}
+      onChange={(mode) => onChange(mode)}
+      aria-label={label}
+      aria-invalid={invalid}
+      aria-required={required || undefined}
+      aria-describedby={describedBy}
+    >
+      {RETURN_MODES.map((mode) => (
+        <Radio
+          key={mode.value}
+          value={mode.value}
+          ref={mode.value === selected ? ref : undefined}
+          className="min-h-11"
+        >
+          {mode.label}
+        </Radio>
+      ))}
+    </Radio.Group>
+  );
+}
 
 /** Comentário da devolução em várias linhas, no `Input` de texto longo do Ecme. */
 function CommentField({ id, ref, value, onChange, invalid, required, describedBy }: FieldProps) {
@@ -113,7 +159,10 @@ function CommentField({ id, ref, value, onChange, invalid, required, describedBy
   );
 }
 
-const RETURN_FIELDS = { comment: (props: FieldProps) => <CommentField {...props} /> };
+const RETURN_FIELDS = {
+  mode: (props: FieldProps) => <ReturnModeField {...props} />,
+  comment: (props: FieldProps) => <CommentField {...props} />,
+};
 
 /** O checklist fica fora do schema: o envio de "Aprovar" não leva nada (#752). */
 const approveSchema = z.object({});
@@ -211,8 +260,8 @@ export function ReviewPanel({
   approvePublish: () => Promise<DecisionOutcome>;
   /** Aprova e agenda para o instante em ISO, ou para a próxima vaga (`approveAndSchedule`). */
   approveSchedule: (at: string) => Promise<DecisionOutcome>;
-  /** Devolve ao editor com o comentário (`returnVersion`). */
-  giveBack: (comment: string) => Promise<DecisionOutcome>;
+  /** Devolve ao editor com o comentário e, com `autoCorrect`, pede a correção (`returnVersion`). */
+  giveBack: (comment: string, autoCorrect: boolean) => Promise<DecisionOutcome>;
 }) {
   const id = useId();
   const router = useRouter();
@@ -414,23 +463,25 @@ export function ReviewPanel({
         />
         <SchemaForm
           schema={returnSchema}
-          defaultValues={{ comment: '' }}
-          labels={{ comment: 'O que corrigir' }}
+          defaultValues={{ mode: 'editor', comment: '' }}
+          labels={{ mode: 'Como devolver', comment: 'O que corrigir' }}
           fields={RETURN_FIELDS}
           card={{
             intro: (
               <>
                 <h2 className={SECTION_TITLE_CLASS}>Devolver ao editor</h2>
                 <p className={SECTION_HINT_CLASS}>
-                  A versão volta a rascunho e sai da fila; o comentário aparece para quem edita.
+                  A versão volta a rascunho e sai da fila; o comentário aparece para quem edita. Com
+                  a correção automática, o comentário também guia uma versão corrigida, que volta à
+                  fila para revisão.
                 </p>
               </>
             ),
           }}
           submitLabel="Devolver ao editor"
           pendingLabel="Devolvendo…"
-          onSubmit={async ({ comment }) => {
-            const result = await giveBack(comment);
+          onSubmit={async ({ mode, comment }) => {
+            const result = await giveBack(comment, mode === 'correcao');
             if (!result.ok) return result.issues;
             settle(result);
             return { success: result.message };
