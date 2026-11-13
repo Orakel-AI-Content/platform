@@ -8,6 +8,8 @@
 //   /build/result.json               escrito pelo render, sempre
 //   /build/publish.json              escrito pelo publish
 //   /build/rollback.json             escrito pelo rollback
+//
+// No fim, o contrato do volume /infra da imagem infra-runner (ADR 0027 da raiz).
 import { z } from 'zod';
 
 export const CONTRACT_VERSION = 1;
@@ -146,3 +148,76 @@ export const EdgeLocalRollbackSchema = z.object({ active: z.string().min(1) });
 export function exitCodeOf(result: { status: 'ok' } | { status: 'failed'; failure: Failure }) {
   return result.status === 'ok' ? EXIT_CODES.ok : EXIT_CODES[result.failure.kind];
 }
+
+// Contrato do volume /infra entre a imagem infra-runner (plan e apply da raiz OpenTofu de um
+// site) e o build-runner do backoffice (ADR 0027 da raiz). Volume próprio da execução, nunca o
+// /build: os containers de site e de infra não compartilham volume.
+//
+//   /infra/site.tfplan       plano salvo, cifrado (aes_gcm), escrito pelo plan
+//   /infra/infra-plan.json   escrito pelo plan, sempre
+//   /infra/infra-apply.json  escrito pelo apply, sempre
+//
+// O andamento (`tofu … -json`) sai no stdout; os arquivos só trazem o resultado.
+
+export const INFRA_DIR = '/infra';
+export const INFRA_PATHS = {
+  plan: 'site.tfplan',
+  planResult: 'infra-plan.json',
+  applyResult: 'infra-apply.json',
+} as const;
+
+/** Ação do recurso no plano; `replace` = destruir e criar (ou criar e destruir). */
+export const INFRA_ACTIONS = ['create', 'update', 'delete', 'replace'] as const;
+export type InfraAction = (typeof INFRA_ACTIONS)[number];
+
+/** Um recurso que o plano muda (`no-op` e `read` ficam fora do resumo). */
+export const InfraChangeSchema = z.object({
+  /** Endereço no OpenTofu, ex.: `module.site.cloudflare_zone.site`. */
+  address: z.string().min(1),
+  /** Tipo do recurso, ex.: `cloudflare_zone`. */
+  type: z.string().min(1),
+  action: z.enum(INFRA_ACTIONS),
+});
+export type InfraChange = z.infer<typeof InfraChangeSchema>;
+
+const InfraBase = {
+  formatVersion: z.literal(CONTRACT_VERSION),
+  /** SITE_ID: também a chave do estado (`sites/<SITE_ID>.tfstate`). */
+  site: z.string().min(1),
+  durationMs: z.number().int().nonnegative(),
+};
+
+const InfraFailed = z.object({ ...InfraBase, status: z.literal('failed'), failure: FailureSchema });
+
+/** Resultado do `plan`: o resumo do plano salvo, que é o que o `apply` aplica. */
+export const InfraPlanResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    ...InfraBase,
+    status: z.literal('ok'),
+    /** Recursos que mudam; vazio quando o site já está como o código descreve. */
+    changes: z.array(InfraChangeSchema),
+  }),
+  InfraFailed,
+]);
+export type InfraPlanResult = z.infer<typeof InfraPlanResultSchema>;
+
+/**
+ * Crawler Hints (ADR 0027): ligado pela rota interna de flags da zona depois do `tofu apply`.
+ * A rota não é documentada, então a falha não derruba o apply: vira `falhou`, e a pessoa
+ * operadora liga no painel.
+ */
+export const CRAWLER_HINTS_STATES = ['ligado', 'falhou'] as const;
+
+/** Resultado do `apply`: as saídas da raiz `infra/site`. */
+export const InfraApplyResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    ...InfraBase,
+    status: z.literal('ok'),
+    /** Nameservers da zona, para configurar no registrador. */
+    nameServers: z.array(z.string().min(1)).min(1),
+    zoneId: z.string().min(1),
+    crawlerHints: z.enum(CRAWLER_HINTS_STATES),
+  }),
+  InfraFailed,
+]);
+export type InfraApplyResult = z.infer<typeof InfraApplyResultSchema>;

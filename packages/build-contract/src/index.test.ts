@@ -4,6 +4,10 @@ import {
   CONTRACT_VERSION,
   EXIT_CODES,
   EdgeLocalRollbackSchema,
+  INFRA_DIR,
+  INFRA_PATHS,
+  InfraApplyResultSchema,
+  InfraPlanResultSchema,
   PATHS,
   PublishResultSchema,
   ResultSchema,
@@ -93,6 +97,63 @@ describe('rollback.json', () => {
     expect(CONTRACT_VERSION).toBe(1);
     expect(PATHS.rollback).toBe('rollback.json');
     expect(EdgeLocalRollbackSchema.parse({ active: 'v1' })).toEqual({ active: 'v1' });
+  });
+});
+
+describe('infra-plan.json e infra-apply.json (volume /infra)', () => {
+  const infra = { formatVersion: 1, site: 'exemplo-a', durationMs: 4200 };
+  const failed = {
+    ...infra,
+    status: 'failed',
+    failure: { kind: 'permanent', message: 'Defina TOFU_STATE_PASSPHRASE' },
+  };
+
+  it('volume próprio, separado do /build', () => {
+    expect(INFRA_DIR).toBe('/infra');
+    expect(INFRA_PATHS).toEqual({
+      plan: 'site.tfplan',
+      planResult: 'infra-plan.json',
+      applyResult: 'infra-apply.json',
+    });
+  });
+
+  it('plano ok traz os recursos que mudam, com a ação de cada um', () => {
+    const ok = {
+      ...infra,
+      status: 'ok',
+      changes: [
+        { address: 'module.site.cloudflare_zone.site', type: 'cloudflare_zone', action: 'create' },
+        {
+          address: 'module.site.cloudflare_dns_record.spf',
+          type: 'cloudflare_dns_record',
+          action: 'replace',
+        },
+      ],
+    };
+    expect(InfraPlanResultSchema.safeParse(ok).success).toBe(true);
+    expect(InfraPlanResultSchema.safeParse({ ...ok, changes: [] }).success).toBe(true);
+    const noop = { ...ok, changes: [{ address: 'x.y', type: 'x', action: 'no-op' }] };
+    expect(InfraPlanResultSchema.safeParse(noop).success).toBe(false);
+  });
+
+  it('apply ok traz nameservers, zona e o estado do Crawler Hints', () => {
+    const ok = {
+      ...infra,
+      status: 'ok',
+      nameServers: ['ada.ns.cloudflare.com', 'bob.ns.cloudflare.com'],
+      zoneId: '023e105f4ecef8ad9ca31a8372d0c353',
+      crawlerHints: 'ligado',
+    };
+    expect(InfraApplyResultSchema.safeParse(ok).success).toBe(true);
+    expect(InfraApplyResultSchema.safeParse({ ...ok, crawlerHints: 'falhou' }).success).toBe(true);
+    expect(InfraApplyResultSchema.safeParse({ ...ok, nameServers: [] }).success).toBe(false);
+    expect(InfraApplyResultSchema.safeParse({ ...ok, crawlerHints: 'talvez' }).success).toBe(false);
+  });
+
+  it('falha traz o tipo e a mensagem, nos dois arquivos', () => {
+    expect(InfraPlanResultSchema.safeParse(failed).success).toBe(true);
+    expect(InfraApplyResultSchema.safeParse(failed).success).toBe(true);
+    expect(InfraApplyResultSchema.safeParse({ ...failed, formatVersion: 2 }).success).toBe(false);
   });
 });
 
