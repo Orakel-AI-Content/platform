@@ -195,6 +195,12 @@ export type ReviewQueueEntry = ReviewQueueItem & {
    * revisão. Só informa: não entra em `pending`.
    */
   opinion: OpinionOutlook;
+  /**
+   * Por que o item não entra no lote (#776): os mesmos motivos que `approveAndPublishBatch`
+   * recusa (pendência, links não conferidos, parecer não favorável); vazio quando é elegível.
+   * A tela só esconde a seleção com ele: o lote confere de novo, item a item.
+   */
+  batchBlockers: string[];
 };
 
 /**
@@ -288,6 +294,7 @@ export async function reviewQueue(
     entries.push({
       ...item,
       ...standing.value,
+      batchBlockers: ineligibility(standing.value),
       returned: last?.decision === 'devolvido' && last.version <= item.version,
       autoCorrected: corrected.has(correctionKey(item.id, item.version)),
     });

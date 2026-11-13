@@ -34,6 +34,7 @@ const item = (id: number): ReviewQueueEntry => ({
   returned: false,
   autoCorrected: false,
   opinion: 'favoravel',
+  batchBlockers: ['a checagem de links externos não terminou'],
 });
 
 /** Primeiro elemento do tipo pedido na árvore devolvida pela página. */

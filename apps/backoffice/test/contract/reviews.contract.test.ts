@@ -1596,6 +1596,40 @@ describe('aprovar e publicar em lote (#775)', () => {
     });
   });
 
+  it('a fila diz por que cada item não entra no lote, pelos mesmos motivos da recusa (#776)', async () => {
+    const ok = await clean(1);
+    // Os conteúdos 2 e 3 da fixture não têm capa nem descrição (o 3, nem categoria): pendências.
+    const reserved = { siteId: SITE, contentId: 2, version: await draft(2) };
+    await finishOpinion(reserved, 'nao_atende');
+    const pending = { siteId: SITE, contentId: 3, version: await draft(3) };
+    await finishLinks(pending);
+    await finishOpinion(pending, 'atende');
+
+    const queue = await reviewQueue(db, role('revisor'), SITE);
+    if (!queue.ok) throw new Error(JSON.stringify(queue.issues));
+    const blockers = Object.fromEntries(
+      queue.value.map((entry) => [entry.id, entry.batchBlockers]),
+    );
+
+    expect(blockers).toEqual({
+      [ok.contentId]: [],
+      [reserved.contentId]: [
+        expect.stringMatching(/pendência/),
+        expect.stringMatching(/links externos/),
+        expect.stringMatching(/com_ressalvas/),
+      ],
+      [pending.contentId]: [expect.stringMatching(/pendência/)],
+    });
+    expect(await batch([item(ok), item(reserved), item(pending)])).toMatchObject({
+      ok: true,
+      value: [
+        { outcome: 'published' },
+        { outcome: 'failed', issues: [ineligible(/links externos/)] },
+        { outcome: 'failed', issues: [ineligible(/pendência/)] },
+      ],
+    });
+  });
+
   it('a versão que não é mais a mais recente é recusada e desfaz só aquele artigo', async () => {
     const seen = await clean(1);
     const newer = await clean(1);

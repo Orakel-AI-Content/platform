@@ -43,13 +43,14 @@ afterEach(() => {
 });
 
 /** Sem pendência, links verificando, enviado pela primeira vez e parecer favorável. */
-const fresh = {
+const fresh: Omit<ReviewQueueEntry, 'id' | 'kind' | 'title' | 'version' | 'submittedAt'> = {
   pending: 0,
   links: { state: 'verificando' },
   returned: false,
   autoCorrected: false,
   opinion: 'favoravel',
-} as const;
+  batchBlockers: ['a checagem de links externos não terminou'],
+};
 
 const rows: ReviewQueueEntry[] = [
   {
