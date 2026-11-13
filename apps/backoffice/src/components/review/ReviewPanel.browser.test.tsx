@@ -123,6 +123,7 @@ describe('Revisão no navegador', () => {
           checklist={CHECKLIST}
           confirmed={[]}
           canApprove
+          canAmend={false}
           confirm={vi.fn()}
           confirmAll={confirmAll}
           approve={approve}
@@ -175,6 +176,7 @@ describe('Revisão no navegador', () => {
         checklist={CHECKLIST}
         confirmed={[]}
         canApprove
+        canAmend={false}
         confirm={confirm}
         confirmAll={vi.fn()}
         approve={vi.fn()}

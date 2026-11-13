@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentEditor } from '@/components/contents/ContentEditor';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
 import ButtonLink from '@/components/ui/Button/ButtonLink';
-import type { Role } from '@/domain/access/rbac.ts';
+import type { Role } from '@/db/schema/index.ts';
 
 // Tela de revisão (#767): com `content.amend` e a versão em revisão, o passo Ajustes recebe o
 // editor no modo `amend`, ligado à versão vista e voltando à revisão em `?passo=ajustes`; a

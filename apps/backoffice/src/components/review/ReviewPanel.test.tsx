@@ -437,6 +437,7 @@ describe('painel de revisão', () => {
         blocked={false}
         checklist={checklist}
         canApprove
+        canAmend={false}
         approve={approve}
         approvePublish={vi.fn()}
         approveSchedule={vi.fn()}
