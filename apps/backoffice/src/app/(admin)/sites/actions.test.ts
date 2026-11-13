@@ -5,11 +5,13 @@ import {
   cancelBuildAction,
   checkSiteInfraAction,
   confirmInfraPlanAction,
+  confirmInfraRemovalAction,
   createSiteAction,
   infraPlanAction,
   pauseSiteAction,
   rebuildOnReleaseAction,
   requestInfraPlanAction,
+  requestInfraRemovalAction,
   registerG1Action,
   rollbackSiteAction,
   resumeSiteAction,
@@ -48,6 +50,8 @@ const mocks = vi.hoisted(() => ({
   requestInfraPlan: vi.fn(),
   confirmInfraPlan: vi.fn(),
   readInfraPlan: vi.fn(),
+  requestInfraRemovalPlan: vi.fn(),
+  confirmInfraRemovalPlan: vi.fn(),
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
@@ -75,6 +79,8 @@ vi.mock('@/domain/infra/plan.ts', () => ({
   requestInfraPlan: mocks.requestInfraPlan,
   confirmInfraPlan: mocks.confirmInfraPlan,
   readInfraPlan: mocks.readInfraPlan,
+  requestInfraRemovalPlan: mocks.requestInfraRemovalPlan,
+  confirmInfraRemovalPlan: mocks.confirmInfraRemovalPlan,
 }));
 vi.mock('@/domain/sites/policy-triggers.ts', () => ({
   registerPolicyTrigger: mocks.registerPolicyTrigger,
@@ -688,5 +694,71 @@ describe('criar infraestrutura (#825)', () => {
     expect(mocks.requestInfraPlan).not.toHaveBeenCalled();
     expect(mocks.confirmInfraPlan).not.toHaveBeenCalled();
     expect(mocks.readInfraPlan).not.toHaveBeenCalled();
+  });
+});
+
+describe('remover infraestrutura (workspace#97)', () => {
+  const admin = { email: 'adm@orakel.local', roles: ['admin' as const] };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.currentActor.mockResolvedValue({ ok: true, value: admin });
+  });
+
+  it('pedir devolve a execução e revalida a página do site', async () => {
+    mocks.requestInfraRemovalPlan.mockResolvedValue({ ok: true, value: { runId: 9 } });
+
+    expect(await requestInfraRemovalAction('exemplo-a')).toEqual({ ok: true, runId: 9 });
+    expect(mocks.requestInfraRemovalPlan).toHaveBeenCalledWith({}, admin, 'exemplo-a');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/sites/exemplo-a');
+  });
+
+  it('a recusa do pedido vira a mensagem, sem revalidar', async () => {
+    const message = 'O site exemplo-a está ativo';
+    mocks.requestInfraRemovalPlan.mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'site.not_paused', message, path: [] }],
+    });
+
+    expect(await requestInfraRemovalAction('exemplo-a')).toEqual({ ok: false, message });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it('confirmar passa o domínio digitado ao domínio', async () => {
+    mocks.confirmInfraRemovalPlan.mockResolvedValue({ ok: true, value: undefined });
+
+    expect(await confirmInfraRemovalAction('exemplo-a', 9, 'exemplo-a.com.br')).toEqual({
+      ok: true,
+      message: 'Remoção da infraestrutura confirmada.',
+    });
+    expect(mocks.confirmInfraRemovalPlan).toHaveBeenCalledWith(
+      {},
+      admin,
+      'exemplo-a',
+      9,
+      'exemplo-a.com.br',
+    );
+  });
+
+  it('domínio errado: a recusa do domínio volta como erro', async () => {
+    const message = 'O domínio digitado não é o do site; a remoção não foi confirmada';
+    mocks.confirmInfraRemovalPlan.mockResolvedValue({
+      ok: false,
+      issues: [{ code: 'infra.domain_mismatch', message, path: ['domain'] }],
+    });
+
+    expect(await confirmInfraRemovalAction('exemplo-a', 9, 'outro.com')).toMatchObject({
+      ok: false,
+      message,
+    });
+  });
+
+  it('sem sessão, nada chega ao domínio', async () => {
+    mocks.currentActor.mockResolvedValue({ ok: false, issues: [] });
+
+    expect(await requestInfraRemovalAction('exemplo-a')).toMatchObject({ ok: false });
+    expect(await confirmInfraRemovalAction('exemplo-a', 9, 'x')).toMatchObject({ ok: false });
+    expect(mocks.requestInfraRemovalPlan).not.toHaveBeenCalled();
+    expect(mocks.confirmInfraRemovalPlan).not.toHaveBeenCalled();
   });
 });
