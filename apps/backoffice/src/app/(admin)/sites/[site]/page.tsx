@@ -1,3 +1,5 @@
+import { TbClipboardCheck, TbPlus, TbSettings } from 'react-icons/tb';
+
 import { RedirectUsageAlert } from '@/components/sites/RedirectUsageAlert';
 import { SiteContentMetrics } from '@/components/sites/SiteContentMetrics';
 import {
@@ -172,11 +174,40 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
     </>
   );
 
-  const edit = canConfigure ? (
-    <ButtonLink href={`/sites/${site.id}/configuracao`} variant="solid" size="sm">
-      Editar configuração
-    </ButtonLink>
-  ) : undefined;
+  // Ações do topo (#873), num grupo só no `PageHeader`: as secundárias antes e a principal
+  // (`solid`) por último. "Revisar" vale para todos; "Editar configuração" só com site.configure;
+  // "Criar conteúdo" só com content.write e, quando aparece, é a principal.
+  const headerActions = (
+    <>
+      <ButtonLink
+        href={`/sites/${site.id}/revisao`}
+        size="sm"
+        icon={<TbClipboardCheck aria-hidden />}
+      >
+        Revisar
+      </ButtonLink>
+      {canConfigure && (
+        <ButtonLink
+          href={`/sites/${site.id}/configuracao`}
+          variant={canWrite ? 'default' : 'solid'}
+          size="sm"
+          icon={<TbSettings aria-hidden />}
+        >
+          Editar configuração
+        </ButtonLink>
+      )}
+      {canWrite && (
+        <ButtonLink
+          href={`/sites/${site.id}/conteudos/novo`}
+          variant="solid"
+          size="sm"
+          icon={<TbPlus aria-hidden />}
+        >
+          Criar conteúdo
+        </ButtonLink>
+      )}
+    </>
+  );
   const publication = (
     <SitePublicationTab
       site={{
@@ -279,7 +310,12 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
 
   return (
     <section aria-labelledby="site-title" className="list-width space-y-4">
-      <PageHeader id="site-title" trail={siteTrail(site)} title={site.name} action={edit} />
+      <PageHeader
+        id="site-title"
+        trail={siteTrail(site)}
+        title={site.name}
+        action={headerActions}
+      />
       {redirects.ok && redirects.value.alert && <RedirectUsageAlert usage={redirects.value} />}
       <DetailLayout>
         <SiteSummaryCard site={site} instance={instance.value} g1Registered={g1 !== undefined} />
@@ -291,7 +327,6 @@ export default async function SitePage({ params }: { params: Promise<{ site: str
             counts={contentCounts.value}
             publishedToday={site.publishedToday}
             dailyLimit={site.effectiveDailyPublishLimit}
-            canWrite={canWrite}
           />
           <SiteTabs
             publication={

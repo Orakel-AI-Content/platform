@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
-import { isValidElement, type ReactElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { isValidElement, type ReactElement, type ReactNode } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PageHeader } from '@/components/shared/PageHeader';
 import { LifecycleAction } from '@/components/sites/SiteActions';
 import { SitePublicationTab } from '@/components/sites/SitePublicationTab';
 
@@ -12,6 +14,7 @@ import { SitePublicationTab } from '@/components/sites/SitePublicationTab';
 
 const state = vi.hoisted(() => ({
   roles: ['operacao'] as string[],
+  canWrite: false,
   openInfra: null as null | Record<string, unknown>,
   history: [] as Record<string, unknown>[],
   driftStatus: null as null | 'em_dia' | 'desatualizado',
@@ -24,7 +27,7 @@ vi.mock('./editorial-page.tsx', () => ({
     ok({
       actor: { email: 'pessoa@orakel.local', roles: state.roles },
       db: {},
-      canWrite: false,
+      canWrite: state.canWrite,
       site: {
         id: 'exemplo-a',
         name: 'Exemplo A',
@@ -262,4 +265,44 @@ describe('página do site: Reaplicar infraestrutura', () => {
       expect((tab?.props.site as { infraDriftStatus: unknown }).infraDriftStatus).toBe(driftStatus);
     },
   );
+});
+
+describe('página do site: ações do topo (#873)', () => {
+  afterEach(() => {
+    cleanup();
+    state.canWrite = false;
+  });
+
+  async function headerLinks() {
+    const page = await SitePage({ params: Promise.resolve({ site: 'exemplo-a' }) });
+    render(<>{find(page, PageHeader)?.props.action as ReactNode}</>);
+    return screen.getAllByRole('link').map((link) => ({
+      name: link.textContent,
+      href: link.getAttribute('href'),
+      solid: link.className.includes('bg-primary'),
+    }));
+  }
+
+  it('admin com escrita: Revisar, Editar configuração e Criar conteúdo, só o último solid', async () => {
+    state.roles = ['admin'];
+    state.canWrite = true;
+    expect(await headerLinks()).toEqual([
+      { name: 'Revisar', href: '/sites/exemplo-a/revisao', solid: false },
+      { name: 'Editar configuração', href: '/sites/exemplo-a/configuracao', solid: false },
+      { name: 'Criar conteúdo', href: '/sites/exemplo-a/conteudos/novo', solid: true },
+    ]);
+  });
+
+  it('sem content.write, "Editar configuração" vira a principal', async () => {
+    state.roles = ['operacao'];
+    expect(await headerLinks()).toEqual([
+      { name: 'Revisar', href: '/sites/exemplo-a/revisao', solid: false },
+      { name: 'Editar configuração', href: '/sites/exemplo-a/configuracao', solid: true },
+    ]);
+  });
+
+  it('sem site.configure nem escrita, só "Revisar"', async () => {
+    state.roles = ['revisor'];
+    expect((await headerLinks()).map(({ name }) => name)).toEqual(['Revisar']);
+  });
 });

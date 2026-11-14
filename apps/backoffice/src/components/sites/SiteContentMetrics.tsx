@@ -7,7 +7,8 @@
 //   não é título de seção;
 // - círculo do ícone nos `*-subtle` da paleta do Backoffice; o ícone é `aria-hidden`;
 // - em grade (1 coluna no celular, 2 a partir de `sm`, 3 a partir de `lg`, 6 a partir de
-//   `2xl`), com o título "Conteúdos" e os atalhos "Criar conteúdo" e "Revisar" acima.
+//   `2xl`), com o título "Conteúdos" acima; os atalhos "Revisar" e "Criar conteúdo" ficam no
+//   `PageHeader` da página (#873).
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import {
@@ -16,13 +17,11 @@ import {
   TbClipboardCheck,
   TbClock,
   TbPencil,
-  TbPlus,
   TbWorld,
 } from 'react-icons/tb';
 
 import { formatCount } from '@/components/audience/format.ts';
 import { CONTENT_STATUS_LABEL } from '@/components/shared/siteLabels.ts';
-import ButtonLink from '@/components/ui/Button/ButtonLink';
 import Card from '@/components/ui/Card';
 import classNames from '@/components/ui/utils/classNames';
 import type { ContentStatusCounts } from '@/domain/content/contents.ts';
@@ -77,44 +76,24 @@ export type SiteContentMetricsProps = {
   /** Publicações de hoje (feitas e agendadas, dia de São Paulo) e o limite efetivo do dia. */
   publishedToday: number;
   dailyLimit: number;
-  /** Com `content.write`, o atalho "Criar conteúdo". */
-  canWrite: boolean;
 };
 
 /**
  * Cartões de conteúdo da Visão geral do site (#596): quantos conteúdos estão em cada etapa,
- * cada um levando à lista filtrada, as publicações de hoje e os atalhos para criar e revisar.
+ * cada um levando à lista filtrada, e as publicações de hoje.
  */
 export function SiteContentMetrics({
   siteId,
   counts,
   publishedToday,
   dailyLimit,
-  canWrite,
 }: SiteContentMetricsProps) {
   const base = `/sites/${siteId}`;
   return (
     <section aria-labelledby="site-content-title" className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="site-content-title" className="h5">
-          Conteúdos
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          <ButtonLink href={`${base}/revisao`} size="sm" icon={<TbClipboardCheck aria-hidden />}>
-            Revisar
-          </ButtonLink>
-          {canWrite && (
-            <ButtonLink
-              href={`${base}/conteudos/novo`}
-              variant="solid"
-              size="sm"
-              icon={<TbPlus aria-hidden />}
-            >
-              Criar conteúdo
-            </ButtonLink>
-          )}
-        </div>
-      </div>
+      <h2 id="site-content-title" className="h5">
+        Conteúdos
+      </h2>
       <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {CARD_STATUSES.map((status) => (
           <li key={status}>
