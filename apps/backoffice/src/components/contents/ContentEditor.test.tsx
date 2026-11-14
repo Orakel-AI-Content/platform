@@ -139,6 +139,14 @@ const save = (user: ReturnType<typeof userEvent.setup>) =>
 const touch = (user: ReturnType<typeof userEvent.setup>) =>
   user.type(screen.getByLabelText(fieldLabel('Título')), '!');
 
+/** O item da linha com os blocos: o ancestral deles que é irmão da coluna de dados. */
+function blocksColumn() {
+  const meta = screen.getByRole('region', { name: 'Dados do conteúdo' });
+  let node: HTMLElement | null = screen.getByRole('region', { name: 'Blocos' });
+  while (node && !node.parentElement?.contains(meta)) node = node.parentElement;
+  return node;
+}
+
 describe('editor de conteúdo', () => {
   it('o "+" do fim só oferece os tipos da release', async () => {
     const user = userEvent.setup();
@@ -304,16 +312,15 @@ describe('barra de ações e continuar no editor (#109)', () => {
     expect(footer?.contains(screen.getByRole('button', { name: 'Ver prévia' }))).toBe(true);
     expect(footer?.querySelector('[role="alert"]')).toBeTruthy();
     expect(document.querySelector('[class*="xl:flex-row-reverse"]')).toBeNull();
-    const blocks = screen.getByRole('region', { name: 'Blocos' });
-    expect(blocks.className.split(' ')).not.toContain('xl:flex-1');
+    expect(blocksColumn()?.className.split(' ')).not.toContain('xl:flex-1');
   });
 
   it('em duas colunas, a de blocos cresce até preencher a linha a partir de xl (#875)', () => {
     renderEditor();
 
-    const blocks = screen.getByRole('region', { name: 'Blocos' });
-    expect(blocks.className.split(' ')).toContain('xl:flex-1');
-    expect(blocks.closest('[class*="xl:flex-row-reverse"]')).not.toBeNull();
+    const column = blocksColumn();
+    expect(column?.className.split(' ')).toContain('xl:flex-1');
+    expect(column?.parentElement?.className).toContain('xl:flex-row-reverse');
   });
 
   it('metadados e cada bloco ficam num Card (#332)', () => {
