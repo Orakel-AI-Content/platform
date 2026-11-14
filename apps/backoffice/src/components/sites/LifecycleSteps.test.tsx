@@ -203,6 +203,17 @@ describe('Criar infraestrutura (#825)', () => {
     expect(buttons()).toEqual(['Criar infraestrutura', 'Conferir agora']);
   });
 
+  it('"Criar infraestrutura" avança (verde) e "Conferir agora" fica no padrão (#873)', () => {
+    render(withInfra(infraActions()));
+
+    expect(screen.getByRole('button', { name: 'Criar infraestrutura' }).className).toContain(
+      'text-success',
+    );
+    expect(screen.getByRole('button', { name: 'Conferir agora' }).className).not.toMatch(
+      /text-(success|warning|error)/,
+    );
+  });
+
   it('sem as actions de infra (sem site.configure na página), não aparece', () => {
     render(withAction('cadastrado'));
 
@@ -524,6 +535,33 @@ describe('Reaplicar infraestrutura (workspace#98)', () => {
     );
     return { user, dialog };
   }
+
+  it('"Reaplicar infraestrutura" volta ao declarado (âmbar) e "Remover" destrói (vermelho)', () => {
+    render(
+      <LifecycleActionScope>
+        <LifecycleAction
+          lifecycle="publicado"
+          check={ok}
+          undo={ok}
+          reapply={reapplyActions()}
+          remove={{
+            domain: 'exemplo-a.com.br',
+            activePages: 12,
+            active: false,
+            open: null,
+            request: vi.fn().mockResolvedValue({ ok: true, runId: 9 }),
+            read: vi.fn().mockResolvedValue(null),
+            confirm: vi.fn(ok),
+          }}
+        />
+      </LifecycleActionScope>,
+    );
+
+    expect(screen.getByRole('button', { name: REAPPLY }).className).toContain('text-warning');
+    expect(screen.getByRole('button', { name: 'Remover infraestrutura' }).className).toContain(
+      'text-error',
+    );
+  });
 
   it('sem as actions de reaplicação (sem site.configure na página), não aparece', () => {
     render(withReapply(undefined));

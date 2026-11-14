@@ -7,7 +7,8 @@ import type { ContentStatusCounts } from '@/domain/content/contents.ts';
 import { SiteContentMetrics } from './SiteContentMetrics.tsx';
 
 // Cartões de conteúdo da Visão geral (#596): a contagem de cada status em pt-BR, o link de
-// cada cartão para a lista filtrada (a fila, em revisão) e o "Criar conteúdo" só com content.write.
+// cada cartão para a lista filtrada (a fila, em revisão). Os atalhos "Revisar" e "Criar
+// conteúdo" moram no `PageHeader` da página (#873), testados no `page.test.tsx`.
 
 afterEach(cleanup);
 
@@ -38,7 +39,6 @@ const renderMetrics = (props: Partial<Parameters<typeof SiteContentMetrics>[0]> 
       counts={COUNTS}
       publishedToday={2}
       dailyLimit={10}
-      canWrite
       {...props}
     />,
   );
@@ -72,26 +72,16 @@ describe('SiteContentMetrics', () => {
     expect(screen.getByText('Publicações hoje').closest('a')).toBeNull();
   });
 
-  it('atalhos: "Revisar" sempre, "Criar conteúdo" só com content.write', () => {
+  it('sem atalhos: os botões ficam no cabeçalho da página (#873)', () => {
     renderMetrics();
-    expect(screen.getByRole('link', { name: 'Revisar' }).getAttribute('href')).toBe(
-      '/sites/exemplo-a/revisao',
-    );
-    expect(screen.getByRole('link', { name: 'Criar conteúdo' }).getAttribute('href')).toBe(
-      '/sites/exemplo-a/conteudos/novo',
-    );
-    cleanup();
-
-    renderMetrics({ canWrite: false });
-    expect(screen.getByRole('link', { name: 'Revisar' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Revisar' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Criar conteúdo' })).toBeNull();
   });
 
-  it('site sem conteúdo: zeros e o atalho de criar', () => {
+  it('site sem conteúdo: zeros', () => {
     renderMetrics({ counts: ZERO, publishedToday: 0 });
     for (const title of ['Rascunho', 'Em revisão', 'Aprovado', 'Agendado', 'Publicado']) {
       expect(within(card(title)).getByText('0', { exact: true })).toBeTruthy();
     }
-    expect(screen.getByRole('link', { name: 'Criar conteúdo' })).toBeTruthy();
   });
 });

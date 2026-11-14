@@ -8,7 +8,8 @@ import { SiteBuildsTable } from './SiteBuildsTable.tsx';
 
 // Histórico em linha do tempo, em Chromium (#651; era a tabela do #637): o item de uma falha
 // abre o painel pelo teclado (Tab até "Ver detalhe" e Enter) e pelo clique no botão; Esc ou
-// "Fechar" fecham e o foco volta ao botão do item.
+// "Fechar" fecham e o foco volta ao botão do item. A paginação do histórico (#873) troca de
+// página pelo teclado.
 // Sem axe nem tema: componente de domínio (ADR 0020 da raiz).
 
 const HISTORY: SiteHistoryItem[] = [
@@ -81,5 +82,37 @@ describe('SiteBuildsTable no navegador', () => {
     await dialog.getByRole('button', { name: /fechar/i }).click();
     await expect.element(dialog).not.toBeInTheDocument();
     await expect.element(button).toHaveFocus();
+  });
+});
+
+describe('SiteBuildsTable paginado no navegador (#873)', () => {
+  const many: SiteHistoryItem[] = Array.from({ length: 12 }, (_, index) => ({
+    type: 'execucao',
+    id: index + 1,
+    kind: 'build',
+    status: 'ok',
+    requestedBy: 'system',
+    cancelRequestedBy: null,
+    at: new Date(Date.UTC(2026, 9, 11, 16, 59 - index)),
+    release: '1.3.0',
+    versionId: `v-${index}`,
+    failure: null,
+  }));
+
+  it('Enter em "Próxima página" mostra os itens seguintes e marca a página atual', async () => {
+    const screen = await renderInApp(<SiteBuildsTable history={many} timeZone="UTC" />);
+    const pagination = screen.getByRole('navigation', { name: 'Paginação' });
+    const next = pagination.getByRole('button', { name: 'Próxima página' });
+
+    await expect.element(screen.getByText('v-0', { exact: false })).toBeVisible();
+    (next.element() as HTMLElement).focus();
+    await expect.element(next).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+
+    await expect.element(screen.getByText('v-11', { exact: false })).toBeVisible();
+    await expect
+      .element(pagination.getByRole('button', { name: 'Página 2' }))
+      .toHaveAttribute('aria-current', 'page');
+    expect(screen.getByText('v-0', { exact: false }).query()).toBeNull();
   });
 });

@@ -5,7 +5,11 @@ import { createContext, use, useId, useRef, useState, type ReactNode } from 'rea
 import { SchemaForm } from '@/components/forms/SchemaForm';
 import { ActionAlert, useActionResult } from '@/components/shared/ActionFeedback.tsx';
 import type { ActionResult } from '@/components/shared/actionResult.ts';
-import ConfirmDialog, { dangerButtonClass } from '@/components/shared/ConfirmDialog.tsx';
+import ConfirmDialog, {
+  dangerButtonClass,
+  successButtonClass,
+  warningButtonClass,
+} from '@/components/shared/ConfirmDialog.tsx';
 import { INFRA_REMOVAL_PAUSE_FIRST, INFRA_STEP_TEXT } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
 import type { OpenInfraRun } from '@/domain/infra/runs.ts';
@@ -198,7 +202,7 @@ export function LifecycleAction({
           ref={infraTrigger}
           type="button"
           size="sm"
-          variant="solid"
+          customColorClass={successButtonClass}
           disabled={scope.pending}
           onClick={() => (openRun === null ? creating.start() : creating.reopen(openRun.id))}
         >
@@ -278,6 +282,7 @@ export function LifecycleAction({
           ref={reapplyTrigger}
           type="button"
           size="sm"
+          customColorClass={warningButtonClass}
           disabled={scope.pending}
           onClick={() =>
             reapplyRun === null ? reapplying.start() : reapplying.reopen(reapplyRun.id)

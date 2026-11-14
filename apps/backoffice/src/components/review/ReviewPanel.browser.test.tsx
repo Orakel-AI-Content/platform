@@ -245,14 +245,38 @@ describe('Revisão no navegador', () => {
     await userEvent.keyboard('{Enter}');
     const picker = page.getByRole('dialog', { name: 'Escolher data e hora' });
     await expect.element(picker).toBeVisible();
-    // Os dias têm uma parada de Tab só (roving tabindex); as setas levam ao dia escolhido.
-    const days = [...picker.element().querySelectorAll<HTMLButtonElement>('button[aria-pressed]')];
-    const tabbableDay = days.find((button) => button.tabIndex === 0);
+    // Os dias têm uma parada de Tab só (roving tabindex); as setas levam ao dia escolhido. As
+    // setas não viram a linha nem o mês (como no Ecme): fora da grade, "Próximo" troca o mês, e
+    // na grade a seta anda pela linha e pela coluna da célula até o dia.
+    const days = () => [
+      ...picker.element().querySelectorAll<HTMLButtonElement>('button[aria-pressed]'),
+    ];
+    const target = () => days().find((button) => button.getAttribute('aria-label') === dayLabel);
+    if (target() === undefined) {
+      await tabTo(picker.getByRole('button', { name: 'Próximo' }));
+      await userEvent.keyboard('{Enter}');
+    }
+    const tabbableDay = days().find((button) => button.tabIndex === 0);
     expect(tabbableDay).toBeDefined();
     await tabTo(tabbableDay!);
+    const cell = (button: Element) => {
+      const td = button.closest('td')!;
+      return { row: (td.parentElement as HTMLTableRowElement).rowIndex, column: td.cellIndex };
+    };
     for (let step = 0; step < 40; step += 1) {
-      if (document.activeElement?.getAttribute('aria-label') === dayLabel) break;
-      await userEvent.keyboard('{ArrowRight}');
+      const active = document.activeElement;
+      if (active === null || active.getAttribute('aria-label') === dayLabel) break;
+      const from = cell(active);
+      const to = cell(target()!);
+      const key =
+        to.row > from.row
+          ? 'ArrowDown'
+          : to.row < from.row
+            ? 'ArrowUp'
+            : to.column > from.column
+              ? 'ArrowRight'
+              : 'ArrowLeft';
+      await userEvent.keyboard(`{${key}}`);
     }
     expect(document.activeElement?.getAttribute('aria-label')).toBe(dayLabel);
     await userEvent.keyboard('{Enter}');

@@ -9,7 +9,7 @@ import { APP_ELEMENT_ID } from '@/components/ui/utils/modalApp';
 import type { ExecutionHistoryItem, SiteHistoryItem } from '@/domain/builds/builds.ts';
 import type { InfraHistoryItem } from '@/domain/infra/runs.ts';
 
-import { SiteBuildsTable } from './SiteBuildsTable.tsx';
+import { HISTORY_PAGE_SIZE, SiteBuildsTable } from './SiteBuildsTable.tsx';
 
 // Histórico da aba "Publicação" em linha do tempo (#651; era a tabela do #637): publicação,
 // reversão, cancelamento, troca de versão, pausa e retomada como itens, na ordem recebida, cada
@@ -303,5 +303,56 @@ describe('SiteBuildsTable', () => {
     render(<SiteBuildsTable history={HISTORY} timeZone="America/Sao_Paulo" />, { container: app });
 
     expect(screen.queryByRole('table')).toBeNull();
+  });
+});
+
+describe('SiteBuildsTable paginado (#873)', () => {
+  const many = (count: number): SiteHistoryItem[] =>
+    Array.from({ length: count }, (_, index) =>
+      execution({
+        id: index + 1,
+        at: new Date(Date.UTC(2026, 9, 11, 16, 59 - index)),
+        versionId: `v-${index}`,
+      }),
+    );
+  /** Os ids de versão dos itens visíveis da linha do tempo (a primeira lista; a segunda é a paginação). */
+  const versions = () =>
+    within(screen.getAllByRole('list')[0]!)
+      .getAllByRole('listitem')
+      .map((item) => /v-\d+/.exec(item.textContent ?? '')?.[0]);
+
+  it('com até 10 itens, mostra todos e sem paginação', () => {
+    render(<SiteBuildsTable history={many(HISTORY_PAGE_SIZE)} timeZone="UTC" />, {
+      container: app,
+    });
+
+    expect(versions()).toHaveLength(10);
+    expect(screen.queryByRole('navigation', { name: 'Paginação' })).toBeNull();
+  });
+
+  it('com mais de 10, os 10 mais recentes primeiro e a paginação leva aos seguintes', async () => {
+    const user = userEvent.setup();
+    render(<SiteBuildsTable history={many(23)} timeZone="UTC" />, { container: app });
+
+    expect(versions()).toEqual(Array.from({ length: 10 }, (_, index) => `v-${index}`));
+    const pagination = screen.getByRole('navigation', { name: 'Paginação' });
+    expect(within(pagination).getByRole('button', { name: 'Página 3' })).toBeTruthy();
+
+    await user.click(within(pagination).getByRole('button', { name: 'Página 3' }));
+    expect(versions()).toEqual(['v-20', 'v-21', 'v-22']);
+  });
+
+  it('o polling troca o histórico e a página escolhida fica; se sumir, vai para a última', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<SiteBuildsTable history={many(23)} timeZone="UTC" />, {
+      container: app,
+    });
+    await user.click(screen.getByRole('button', { name: 'Página 2' }));
+
+    rerender(<SiteBuildsTable history={many(24)} timeZone="UTC" />);
+    expect(versions()[0]).toBe('v-10');
+
+    rerender(<SiteBuildsTable history={many(5)} timeZone="UTC" />);
+    expect(versions()).toHaveLength(5);
   });
 });
