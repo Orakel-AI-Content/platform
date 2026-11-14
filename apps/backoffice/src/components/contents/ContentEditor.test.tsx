@@ -304,6 +304,16 @@ describe('barra de ações e continuar no editor (#109)', () => {
     expect(footer?.contains(screen.getByRole('button', { name: 'Ver prévia' }))).toBe(true);
     expect(footer?.querySelector('[role="alert"]')).toBeTruthy();
     expect(document.querySelector('[class*="xl:flex-row-reverse"]')).toBeNull();
+    const blocks = screen.getByRole('region', { name: 'Blocos' });
+    expect(blocks.className.split(' ')).not.toContain('xl:flex-1');
+  });
+
+  it('em duas colunas, a de blocos cresce até preencher a linha a partir de xl (#875)', () => {
+    renderEditor();
+
+    const blocks = screen.getByRole('region', { name: 'Blocos' });
+    expect(blocks.className.split(' ')).toContain('xl:flex-1');
+    expect(blocks.closest('[class*="xl:flex-row-reverse"]')).not.toBeNull();
   });
 
   it('metadados e cada bloco ficam num Card (#332)', () => {

@@ -612,12 +612,14 @@ export function ContentEditor({
             </section>
           </div>
 
-          {/* O erro da lista ("ao menos um bloco") é a mensagem do `FormItem` (#329). */}
+          {/* O erro da lista ("ao menos um bloco") é a mensagem do `FormItem` (#329). Em duas
+              colunas, base zero que cresce (`xl:flex-1`, #875): com `flex-auto`, a coluna
+              encolhia até o próprio conteúdo e o `row-reverse` deixava as duas presas à direita. */}
           <FieldGroup
             as="section"
             message={blocksError}
             aria-labelledby={`${id}-blocks`}
-            className="min-w-0 flex-auto space-y-4"
+            className={classNames('min-w-0 flex-auto space-y-4', !embedded && 'xl:flex-1')}
           >
             <div className="flex flex-wrap items-center gap-2">
               <h2 id={`${id}-blocks`} className="mr-auto text-lg font-semibold">
