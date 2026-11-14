@@ -96,7 +96,9 @@ export function GenerationForm({
         {title}
         <Alert type="warning" showIcon duration={0}>
           {canWrite ? (
-            <div className="space-y-3">
+            // Em flex (#876): solto num bloco comum, o `ButtonLink` (um `<a>` inline) partia o
+            // fundo e deixava o texto branco sobre o amarelo do alerta.
+            <div className="flex flex-col items-start gap-3">
               <p className="text-sm">Cadastre o contexto editorial do site antes de gerar.</p>
               <ButtonLink
                 href={`${contexts}/nova`}
