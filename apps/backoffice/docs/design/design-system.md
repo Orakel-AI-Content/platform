@@ -683,7 +683,13 @@ Na Visão geral do site (`sites/[site]/page.tsx`, #596), o mesmo cartão em
   agora?"), e o "Confirmar" diz o verbo ("Remover", "Publicar"). O botão que abre a
   confirmação usa o `dangerButtonClass` no `customColorClass` (contorno e texto em `error`;
   branco no claro, transparente no escuro), e o "Confirmar", o `dangerConfirmButtonProps` no
-  `confirmButtonProps` (`bg-error`). "Cancelar", Esc e o fundo fecham sem efeito e o foco volta
+  `confirmButtonProps` (`bg-error`). Na aba Publicação da página do site (#873), o contorno do
+  gatilho diz a função: `successButtonClass` (verde) no que avança ("Publicar agora",
+  "Atualizar para a mais recente", "Retomar", "Criar infraestrutura"), `warningButtonClass`
+  (âmbar) no que volta ou interrompe ("Voltar à versão anterior", "Escolher outra versão do
+  motor", "Desfazer última publicação", "Escolher outra versão", "Pausar", "Reaplicar
+  infraestrutura") e `dangerButtonClass` no que aborta ou destrói ("Cancelar", "Remover
+  infraestrutura"); "Conferir agora" e "Desmarcar" ficam no `default`. "Cancelar", Esc e o fundo fecham sem efeito e o foco volta
   ao botão de origem; quando o botão some com a ação ("Remover" da mídia, "Remover link"), o
   foco vai ao controle que fica, no `onAfterClose`. Depois de confirmar, o retorno segue o
   padrão acima (toast ou `ActionAlert`). Confirmam hoje:
