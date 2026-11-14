@@ -1850,6 +1850,24 @@ const ECME_PAIRS: readonly EcmePair[] = [
     background: 'dark:bg-error',
     minimum: 4.5,
   },
+  // Gatilhos que avançam e que voltam (#873): `text-success` e `text-warning`, no formato do
+  // destrutivo, sobre o branco do `default` no claro e transparentes sobre o cartão no escuro.
+  ...(['success', 'warning'] as const).flatMap((color): EcmePair[] => [
+    {
+      name: `gatilho ${color} no cartão`,
+      theme: 'claro',
+      text: `text-${color}`,
+      background: 'bg-white',
+      minimum: 4.5,
+    },
+    {
+      name: `gatilho ${color} no cartão`,
+      theme: 'escuro',
+      text: `dark:text-${color}`,
+      background: 'dark:bg-gray-800',
+      minimum: 4.5,
+    },
+  ]),
   // Envio de imagens (#376): o texto da área do Upload arrastável no diálogo, sobre o
   // `bg-gray-100` da área no claro e o `dark:bg-gray-800` do diálogo no escuro (a área é
   // `dark:bg-transparent`). O azul fixo do Ecme, fora da paleta, vira `primary`; a segunda

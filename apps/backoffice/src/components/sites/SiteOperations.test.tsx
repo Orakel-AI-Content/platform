@@ -186,8 +186,34 @@ describe('ações nas etapas', () => {
     expect(stepButtons(3)).toEqual(['Escolher outra versão exemplo-a']);
     expect(stepButtons(4)).toEqual(['Pausar exemplo-a']);
     const publish = screen.getByRole('button', { name: 'Publicar agora exemplo-a' });
-    expect(publish.className).toContain('text-error');
+    expect(publish.className).toContain('text-success');
     expect(publish.className.split(' ')).toContain(CONTROL_SIZES.sm.h);
+  });
+
+  it('a cor do botão diz a função: verde avança, âmbar volta ou interrompe, vermelho aborta', () => {
+    const { rerender } = renderPanel({
+      ...ALL,
+      activity: QUEUED_ACTIVITY,
+      update: { tag: '1.5.0', action: ok('') },
+      revert: { tag: '1.1.0', action: ok('') },
+      undo: { version: PREVIOUS, action: ok('') },
+    });
+    const color = (name: RegExp) => {
+      const classes = screen.getByRole('button', { name }).className.split(' ');
+      return ['success', 'warning', 'error'].find((token) => classes.includes(`text-${token}`));
+    };
+
+    expect(color(/^Publicar agora/)).toBe('success');
+    expect(color(/^Atualizar para a mais recente/)).toBe('success');
+    expect(color(/^Voltar à versão anterior/)).toBe('warning');
+    expect(color(/^Escolher outra versão do motor/)).toBe('warning');
+    expect(color(/^Escolher outra versão exemplo-a/)).toBe('warning');
+    expect(color(/^Desfazer última publicação/)).toBe('warning');
+    expect(color(/^Pausar/)).toBe('warning');
+    expect(color(/^Cancelar/)).toBe('error');
+
+    rerender(<Panel {...ALL} paused />);
+    expect(color(/^Retomar/)).toBe('success');
   });
 
   it('pausado, "Retomar" no lugar de "Pausar" na linha Site e "Publicar agora" some', () => {

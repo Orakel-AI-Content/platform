@@ -13,6 +13,8 @@
 // só no escuro, onde o fundo do `default` (gray-700) daria 3,67:1 com o `error`. No claro, fica
 // o branco do `default`: transparente, numa linha de tabela em hover sobre o body (#eeeeee),
 // o `error` daria 4,25:1.
+// Acrescentado (#873): os gatilhos que avançam e que voltam, no mesmo formato, em `success`
+// (`successButtonClass`) e `warning` (`warningButtonClass`): a cor do botão diz a função.
 'use client';
 
 import {
@@ -45,6 +47,20 @@ interface ConfirmDialogProps extends Omit<DialogProps, 'title'> {
 /** `customColorClass` do botão que dispara a ação destrutiva (contorno e texto em `error`). */
 export const dangerButtonClass = () =>
   'border-error ring-1 ring-error text-error hover:border-error hover:ring-error hover:text-error dark:bg-transparent dark:border-error dark:ring-error dark:text-error dark:hover:border-error dark:hover:text-error';
+
+/**
+ * `customColorClass` do gatilho que avança (publicar, atualizar, retomar, criar), no mesmo
+ * formato do `dangerButtonClass`: contorno e texto em `success`.
+ */
+export const successButtonClass = () =>
+  'border-success ring-1 ring-success text-success hover:border-success hover:ring-success hover:text-success dark:bg-transparent dark:border-success dark:ring-success dark:text-success dark:hover:border-success dark:hover:text-success';
+
+/**
+ * `customColorClass` do gatilho que volta ou interrompe (reverter, desfazer, pausar, reaplicar),
+ * no mesmo formato do `dangerButtonClass`: contorno e texto em `warning`.
+ */
+export const warningButtonClass = () =>
+  'border-warning ring-1 ring-warning text-warning hover:border-warning hover:ring-warning hover:text-warning dark:bg-transparent dark:border-warning dark:ring-warning dark:text-warning dark:hover:border-warning dark:hover:text-warning';
 
 /** "Confirmar" de um `ConfirmDialog type="danger"`: o `solid` em `bg-error`. */
 export const dangerConfirmButtonProps: ButtonProps = {

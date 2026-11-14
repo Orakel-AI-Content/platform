@@ -7,6 +7,8 @@ import type { ActionResult } from '@/components/shared/actionResult.ts';
 import ConfirmDialog, {
   dangerButtonClass,
   dangerConfirmButtonProps,
+  successButtonClass,
+  warningButtonClass,
 } from '@/components/shared/ConfirmDialog.tsx';
 import { previousVersionText, revertReleaseText } from '@/components/shared/siteLabels.ts';
 import { Button } from '@/components/ui/Button';
@@ -104,6 +106,22 @@ const LABEL: Record<SiteOperation, { idle: string; pending: string }> = {
   undo: { idle: 'Desfazer última publicação', pending: 'Desfazendo…' },
   update: { idle: 'Atualizar para a mais recente', pending: 'Atualizando…' },
   revert: { idle: 'Voltar à versão anterior', pending: 'Voltando…' },
+};
+
+/**
+ * Cor do botão pela função (#873): verde avança (publicar, atualizar, retomar), âmbar volta ou
+ * interrompe (outra versão, desfazer, pausar) e vermelho aborta (cancelar o build).
+ */
+const COLOR: Record<SiteOperation, () => string> = {
+  publish: successButtonClass,
+  update: successButtonClass,
+  resume: successButtonClass,
+  revert: warningButtonClass,
+  rebuild: warningButtonClass,
+  rollback: warningButtonClass,
+  undo: warningButtonClass,
+  pause: warningButtonClass,
+  cancel: dangerButtonClass,
 };
 
 /** Se a operação vale para o site agora: publicar e pausar fora da pausa, retomar só pausado. */
@@ -334,7 +352,7 @@ export function SiteOperationButton({ operation }: { operation: SiteOperation })
     <Button
       type="button"
       size="sm"
-      customColorClass={dangerButtonClass}
+      customColorClass={COLOR[operation]}
       ref={(element) => {
         scope.register(operation, element);
         return () => scope.register(operation, null);
