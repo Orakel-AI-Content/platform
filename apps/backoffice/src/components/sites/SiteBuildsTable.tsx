@@ -12,6 +12,7 @@ import {
   historyItemTitle,
   INFRA_REAPPLY_OK_TEXT,
 } from '@/components/shared/siteLabels.ts';
+import Pagination from '@/components/ui/Pagination';
 import { Timeline } from '@/components/ui/Timeline';
 import classNames from '@/components/ui/utils/classNames';
 import type { SiteHistoryItem } from '@/domain/builds/builds.ts';
@@ -56,6 +57,9 @@ function version(item: SiteHistoryItem): string | null {
   return null;
 }
 
+/** Itens do histórico por página (#873): os mais recentes primeiro, dez de cada vez. */
+export const HISTORY_PAGE_SIZE = 10;
+
 /**
  * Histórico da aba "Publicação" da página do site (#651; era a `Table` do #637): publicações,
  * reversões, cancelamentos, trocas de versão, pausas e retomadas no `Timeline` do Ecme, um item
@@ -80,13 +84,20 @@ export function SiteBuildsTable({
   timeZone: string;
 }) {
   const [selected, setSelected] = useState<FailedExecution | null>(null);
+  const [page, setPage] = useState(1);
 
   if (history.length === 0) return <EmptyState>Nenhuma atividade ainda.</EmptyState>;
+
+  // Paginado no cliente (#873): o polling troca o `history`, e a página escolhida só muda se
+  // deixar de existir (a lista encolheu), quando vai para a última.
+  const pages = Math.ceil(history.length / HISTORY_PAGE_SIZE);
+  const current = Math.min(page, pages);
+  const visible = history.slice((current - 1) * HISTORY_PAGE_SIZE, current * HISTORY_PAGE_SIZE);
 
   return (
     <>
       <Timeline>
-        {history.map((item) => {
+        {visible.map((item) => {
           const failed = isFailed(item) ? item : null;
           const at = formatDateTime(item.at, timeZone);
           const itemVersion = version(item);
@@ -135,6 +146,16 @@ export function SiteBuildsTable({
           );
         })}
       </Timeline>
+      {pages > 1 && (
+        <div className="mt-4">
+          <Pagination
+            pageSize={HISTORY_PAGE_SIZE}
+            currentPage={current}
+            total={history.length}
+            onChange={setPage}
+          />
+        </div>
+      )}
       <SiteExecutionDrawer
         execution={selected}
         timeZone={timeZone}
