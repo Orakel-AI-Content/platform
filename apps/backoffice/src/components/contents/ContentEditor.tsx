@@ -612,100 +612,106 @@ export function ContentEditor({
             </section>
           </div>
 
-          {/* O erro da lista ("ao menos um bloco") é a mensagem do `FormItem` (#329). */}
-          <FieldGroup
-            as="section"
-            message={blocksError}
-            aria-labelledby={`${id}-blocks`}
-            className="min-w-0 flex-auto space-y-4"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 id={`${id}-blocks`} className="mr-auto text-lg font-semibold">
-                Blocos
-              </h2>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setCollapsed(new Set(blocks.fields.map((field) => field.id)))}
-              >
-                Recolher todos
-              </Button>
-              <Button type="button" size="sm" onClick={() => setCollapsed(new Set())}>
-                Expandir todos
-              </Button>
-            </div>
-            {blocks.fields.map((field, index) => {
-              const { type } = field as { type?: unknown };
-              if (!isBlockType(type)) return null;
-              const position = index + 1;
-              const isCollapsed = collapsed.has(field.id);
-              return (
-                <Fragment key={field.id}>
-                  {insertMenu(index)}
-                  <Card>
-                    <fieldset id={`${id}-block-${index}`} tabIndex={-1}>
-                      {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
-                      <legend className="sr-only">{`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}</legend>
-                      <div className="flex items-center gap-2">
-                        <IconButton
-                          label={`Conteúdo do bloco ${position}`}
-                          icon={isCollapsed ? <PiCaretRight /> : <PiCaretDown />}
-                          aria-expanded={!isCollapsed}
-                          aria-controls={`${id}-block-body-${index}`}
-                          onClick={() => toggleBlock(field.id)}
-                        />
-                        <span aria-hidden="true" className="shrink-0 text-sm font-semibold">
-                          {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
-                        </span>
-                        {isCollapsed && (
-                          <span
-                            className="min-w-0 flex-1 truncate text-sm"
-                            title={blockText(form.getValues(`blocks.${index}`)) || undefined}
-                          >
-                            {blockSummary(form.getValues(`blocks.${index}`))}
+          {/* A coluna de blocos (#875): o item da linha é este invólucro, não a `section`, que
+              o `FormItem` do `FieldGroup` embrulha. Em duas colunas, base zero que cresce
+              (`xl:flex-1`): o invólucro do `FormItem` encolhia até o conteúdo, e o
+              `row-reverse` deixava as duas colunas presas à direita. O erro da lista ("ao menos
+              um bloco") é a mensagem do `FormItem` (#329). */}
+          <div className={classNames('min-w-0 flex-auto', !embedded && 'xl:flex-1')}>
+            <FieldGroup
+              as="section"
+              message={blocksError}
+              aria-labelledby={`${id}-blocks`}
+              className="min-w-0 flex-auto space-y-4"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id={`${id}-blocks`} className="mr-auto text-lg font-semibold">
+                  Blocos
+                </h2>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setCollapsed(new Set(blocks.fields.map((field) => field.id)))}
+                >
+                  Recolher todos
+                </Button>
+                <Button type="button" size="sm" onClick={() => setCollapsed(new Set())}>
+                  Expandir todos
+                </Button>
+              </div>
+              {blocks.fields.map((field, index) => {
+                const { type } = field as { type?: unknown };
+                if (!isBlockType(type)) return null;
+                const position = index + 1;
+                const isCollapsed = collapsed.has(field.id);
+                return (
+                  <Fragment key={field.id}>
+                    {insertMenu(index)}
+                    <Card>
+                      <fieldset id={`${id}-block-${index}`} tabIndex={-1}>
+                        {/* O nome do grupo; o cabeçalho visível repete o texto com aria-hidden. */}
+                        <legend className="sr-only">{`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}</legend>
+                        <div className="flex items-center gap-2">
+                          <IconButton
+                            label={`Conteúdo do bloco ${position}`}
+                            icon={isCollapsed ? <PiCaretRight /> : <PiCaretDown />}
+                            aria-expanded={!isCollapsed}
+                            aria-controls={`${id}-block-body-${index}`}
+                            onClick={() => toggleBlock(field.id)}
+                          />
+                          <span aria-hidden="true" className="shrink-0 text-sm font-semibold">
+                            {`Bloco ${position}: ${BLOCK_TYPE_LABEL[type]}`}
                           </span>
-                        )}
-                        <div className="ml-auto flex shrink-0 gap-1">
-                          <IconButton
-                            label={`Mover bloco ${position} para cima`}
-                            icon={<PiArrowUp />}
-                            // aria-disabled (não disabled): o foco fica no botão depois de mover.
-                            aria-disabled={index === 0}
-                            onClick={() => index > 0 && blocks.move(index, index - 1)}
-                          />
-                          <IconButton
-                            label={`Mover bloco ${position} para baixo`}
-                            icon={<PiArrowDown />}
-                            aria-disabled={index === blocks.fields.length - 1}
-                            onClick={() =>
-                              index < blocks.fields.length - 1 && blocks.move(index, index + 1)
-                            }
-                          />
-                          <IconButton
-                            label={`Remover bloco ${position}`}
-                            icon={<PiTrash />}
-                            onClick={() => removeBlock(index)}
+                          {isCollapsed && (
+                            <span
+                              className="min-w-0 flex-1 truncate text-sm"
+                              title={blockText(form.getValues(`blocks.${index}`)) || undefined}
+                            >
+                              {blockSummary(form.getValues(`blocks.${index}`))}
+                            </span>
+                          )}
+                          <div className="ml-auto flex shrink-0 gap-1">
+                            <IconButton
+                              label={`Mover bloco ${position} para cima`}
+                              icon={<PiArrowUp />}
+                              // aria-disabled (não disabled): o foco fica no botão depois de mover.
+                              aria-disabled={index === 0}
+                              onClick={() => index > 0 && blocks.move(index, index - 1)}
+                            />
+                            <IconButton
+                              label={`Mover bloco ${position} para baixo`}
+                              icon={<PiArrowDown />}
+                              aria-disabled={index === blocks.fields.length - 1}
+                              onClick={() =>
+                                index < blocks.fields.length - 1 && blocks.move(index, index + 1)
+                              }
+                            />
+                            <IconButton
+                              label={`Remover bloco ${position}`}
+                              icon={<PiTrash />}
+                              onClick={() => removeBlock(index)}
+                            />
+                          </div>
+                        </div>
+                        {/* Recolhido, só oculto: os campos seguem registrados e o TipTap guarda o texto. */}
+                        <div id={`${id}-block-body-${index}`} hidden={isCollapsed} className="mt-4">
+                          <SchemaFields
+                            schema={BLOCK_SCHEMAS[type]}
+                            prefix={`blocks.${index}`}
+                            labels={BLOCK_LABELS}
+                            hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
+                            fields={blockFields[type]}
                           />
                         </div>
-                      </div>
-                      {/* Recolhido, só oculto: os campos seguem registrados e o TipTap guarda o texto. */}
-                      <div id={`${id}-block-body-${index}`} hidden={isCollapsed} className="mt-4">
-                        <SchemaFields
-                          schema={BLOCK_SCHEMAS[type]}
-                          prefix={`blocks.${index}`}
-                          labels={BLOCK_LABELS}
-                          hidden={['blocks.*.n', 'blocks.*.type', 'blocks.*.new']}
-                          fields={blockFields[type]}
-                        />
-                      </div>
-                    </fieldset>
-                  </Card>
-                </Fragment>
-              );
-            })}
-            {/* O "+" do fim (#591): o único caminho para o primeiro bloco e para o último. */}
-            {insertMenu(blocks.fields.length)}
-          </FieldGroup>
+                      </fieldset>
+                    </Card>
+                  </Fragment>
+                );
+              })}
+              {/* O "+" do fim (#591): o único caminho para o primeiro bloco e para o último. */}
+              {insertMenu(blocks.fields.length)}
+            </FieldGroup>
+          </div>
         </div>
         {embedded ? (
           // Dentro do painel (#767): os botões no rodapé do formulário, como no `card` do
