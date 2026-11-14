@@ -127,6 +127,16 @@ describe('formulário da geração', () => {
     expect(screen.queryByRole('button', { name: 'Gerar artigo' })).toBeNull();
   });
 
+  it('o botão de criar fica num contêiner flex em coluna, alinhado ao início (#876)', () => {
+    renderForm(ok(), { context: undefined });
+
+    const wrapper = screen.getByRole('link', { name: 'Criar contexto editorial' }).parentElement;
+    expect(wrapper?.className.split(' ')).toEqual(
+      expect.arrayContaining(['flex', 'flex-col', 'items-start']),
+    );
+    expect(wrapper?.textContent).toContain('Cadastre o contexto editorial do site antes de gerar');
+  });
+
   it('sem contexto editorial e sem content.write, o aviso sem ação', () => {
     renderForm(ok(), { context: undefined, canWrite: false });
 
