@@ -7,7 +7,7 @@
 //   não é título de seção;
 // - círculo do ícone nos `*-subtle` da paleta do Backoffice; o ícone é `aria-hidden`;
 // - em grade (1 coluna no celular, 2 a partir de `sm`, 3 a partir de `lg`, 6 a partir de
-//   `2xl`), com o título "Conteúdos" acima; os atalhos "Revisar" e "Criar conteúdo" ficam no
+//   `2xl`), sem título visível (a seção se nomeia por `aria-label`); os atalhos "Revisar" e "Criar conteúdo" ficam no
 //   `PageHeader` da página (#873).
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -90,10 +90,7 @@ export function SiteContentMetrics({
 }: SiteContentMetricsProps) {
   const base = `/sites/${siteId}`;
   return (
-    <section aria-labelledby="site-content-title" className="space-y-4">
-      <h2 id="site-content-title" className="h5">
-        Conteúdos
-      </h2>
+    <section aria-label="Conteúdos">
       <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {CARD_STATUSES.map((status) => (
           <li key={status}>
